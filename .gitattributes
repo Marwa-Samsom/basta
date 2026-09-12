@@ -1,0 +1,19 @@
+# نهايات الأسطر موحّدة في المستودع (LF) مهما كان نظام المطوّر.
+# بدون هذا يظهر كل ملف معدَّلاً عند أول سحب على جهاز آخر.
+* text=auto eol=lf
+
+# ثنائية — لا تُمسّ
+*.png binary
+*.jpg binary
+*.webp binary
+*.avif binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# ملفات ويندوز تحتاج CRLF فعلياً
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# مولَّد — يُخفى من فروق المراجعة
+package-lock.json linguist-generated=true -diff
