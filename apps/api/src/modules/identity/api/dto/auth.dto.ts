@@ -1,0 +1,55 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { MIN_PASSWORD_LENGTH } from '../../domain/password';
+
+export class RegisterDto {
+  @ApiProperty({ example: 'noor@example.com' })
+  @IsEmail({}, { message: 'صيغة البريد غير صحيحة.' })
+  email!: string;
+
+  @ApiProperty({ minLength: MIN_PASSWORD_LENGTH })
+  @IsString()
+  @Length(MIN_PASSWORD_LENGTH, 200, {
+    message: `كلمة المرور من ${MIN_PASSWORD_LENGTH} محارف على الأقل.`,
+  })
+  password!: string;
+
+  @ApiProperty({ example: 'نور الحاج' })
+  @IsString()
+  @Length(2, 120, { message: 'الاسم من حرفين إلى 120 حرفاً.' })
+  fullName!: string;
+
+  @ApiPropertyOptional({ example: '+962790000000' })
+  @IsOptional()
+  @Matches(/^\+[1-9]\d{7,14}$/, { message: 'الهاتف بصيغة دولية تبدأ بـ + ورمز الدولة.' })
+  phone?: string;
+}
+
+export class LoginDto {
+  @ApiProperty()
+  @IsEmail({}, { message: 'صيغة البريد غير صحيحة.' })
+  email!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(200)
+  password!: string;
+
+  @ApiPropertyOptional({ description: 'رمز التحقق الثنائي — إلزامي للإدارة' })
+  @IsOptional()
+  @Matches(/^\d{6}$/, { message: 'رمز التحقق ستة أرقام.' })
+  totp?: string;
+}
+
+export class RefreshDto {
+  @ApiProperty()
+  @IsString()
+  @Length(20, 400)
+  refreshToken!: string;
+}
+
+export class TotpConfirmDto {
+  @ApiProperty()
+  @Matches(/^\d{6}$/, { message: 'رمز التحقق ستة أرقام.' })
+  token!: string;
+}

@@ -28,8 +28,19 @@ export class ScopedRepository<T> {
     private readonly resourceName: string,
   ) {}
 
-  /** الفلتر يُدمج دائماً، ولا يمكن لشرط المستدعي أن يلغيه. */
+  /**
+   * الفلتر يُدمج دائماً، ولا يمكن لشرط المستدعي أن يلغيه.
+   *
+   * ومستدعٍ يمرّر `vendorId` مخالفاً **يُرفض صراحةً** لا يُستبدل بصمت.
+   * الاستبدال الصامت يعطي من طلب بيانات متجر آخر بياناتِ متجره هو، فيبدو
+   * الطلب ناجحاً وهو ليس ما طُلب — وهذا يخفي خطأً برمجياً حقيقياً بقدر
+   * ما يحبط محاولة اختراق. الخطأ الصريح يكشف الاثنين.
+   */
   private scoped(where: Record<string, unknown> = {}): Record<string, unknown> {
+    const requested = where['vendorId'];
+    if (requested !== undefined && requested !== this.scope.vendorId) {
+      throw new NotFoundError(`${this.resourceName} غير موجود.`);
+    }
     return { ...where, vendorId: this.scope.vendorId };
   }
 

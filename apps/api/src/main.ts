@@ -1,7 +1,10 @@
 import 'reflect-metadata';
 import { initSentry } from './common/observability/sentry';
+import { loadEnv } from './common/config/env';
 
 // قبل أي استيراد يُنشئ خدمة: الأدوات التي ترقب الأخطاء يجب أن تسبقها
+// يرفض الإقلاع بمتغيّر ناقص — عطل صاخب أهون من ثغرة صامتة
+loadEnv();
 initSentry();
 
 import { NestFactory } from '@nestjs/core';

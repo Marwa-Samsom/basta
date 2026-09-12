@@ -33,7 +33,14 @@ export default [
       /** ADR-001 — لا حساب على المال خارج نواة money. */
       'no-restricted-imports': ['error', {
         patterns: [{
-          group: ['**/modules/*/domain/**', '**/modules/*/application/**', '**/modules/*/infrastructure/**'],
+          // api/** كان ناقصاً، فمرّ استيراد من داخل وحدة بلا اعتراض.
+          // القائمة تعدّ ما يُمنع لا ما يُسمح — فنسيان مجلد يفتح ثغرة صامتة.
+          group: [
+            '**/modules/*/domain/**',
+            '**/modules/*/application/**',
+            '**/modules/*/infrastructure/**',
+            '**/modules/*/api/**',
+          ],
           message: 'استورد من public/ الخاصة بالوحدة، لا من داخلها (ADR-002).',
         }],
       }],

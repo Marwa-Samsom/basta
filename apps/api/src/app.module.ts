@@ -1,21 +1,33 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { HealthController } from './common/health.controller';
+import { IdentityModule } from './modules/identity/identity.module';
 
 /**
  * Modular Monolith — ADR-002.
- *
- * الوحدات تُسجَّل هنا، وكل واحدة تصدّر واجهتها العامة من public/ فقط.
- * فحص eslint-plugin-boundaries في CI يرفض أي استيراد يتجاوز الحدّ.
+ * كل وحدة تصدّر واجهتها من public/ فقط، وفحص CI يرفض ما عداه.
  *
  * ترتيب الإضافة يتبع مراحل الخطة:
- *   04 identity · 05 currency, catalog, inventory · 06 vendors
+ *   04 identity ✓ · 05 currency, catalog, inventory · 06 vendors
  *   07 search, cart · 08 pricing, checkout, orders, payments
  *   09 shipping, aftersales · 10 finance · 11 notifications, admin
  */
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    /**
+     * تحديد المعدّل — SRS C-01: عشر محاولات من عنوان واحد خلال 15 دقيقة.
+     * التخزين في الذاكرة الآن لغياب Redis على هذا الجهاز؛ يُستبدل بمخزن
+     * Redis عند توفّره، وإلا لم يسرِ الحدّ عبر أكثر من نسخة من التطبيق.
+     */
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 900_000, limit: 100 }]),
+    PrismaModule,
+    IdentityModule,
+  ],
   controllers: [HealthController],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

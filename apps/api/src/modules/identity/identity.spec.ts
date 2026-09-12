@@ -138,13 +138,22 @@ describe('ADR-010 · عزل بيانات البائع', () => {
     expect(seen.every((w) => w['vendorId'] === VENDOR_A)).toBe(true);
   });
 
-  it('شرط المستدعي لا يستطيع إلغاء فلتر المالك', async () => {
+  it('شرط بائع مخالف يُرفض صراحةً ولا يصل طبقة البيانات', async () => {
     const { delegate, seen } = fakeDelegate(rows);
     const repo = new ScopedRepository(delegate, vendorScopeOf(vendorA), 'المنتج');
 
-    // محاولة صريحة لانتحال بائع آخر عبر الشرط
-    await repo.findMany({ where: { vendorId: VENDOR_B } });
+    await expect(repo.findMany({ where: { vendorId: VENDOR_B } })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    // الاستعلام لم يصل القاعدة أصلاً — الرفض قبل الوصول لا بعده
+    expect(seen).toHaveLength(0);
+  });
 
+  it('شرط بائع مطابق مسموح — لا تشدّد بلا سبب', async () => {
+    const { delegate, seen } = fakeDelegate(rows);
+    const repo = new ScopedRepository(delegate, vendorScopeOf(vendorA), 'المنتج');
+
+    await repo.findMany({ where: { vendorId: VENDOR_A } });
     expect(seen[0]?.['vendorId']).toBe(VENDOR_A);
   });
 });
@@ -239,7 +248,6 @@ describe('تدوير رموز التحديث', () => {
     tokenHash: 'h',
     expiresAt: new Date('2026-10-12T12:00:00Z'),
     revokedAt: null,
-    replacedById: null,
   };
 
   it('الرمز الصالح يُدوَّر', () => {

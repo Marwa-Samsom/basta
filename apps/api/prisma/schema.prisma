@@ -143,7 +143,14 @@ model AuditLog {
   userAgent   String?
   createdAt   DateTime @default(now()) @db.Timestamptz
 
-  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  /**
+   * Restrict لا SetNull: تصفير الفاعل تعديلٌ على سجل التدقيق، ومشغّل
+   * ADR-005 يرفضه — فكان المخطط يَعِد بسلوك ترفضه قاعدة البيانات.
+   * النتيجة المقصودة: المستخدم ذو الأثر التدقيقي لا يُحذف نهائياً أبداً.
+   * الحذف منطقي بـ deletedAt، وحق المحو يُنفَّذ بتجهيل الحقول الشخصية
+   * مع إبقاء المعرّف — فتبقى سلامة التدقيق وتزول البيانات الشخصية معاً.
+   */
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([entityType, entityId])
   @@index([actorUserId, createdAt])

@@ -12,13 +12,16 @@
  * هذا هو السلوك الصحيح: تسجيل خروج مزعج مرة، أفضل من حساب مسروق بصمت.
  */
 
+/**
+ * يصف ما يُخزَّن فعلاً لا أكثر. سلسلة التدوير تُستنتج من familyId
+ * وترتيب الإنشاء، فلا داعي لمؤشّر صريح لا يُقرأ.
+ */
 export interface StoredToken {
   id: string;
   familyId: string;
   tokenHash: string;
   expiresAt: Date;
   revokedAt: Date | null;
-  replacedById: string | null;
 }
 
 export type RotationOutcome =

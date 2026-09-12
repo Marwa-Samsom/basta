@@ -2,7 +2,13 @@ import { Controller, Get, InternalServerErrorException } from '@nestjs/common';
 import { ApiExcludeEndpoint, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from './prisma/prisma.service';
 import { isSentryEnabled } from './observability/sentry';
+import { Public } from './security/decorators';
 
+/**
+ * مفتوح صراحةً: موازن الأحمال ومراقبة الجاهزية لا يحملان رموزاً،
+ * وفحص صحة محميّ يعني أن كل نشرة تبدو ميتة للمراقب.
+ */
+@Public()
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
