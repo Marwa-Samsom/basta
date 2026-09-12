@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { DomainError } from '../errors/domain-error';
 import { captureError } from '../observability/sentry';
+import { writeErrorLog } from '../observability/error-log';
 
 /**
  * المترجم الوحيد بين أخطاء المجال والاستجابة.
@@ -43,10 +44,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     const requestId = req.id ?? '—';
-    this.logger.error(
-      `${req.method} ${req.url} [${requestId}]`,
-      exception instanceof Error ? exception.stack : String(exception),
-    );
+    const err = exception instanceof Error ? exception : new Error(String(exception));
+
+    this.logger.error(`${req.method} ${req.url} [${requestId}]`, err.stack);
+
+    /**
+     * مسلكان متوازيان لا بديلان:
+     * السجل الدائم يعمل دائماً ويضمن ألّا يمرّ خطأ صامتاً بلا استضافة،
+     * و Sentry يضيف التنبيه الفوري متى توفّر مفتاحه.
+     */
+    writeErrorLog({
+      timestamp: new Date().toISOString(),
+      requestId,
+      level: 'error',
+      message: err.message,
+      ...(err.stack ? { stack: err.stack } : {}),
+      ...(req.method ? { method: req.method } : {}),
+      ...(req.url ? { url: req.url } : {}),
+    });
     captureError(exception, { url: req.url, method: req.method, requestId });
 
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({

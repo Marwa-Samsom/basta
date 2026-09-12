@@ -112,13 +112,7 @@ jobs:
       - run: npm run db:generate
       - run: npm run build
 
-  deploy-staging:
-    name: نشر التجريبية
-    runs-on: ubuntu-latest
-    needs: [test, build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: staging
-    steps:
-      - uses: actions/checkout@v4
-      - name: النشر
-        run: echo "يُوصَل بمزوّد الاستضافة عند اختياره — بوابة خروج المرحلة 03"
+# ملاحظة: لا وظيفة نشر.
+# المشروع محلي بلا استضافة، ووظيفة تُعرَّف ولا تعمل أبداً حارس يكذب —
+# يُطمئن بوجوده ولا يحمي شيئاً. مكافئ النشر هنا `npm run verify` الذي
+# يهدم البيئة ويعيد بناءها من الصفر. متى وُجد مزوّد تُضاف الوظيفة بأسرارها.

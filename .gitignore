@@ -26,3 +26,6 @@ uploads/
 
 # سجل تشغيل محلي
 apps/api/api.log
+
+# سجلات محلية
+logs/

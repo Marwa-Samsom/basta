@@ -49,4 +49,21 @@ export default [
       '@typescript-eslint/no-floating-promises': 'off',
     },
   },
+  {
+    /**
+     * الواجهة. القواعد هنا أقلّ عدداً لا أقلّ صرامة: حرّاس الرموز والاتجاه
+     * والوصولية تعيش في سكربت التحقق لأنها أنماط نصّية لا قواعد نوعية،
+     * وتشغيلها هناك يجعلها تسري على CSS كما تسري على TSX.
+     */
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: { sourceType: 'module', ecmaFeatures: { jsx: true } },
+    },
+    plugins: { '@typescript-eslint': tseslint },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
 ];

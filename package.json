@@ -26,9 +26,10 @@
     "up": "docker compose up -d",
     "down": "docker compose down",
     "reset": "docker compose down -v && docker compose up -d && npm run db:migrate && npm run db:seed",
-    "verify": "npm run lint && npm run typecheck && npm run test",
+    "verify": "bash scripts/verify-local.sh",
     "db:backup": "bash scripts/db-backup.sh backup",
-    "db:verify-restore": "bash scripts/db-backup.sh verify"
+    "db:verify-restore": "bash scripts/db-backup.sh verify",
+    "verify:quick": "bash scripts/verify-local.sh --keep"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.18.0",
