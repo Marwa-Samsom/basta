@@ -3,8 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "description": "سوق إلكتروني متعدد البائعين",
-  "workspaces": ["apps/*", "packages/*"],
-  "engines": { "node": ">=22.0.0" },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "dev:api": "npm run dev -w @basta/api",
@@ -21,7 +26,9 @@
     "up": "docker compose up -d",
     "down": "docker compose down",
     "reset": "docker compose down -v && docker compose up -d && npm run db:migrate && npm run db:seed",
-    "verify": "npm run lint && npm run typecheck && npm run test"
+    "verify": "npm run lint && npm run typecheck && npm run test",
+    "db:backup": "bash scripts/db-backup.sh backup",
+    "db:verify-restore": "bash scripts/db-backup.sh verify"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.18.0",

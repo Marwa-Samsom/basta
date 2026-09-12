@@ -45,12 +45,44 @@ describe('ADR-005 · دفتر الأستاذ للإضافة فقط', () => {
     ).rejects.toThrow();
   });
 
-  dbIt('يرفض التعديل على سجل التدقيق وحركات المخزون أيضاً', async () => {
+  dbIt('يرفض التعديل على سجل التدقيق وحركات المخزون وأسعار الصرف', async () => {
     await expect(
       prisma.$executeRawUnsafe(`UPDATE "audit_logs" SET "action" = 'x'`),
     ).rejects.toThrow();
     await expect(
       prisma.$executeRawUnsafe(`DELETE FROM "inventory_movements"`),
+    ).rejects.toThrow();
+    await expect(
+      prisma.$executeRawUnsafe(`UPDATE "exchange_rates" SET "rate" = 1`),
+    ).rejects.toThrow();
+  });
+
+  /**
+   * TRUNCATE يتجاوز مشغّلات الصفوف كلياً — أمر واحد يمحو الدفتر بلا اعتراض.
+   * هذه الثغرة كانت مفتوحة فعلاً حتى كشفها هذا الاختبار.
+   */
+  dbIt('يرفض TRUNCATE — الثغرة التي تتجاوز مشغّلات الصفوف', async () => {
+    for (const table of [
+      'ledger_entries',
+      'audit_logs',
+      'inventory_movements',
+      'exchange_rates',
+    ]) {
+      await expect(
+        prisma.$executeRawUnsafe(`TRUNCATE TABLE "${table}"`),
+      ).rejects.toThrow();
+    }
+  });
+
+  /**
+   * الحارس قاعدة مطلقة لا أثر جانبي لوجود بيانات: يُطلَق على الجدول الفارغ
+   * كما يُطلَق على الممتلئ. مشغّل الصف كان يمرّ صامتاً على الفارغ.
+   */
+  dbIt('يرفض الجملة ولو كان الجدول فارغاً', async () => {
+    const count = await prisma.ledgerEntry.count();
+    expect(count).toBe(0);
+    await expect(
+      prisma.$executeRawUnsafe(`DELETE FROM "ledger_entries" WHERE 1=0`),
     ).rejects.toThrow();
   });
 });

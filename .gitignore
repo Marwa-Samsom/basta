@@ -20,3 +20,6 @@ npm-debug.log*
 .vercel/
 apps/api/prisma/migrations/dev/
 uploads/
+
+# قاعدة بيانات محلية محمولة — لا تُلتزم أبداً
+.localdb/
