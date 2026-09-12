@@ -1,9 +1,15 @@
 import 'reflect-metadata';
+import { initSentry } from './common/observability/sentry';
+
+// قبل أي استيراد يُنشئ خدمة: الأدوات التي ترقب الأخطاء يجب أن تسبقها
+initSentry();
+
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
@@ -12,10 +18,9 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.enableCors({ origin: process.env.NEXT_PUBLIC_SITE_URL ?? true, credentials: true });
 
-  // OpenAPI موثّق من اليوم الأول — ADR-002:
-  // هو ما يجعل تطبيقات الموبايل لاحقاً عملية توصيل لا إعادة بناء
   const config = new DocumentBuilder()
     .setTitle('Basta API')
     .setDescription('سوق إلكتروني متعدد البائعين')

@@ -1,6 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Controller, Get, InternalServerErrorException } from '@nestjs/common';
+import { ApiExcludeEndpoint, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from './prisma/prisma.service';
+import { isSentryEnabled } from './observability/sentry';
 
 @ApiTags('health')
 @Controller('health')
@@ -20,8 +21,22 @@ export class HealthController {
     return {
       status: database === 'up' ? 'ok' : 'degraded',
       database,
+      sentry: isSentryEnabled() ? 'on' : 'off',
       latencyMs: Date.now() - started,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * خطأ مقصود لإثبات وصول التنبيه — بند في بوابة خروج المرحلة 03.
+   * محجوب في الإنتاج: نقطة تُسقط الطلب عمداً لا مكان لها هناك.
+   */
+  @Get('boom')
+  @ApiExcludeEndpoint()
+  boom(): never {
+    if (process.env.NODE_ENV === 'production') {
+      throw new InternalServerErrorException('غير متاح');
+    }
+    throw new Error('خطأ مقصود للتحقق من وصول التنبيه إلى Sentry');
   }
 }
