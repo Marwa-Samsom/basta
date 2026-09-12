@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="عرض فني ومالي لبناء منصة سوق إلكتروني متعدد البائعين من الصفر — التقنيات والجدول الزمني والتسعير.">
+<meta name="color-scheme" content="light dark">
+<title>منصة بسطة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@600;700;800&display=swap">
+<style>
+:root{
+  --paper:#F7F6F2;
+  --card:#FFFFFF;
+  --ink:#141A22;
+  --ink-2:#414C58;
+  --ink-3:#727E8B;
+  --rule:#DCD9D0;
+  --rule-2:#ECEAE3;
+  --accent:#1E5F74;
+  --accent-soft:#66939F;
+  --accent-wash:#E4EDF0;
+  --brass:#8F6220;
+  --brass-wash:#F2E9D8;
+  --shadow:0 1px 2px rgba(20,26,34,.05);
+
+  --f-display:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif;
+  --f-body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;
+  --f-mono:"IBM Plex Mono","Consolas",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1419; --card:#161D25; --ink:#E9E7E1; --ink-2:#B4BDC6; --ink-3:#7B8794;
+    --rule:#2A343E; --rule-2:#1E262E;
+    --accent:#5FB3CC; --accent-soft:#3F808F; --accent-wash:#14282F;
+    --brass:#D8A45C; --brass-wash:#2A2318;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1419; --card:#161D25; --ink:#E9E7E1; --ink-2:#B4BDC6; --ink-3:#7B8794;
+  --rule:#2A343E; --rule-2:#1E262E;
+  --accent:#5FB3CC; --accent-soft:#3F808F; --accent-wash:#14282F;
+  --brass:#D8A45C; --brass-wash:#2A2318;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box}
+body{
+  direction:rtl;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:15px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+.doc{max-width:980px;margin:0 auto;padding-inline:20px;padding-block:0 64px}
+
+/* ---------- datasheet header ---------- */
+.sheet{
+  border-bottom:2px solid var(--ink);
+  padding-block:40px 18px;
+  margin-bottom:44px;
+}
+.stamp{
+  font-family:var(--f-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);display:flex;gap:10px;align-items:center;margin-bottom:22px;
+}
+.stamp::after{content:"";flex:1;height:1px;background:var(--rule)}
+h1{
+  font-family:var(--f-display);font-weight:800;font-size:clamp(30px,6vw,50px);
+  line-height:1.24;margin:0 0 6px;letter-spacing:-.01em;text-wrap:balance;
+}
+.sub{font-size:clamp(15px,2.4vw,18px);color:var(--ink-2);margin:0 0 30px;max-width:56ch;font-weight:500}
+.meta{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);
+}
+.meta div{background:var(--paper);padding:11px 13px}
+.meta dt{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 3px}
+.meta dd{margin:0;font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---------- sections ---------- */
+section{margin-bottom:52px;scroll-margin-top:20px}
+.shead{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--rule);padding-bottom:9px;margin-bottom:22px}
+.snum{font-family:var(--f-mono);font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.08em}
+h2{font-family:var(--f-display);font-weight:700;font-size:clamp(19px,3.4vw,24px);margin:0;letter-spacing:-.005em}
+.shead .tail{margin-inline-start:auto;font-family:var(--f-mono);font-size:10px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase}
+h3{font-family:var(--f-display);font-weight:700;font-size:15.5px;margin:0 0 8px}
+p{margin:0 0 14px;max-width:68ch;color:var(--ink-2)}
+p strong{color:var(--ink);font-weight:600}
+.lead{font-size:16.5px;color:var(--ink);max-width:64ch}
+
+/* ---------- scope ---------- */
+.scope{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.mod{background:var(--card);padding:20px 18px;display:flex;flex-direction:column;gap:10px}
+.mod-tag{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.14em;color:var(--accent);text-transform:uppercase}
+.mod ul{margin:0;padding-inline-start:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.mod li{font-size:13.5px;color:var(--ink-2);padding-inline-start:15px;position:relative;line-height:1.6}
+.mod li::before{content:"";position:absolute;inset-inline-start:0;top:.62em;width:5px;height:5px;background:var(--accent-soft)}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto;border:1px solid var(--rule)}
+table{width:100%;border-collapse:collapse;min-width:520px;background:var(--card)}
+th,td{text-align:start;padding:11px 14px;border-bottom:1px solid var(--rule-2);font-size:13.5px;vertical-align:top}
+thead th{
+  background:var(--paper);font-family:var(--f-mono);font-size:9.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:500;border-bottom:1px solid var(--rule);white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none}
+td.layer{font-weight:600;color:var(--ink);white-space:nowrap}
+td.tech{font-family:var(--f-mono);font-size:12px;color:var(--accent);line-height:1.65;direction:ltr;text-align:start}
+td.why{color:var(--ink-3);font-size:12.5px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:end;white-space:nowrap}
+tfoot td{background:var(--paper);font-weight:700;border-top:1px solid var(--ink);font-size:14px}
+tfoot .disc td{font-weight:500;color:var(--brass);border-top:1px solid var(--rule)}
+
+/* ---------- gantt ---------- */
+.gwrap{overflow-x:auto;border:1px solid var(--rule);background:var(--card)}
+.gantt{min-width:660px}
+.grow{display:grid;grid-template-columns:190px 1fr;border-bottom:1px solid var(--rule-2);align-items:center}
+.grow:last-child{border-bottom:none}
+.glabel{padding:9px 14px;font-size:12.5px;font-weight:600;display:flex;gap:9px;align-items:baseline;border-inline-end:1px solid var(--rule)}
+.glabel i{font-family:var(--f-mono);font-style:normal;font-size:10px;color:var(--ink-3)}
+.gtrack{display:grid;grid-template-columns:repeat(21,1fr);height:38px;align-items:center;position:relative}
+.gtrack::before{
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(to left,transparent 0,transparent calc(100%/21 - 1px),var(--rule-2) calc(100%/21 - 1px),var(--rule-2) calc(100%/21));
+}
+.bar{height:11px;border-radius:1px;position:relative;z-index:1;margin-inline:2px}
+.b1{background:var(--accent-soft)}
+.b2{background:var(--accent)}
+.b3{background:var(--brass)}
+.gscale{display:grid;grid-template-columns:190px 1fr;background:var(--paper);border-bottom:1px solid var(--rule)}
+.gscale .glabel{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:500;padding-block:8px}
+.gticks{display:grid;grid-template-columns:repeat(21,1fr)}
+.gticks span{font-family:var(--f-mono);font-size:9.5px;color:var(--ink-3);text-align:center;padding-block:8px;border-inline-start:1px solid var(--rule-2)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:11.5px;color:var(--ink-3)}
+.legend b{display:inline-block;width:14px;height:8px;margin-inline-end:6px;vertical-align:middle}
+
+/* ---------- price ---------- */
+.total{
+  border:2px solid var(--ink);background:var(--card);padding:22px 20px;margin-top:24px;
+  display:flex;flex-wrap:wrap;gap:20px 34px;align-items:baseline;
+}
+.total .big{font-family:var(--f-mono);font-size:clamp(30px,6.5vw,44px);font-weight:600;letter-spacing:-.02em;line-height:1}
+.total .cur{font-family:var(--f-mono);font-size:14px;color:var(--ink-3);margin-inline-start:8px}
+.total .note{font-size:12.5px;color:var(--ink-3);margin-inline-start:auto;max-width:34ch;line-height:1.6}
+.fx{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-top:none}
+.fx div{background:var(--card);padding:12px 14px}
+.fx dt{font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;color:var(--ink-3);margin:0 0 2px}
+.fx dd{margin:0;font-family:var(--f-mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.fxnote{font-size:11.5px;color:var(--ink-3);margin-top:9px}
+
+/* ---------- pay schedule ---------- */
+.pay{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.pay div{background:var(--card);padding:16px 15px;display:flex;flex-direction:column;gap:3px}
+.pay .pct{font-family:var(--f-mono);font-size:22px;font-weight:600;color:var(--accent);line-height:1.1}
+.pay .when{font-size:12.5px;font-weight:600}
+.pay .amt{font-family:var(--f-mono);font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* ---------- plans ---------- */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.plan{background:var(--card);padding:18px 16px}
+.plan.pick{background:var(--accent-wash)}
+.plan .pname{font-family:var(--f-display);font-weight:700;font-size:14.5px;margin-bottom:2px}
+.plan .pprice{font-family:var(--f-mono);font-size:19px;font-weight:600;color:var(--accent);margin-bottom:9px}
+.plan ul{margin:0;padding-inline-start:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+.plan li{font-size:12.5px;color:var(--ink-2);padding-inline-start:14px;position:relative}
+.plan li::before{content:"";position:absolute;inset-inline-start:0;top:.6em;width:4px;height:4px;background:var(--accent-soft)}
+
+/* ---------- notes ---------- */
+.notes{list-style:none;margin:0;padding:0;display:grid;gap:0;border:1px solid var(--rule)}
+.notes li{
+  display:grid;grid-template-columns:34px 1fr;gap:12px;padding:12px 14px;
+  background:var(--card);border-bottom:1px solid var(--rule-2);font-size:13.5px;color:var(--ink-2);
+}
+.notes li:last-child{border-bottom:none}
+.notes li b{font-family:var(--f-mono);font-size:10px;color:var(--ink-3);font-weight:500;padding-top:4px}
+.warn{border-inline-start:3px solid var(--brass);background:var(--brass-wash);padding:14px 16px;font-size:13.5px;color:var(--ink-2);margin-top:18px}
+.warn strong{color:var(--ink)}
+
+/* ---------- sign ---------- */
+.sign{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:30px;margin-top:30px}
+.sign div{border-top:1px solid var(--ink);padding-top:9px}
+.sign span{font-family:var(--f-mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3)}
+footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--rule);font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 22px}
+
+@media (max-width:560px){
+  .grow,.gscale{grid-template-columns:150px 1fr}
+  .total .note{margin-inline-start:0}
+}
+
+/* ---------- base reset (standalone) ---------- */
+html{color-scheme:light dark}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- theme switch (standalone only) ---------- */
+.themebar{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--rule-2);
+  display:flex;justify-content:flex-end;gap:8px;padding:8px 0;margin-bottom:-1px}
+.themebar button{
+  font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  background:none;border:1px solid var(--rule);color:var(--ink-3);padding:5px 11px;cursor:pointer;border-radius:1px;
+}
+.themebar button:hover{color:var(--ink);border-color:var(--ink-3)}
+.themebar button[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--accent-wash)}
+
+/* ---------- print / PDF export ---------- */
+@page{size:A4;margin:14mm 12mm}
+@media print{
+  :root{
+    --paper:#fff;--card:#fff;--ink:#111;--ink-2:#333;--ink-3:#666;
+    --rule:#bbb;--rule-2:#ddd;--accent:#14505f;--accent-soft:#6f9aa5;--accent-wash:#eef4f6;
+    --brass:#7d5518;--brass-wash:#f6efe2;--shadow:none;
+  }
+  .themebar{display:none}
+  body{background:#fff;font-size:10.5pt;line-height:1.6}
+  .doc{max-width:none;padding:0}
+  section{page-break-inside:auto;margin-bottom:26px}
+  .shead,h2,h3{page-break-after:avoid}
+  tr,.grow,.mod,.plan,.pay div,.notes li{page-break-inside:avoid}
+  .tw,.gwrap{overflow:visible}
+  table{min-width:0}
+  .gantt{min-width:0}
+  .sheet{padding-block:0 14px;page-break-after:auto}
+  .total{page-break-inside:avoid}
+  section:nth-of-type(5),section:nth-of-type(9){page-break-before:always;break-before:page}
+  footer{position:fixed;bottom:0;inset-inline:0;border-top:1px solid #ccc;background:#fff}
+}
+</style>
+</head>
+<body>
+<div class="doc" style="padding-block:0">
+  <div class="themebar" role="group" aria-label="سمة العرض">
+    <button type="button" id="th-auto" aria-pressed="true">تلقائي</button>
+    <button type="button" id="th-light" aria-pressed="false">فاتح</button>
+    <button type="button" id="th-dark" aria-pressed="false">داكن</button>
+    <button type="button" id="th-print">طباعة / PDF</button>
+  </div>
+</div>
+
+<div class="doc" lang="ar" dir="rtl">
+
+  <header class="sheet">
+    <div class="stamp">عرض فني ومالي — سرّي</div>
+    <h1>منصة بسطة</h1>
+    <p class="sub">سوق إلكتروني متعدد البائعين، مبني بالكامل من الصفر: واجهة متجر، لوحة بائع مستقلة، ولوحة إدارة مركزية بمحرك عمولات وتسويات.</p>
+    <dl class="meta">
+      <div><dt>رقم العرض</dt><dd>PRP-2026-014</dd></div>
+      <div><dt>التاريخ</dt><dd>10 / 09 / 2026</dd></div>
+      <div><dt>المدة</dt><dd>21 أسبوعاً</dd></div>
+      <div><dt>الكلفة</dt><dd>30,875 USD</dd></div>
+      <div><dt>سريان العرض</dt><dd>30 يوماً</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <div class="shead"><span class="snum">01</span><h2>الملخّص التنفيذي</h2></div>
+    <p class="lead">المطلوب ليس متجراً إلكترونياً، بل <strong>بنية سوق</strong>: عشرات البائعين المستقلين، كل واحد بمخزونه وأسعاره وشحنه ومحفظته، فوق طبقة واحدة تديرها أنت وتقتطع منها عمولتك.</p>
+    <p>الفرق الجوهري بين متجر ومنصة أسواق يظهر في ثلاث نقاط تُبنى مرة واحدة أو تُعاد كتابة النظام لاحقاً: <strong>السلة متعددة البائعين</strong> (طلب واحد للمشتري ينقسم إلى عدة طلبات فرعية لكل بائع، بشحن وحالة مستقلة)، و<strong>محرّك العمولات</strong> (نسبة عامة، أو لكل فئة، أو تفاوضية لكل بائع)، و<strong>دورة التسوية</strong> (احتساب مستحقات البائع بعد فترة الإرجاع، وطلبات السحب، وسجل مالي قابل للتدقيق).</p>
+    <p>هذا العرض يغطي الإصدار الأول كتطبيق ويب متجاوب بتقنية PWA — قابل للتثبيت على شاشة الهاتف ويعمل كتطبيق دون المرور بمتاجر التطبيقات. تطبيقات المتاجر الأصلية مذكورة في القسم 07 كمرحلة ثانية اختيارية، وقد صُمّمت واجهات الـ API من الآن لتخدمها دون إعادة بناء.</p>
+    <p><strong>بسطة</strong> اسم عمل مؤقت داخل هذا المستند، ويُستبدل بالهوية النهائية عند اعتماد العرض.</p>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">02</span><h2>نطاق العمل</h2><span class="tail">4 وحدات · 47 شاشة</span></div>
+    <div class="scope">
+      <div class="mod">
+        <span class="mod-tag">A — واجهة المتجر</span>
+        <ul>
+          <li>رئيسية بأقسام قابلة للإدارة وبنرات وحملات</li>
+          <li>تصفّح فئات متعدد المستويات مع تصفية أوجه (سعر، ماركة، تقييم، بائع، سمات)</li>
+          <li>صفحة منتج بخيارات متعددة (مقاس/لون) وصور مكبّرة وسؤال البائع</li>
+          <li>صفحة بائع مستقلة: منتجاته، تقييمه، سياسات شحنه وإرجاعه</li>
+          <li>بحث فوري بتسامح إملائي عربي واقتراحات أثناء الكتابة</li>
+          <li>سلة متعددة البائعين تُقسَّم تلقائياً وقت الطلب</li>
+          <li>إتمام شراء بخطوة واحدة، عنوان مع خريطة، ضيف أو مسجّل</li>
+          <li>تتبع الطلب بحالات مستقلة لكل بائع + إشعارات</li>
+          <li>مراجعات موثّقة بالشراء، مفضلة، مقارنة، كوبونات</li>
+        </ul>
+      </div>
+      <div class="mod">
+        <span class="mod-tag">B — لوحة البائع</span>
+        <ul>
+          <li>تسجيل ذاتي ورفع وثائق وحالة "قيد المراجعة"</li>
+          <li>إدارة منتجات: إفراد، أو استيراد جماعي CSV/Excel</li>
+          <li>مخزون بتنبيهات نفاد وحجز عند الطلب</li>
+          <li>إدارة الطلبات: قبول، تجهيز، بوليصة شحن، تسليم</li>
+          <li>مناطق وأسعار شحن خاصة بالبائع</li>
+          <li>محفظة: رصيد معلّق، رصيد متاح، طلب سحب</li>
+          <li>تقارير مبيعات وأفضل المنتجات وقابلية التصدير</li>
+          <li>ملف المتجر: شعار، غلاف، وصف، سياسات</li>
+          <li>مراسلة العملاء وإدارة النزاعات</li>
+        </ul>
+      </div>
+      <div class="mod">
+        <span class="mod-tag">C — لوحة الإدارة</span>
+        <ul>
+          <li>مراجعة البائعين والموافقة والتعليق والحظر</li>
+          <li>شجرة الفئات والسمات ومواصفات كل فئة</li>
+          <li>محرّك العمولات: عام / لكل فئة / لكل بائع</li>
+          <li>دورة التسوية وموافقة طلبات السحب وسجل مالي</li>
+          <li>إدارة النزاعات والمرتجعات واسترداد المبالغ</li>
+          <li>كوبونات وحملات ترويجية ومنتجات مميّزة</li>
+          <li>إدارة صفحات المحتوى والبانرات والقوائم</li>
+          <li>مستخدمو الإدارة والصلاحيات وسجل تدقيق كامل</li>
+          <li>لوحة مؤشرات: مبيعات، عمولات، بائعون، تحويل</li>
+        </ul>
+      </div>
+      <div class="mod">
+        <span class="mod-tag">D — الأنظمة الخلفية</span>
+        <ul>
+          <li>تقسيم الطلب تلقائياً حسب البائع مع رقم أب ورقم فرعي</li>
+          <li>احتساب الضريبة (VAT) على مستوى المنطقة</li>
+          <li>عربي/إنجليزي كاملان مع RTL و LTR ومحتوى مترجَم</li>
+          <li>عملات متعددة مع سعر صرف قابل للتحديث</li>
+          <li>طبقة دفع مجرّدة (Adapter) تُوصَّل بأي بوابة لاحقاً</li>
+          <li>إشعارات: بريد + رسائل نصية/واتساب + Push للمتصفح</li>
+          <li>SEO تقني: Schema.org، sitemap ديناميكي، صفحات مفهرسة لكل بائع</li>
+          <li>نسخ احتياطي يومي واستعادة مجرَّبة</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">03</span><h2>المعمارية والتقنيات</h2><span class="tail">Custom Build</span></div>
+    <p>البناء مخصّص بالكامل — لا قوالب ولا إضافات جاهزة — بمعمارية <strong>Modular Monolith</strong>: نشر ومتابعة بسيطان في البداية، مع حدود وحدات واضحة تسمح بفصل أي وحدة إلى خدمة مستقلة عند نمو الأحمال، دون إعادة كتابة.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>الطبقة</th><th>التقنية</th><th>لماذا هذا الاختيار</th></tr></thead>
+        <tbody>
+          <tr><td class="layer">الواجهة</td><td class="tech">Next.js 15 · TypeScript · Tailwind · shadcn/ui</td><td class="why">عرض من الخادم (SSR/ISR) يعطي صفحات منتجات مفهرسة وسريعة — شرط أساسي لسوق يعتمد على البحث العضوي. دعم RTL أصلي.</td></tr>
+          <tr><td class="layer">حالة البيانات</td><td class="tech">TanStack Query · Zustand</td><td class="why">كاش ذكي على مستوى العميل يقلّل الطلبات ويجعل السلة والفلاتر فورية.</td></tr>
+          <tr><td class="layer">الخلفية</td><td class="tech">NestJS · Node 22 · TypeScript</td><td class="why">لغة واحدة عبر المشروع كله، وبنية وحدات صارمة تناسب فصل الخدمات لاحقاً.</td></tr>
+          <tr><td class="layer">الواجهات البرمجية</td><td class="tech">REST + OpenAPI · WebSocket</td><td class="why">توثيق تلقائي يجعل تطبيقات الموبايل لاحقاً عملية توصيل لا إعادة بناء. WebSocket للطلبات الحيّة والمحادثات.</td></tr>
+          <tr><td class="layer">قاعدة البيانات</td><td class="tech">PostgreSQL 16 · Prisma ORM</td><td class="why">معاملات ACID غير قابلة للتنازل في المال: العمولة والمخزون والتسوية إمّا تتم كاملة أو تتراجع.</td></tr>
+          <tr><td class="layer">الكاش والمهام</td><td class="tech">Redis · BullMQ</td><td class="why">التسويات والإشعارات وتصدير التقارير تعمل في الخلفية بطوابير قابلة لإعادة المحاولة، فلا يتجمّد المستخدم.</td></tr>
+          <tr><td class="layer">البحث</td><td class="tech">Meilisearch</td><td class="why">بحث عربي بتسامح إملائي (يجد «موبايل» من «موبيل») وتصفية أوجه بزمن استجابة تحت 50 مللي ثانية.</td></tr>
+          <tr><td class="layer">التخزين</td><td class="tech">Cloudflare R2 / S3 · CDN · Sharp</td><td class="why">صور البائعين تُضغط وتُحوَّل إلى WebP/AVIF تلقائياً — أكبر مكسب أداء في أي سوق.</td></tr>
+          <tr><td class="layer">الدفع</td><td class="tech">Payment Adapter Layer</td><td class="why">واجهة موحّدة داخلية تُوصَّل بـ Stripe أو Tap أو HyperPay أو Moyasar أو PayPal أو الدفع عند الاستلام. تحديد البوابة يمكن تأجيله دون تعطيل التطوير.</td></tr>
+          <tr><td class="layer">الهوية</td><td class="tech">JWT + Refresh Rotation · RBAC · 2FA · OTP</td><td class="why">ثلاثة أدوار منفصلة (عميل / بائع / إدارة) بعزل بيانات صارم، وتحقق ثنائي إلزامي على حسابات الإدارة.</td></tr>
+          <tr><td class="layer">الإشعارات</td><td class="tech">Web Push (FCM) · Resend/SES · WhatsApp API</td><td class="why">إشعارات الطلب تصل على الهاتف من الـ PWA مباشرة دون تطبيق مثبَّت من المتجر.</td></tr>
+          <tr><td class="layer">المراقبة</td><td class="tech">Sentry · OpenTelemetry · Grafana</td><td class="why">تعرف أن خطأً وقع في الدفع من التنبيه، لا من شكوى بائع.</td></tr>
+          <tr><td class="layer">الاختبار</td><td class="tech">Vitest · Playwright E2E</td><td class="why">مسارات الشراء والتسوية مغطّاة آلياً، فلا يكسر تعديلٌ لاحق ما كان يعمل.</td></tr>
+          <tr><td class="layer">النشر</td><td class="tech">Docker · GitHub Actions · Vercel + VPS</td><td class="why">بيئتان (تجريبية وإنتاج) ونشر بضغطة واحدة مع إمكانية التراجع الفوري.</td></tr>
+          <tr><td class="layer">PWA</td><td class="tech">Service Worker · Web App Manifest</td><td class="why">تثبيت على الشاشة الرئيسية، تصفّح جزئي دون اتصال، وإشعارات — بتكلفة جزء يسير من تطبيق أصلي.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="warn"><strong>ملاحظة على بوابة الدفع:</strong> لم تُحدَّد بوابة بعد، ولذلك عُزل الدفع خلف طبقة وسيطة. الأثر العملي: يمكن اختيار البوابة حتى الأسبوع 14 دون أي تأخير، وربط بوابة إضافية لاحقاً يكلّف أسبوعاً واحداً لا إعادة هيكلة.</div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">04</span><h2>الجدول الزمني</h2><span class="tail">21 أسبوعاً · 10 مراحل</span></div>
+    <p>المراحل متوازية حيث يسمح الاعتماد المتبادل، لا متسلسلة بالكامل. تسليم بيئة تجريبية حيّة يبدأ من الأسبوع الثامن ويُحدَّث أسبوعياً، فترى المنتج ينمو بدل انتظار التسليم النهائي.</p>
+    <div class="gwrap">
+      <div class="gantt">
+        <div class="gscale">
+          <div class="glabel">المرحلة</div>
+          <div class="gticks">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+            <span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span>
+          </div>
+        </div>
+        <div class="grow"><div class="glabel"><i>01</i> التحليل و SRS</div><div class="gtrack"><div class="bar b1" style="grid-column:1/3"></div></div></div>
+        <div class="grow"><div class="glabel"><i>02</i> تصميم UX/UI</div><div class="gtrack"><div class="bar b1" style="grid-column:2/6"></div></div></div>
+        <div class="grow"><div class="glabel"><i>03</i> البنية والصلاحيات</div><div class="gtrack"><div class="bar b2" style="grid-column:3/6"></div></div></div>
+        <div class="grow"><div class="glabel"><i>04</i> لوحة البائع</div><div class="gtrack"><div class="bar b2" style="grid-column:5/9"></div></div></div>
+        <div class="grow"><div class="glabel"><i>05</i> المتجر والسلة والدفع</div><div class="gtrack"><div class="bar b2" style="grid-column:7/13"></div></div></div>
+        <div class="grow"><div class="glabel"><i>06</i> العمولات والتسويات</div><div class="gtrack"><div class="bar b2" style="grid-column:11/16"></div></div></div>
+        <div class="grow"><div class="glabel"><i>07</i> لوحة الإدارة والتقارير</div><div class="gtrack"><div class="bar b2" style="grid-column:14/18"></div></div></div>
+        <div class="grow"><div class="glabel"><i>08</i> البحث والأداء و SEO</div><div class="gtrack"><div class="bar b2" style="grid-column:16/19"></div></div></div>
+        <div class="grow"><div class="glabel"><i>09</i> اختبار وأمان و UAT</div><div class="gtrack"><div class="bar b3" style="grid-column:17/21"></div></div></div>
+        <div class="grow"><div class="glabel"><i>10</i> الإطلاق والتدريب</div><div class="gtrack"><div class="bar b3" style="grid-column:20/22"></div></div></div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><b class="b1"></b>تحليل وتصميم</span>
+      <span><b class="b2"></b>تطوير</span>
+      <span><b class="b3"></b>اختبار وإطلاق</span>
+      <span>الأرقام = رقم الأسبوع من بدء العمل</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">05</span><h2>التسعير التفصيلي</h2><span class="tail">1,355 ساعة · 25 USD/ساعة</span></div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>البند</th><th class="num">الساعات</th><th class="num">USD</th></tr></thead>
+        <tbody>
+          <tr><td>التحليل، وثيقة المتطلبات SRS، ونمذجة قاعدة البيانات</td><td class="num">80</td><td class="num">2,000</td></tr>
+          <tr><td>تصميم UX/UI لـ 47 شاشة + نظام تصميم قابل لإعادة الاستخدام</td><td class="num">160</td><td class="num">4,000</td></tr>
+          <tr><td>البنية الخلفية، قاعدة البيانات، المصادقة والصلاحيات RBAC</td><td class="num">140</td><td class="num">3,500</td></tr>
+          <tr><td>لوحة البائع كاملة (منتجات، مخزون، طلبات، محفظة، شحن)</td><td class="num">180</td><td class="num">4,500</td></tr>
+          <tr><td>واجهة المتجر، السلة متعددة البائعين، وإتمام الشراء</td><td class="num">220</td><td class="num">5,500</td></tr>
+          <tr><td>محرّك العمولات، المحفظة، ودورة التسوية والسحب</td><td class="num">100</td><td class="num">2,500</td></tr>
+          <tr><td>الشحن والمناطق والتتبع وربط شركة شحن واحدة</td><td class="num">60</td><td class="num">1,500</td></tr>
+          <tr><td>لوحة الإدارة، النزاعات، المحتوى، والتقارير</td><td class="num">120</td><td class="num">3,000</td></tr>
+          <tr><td>البحث Meilisearch، تحسين الأداء، و SEO التقني</td><td class="num">70</td><td class="num">1,750</td></tr>
+          <tr><td>الإشعارات (بريد، رسائل، واتساب، Push) وقوالبها</td><td class="num">50</td><td class="num">1,250</td></tr>
+          <tr><td>تعدد العملات في التسوية: محفظة ودفتر لكل عملة، لقطة سعر صرف، تقارير موحّدة</td><td class="num">55</td><td class="num">1,375</td></tr>
+          <tr><td>ضمان الجودة، الاختبار الأمني، DevOps والنشر</td><td class="num">120</td><td class="num">3,000</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td>مجموع البنود</td><td class="num">1,355</td><td class="num">33,875</td></tr>
+          <tr class="disc"><td>خصم الباقة المتكاملة</td><td class="num">—</td><td class="num">‎−3,000</td></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="total">
+      <div>
+        <span class="big">30,875</span><span class="cur">USD</span>
+      </div>
+      <p class="note" style="margin:0">سعر ثابت للنطاق الموصوف أعلاه. لا رسوم مخفية ولا فوترة بالساعة ما لم يُطلب تغيير في النطاق.</p>
+    </div>
+    <div class="fx">
+      <div><dt>SAR</dt><dd>115,781</dd></div>
+      <div><dt>AED</dt><dd>113,390</dd></div>
+      <div><dt>JOD</dt><dd>21,890</dd></div>
+      <div><dt>QAR</dt><dd>112,385</dd></div>
+      <div><dt>KWD</dt><dd>9,463</dd></div>
+      <div><dt>EUR</dt><dd>28,405</dd></div>
+      <div><dt>GBP</dt><dd>24,083</dd></div>
+      <div><dt>EGP</dt><dd>1,482,000</dd></div>
+    </div>
+    <p class="fxnote">أسعار الصرف إرشادية بتاريخ العرض. الفوترة والتعاقد بالدولار الأمريكي؛ ما عداه للاسترشاد فقط، والجنيه المصري بالذات يُعاد تثبيته يوم التوقيع.</p>
+
+    <h3 style="margin-top:34px">جدول الدفعات</h3>
+    <div class="pay">
+      <div><span class="pct">30%</span><span class="when">عند التوقيع</span><span class="amt">9,263 USD</span></div>
+      <div><span class="pct">25%</span><span class="when">اعتماد التصميم — أسبوع 5</span><span class="amt">7,719 USD</span></div>
+      <div><span class="pct">25%</span><span class="when">تسليم النسخة التجريبية — أسبوع 13</span><span class="amt">7,719 USD</span></div>
+      <div><span class="pct">20%</span><span class="when">الإطلاق وتسليم الكود</span><span class="amt">6,174 USD</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">06</span><h2>ما بعد الإطلاق</h2></div>
+    <p>ضمان إصلاح الأخطاء البرمجية <strong>مجاني لمدة 60 يوماً</strong> من تاريخ الإطلاق. بعدها تبدأ باقة صيانة اختيارية:</p>
+    <div class="plans">
+      <div class="plan">
+        <div class="pname">أساسية</div>
+        <div class="pprice">450 USD<span style="font-size:11px;color:var(--ink-3)"> / شهر</span></div>
+        <ul>
+          <li>مراقبة 24/7 وتنبيهات أعطال</li>
+          <li>نسخ احتياطي يومي واستعادة</li>
+          <li>تحديثات أمنية للمكتبات</li>
+          <li>8 ساعات دعم فني شهرياً</li>
+        </ul>
+      </div>
+      <div class="plan pick">
+        <div class="pname">نمو — الموصى بها</div>
+        <div class="pprice">900 USD<span style="font-size:11px;color:var(--ink-3)"> / شهر</span></div>
+        <ul>
+          <li>كل ما في الأساسية</li>
+          <li>20 ساعة تطوير وتحسينات شهرياً</li>
+          <li>تحسين أداء وسيو مستمر</li>
+          <li>تقرير أداء شهري بالمؤشرات</li>
+          <li>استجابة خلال 4 ساعات عمل</li>
+        </ul>
+      </div>
+      <div class="plan">
+        <div class="pname">مخصّصة</div>
+        <div class="pprice">حسب الاتفاق</div>
+        <ul>
+          <li>اتفاقية مستوى خدمة SLA</li>
+          <li>فريق مخصّص وقنوات مباشرة</li>
+          <li>خارطة طريق تطوير ربع سنوية</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:16px">التدريب مشمول في السعر الأساسي: جلستان مسجّلتان — واحدة لفريق الإدارة وأخرى لتأهيل البائعين — مع دليل استخدام عربي مصوّر.</p>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">07</span><h2>إضافات اختيارية</h2><span class="tail">تُسعَّر منفصلة</span></div>
+    <p>غير مشمولة في السعر أعلاه. يمكن ضمّ أي منها للعقد الأصلي أو تأجيلها لمرحلة ثانية — البنية جاهزة لها.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>الإضافة</th><th class="num">المدة</th><th class="num">USD</th></tr></thead>
+        <tbody>
+          <tr><td>تطبيق موبايل للعملاء — Flutter (iOS + Android)</td><td class="num">8 أسابيع</td><td class="num">9,500</td></tr>
+          <tr><td>تطبيق موبايل للبائعين — إدارة الطلبات والمخزون</td><td class="num">5 أسابيع</td><td class="num">6,000</td></tr>
+          <tr><td>محرّك توصيات وبحث دلالي بالذكاء الاصطناعي</td><td class="num">3 أسابيع</td><td class="num">4,500</td></tr>
+          <tr><td>لوحة تحليلات متقدمة (BI) بتقارير مخصّصة</td><td class="num">2.5 أسبوع</td><td class="num">3,200</td></tr>
+          <tr><td>تكامل مع نظام محاسبي / ERP</td><td class="num">3 أسابيع</td><td class="num">3,500</td></tr>
+          <tr><td>برنامج ولاء ونقاط وإحالات</td><td class="num">2 أسبوع</td><td class="num">2,800</td></tr>
+          <tr><td>ربط شركة شحن إضافية</td><td class="num">1 أسبوع</td><td class="num">1,200</td></tr>
+          <tr><td>ربط بوابة دفع إضافية</td><td class="num">1 أسبوع</td><td class="num">800</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">08</span><h2>الافتراضات والاستثناءات</h2></div>
+    <ul class="notes">
+      <li><b>01</b><span>محتوى المنتجات (الصور، الأوصاف، الأسعار) وبيانات البائعين مسؤولية العميل. يشمل العرض إدخال 20 منتجاً نموذجياً لأغراض الاختبار فقط.</span></li>
+      <li><b>02</b><span>تكاليف الاستضافة والنطاق والشهادات وتراخيص الخدمات الخارجية خارج السعر، وتُقدَّر بـ 90 – 190 دولاراً شهرياً في مرحلة الإطلاق حسب حجم الزيارات.</span></li>
+      <li><b>03</b><span>تكامل بوابة دفع واحدة مشمول. فتح حساب التاجر لدى البوابة، والموافقات، والرسوم البنكية والعمولات — كلها مسؤولية العميل.</span></li>
+      <li><b>04</b><span>جولتان من التعديلات مشمولتان على كل مخرج تصميمي. التعديلات بعدهما، أو بعد الاعتماد الرسمي، تُعامل كطلب تغيير.</span></li>
+      <li><b>05</b><span>أي إضافة خارج النطاق المكتوب في القسم 02 تمرّ عبر طلب تغيير موثّق بأثره على المدة والكلفة، وتُسعَّر بـ 30 دولاراً للساعة.</span></li>
+      <li><b>06</b><span>يلتزم العميل بمراجعة المخرجات واعتمادها خلال 3 أيام عمل. التأخر في الاعتماد يزيح الجدول الزمني بالمدة نفسها.</span></li>
+      <li><b>07</b><span>الترجمة عربي/إنجليزي مشمولة كبنية تقنية؛ نصوص المحتوى التسويقي بالإنجليزية يوفّرها العميل.</span></li>
+      <li><b>08</b><span>الكود المصدري كاملاً ملك العميل ويُسلَّم على مستودع خاص عند سداد الدفعة الأخيرة، مع وثائق النشر والمعمارية.</span></li>
+      <li><b>09</b><span>لا يشمل العرض: تصميم الهوية البصرية والشعار، إنتاج الصور والفيديو، إدارة الحملات الإعلانية، أو التسجيل الضريبي والقانوني للمنصة.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="shead"><span class="snum">09</span><h2>الاعتماد</h2></div>
+    <p>هذا العرض ساري 30 يوماً من تاريخه. عند الموافقة يُحرَّر عقد تنفيذ يتضمن هذا المستند كملحق مُلزِم، ويبدأ احتساب الأسبوع الأول من تاريخ استلام الدفعة الأولى واكتمال المواد الأولية من العميل.</p>
+    <div class="sign">
+      <div><span>عن الجهة المنفّذة — الاسم والتوقيع والتاريخ</span></div>
+      <div><span>عن العميل — الاسم والتوقيع والتاريخ</span></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>PRP-2026-014</span>
+    <span>الإصدار 2.0</span>
+    <span>10 · 09 · 2026</span>
+    <span>وثيقة سرّية</span>
+  </footer>
+
+</div>
+<script>
+(function () {
+  var root = document.documentElement;
+  var btns = { auto: 'th-auto', light: 'th-light', dark: 'th-dark' };
+  function apply(mode) {
+    if (mode === 'auto') { root.removeAttribute('data-theme'); }
+    else { root.setAttribute('data-theme', mode); }
+    Object.keys(btns).forEach(function (k) {
+      document.getElementById(btns[k]).setAttribute('aria-pressed', String(k === mode));
+    });
+    try { localStorage.setItem('basta-theme', mode); } catch (e) {}
+  }
+  Object.keys(btns).forEach(function (k) {
+    document.getElementById(btns[k]).addEventListener('click', function () { apply(k); });
+  });
+  document.getElementById('th-print').addEventListener('click', function () { window.print(); });
+  var saved = 'auto';
+  try { saved = localStorage.getItem('basta-theme') || 'auto'; } catch (e) {}
+  apply(saved);
+})();
+</script>
+</body>
+</html>
