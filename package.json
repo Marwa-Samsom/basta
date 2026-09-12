@@ -1,0 +1,34 @@
+{
+  "name": "basta",
+  "private": true,
+  "version": "0.1.0",
+  "description": "سوق إلكتروني متعدد البائعين",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=22.0.0" },
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:api": "npm run dev -w @basta/api",
+    "dev:web": "npm run dev -w @basta/web",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e -w @basta/web",
+    "db:generate": "npm run db:generate -w @basta/api",
+    "db:migrate": "npm run db:migrate -w @basta/api",
+    "db:seed": "npm run db:seed -w @basta/api",
+    "db:studio": "npm run db:studio -w @basta/api",
+    "up": "docker compose up -d",
+    "down": "docker compose down",
+    "reset": "docker compose down -v && docker compose up -d && npm run db:migrate && npm run db:seed",
+    "verify": "npm run lint && npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-boundaries": "^5.0.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  }
+}

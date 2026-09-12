@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  TZ: UTC
+
+jobs:
+  quality:
+    name: فحص الأنواع والنمط والحدود
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - run: npm ci
+      - run: npm run db:generate
+      - name: تدقيق النمط وحدود الوحدات (ADR-002)
+        run: npm run lint
+      - run: npm run typecheck
+
+  guards:
+    name: حرّاس الرموز والاتجاه
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # نظام التصميم: كل لون يأتي من رمز، ولا قيمة صريحة في مكوّن
+      - name: لا قيم لون صريحة خارج tokens.css
+        run: |
+          if grep -rInE '#[0-9a-fA-F]{3,8}\b|rgba?\(' \
+               --include='*.tsx' --include='*.jsx' \
+               apps/web/src 2>/dev/null; then
+            echo "::error::لون صريح في مكوّن. خذه من رمز في src/styles/tokens.css"
+            exit 1
+          fi
+
+      # RTL: الخصائص المنطقية فقط — أكثر عيوب RTL شيوعاً وأقلّها ملاحظةً
+      - name: لا خصائص فيزيائية للاتجاه
+        run: |
+          if grep -rInE '(margin|padding)-(left|right)\s*:' \
+               --include='*.css' --include='*.tsx' \
+               apps/web/src src/styles 2>/dev/null; then
+            echo "::error::استخدم inline-start / inline-end بدل left / right"
+            exit 1
+          fi
+
+      # الوصولية: التركيز مرئي دائماً
+      - name: لا outline none بلا بديل
+        run: |
+          if grep -rIn 'outline:\s*none' --include='*.css' --include='*.tsx' \
+               apps/web/src src/styles 2>/dev/null | grep -v 'focus-visible'; then
+            echo "::error::إلغاء التركيز بلا بديل مرئي"
+            exit 1
+          fi
+
+      # ADR-001: لا حساب على المال خارج النواة
+      - name: لا ضرب في 100 على المال
+        run: |
+          if grep -rInE '\*\s*100\b|/\s*100\b' \
+               --include='*.ts' apps/api/src/modules 2>/dev/null; then
+            echo "::error::تحويل عملة بثابت 100. استعمل money.ts — الدينار 3 خانات (ADR-013)"
+            exit 1
+          fi
+
+  test:
+    name: الاختبارات
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: basta
+          POSTGRES_PASSWORD: basta_dev_pw
+          POSTGRES_DB: basta_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U basta"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgresql://basta:basta_dev_pw@localhost:5432/basta_test?schema=public
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - run: npm ci
+      - run: npm run db:generate
+      - name: تطبيق المهاجرات والحرّاس
+        run: npm run db:deploy -w @basta/api
+      - run: npm test
+
+  build:
+    name: البناء
+    runs-on: ubuntu-latest
+    needs: [quality, guards]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm }
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run build
+
+  deploy-staging:
+    name: نشر التجريبية
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: النشر
+        run: echo "يُوصَل بمزوّد الاستضافة عند اختياره — بوابة خروج المرحلة 03"
