@@ -939,7 +939,7 @@ Native mobile apps · real-time live chat · loyalty points and referrals · AI 
 | الحساب والعناوين · Account & addresses | ST-25 + ST-26 | | | | | | |
 
 **Added — 39:** ST-02 · 06 · 09 · 10 · 21 · 22 · 24 · 27 · 28 · 29 · 30 · 31 · SH-01 to 08 · VD-04 · 05 · 14 · 15 · 19 · 20 · 21 · AD-01 · 02 · 06 · 07 · 12 · 17 · 19 · 20 · 21 · 22 · 26.
-> Many are small states, dialogs or templates, but they **expand Phase 02's scope**, which was priced on 47 screens. To be confirmed as a change request before starting them.
+> **All 86 screens are approved within Phase 02's scope** by the project owner (13 September 2026). Design every screen in §8.
 
 ---
 
