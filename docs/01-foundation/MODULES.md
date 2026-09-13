@@ -55,8 +55,8 @@ src/modules/
 | `identity` | users, roles, permissions, refresh_tokens, otp, audit_logs | — | 04 |
 | `vendors` | vendors, documents, bank_accounts | identity, currency | 06 |
 | `currency` | currencies, exchange_rates | — | 05 |
-| `catalog` | categories, attributes, brands, products, variants, images | vendors | 05 |
-| `inventory` | inventory, movements, **stock_reservations** | catalog | 05 |
+| `catalog` | categories, attributes, brands, products, variants, images | vendors، **inventory** | 05 |
+| `inventory` | inventory, movements, **stock_reservations** | — *(الطبقة الأدنى)* | 05 |
 | `cart` | carts, cart_items | catalog, pricing | 07 |
 | `pricing` | tax_rates, coupons, redemptions | catalog, shipping, currency | 08 |
 | `checkout` | — *(منسّق بلا جداول)* | cart, pricing, inventory, payments, orders, finance | 08 |
@@ -68,6 +68,8 @@ src/modules/
 | `notifications` | templates, notifications, push_subscriptions | identity | 11 |
 | `admin` | cms_pages, banners, menus, settings | الجميع (قراءة) | 11 |
 | `search` | — *(فهرس Meilisearch)* | catalog, vendors | 07 |
+
+> **عكس اتجاه في المرحلة 05.** الجدول الأصلي جعل `inventory` يعتمد على `catalog`، لكن إنشاء منتج بمخزونه واستيراد ملف يكتبان المنتج ومخزونه في معاملة واحدة، فالكتالوج هو من يستدعي المخزون — والاتجاه الأصلي كان سيصنع اعتماداً دائرياً. الآن **المخزون لا يعرف المنتجات ولا البائعين**: الكتالوج يتحقق من الملكية ثم يستدعيه، واسم المنتج في رسالة النفاد يمرّره المستدعي. المنسّق `checkout` (المرحلة 08) يستدعيه بالطريقة نفسها.
 
 ---
 

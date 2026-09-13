@@ -143,6 +143,8 @@ erDiagram
 **`product_variants`** — `id` · `product_id` · `sku` (فريد لكل بائع) · `price_minor` · `compare_at_price_minor` · `barcode` · `weight_grams` · `length_mm` · `width_mm` · `height_mm` · `is_active`
 **`variant_option_values`** — `variant_id` · `attribute_id` · `attribute_value_id`
 > قيد فريد مركّب يمنع تكرار التركيبة نفسها داخل المنتج الواحد.
+> **كما نُفّذ في المرحلة 05:** `product_variants` يحمل `vendor_id` مقيَّداً بمفتاح أجنبي مركّب `(product_id, vendor_id)` فلا يخالف بائع منتجه، و`options_key` (أزواج سمة:قيمة مرتّبة بمعرّف السمة) و`archived_at`. التفرّد **جزئي على الحيّ**: `(vendor_id, sku)` و`(product_id, options_key)` حيث `archived_at IS NULL` — فالأرشفة تحرّر SKU لإعادة الاستعمال.
+> **المتغيّر لا يُحذف بل يُؤرشف.** حركات مخزونه للإضافة فقط (ADR-005)، ومشغّل الجملة يرفض أي DELETE عليها — فكل مفتاح أجنبي إلى المتغيّر `RESTRICT` لا `CASCADE`. «حذف» المنتج أرشفته هو ومتغيّراته، والمخزون الفعلي لا يُصفَّر.
 
 **`product_attribute_values`** — `product_id` · `attribute_id` · `attribute_value_id` | `value_text_ar/en` | `value_number` | `value_boolean`
 **`product_images`** — `id` · `product_id` · `variant_id` · `file_key` · `alt_ar/en` · `width` · `height` · `sort`
@@ -152,6 +154,7 @@ erDiagram
 > **المتاح = `on_hand - reserved`**، حقل محسوب لا مخزَّن.
 > قيود على مستوى قاعدة البيانات: `on_hand >= 0` و `reserved >= 0` و `reserved <= on_hand`.
 > `reserved` **إسقاط** لمجموع الحجوزات النشطة، لا رقم يُحرَّك يدوياً — يُدقَّق ليلياً ضد `stock_reservations`.
+> **المرحلة 05:** `low_stock_since` لحظة نزول `on_hand` إلى `low_stock_threshold` أو دونها، وتُمسح عند تجاوزها صعوداً. العتبة على `on_hand` لا على المتاح — الحجوزات تتذبذب كل دقيقة. المخزون يرصد، ووحدة الإشعارات (المرحلة 11) ترسل.
 
 **`stock_reservations`** *(ADR-006 — جديد في المراجعة 2)*
 `id` · `variant_id` · `cart_id` · `order_id` · `qty` · `status` (active/committed/released/expired) · `expires_at` · `committed_at` · `released_at` · `created_at`
