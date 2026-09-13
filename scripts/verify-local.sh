@@ -87,6 +87,24 @@ say "حرّاس الكود"
 npx eslint apps/api/src apps/web/src --max-warnings 0 >/dev/null || die "تدقيق النمط وحدود الوحدات"
 ok "حدود الوحدات سليمة (ADR-002)"
 
+# الحارس الذي لا يعترض على خرق متعمَّد ليس حارساً (الدرس 5): حتى المرحلة 05
+# لم يُحلّ أي استيراد .ts فمرّت كل الحدود بلا فحص، و «سليمة» أعلاه كانت تكذب
+probe_file="apps/api/src/modules/catalog/application/__boundary_probe.ts"
+mkdir -p "$(dirname "$probe_file")"
+trap 'rm -f "$probe_file"' EXIT
+printf "import { hashPassword } from '../../identity/domain/password';
+export const probe = hashPassword;
+" > "$probe_file"
+if npx eslint "$probe_file" >/dev/null 2>&1; then
+  die "حارس الحدود لا يعترض على استيراد داخلي عابر للوحدات"
+fi
+# ومن داخل apps/api كما يشغّله CI (npm run lint): الأنماط كانت تُقاس من مجلد التشغيل فتعمى هناك وحدها
+if (cd apps/api && npx eslint "${probe_file#apps/api/}" >/dev/null 2>&1); then
+  die "حارس الحدود أعمى حين يُشغَّل من apps/api كما في CI"
+fi
+rm -f "$probe_file"
+ok "حارس الحدود يرفض خرقاً متعمَّداً — من الجذر ومن apps/api"
+
 grep -rInE '#[0-9a-fA-F]{3,8}\b|rgba?\(' --include='*.tsx' --include='*.jsx' --include='*.ts' \
   --exclude='theme-colors.ts' apps/web/src >/dev/null 2>&1 && die "لون صريح في مكوّن"
 grep -rInE '(margin|padding)-(left|right)\s*:' --include='*.css' --include='*.tsx' \

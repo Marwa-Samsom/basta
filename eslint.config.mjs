@@ -1,6 +1,11 @@
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import boundaries from 'eslint-plugin-boundaries';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// المسارات تُحسب من موقع هذا الملف لا من مجلد التشغيل — انظر import/resolver
+const ROOT = dirname(fileURLToPath(import.meta.url));
 
 export default [
   { ignores: ['**/dist/**', '**/.next/**', '**/node_modules/**', '**/*.config.*'] },
@@ -9,9 +14,27 @@ export default [
     languageOptions: { parser: tsparser, parserOptions: { sourceType: 'module' } },
     plugins: { '@typescript-eslint': tseslint, boundaries },
     settings: {
+      /**
+       * بلا محلّل، لم يُحلَّ أي استيراد .ts أصلاً: كل هدف كان «نوعاً مجهولاً»
+       * فتجاهلته boundaries، ومرّ استيراد common من داخل وحدة بلا اعتراض.
+       * الحارس كان صامتاً منذ المرحلة 03 — مجموعة اختبار الحارس في
+       * scripts/verify-local.sh تحاول الخرق الآن لتثبت أنه يعترض.
+       */
+      /**
+       * أنماط العناصر أدناه نسبية لجذر المستودع. بلا هذا تُقاس من مجلد التشغيل:
+       * من apps/api يصير المسار src/modules/… فلا يطابق apps/api/src/modules/…،
+       * فكل ملف «نوع مجهول» ولا قاعدة تسري — والـ CI يشغّل lint من هناك بالضبط.
+       * إصلاح مسار المحلّل وحده لم يكفِ؛ كشفه مسبار verify المزدوج.
+       */
+      'boundaries/root-path': ROOT,
+      'import/resolver': {
+        // مطلق من موقع الملف: يصحّ أيّاً كان مجلد التشغيل (الجذر في verify، و apps/api في CI)
+        typescript: { project: join(ROOT, 'apps/api/tsconfig.json') },
+      },
       'boundaries/elements': [
-        { type: 'module-public',   pattern: 'apps/api/src/modules/*/public/**' },
-        { type: 'module-internal', pattern: 'apps/api/src/modules/*/!(public)/**' },
+        // capture يلتقط اسم الوحدة، فتصير «الوحدة نفسها» شرطاً قابلاً للفحص لا افتراضاً
+        { type: 'module-public',   pattern: 'apps/api/src/modules/*/public/**',     capture: ['module'] },
+        { type: 'module-internal', pattern: 'apps/api/src/modules/*/!(public)/**', capture: ['module'] },
         { type: 'common',          pattern: 'apps/api/src/common/**' },
       ],
     },
@@ -23,10 +46,27 @@ export default [
        */
       'boundaries/element-types': ['error', {
         default: 'disallow',
+        /**
+         * كان module-internal يسمح بـ module-internal أيّاً كانت وحدته، فمرّ
+         * `../../identity/domain/password` من داخل catalog بلا اعتراض — ونمط
+         * no-restricted-imports لا يرى المسار النسبي لأنه لا يحوي "modules/".
+         * الدرس 3 مرة ثالثة: القاعدة كانت تعدّ ما يُسمح بصيغة أوسع مما قُصد.
+         * الآن الداخل مسموح داخل الوحدة نفسها فقط، والعبور عبر public/.
+         */
         rules: [
-          { from: 'module-internal', allow: ['module-public', 'common', 'module-internal'] },
-          { from: 'module-public',   allow: ['module-internal', 'common'] },
-          { from: 'common',          allow: ['common'] },
+          {
+            from: 'module-internal',
+            allow: ['module-public', 'common', ['module-internal', { module: '${from.module}' }]],
+          },
+          {
+            from: 'module-public',
+            allow: [
+              'common',
+              ['module-internal', { module: '${from.module}' }],
+              ['module-public', { module: '${from.module}' }],
+            ],
+          },
+          { from: 'common', allow: ['common'] },
         ],
       }],
 
