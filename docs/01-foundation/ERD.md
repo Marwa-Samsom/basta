@@ -306,7 +306,7 @@ reservation_ttl_minutes     = 15      ← ADR-006
 cart_expiry_hours           = 168
 payment_reconcile_minutes   = 10
 base_currency               = USD     ← ADR-013، عملة المحاسبة والتقارير الموحّدة
-fx_spread_bps               = 0       ← ADR-013، مؤجَّل للمرحلة 10
+fx_spread_bps               = 200     ← ADR-013 و Q-13، هامش 2% (مؤكَّد 13 سبتمبر 2026)
 coupon_default_funded_by    = platform ← Q-06
 ```
 > **`min_payout_minor` انتقل إلى `currencies`** — لكل عملة حدّها، لا رقم واحد مشترك.
