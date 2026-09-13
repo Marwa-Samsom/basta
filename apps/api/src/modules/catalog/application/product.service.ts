@@ -5,6 +5,7 @@ import {
   DomainError,
   DuplicateError,
   InvalidInputError,
+  InvalidStateTransitionError,
   NotFoundError,
 } from '../../../common/errors/domain-error';
 import {
@@ -15,7 +16,7 @@ import {
 } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ScopedRepository } from '../../../common/prisma/scoped-repository';
-import type { Actor, VendorScope } from '../../../common/security/actor';
+import { vendorScopeOf, type Actor, type VendorScope } from '../../../common/security/actor';
 import {
   InventoryService,
   type StockChange,
@@ -34,6 +35,7 @@ import { LocalImageStorage } from '../infrastructure/product-images';
 import { CategoryService, isUniqueViolation, type EffectiveAttribute } from './category.service';
 import {
   priceView,
+  type AdminProductListItemView,
   type Page,
   type ProductDetailView,
   type ProductListItemView,
@@ -405,7 +407,8 @@ export class ProductService {
         ? this.resolveAttributes(current.attrValues.map(asAttributeInput), effective)
         : null;
 
-    if (current.status === 'active') {
+    // قيد المراجعة كالمنشور: بلا هذا يُفرَّغ المنتج بعد إرساله فتعتمده الإدارة ناقصاً (Q-15)
+    if (current.status === 'active' || current.status === 'pending_review') {
       const provided = providedAttributeIds(
         attributes ?? current.attrValues.map((a) => ({ attributeId: a.attributeId })),
         finalVariants,
@@ -415,8 +418,9 @@ export class ProductService {
         provided,
       );
       if (missing.length > 0) {
+        const state = current.status === 'active' ? 'منشور' : 'قيد المراجعة';
         throw new InvalidInputError(
-          `المنتج منشور، والتعديل يترك سمات إلزامية فارغة: ${missing.join('، ')}. املأها أو أوقف النشر أولاً.`,
+          `المنتج ${state}، والتعديل يترك سمات إلزامية فارغة: ${missing.join('، ')}. املأها أو أوقف النشر أولاً.`,
           { missing },
         );
       }
@@ -587,14 +591,18 @@ export class ProductService {
 
     if (reasons.length > 0) throw new PublishBlockedError(reasons);
 
-    await this.products(scope).updateOwned(id, {
-      status: 'active',
-      rejectReason: null,
-      publishedAt: product.publishedAt ?? new Date(),
-    });
+    /**
+     * Q-15 — محسوم 13 سبتمبر 2026: النشر **طلب مراجعة** لا نشر فوري.
+     * الموانع أعلاه تُفحص عند الإرسال كي لا تصل الإدارة منتجات ناقصة، والاعتماد
+     * أو الرفض بسبب يقع في approve و reject. الإرسال المكرر لا يغيّر شيئاً.
+     */
+    if (product.status !== 'active' && product.status !== 'pending_review') {
+      await this.products(scope).updateOwned(id, { status: 'pending_review', rejectReason: null });
+    }
     return this.get(scope, id);
   }
 
+  /** سحب الإرسال أو إيقاف النشر: يعود مسودة من أي حالة. */
   async unpublish(scope: VendorScope, id: string): Promise<ProductDetailView> {
     const found = await this.products(scope).findFirst({ where: { id, deletedAt: null }, select: { id: true } });
     if (!found) throw new NotFoundError('المنتج غير موجود.', { id });
@@ -602,16 +610,119 @@ export class ProductService {
     return this.get(scope, id);
   }
 
-  /**
-   * رفض إداري لمنتج منشور — لا مراجعة مسبقة (Q-15). البائع يرى السبب ويصلح ويعيد النشر.
-   * وصول إداري صريح بلا نطاق بائع: الإدارة ترى كل المتاجر (ADR-010).
-   */
+  // ================================================================ مراجعة الإدارة — Q-15
+  // وصول إداري صريح بلا نطاق بائع: الإدارة ترى كل المتاجر (ADR-010).
+
+  /** اعتماد منتج قيد المراجعة. المعتمد لأول مرة يأخذ publishedAt، والمُعاد اعتماده يحتفظ بتاريخه. */
+  async approve(id: string): Promise<void> {
+    const product = await this.prisma.product.findFirst({
+      where: { id, deletedAt: null },
+      select: { status: true, publishedAt: true, vendor: { select: { status: true } } },
+    });
+    if (!product) throw new NotFoundError('المنتج غير موجود.', { id });
+    if (product.status !== 'pending_review') {
+      throw new InvalidStateTransitionError(product.status, 'active');
+    }
+    if (product.vendor.status !== 'approved') {
+      throw new InvalidInputError('المتجر غير معتمد أو معلَّق — لا يُعتمد منتج لا يستطيع صاحبه البيع.');
+    }
+
+    // الشرط على الحالة داخل الكتابة: اعتمادان متزامنان أو سحب البائع أثناء المراجعة لا يمرّان معاً
+    const { count } = await this.prisma.product.updateMany({
+      where: { id, deletedAt: null, status: 'pending_review' },
+      data: { status: 'active', rejectReason: null, publishedAt: product.publishedAt ?? new Date() },
+    });
+    if (count === 0) throw new InvalidStateTransitionError('pending_review', 'active');
+  }
+
+  /** رفض بسبب يراه البائع — لمنتج قيد المراجعة أو منشور. المسودة لم تُرسل فلا تُرفض. */
   async reject(id: string, reason: string): Promise<void> {
     const { count } = await this.prisma.product.updateMany({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, status: { in: ['pending_review', 'active'] } },
       data: { status: 'rejected', rejectReason: reason },
     });
-    if (count === 0) throw new NotFoundError('المنتج غير موجود.', { id });
+    if (count === 0) {
+      const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null }, select: { status: true } });
+      if (!product) throw new NotFoundError('المنتج غير موجود.', { id });
+      throw new InvalidStateTransitionError(product.status, 'rejected');
+    }
+  }
+
+  /** تفاصيل المنتج كما يراها البائع، لمراجِع الإدارة — بنطاق بائعه صراحةً. */
+  async adminGet(actor: Actor, id: string): Promise<ProductDetailView> {
+    const product = await this.prisma.product.findFirst({
+      where: { id, deletedAt: null },
+      select: { vendorId: true },
+    });
+    if (!product) throw new NotFoundError('المنتج غير موجود.', { id });
+    return this.get(vendorScopeOf(actor, product.vendorId), id);
+  }
+
+  /** منتجات المنصة. طابور المراجعة (?status=pending_review) مرتّب الأقدم أولاً — من انتظر أطول يُراجَع أولاً. */
+  async adminList(query: {
+    status?: ProductStatus | undefined;
+    search?: string | undefined;
+    page?: number | undefined;
+    pageSize?: number | undefined;
+  }): Promise<Page<AdminProductListItemView>> {
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    const search = query.search?.trim();
+
+    const where: Prisma.ProductWhereInput = {
+      deletedAt: null,
+      ...(query.status ? { status: query.status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { nameAr: { contains: search, mode: 'insensitive' } },
+              { nameEn: { contains: search, mode: 'insensitive' } },
+              { vendor: { nameAr: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        orderBy: { updatedAt: query.status === 'pending_review' ? 'asc' : 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          vendor: { select: { id: true, nameAr: true, status: true, settlementCurrency: true } },
+          category: { select: { nameAr: true } },
+          variants: { where: { archivedAt: null }, select: { priceMinorUnits: true } },
+          images: { take: 1, orderBy: { sort: 'asc' }, select: { fileKey: true } },
+        },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return {
+      page,
+      pageSize,
+      total,
+      items: rows.map((r) => {
+        const lowest = r.variants
+          .map((v) => v.priceMinorUnits)
+          .reduce<bigint | null>((min, p) => (min === null || p < min ? p : min), null);
+        const image = r.images[0];
+        return {
+          id: r.id,
+          nameAr: r.nameAr,
+          nameEn: r.nameEn,
+          status: r.status,
+          rejectReason: r.rejectReason,
+          vendor: { id: r.vendor.id, nameAr: r.vendor.nameAr, status: r.vendor.status },
+          categoryNameAr: r.category.nameAr,
+          variantCount: r.variants.length,
+          priceFrom: lowest !== null ? priceView(lowest, r.vendor.settlementCurrency) : null,
+          thumbnail: image ? this.storage.urls(image.fileKey)['thumb.webp'] : null,
+          updatedAt: r.updatedAt,
+        };
+      }),
+    };
   }
 
   // ================================================================ داخلي

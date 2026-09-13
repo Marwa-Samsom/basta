@@ -108,6 +108,21 @@ export interface ProductListItemView {
   readonly updatedAt: Date;
 }
 
+/** صف طابور مراجعة الإدارة — Q-15 */
+export interface AdminProductListItemView {
+  readonly id: string;
+  readonly nameAr: string;
+  readonly nameEn: string | null;
+  readonly status: string;
+  readonly rejectReason: string | null;
+  readonly vendor: { readonly id: string; readonly nameAr: string; readonly status: string };
+  readonly categoryNameAr: string;
+  readonly variantCount: number;
+  readonly priceFrom: PriceView | null;
+  readonly thumbnail: string | null;
+  readonly updatedAt: Date;
+}
+
 export interface Page<T> {
   readonly items: readonly T[];
   readonly page: number;

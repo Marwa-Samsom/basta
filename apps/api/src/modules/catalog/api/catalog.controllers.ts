@@ -160,9 +160,28 @@ export class AdminCatalogController {
     await this.categories.unlinkAttribute(id, attributeId);
   }
 
+  @Get('products')
+  @ApiOperation({ summary: 'منتجات المنصة — ?status=pending_review طابور المراجعة، الأقدم أولاً (Q-15)' })
+  listProducts(@Query() query: ListProductsQueryDto) {
+    return this.products.adminList(query);
+  }
+
+  @Get('products/:id')
+  @ApiOperation({ summary: 'تفاصيل منتج للمراجعة كما يراها بائعه' })
+  getProduct(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string) {
+    return this.products.adminGet(actor, id);
+  }
+
+  @Post('products/:id/approve')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'اعتماد منتج قيد المراجعة — يصير منشوراً (Q-15)' })
+  async approveProduct(@Param('id', uuidParam) id: string): Promise<void> {
+    await this.products.approve(id);
+  }
+
   @Post('products/:id/reject')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'رفض منتج منشور بسبب يراه البائع' })
+  @ApiOperation({ summary: 'رفض منتج قيد المراجعة أو منشور بسبب يراه البائع' })
   async rejectProduct(@Param('id', uuidParam) id: string, @Body() dto: RejectProductDto): Promise<void> {
     await this.products.reject(id, dto.reason);
   }
@@ -212,6 +231,7 @@ export class VendorCatalogController {
 
   @Post('products/:id/publish')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'إرسال المنتج لمراجعة الإدارة — يصير «قيد المراجعة» حتى يُعتمد أو يُرفض (Q-15)' })
   publish(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string) {
     return this.products.publish(scopeOf(actor), id);
   }
