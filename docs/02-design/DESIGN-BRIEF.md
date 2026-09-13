@@ -1,895 +1,1040 @@
-# بريف التصميم — منصة بسطة
+# Design Brief — Basta Marketplace
 
-> **لمن:** Claude Design، لتصميم واجهات المنصة كاملة: المتجر ولوحة البائع ولوحة الإدارة.
-> **الإصدار:** 13 سبتمبر 2026 · يعتمد على [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) و [`tokens.css`](../../src/styles/tokens.css) و [SRS.md](../01-foundation/SRS.md) و [ORDER-STATES.md](../01-foundation/ORDER-STATES.md).
-> **كيف تستعمله:** الصق القسم 0 ثم القسم الخاص بالدفعة التي تصمّمها (القسم 11). الأقسام 1–6 مرجع ثابت لكل الدفعات.
+> **For:** Claude Design — interactive UI design for the whole platform: Storefront, Vendor Dashboard, Admin Dashboard.
+> **Version:** 13 September 2026 · Burgundy & beige identity · Interactive prototypes
+> **Sources of truth:** [`tokens.css`](../../src/styles/tokens.css) (values) · [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) (rationale) · [SRS.md](../01-foundation/SRS.md) (requirements) · [ORDER-STATES.md](../01-foundation/ORDER-STATES.md) (state machines)
+> **How to use:** paste §0 at the start of every Claude Design session, then the batch prompt from §13 with the screen specs it names from §8. Sections 1–7 are the fixed reference for every batch.
 
 ---
 
-## 0 · التعليمات الثابتة لكل جلسة تصميم
-
-انسخ هذا كما هو في بداية كل جلسة:
+## 0 · Standing instructions — paste into every session
 
 ```
-أنت تصمّم واجهات «بسطة»: سوق إلكتروني متعدد البائعين، عربي أولاً (RTL)، ويعمل بالإنجليزية (LTR).
-التزم بهذه القواعد في كل إطار:
+You are designing "Basta" (بسطة): a multi-vendor online marketplace. The UI is Arabic-first (RTL)
+and also works in English (LTR). Produce INTERACTIVE, clickable prototypes — not static mockups.
 
-1. الاتجاه: التصميم الأساسي RTL بالعربية. الأيقونات الاتجاهية (أسهم الرجوع والتالي) تنعكس،
-   والشعارات لا تنعكس، والأرقام والرموز اللاتينية (SKU، أرقام التتبّع، الهاتف) معزولة بترتيبها LTR.
-2. المقاسات: كل شاشة بإطارين — سطح المكتب 1440 بكسل، والجوال 400 بكسل. المتجر بعرض محتوى أقصى 1280،
-   واللوحات 1600.
-3. الألوان من الرموز حصراً (القسم 2). النيلي #2A4480 للعلامة. الرمان #B23A5B **للمال وحده**:
-   السعر والخصم والمجموع والرصيد — لا زر ولا رابط ولا زينة بالرمان أبداً.
-4. الخطوط: Almarai 800 للعناوين، IBM Plex Sans Arabic للواجهة، IBM Plex Mono للأرقام في الجداول.
-5. الأرقام لاتينية دائماً (79.00 لا ٧٩٫٠٠)، والمبالغ بخانات عملتها: الريال خانتان والدينار ثلاث.
-6. الحالات تُكتب نصاً بجانب لونها — اللون وحده لا يحمل معنى.
-7. الأزرار المعروضة هي الإجراءات المسموحة فقط. الإجراء غير المسموح لا يظهر معطّلاً بل لا يظهر.
-8. رسائل الخطأ تقول: ما الذي حدث، ولماذا، وما الخطوة التالية. بلا «عذراً، حدث خطأ ما».
-9. لا رسوم كرتونية في الحالات الفارغة — اقتراحات حقيقية وزر إجراء.
-10. الكثافة: المتجر مريح (comfortable)، ولوحتا البائع والإدارة مضغوطتان (compact) — الرموز نفسها.
-11. استعمل البيانات النموذجية في القسم 8، لا نصوص Lorem ipsum.
-12. هدف اللمس 44×44 بكسل على الجوال، والتركيز مرئي دائماً بحلقة نيلية.
+Rules for every frame:
+1.  Direction: primary design is Arabic RTL. Directional icons (back/next arrows, steppers) mirror.
+    Logos never mirror. Latin runs inside Arabic text (SKU, tracking numbers, phone, order numbers)
+    are isolated and keep LTR order.
+2.  Sizes: every screen in two frames — desktop 1440px and mobile 400px. Storefront content max-width
+    1280px; dashboards 1600px.
+3.  Colors come only from the tokens in §2. Burgundy #8C2F46 is the brand. Dark teal #0E6B66 is
+    RESERVED FOR MONEY ONLY: prices, discounts, totals, balances — never buttons, links or decoration.
+    Beige neutrals: page #F8F3EC, cards #FFFFFF.
+4.  Danger red is close to the burgundy family: destructive actions are outlined buttons with an icon
+    and explicit text; a filled red button appears only inside a confirmation dialog.
+5.  Fonts: Almarai 800 for headings, IBM Plex Sans Arabic for UI text, IBM Plex Mono for numbers in tables.
+6.  Numbers are always Latin digits (79.00, not ٧٩٫٠٠). Amounts use their currency's decimals:
+    SAR has 2, Jordanian and Kuwaiti dinars have 3.
+7.  Every status is written as text next to its color — color alone never carries meaning.
+8.  Only allowed actions are shown. A disallowed action is not shown disabled — it is not shown at all.
+9.  Error messages say what happened, why, and what to do next. Never "Sorry, something went wrong".
+10. No cartoon illustrations in empty states — real suggestions and an action button.
+11. Density: Storefront is comfortable; Vendor and Admin dashboards are compact — same tokens.
+12. Use the sample data in §10. No lorem ipsum.
+13. Touch targets 44×44px on mobile. Focus is always visible as a burgundy ring.
+14. Interactivity (§5): links navigate between the batch's screens, controls change state, forms
+    validate, totals recalculate, drawers/modals/sheets open and close, loading → content transitions
+    are shown. Include a small "state switcher" to preview empty / loading / error / edge states.
 ```
 
 ---
 
-## 1 · المنتج
+## 1 · The product
 
-**بسطة** — اسم عمل مؤقت يُستبدل بالهوية النهائية؛ صمّم الشعار كنص عربي بسيط قابل للاستبدال.
+**Basta (بسطة)** — working name, replaced by the final identity later; design the logo as simple Arabic wordmark text that is easy to swap.
 
-سوق إلكتروني **متعدد البائعين**، لا متجراً واحداً. عشرات المتاجر المستقلة، لكل منها منتجاته ومخزونه وأسعاره وشحنه ومحفظته، فوق منصة واحدة تقتطع عمولة من كل بيع. **لا اشتراكات للبائعين.**
+A **multi-vendor marketplace**, not a single store. Dozens of independent shops, each with its own products, stock, prices, shipping and wallet, on one platform that takes a commission from every sale. **No vendor subscriptions.**
 
-| السطح | المستخدم | طبيعة الاستعمال | الكثافة |
-|-------|----------|-----------------|---------|
-| **المتجر** | مشترٍ لا يعرف المنصة، غالباً على الجوال | يتصفّح ويقارن ويقرّر الشراء — مساحة مريحة وصور كبيرة | comfortable |
-| **لوحة البائع** | صاحب متجر أو موظفه، يومياً | يُشغّل متجره — جداول وعمليات متكررة | compact |
-| **لوحة الإدارة** | موظف مدرَّب لدى المنصة | يراقب ويفصل في الاستثناءات — بيانات مالية كثيفة | compact |
+| Surface | User | How it is used | Density |
+|---------|------|----------------|---------|
+| **Storefront** | A buyer who doesn't know the platform, mostly on mobile | Browse, compare, decide to buy — roomy, big images | comfortable |
+| **Vendor Dashboard** | A shop owner or staff member, daily | Operate the shop — tables, repeated tasks | compact |
+| **Admin Dashboard** | Trained platform staff | Monitor and resolve exceptions — dense financial data | compact |
 
-**السوق:** الخليج والشام ومصر. **سبع عملات:** USD · SAR · AED · JOD · KWD · EGP · EUR.
-**المنصة:** ويب متجاوب يُثبَّت كتطبيق (PWA) — لا تطبيقات متاجر أصلية.
+**Market:** Gulf, Levant, Egypt. **Seven currencies:** USD · SAR · AED · JOD · KWD · EGP · EUR.
+**Platform:** responsive web installable as an app (PWA) — no native store apps.
 
-### ثلاث حقائق تشكّل الواجهة
-1. **السلة الواحدة تنقسم حسب البائع.** المشتري يدفع مرة، لكن طلبه يصير طلبات فرعية لكل بائع، بشحن مستقل وحالة مستقلة وقد تصل في أيام مختلفة. **أظهر الانقسام من السلة حتى التتبّع** — إخفاؤه يصنع شكاوى.
-2. **المخزون يُحجز 15 دقيقة عند دخول صفحة الدفع**، لا عند الإضافة للسلة. عدّاد تنازلي ظاهر.
-3. **البائع يُسعّر بعملته، والمشتري يرى عملة عرضه.** مستحقات البائع تُحرَّر بعد 14 يوماً من التسليم.
+### Three facts that shape the UI
+1. **One cart splits by vendor.** The buyer pays once, but the order becomes a sub-order per vendor, with its own shipping and status, possibly arriving on different days. **Show the split from the cart all the way to tracking** — hiding it creates complaints.
+2. **Stock is reserved for 15 minutes when the buyer enters checkout**, not when adding to cart. A visible countdown timer.
+3. **Vendors price in their own currency; buyers see their display currency.** Vendor earnings are released 14 days after delivery.
+
+### Settled product decisions reflected in the screens
+- **Product review before publishing (Q-15):** every product a vendor submits waits for admin approval before it appears in the store.
+- **Edits to published products (Q-16):** editing *content* (name, description, images, category, attributes, variant options) sends a published product back to review; editing *price or stock* does not.
 
 ---
 
-## 2 · الهوية البصرية — القيم
+## 2 · Visual identity — values
 
-### 2.1 · الألوان الخام
+### 2.1 · Raw palette
 
-| النيلي (العلامة) | | الرمان (المال وحده) | | المحايدات (بميل نيلي بارد) | |
-|---|---|---|---|---|---|
-| `indigo-50` | `#EEF1F8` | `pom-50` | `#FBEEF2` | `neutral-0` | `#FFFFFF` |
-| `indigo-100` | `#DCE2F0` | `pom-100` | `#F5DAE2` | `neutral-25` | `#FAFBFC` |
-| `indigo-200` | `#B4C0DF` | `pom-300` | `#D98FA5` | `neutral-50` | `#F4F6F9` |
-| `indigo-300` | `#8598C9` | **`pom-500`** | **`#B23A5B`** | `neutral-100` | `#E8EBF1` |
-| `indigo-400` | `#5570AF` | `pom-600` | `#962E4B` | `neutral-200` | `#D5DAE4` |
-| **`indigo-500`** | **`#2A4480`** | `pom-700` | `#78243B` | `neutral-300` | `#B3BBCA` |
-| `indigo-600` | `#22376A` | | | `neutral-400` | `#8A94A8` |
-| `indigo-700` | `#1A2B53` | | | `neutral-500` | `#656F84` |
-| `indigo-800` | `#14213F` | | | `neutral-600` | `#4B5468` |
-| `indigo-900` | `#0E1729` | | | `neutral-700` | `#363E4F` |
-| | | | | `neutral-800` | `#232A38` |
-| | | | | `neutral-850` | `#1A202B` |
-| | | | | `neutral-900` | `#121722` |
-| | | | | `neutral-950` | `#0B0F17` |
+**Burgundy — brand**
 
-**الدلالات — منفصلة تماماً عن العلامة:**
+| Token | Hex | | Token | Hex |
+|-------|-----|-|-------|-----|
+| `burgundy-50` | `#FBF1F3` | | `burgundy-500` | **`#8C2F46`** (base) |
+| `burgundy-100` | `#F4DDE2` | | `burgundy-600` | `#74243A` |
+| `burgundy-200` | `#E6B6C1` | | `burgundy-700` | `#5C1B2E` |
+| `burgundy-300` | `#D08A9B` | | `burgundy-800` | `#451422` |
+| `burgundy-400` | `#B05A70` | | `burgundy-900` | `#2E0D17` |
 
-| | 100 | 500 | 600 | 900 |
+**Dark teal — money only** (complementary to burgundy, so it never reads as brand)
+
+| `teal-50` | `teal-100` | `teal-300` | **`teal-500`** | `teal-600` | `teal-700` | `teal-900` |
+|---|---|---|---|---|---|---|
+| `#E3F2F0` | `#C4E5E1` | `#5CC6B8` | **`#0E6B66`** | `#0B5652` | `#08403D` | `#0F2624` |
+
+**Beige — warm neutrals**
+
+| Token | Hex | | Token | Hex |
+|-------|-----|-|-------|-----|
+| `beige-0` | `#FFFFFF` | | `beige-500` | `#7D6C5B` |
+| `beige-25` | `#FDFAF6` | | `beige-600` | `#6B5C4D` |
+| `beige-50` | `#F8F3EC` | | `beige-700` | `#4A3F35` |
+| `beige-100` | `#F0E8DD` | | `beige-800` | `#332B24` |
+| `beige-200` | `#E3D7C7` | | `beige-850` | `#28211C` |
+| `beige-300` | `#CBBBA6` | | `beige-900` | `#1E1814` |
+| `beige-350` | `#A89680` | | `beige-950` | `#14100D` |
+| `beige-400` | `#958470` | | | |
+
+**Semantic — fully separate from the brand**
+
+| | subtle (100) | base (500) | text on subtle (600) | dark subtle (900) |
 |---|---|---|---|---|
-| أخضر (نجاح) | `#DAF0E5` | `#15795A` | `#0F5F47` | `#0B2E24` |
-| كهرماني (تنبيه) | `#FAEED2` | `#9A6B08` | `#7D5606` | `#332401` |
-| أحمر (خطر) | `#FADEDB` | `#C0392B` | `#9E2B20` | `#3A100C` |
-| سماوي (معلومة) | `#D9E9F6` | `#2C6FA8` | `#235887` | `#0C2436` |
+| Green · success | `#E3F1E6` | `#2F7A3E` | `#25622F` | `#13261A` |
+| Orange · warning | `#FBEBDD` | `#9A4F0B` | `#7E4009` | `#2E1C0B` |
+| Red-orange · danger | `#FBE3DD` | `#C23A1A` | `#A12E13` | `#331410` |
+| Blue · info | `#E1EBF4` | `#2D5F8B` | `#244C70` | `#0F1E2C` |
 
-### 2.2 · الأدوار — ما يُستعمل فعلاً في التصميم
+### 2.2 · Roles — what the design actually uses
 
-| الدور | الفاتح | الداكن |
-|-------|--------|--------|
-| أرضية الصفحة | `#F4F6F9` | `#0B0F17` |
-| البطاقة | `#FFFFFF` | `#121722` |
-| سطح مرفوع (قوائم، نوافذ) | `#FFFFFF` | `#1A202B` |
-| سطح غائر (حقول، صفوف متناوبة) | `#E8EBF1` | `#0B0F17` |
-| نص قوي (عناوين) | `#121722` | `#FAFBFC` |
-| نص جارٍ | `#363E4F` | `#D5DAE4` |
-| نص خافت | `#656F84` | `#8A94A8` |
-| نص باهت (تلميحات) | `#8A94A8` | `#656F84` |
-| حد خفيف / افتراضي / قوي | `#E8EBF1` / `#D5DAE4` / `#B3BBCA` | `#1A202B` / `#232A38` / `#363E4F` |
-| **العلامة** (أزرار أساسية، روابط، تحديد) | **`#2A4480`**، تمرير `#22376A` | **`#8598C9`**، تمرير `#B4C0DF` |
-| خلفية العلامة الخفيفة | `#EEF1F8` | `#0E1729` |
-| **السعر** | **`#B23A5B`** | **`#D98FA5`** |
-| خلفية المال الخفيفة | `#FBEEF2` | `#2A1620` |
-| نجاح / تنبيه / خطر / معلومة | `#15795A` / `#9A6B08` / `#C0392B` / `#2C6FA8` | `#4FBF95` / `#E0A93C` / `#E8776A` / `#5FA3D8` |
-| حلقة التركيز | `#5570AF` | `#8598C9` |
+| Role | Light | Dark |
+|------|-------|------|
+| Page background | `#F8F3EC` | `#14100D` |
+| Card | `#FFFFFF` | `#1E1814` |
+| Raised surface (menus, dialogs) | `#FFFFFF` | `#28211C` |
+| Sunken surface (inputs, zebra rows) | `#F0E8DD` | `#14100D` |
+| Inverse surface (tooltips) | `#28211C` | `#F0E8DD` |
+| Strong text (headings) | `#1E1814` | `#FDFAF6` |
+| Body text | `#4A3F35` | `#E3D7C7` |
+| Muted text | `#6B5C4D` | `#A89680` |
+| Faint text (hints) | `#7D6C5B` | `#958470` |
+| Border subtle / default | `#F0E8DD` / `#E3D7C7` | `#28211C` / `#332B24` |
+| **Control border** (inputs, secondary buttons) | `#958470` | `#7D6C5B` |
+| **Brand** (primary buttons, links, selection) | **`#8C2F46`** · hover `#74243A` · pressed `#5C1B2E` | **`#D08A9B`** · hover `#E6B6C1` · pressed `#F4DDE2` |
+| Text on brand button | `#FFFFFF` | `#1E1814` |
+| Brand subtle (selected chip bg) / brand text | `#FBF1F3` / `#74243A` | `#2E0D17` / `#D08A9B` |
+| **Money** | **`#0E6B66`** | **`#5CC6B8`** |
+| Money subtle bg / border | `#E3F2F0` / `#C4E5E1` | `#0F2624` / `#08403D` |
+| Success / warning / danger / info | `#2F7A3E` / `#9A4F0B` / `#C23A1A` / `#2D5F8B` | `#6CC287` / `#E39A4B` / `#F07A66` / `#7FB2E0` |
+| Status text on its subtle bg | `#25622F` / `#7E4009` / `#A12E13` / `#244C70` | same as base |
+| Focus ring | `#B05A70` | `#D08A9B` |
 
-> النيلي الأساس يسقط تباينه على الداكن (2.1:1)، لذلك يُرفع إلى `#8598C9` هناك. لا تستعمل `#2A4480` على أرضية داكنة.
+**Measured WCAG contrast — all pass AA:** strong text 15.9:1 · body 10.2:1 · muted 6.4:1 · faint 5.0:1 · white on brand 8.1:1 · money on card 6.3:1 · danger 5.4:1 · control border 3.6:1 · focus ring 4.2:1 (light). Dark theme: 18.2 · 12.4 · 6.1 · 4.9 · 6.5 · 8.6 · 6.4 · 3.5 · 7.0.
 
-### 2.3 · الطباعة
+> Never use base burgundy `#8C2F46` as text on a dark background — use `#D08A9B` there.
 
-| الرمز | المقاس | الاستعمال |
-|-------|--------|-----------|
-| `text-3xl` | 38 | بطل الصفحة الرئيسية |
-| `text-2xl` | 30 | عنوان رئيسي |
-| `text-xl` | 24 | عنوان صفحة |
-| `text-lg` | 20 | عنوان قسم |
-| `text-md` | 17 | نص بارز، سعر في صفحة المنتج |
-| `text-base` | 15 | **أساس المتجر** |
-| `text-sm` | 13 | **أساس اللوحات** |
-| `text-xs` | 12 | بيانات ثانوية |
-| `text-2xs` | 11 | شارات وتسميات دقيقة |
+### 2.3 · Typography
 
-- العناوين **Almarai** بوزن 800 (أو 700)، ارتفاع سطر 1.25
-- الواجهة **IBM Plex Sans Arabic** بأوزان 400/500/600، ارتفاع سطر 1.45، والنص الجاري 1.7 بعرض أقصى 68 حرفاً
-- الأرقام الجدولية **IBM Plex Mono** وكل رقم في جدول أو مبلغ بمحاذاة جدولية
-- السعر: لون الرمان ووزن 600
+| Token | Size | Use |
+|-------|------|-----|
+| `text-3xl` | 38 | Home hero |
+| `text-2xl` | 30 | Main heading |
+| `text-xl` | 24 | Page title |
+| `text-lg` | 20 | Section title |
+| `text-md` | 17 | Emphasis, product-page price |
+| `text-base` | 15 | **Storefront base** |
+| `text-sm` | 13 | **Dashboard base** |
+| `text-xs` | 12 | Secondary data |
+| `text-2xs` | 11 | Badges, micro labels |
 
-### 2.4 · المسافات والأشكال والظلال
+- Headings **Almarai** 800 (or 700), line-height 1.25
+- UI **IBM Plex Sans Arabic** 400/500/600, line-height 1.45; long prose 1.7, max 68 characters wide
+- Tabular numbers **IBM Plex Mono**; every amount and table number uses tabular figures
+- Prices: money teal, weight 600
 
-- **سلّم 4 بكسل حصراً:** 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64 · 80. لا 5 ولا 13.
-- **أنصاف الأقطار — ثلاث درجات:** 4 (أزرار، حقول، شارات) · 8 (بطاقات، لوحات) · 14 (نوافذ، أوراق سفلية) · كامل (صور رمزية).
-- **ارتفاعات عناصر التحكم:** 32 (مضغوط) · 40 (افتراضي) · 48 (كبير، أزرار المتجر الرئيسية). هدف اللمس 44.
-- **الظلال خافتة بميل نيلي:** صغير للبطاقات، متوسط للقوائم المنسدلة، كبير للأدراج، وطبقة للنوافذ.
-- **الكثافة:** المريحة — نص 15، صف 48، حشو بطاقة 20. المضغوطة — نص 13، صف 32، حشو بطاقة 16.
-- **الحركة:** 120 و 200 مللي ثانية بمنحنى خروج ناعم، وتُلغى عند تفضيل تقليل الحركة.
+### 2.4 · Spacing, shape, elevation, motion
+- **4px scale only:** 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64 · 80.
+- **Radii — three steps:** 4 (buttons, inputs, badges) · 8 (cards, panels) · 14 (dialogs, bottom sheets) · full (avatars).
+- **Control heights:** 32 (compact) · 40 (default) · 48 (large storefront CTAs). Touch minimum 44.
+- **Shadows** soft with a warm brown tint: small for cards, medium for dropdowns, large for drawers, overlay for dialogs.
+- **Density:** comfortable — text 15, row 48, card padding 20. Compact — text 13, row 32, card padding 16.
+- **Motion:** 120ms and 200ms with a soft ease-out; honor reduced-motion.
 
-### 2.5 · الأيقونات والصور
-- أيقونات خطّية بسماكة 1.5 بكسل ونهايات مستديرة، بمقاسي 16 و 20 و 24.
-- صور المنتجات على خلفية محايدة فاتحة بنسبة 1:1 في البطاقات، و 4:5 في معرض صفحة المنتج.
-- لا رسوم كرتونية ولا صور أشخاص مصطنعة. الحالة الفارغة تقترح فعلاً حقيقياً.
-
----
-
-## 3 · قواعد ملزمة للواجهة
-
-### 3.1 · المال
-| القاعدة | مثال |
-|---------|------|
-| أرقام لاتينية دائماً | `79.00` لا `٧٩٫٠٠` |
-| خانات العملة نفسها | ريال `249.00 ر.س.` · دينار أردني `70.900 د.أ.` · دولار `US$ 500.00` · درهم `320.00 د.إ.` · جنيه `450.00 ج.م.` · دينار كويتي `12.750 د.ك.` |
-| الرمان للمبلغ لا لتسميته | «الإجمالي» بنص قوي، و `1,248.50 ر.س.` بالرمان |
-| السعر قبل الخصم | مشطوب بنص خافت بجانب السعر، مع شارة «−20%» بخلفية المال الخفيفة |
-| المبلغ السالب | بعلامة ناقص صريحة ولون الخطر في كشف الحساب: `−50.00 ر.س.` |
-
-### 3.2 · الاتجاه
-- التخطيط كله بالخصائص المنطقية: «بداية» و«نهاية» لا «يمين» و«يسار».
-- **ينعكس:** أسهم الرجوع والتالي، مؤشر الخطوات، الخط الزمني (يتقدّم من اليمين).
-- **لا ينعكس:** الشعار، أيقونات السلة والبحث والقلب، الرسوم البيانية الرقمية، رموز العلامات التجارية.
-- **يُعزل LTR داخل نص عربي:** `SKU: TS01-RED-M` · رقم التتبّع `SA123456789` · الهاتف `+966 50 123 4567` · رقم الطلب `BST-26-004821`. هذا أكثر عيب شائع — اعتنِ به في كل جدول.
-
-### 3.3 · الوصولية
-- تباين النص AA على السمتين (4.5:1 للعادي، 3:1 للكبير)، وحدود الحقول 3:1.
-- كل حقل له تسمية ظاهرة فوقه، والخطأ نصاً تحته بلون الخطر وأيقونة.
-- حالة التركيز مرئية على كل عنصر تفاعلي.
-
-### 3.4 · الحالات السبع لكل عنصر تفاعلي
-طبيعي · تمرير · تركيز · مضغوط · معطّل · تحميل · خطأ — صمّمها في ورقة المكوّنات مرة واحدة.
-
-### 3.5 · كتابة الرسائل — نصوص حقيقية من النظام
-استعمل هذه الصياغات كما هي:
-
-| الموقف | النص |
-|--------|------|
-| نفد منتج أثناء الدفع | نفد «قميص قطني مصري». يمكنك إتمام باقي الطلب، أو إزالته ومتابعة الشراء. |
-| كمية أقل من المطلوب | بقي 2 فقط من «سماعات لاسلكية». قلّل الكمية أو أزل الصنف لمتابعة الشراء. |
-| انتهاء مهلة الحجز | انتهت مهلة حجز سلّتك. نعيد المحاولة الآن — إن توفّر المخزون يكتمل الطلب. |
-| فشل الدفع | فشل الدفع: رفض البنك العملية. جرّب بطاقة أخرى أو الدفع عند الاستلام. |
-| سحب دون الحد | الحد الأدنى للسحب 187.50 ر.س. رصيدك يتراكم حتى يتجاوزه، ولا يضيع منه شيء. |
-| خفض مخزون تحت المحجوز | لا يمكن جعل المخزون 2 لأن 3 قطع محجوزة الآن لمشترين في صفحة الدفع. اختر 3 أو أكثر، أو انتظر حتى تنتهي مهلة الحجز. |
-| دخول خاطئ | البريد أو كلمة المرور غير صحيحة. |
-| خلل غير متوقّع | حدث خلل غير متوقّع ولم يكتمل طلبك. أعد المحاولة، وإن تكرّر أبلغنا بالرقم `req-8f3a2c`. |
-| موانع النشر (تُعرض كلها معاً) | لا يمكن إرسال المنتج بعد: المتجر لم يُعتمد بعد؛ سمات إلزامية للفئة لم تُملأ: الخامة. |
+### 2.5 · Icons and imagery
+- Outline icons, 1.5px stroke, rounded caps, at 16 / 20 / 24.
+- Product photos on light neutral backgrounds: 1:1 in cards, 4:5 in the product gallery.
+- No cartoons and no staged stock people. Empty states suggest a real next step.
 
 ---
 
-## 4 · المكوّنات
+## 3 · Binding UI rules
 
-صمّم **ورقة مكوّنات** قبل الشاشات (الدفعة 0)، بكل حالاتها وبالسمتين.
+### 3.1 · Money
+| Rule | Example |
+|------|---------|
+| Latin digits always | `79.00` not `٧٩٫٠٠` |
+| Currency's own decimals | SAR `249.00 ر.س.` · JOD `70.900 د.أ.` · USD `US$ 500.00` · AED `320.00 د.إ.` · EGP `450.00 ج.م.` · KWD `12.750 د.ك.` |
+| Teal for the amount, not its label | "الإجمالي / Total" in strong text; `1,248.50 ر.س.` in teal |
+| Compare-at price | Struck through in muted text next to the price, with a "−20%" badge on money-subtle background |
+| Negative amount | Explicit minus sign in danger color in statements: `−50.00 ر.س.` |
 
-### 4.1 · الـ 47 المعتمدة
-- **الأساسيات (12):** زر بخمسة أنواع (أساسي، ثانوي، خفيّ، خطر، رابط) · حقل نص · قائمة منسدلة · مربع اختيار · زر اختيار · مفتاح · مساحة نص · رافع ملفات · منتقي تاريخ · منتقي كمية · شريط بحث · شارة
-- **التخطيط (8):** بطاقة · لوحة · فاصل · شبكة · شريط علوي · شريط جانبي · تبويبات · مسار تنقّل
-- **البيانات (10):** جدول بفرز وتقسيم صفحات · صف جدول · حالة فارغة · حالة تحميل هيكلية · حالة خطأ · تقسيم صفحات · بطاقة إحصاء · خط شرارة · شريط تقدّم · مؤشر حالة
-- **التجارة (9):** بطاقة منتج · صورة مصغّرة · منتقي متغيّر · عرض السعر · شارة خصم · مؤشر توفّر · نجوم التقييم · بطاقة بائع · مجموعة سلة البائع
-- **الملاحظات (8):** تنبيه شريطي · إشعار عابر · نافذة · ورقة سفلية · تلميح · تأكيد · مؤشر خطوات · عدّاد تنازلي
+### 3.2 · Direction
+- Layout uses logical properties: "start" and "end", never "left" and "right".
+- **Mirror:** back/next arrows, stepper, timeline (progresses from the right in Arabic).
+- **Don't mirror:** logo, cart/search/heart icons, numeric charts, brand marks.
+- **Isolate LTR inside Arabic:** `SKU: TS01-RED-M` · tracking `SA1029384756` · phone `+966 50 123 4567` · order `BST-26-004821`. This is the most common RTL bug — get it right in every table.
 
-### 4.2 · مكوّنات تحتاجها الشاشات ولم تكن في الجرد
-| المكوّن | أين |
-|---------|-----|
-| شارة حالة لكل آلة حالات (القسم 7) | كل الطلبات والمنتجات والبائعين والسحب |
-| خط زمني للحالات | تتبّع الطلب، طلب السحب |
-| محرّر مصفوفة المتغيّرات | تحرير منتج |
-| رافع صور متعدد بترتيب بالسحب | تحرير منتج، طلب إرجاع |
-| شجرة قابلة للسحب | شجرة الفئات |
-| محادثة (خيط رسائل بمرفقات) | الرسائل، النزاعات |
-| منتقي موقع على خريطة | العناوين، إتمام الشراء |
-| مبدّل عملة العرض واللغة | ترويسة المتجر |
-| حقل رمز من 6 خانات | التحقق OTP، التحقق الثنائي |
-| رمز QR بسرّ نصّي | تفعيل التحقق الثنائي |
-| بطاقة الأرصدة الثلاثة | المحفظة |
-| قائمة موانع | إرسال منتج للمراجعة |
-| محرّر نص منسّق بسيط بمتغيّرات | صفحات المحتوى، قوالب الإشعارات |
-| منتقي نطاق تاريخ | التقارير، كشف الحساب، سجل التدقيق |
-| درج جانبي للتفاصيل | سجل الحركات، فروقات التدقيق |
-| ورقة فلاتر سفلية | قائمة الفئة على الجوال |
-| شريط إضافة للسلة ثابت | صفحة المنتج على الجوال |
+### 3.3 · Accessibility
+- Text contrast AA on both themes; input borders 3:1.
+- Every field has a visible label above it; the error is text below it, in danger color with an icon.
+- Visible focus on every interactive element.
 
-### 4.3 · بطاقة المنتج — التشريح
-صورة 1:1 · قلب المفضلة في الزاوية · شارة خصم إن وُجد · اسم المنتج بسطرين أقصى · اسم المتجر بنص خافت · نجوم وعدد التقييمات · السعر بالرمان والسعر قبل الخصم مشطوباً · «بقي 3 فقط» بلون التنبيه تحت العتبة · بطاقة «نفد» بتعتيم الصورة ونص صريح.
+### 3.4 · The seven states of every interactive element
+Default · Hover · Focus · Pressed · Disabled · Loading · Error — defined once in the component sheet.
 
-### 4.4 · منتقي المتغيّر
-اللون عيّنات دائرية بلونها الحقيقي واسمه عند التمرير · المقاس رقائق نصية · **التركيبة غير المتوفرة تظهر معطّلة بخط مائل عليها، لا مخفية** · اختيار متغيّر يحدّث السعر والصور والتوفّر في مكانها.
+### 3.5 · Real system copy — use as written
+The UI is Arabic; English is provided for understanding and for the LTR variants.
 
----
+| Situation | Arabic (UI) | English |
+|-----------|-------------|---------|
+| Out of stock at checkout | نفد «قميص قطني مصري». يمكنك إتمام باقي الطلب، أو إزالته ومتابعة الشراء. | "Egyptian Cotton Shirt" is sold out. You can complete the rest of the order, or remove it and continue. |
+| Less stock than requested | بقي 2 فقط من «سماعات لاسلكية». قلّل الكمية أو أزل الصنف لمتابعة الشراء. | Only 2 "Wireless Headphones" left. Reduce the quantity or remove the item to continue. |
+| Reservation expired | انتهت مهلة حجز سلّتك. نعيد المحاولة الآن — إن توفّر المخزون يكتمل الطلب. | Your cart reservation expired. Retrying now — if stock is available, the order completes. |
+| Payment failed | فشل الدفع: رفض البنك العملية. جرّب بطاقة أخرى أو الدفع عند الاستلام. | Payment failed: the bank declined it. Try another card or cash on delivery. |
+| Payout below minimum | الحد الأدنى للسحب 187.50 ر.س. رصيدك يتراكم حتى يتجاوزه، ولا يضيع منه شيء. | Minimum payout is 187.50 SAR. Your balance accumulates until it passes it — nothing is lost. |
+| Stock below reserved | لا يمكن جعل المخزون 2 لأن 3 قطع محجوزة الآن لمشترين في صفحة الدفع. اختر 3 أو أكثر، أو انتظر حتى تنتهي مهلة الحجز. | Can't set stock to 2 because 3 units are reserved by buyers in checkout. Choose 3 or more, or wait for the reservation to expire. |
+| Wrong login | البريد أو كلمة المرور غير صحيحة. | Email or password is incorrect. |
+| Unexpected failure | حدث خلل غير متوقّع ولم يكتمل طلبك. أعد المحاولة، وإن تكرّر أبلغنا بالرقم `req-8f3a2c`. | An unexpected failure stopped your request. Try again; if it repeats, report reference `req-8f3a2c`. |
+| Submit blockers (shown together) | لا يمكن إرسال المنتج بعد: المتجر لم يُعتمد بعد؛ سمات إلزامية للفئة لم تُملأ: الخامة. | Can't submit the product yet: the shop isn't approved; required category attributes missing: Material. |
+| Published product edited | عدّلت محتوى منتج منشور — عاد إلى المراجعة ويظهر في المتجر بعد اعتماده. | You edited a published product's content — it's back in review and returns to the store once approved. |
 
-## 5 · الأصداف والتنقّل
+### 3.6 · Glossary — Arabic UI terms
 
-### 5.1 · المتجر
-**ترويسة سطح المكتب:** الشعار · زر «الأقسام» بقائمة ضخمة من ثلاثة مستويات · شريط البحث في الوسط مع اقتراحات · مبدّل عملة العرض (`SAR ▾`) واللغة (`EN`) · حسابي · المفضلة بعدد · السلة بعدد ومجموعها بالرمان.
-**ترويسة الجوال:** الشعار · أيقونة بحث تفتح بحثاً بملء الشاشة · السلة.
-**شريط سفلي على الجوال:** الرئيسية · الأقسام · البحث · السلة · حسابي.
-**التذييل:** من نحن · الأسئلة الشائعة · سياسة الإرجاع · الشروط · الخصوصية · تواصل معنا · **كن بائعاً** · وسائل الدفع · زر «ثبّت التطبيق» · حقوق النشر.
-
-### 5.2 · لوحة البائع
-**شريط جانبي:** الرئيسية · المنتجات · المخزون · الطلبات (بعدد ما ينتظر القبول) · المرتجعات والنزاعات · الرسائل · الشحن · المحفظة · التقارير · ملف المتجر · الإعدادات.
-**شريط علوي:** اسم المتجر وشارة حالته (معتمد/قيد المراجعة/معلَّق) · بحث سريع · الإشعارات · الحساب.
-**الجوال:** الشريط الجانبي درج، والجداول تتحوّل بطاقات مكدّسة بأهم عمودين.
-
-### 5.3 · لوحة الإدارة
-**شريط جانبي مجمّع:**
-- **نظرة عامة:** لوحة المؤشرات
-- **التشغيل:** البائعون · مراجعة المنتجات · الطلبات · المرتجعات · النزاعات · العملاء · مراجعات المنتجات
-- **الكتالوج:** شجرة الفئات · السمات
-- **المال:** قواعد العمولة · طلبات السحب · العملات وأسعار الصرف · التقارير
-- **التسويق:** الكوبونات · الحملات والمنتجات المميّزة · الرئيسية والبانرات والقوائم · صفحات المحتوى
-- **النظام:** قوالب الإشعارات · مستخدمو الإدارة · سجل التدقيق · إعدادات المنصة
-
-**الصلاحيات تحكم ما يظهر.** البنود والأزرار المرتبطة بصلاحية لا يملكها الإداري لا تظهر: `vendors.approve` · `payouts.approve` · `commissions.edit` · `disputes.resolve` · `catalog.manage` · `orders.cancel`.
+| English | Arabic | | English | Arabic |
+|---------|--------|-|---------|--------|
+| Add to cart | أضف إلى السلة | | Submit for review | أرسل للمراجعة |
+| Checkout | إتمام الشراء | | In review | قيد المراجعة |
+| Pay | ادفع | | Published | منشور |
+| My orders | طلباتي | | Rejected | مرفوض |
+| Wishlist | المفضلة | | Draft | مسودة |
+| Categories | الأقسام | | Inventory | المخزون |
+| Search | ابحث | | Wallet | المحفظة |
+| Shipping | الشحن | | Payout request | طلب سحب |
+| Return request | طلب إرجاع | | Available / Pending / Withdrawn | متاح / معلّق / مسحوب |
+| Open a dispute | افتح نزاعاً | | Approve / Reject | اعتمد / ارفض |
+| Sold out | نفد | | Reason (required) | السبب (إلزامي) |
+| Only N left | بقي N فقط | | Export | تصدير |
+| Sell on Basta | كن بائعاً | | Audit log | سجل التدقيق |
 
 ---
 
-## 6 · جرد الشاشات الكامل — 86 شاشة
+## 4 · Components
 
-> **الترميز:** `ST` المتجر · `SH` مشترك · `VD` لوحة البائع · `AD` لوحة الإدارة.
-> **(إضافة)** = شاشة لم تكن في جرد الـ 47 الأصلي، وتفرضها المتطلبات أو العرض الفني. القسم 10 يطابق الـ 47 برموزها.
-> لكل شاشة: الهدف · المحتوى بترتيبه · الحالات · الإجراءات · ملاحظة الجوال.
+Design a **component sheet** before the screens (Batch 0), with every state, in both themes.
 
----
+### 4.1 · The 47 approved components
+- **Basics (12):** Button in five kinds (primary, secondary, ghost, danger, link) · Text input · Select · Checkbox · Radio · Switch · Textarea · File uploader · Date picker · Quantity stepper · Search bar · Badge
+- **Layout (8):** Card · Panel · Divider · Grid · Top bar · Sidebar · Tabs · Breadcrumbs
+- **Data (10):** Table with sort and pagination · Table row · Empty state · Skeleton loading · Error state · Pagination · Stat card · Sparkline · Progress bar · Status indicator
+- **Commerce (9):** Product card · Thumbnail · Variant picker · Price display · Discount badge · Availability indicator · Rating stars · Vendor card · Vendor cart group
+- **Feedback (8):** Inline alert · Toast · Modal · Bottom sheet · Tooltip · Confirmation · Stepper · Countdown timer
 
-### 6.1 · المتجر — 31 شاشة
+### 4.2 · Components the screens need beyond the original list
+| Component | Used in |
+|-----------|---------|
+| Status badge per state machine (§9) | All orders, products, vendors, payouts |
+| Status timeline | Order tracking, payout request |
+| Variant matrix editor | Product editor |
+| Multi-image uploader with drag-to-reorder | Product editor, return request |
+| Draggable tree | Category tree |
+| Message thread with attachments | Messages, disputes |
+| Map location picker | Addresses, checkout |
+| Display-currency & language switcher | Storefront header |
+| 6-digit code input | OTP, two-factor |
+| QR code with text secret | Two-factor setup |
+| Three-balance card | Wallet |
+| Blocker list | Submit for review |
+| Simple rich-text editor with variable chips | Content pages, notification templates |
+| Date-range picker | Reports, statements, audit log |
+| Side detail drawer | Stock movements, audit diffs |
+| Filter bottom sheet | Category list on mobile |
+| Sticky add-to-cart bar | Product page on mobile |
+| State switcher (prototype-only) | Every batch — preview empty/loading/error/edge |
 
-#### ST-01 · الرئيسية — `/`
-**الهدف:** مدخل الاكتشاف لمشترٍ جديد، وثقة بسوق لا يعرفه.
-**المحتوى:**
-1. بانر بطل متحرك (1–5 شرائح تديرها الإدارة) بعنوان وزر
-2. شريط الأقسام الرئيسية بأيقونات: إلكترونيات وأجهزة · ملابس وأحذية · جمال وعناية · منزل ومطبخ · بقالة ومواد غذائية · يدويّات وحرف
-3. قسم حملة أو «منتجات مميّزة» تديره الإدارة
-4. «عروض اليوم» — بطاقات بأسعار مخفّضة
-5. «متاجر مختارة» — بطاقات بائعين بشعار وتقييم
-6. «شوهدت مؤخراً» — يظهر فقط إن وُجدت
-7. «وصل حديثاً» في كل قسم رئيسي
-8. شريط ثقة: بائعون موثّقون · إرجاع خلال 14 يوماً · دفع آمن أو عند الاستلام
-**الحالات:** تحميل هيكلي · منصة بلا منتجات بعد (أقسام تقترح التصفّح لا فراغ)
-**الجوال:** البانر بعرض كامل، والأقسام تمرير أفقي.
+### 4.3 · Product card — anatomy
+1:1 image · wishlist heart in the corner · discount badge if any · product name, max two lines · shop name in muted text · stars and review count · price in teal with struck compare-at price · "بقي 3 فقط" in warning color under the threshold · "نفد" state with dimmed image and explicit text.
+**Interactions:** hover lifts the card (shadow-md) and shows a second image; heart toggles with a toast; tapping opens the product page.
 
-#### ST-02 · كل الأقسام — `/categories` · (إضافة)
-**الهدف:** تصفّح الشجرة كاملة، وضروري على الجوال.
-**المحتوى:** الأقسام الرئيسية بأيقونات، وكل قسم يفتح فروعه حتى أربعة مستويات (مثال: ملابس وأحذية ← ملابس رجالية).
-**الجوال:** قائمة متدرّجة بمسار رجوع.
-
-#### ST-03 · قائمة الفئة — `/c/[slug]`
-**الهدف:** الوصول للمنتج المناسب بسرعة بالتصفية.
-**المحتوى:**
-1. مسار تنقّل · عنوان الفئة · عدد النتائج
-2. الفئات الفرعية كرقائق
-3. **الفلاتر:** السعر (نطاق) · الماركة · التقييم · البائع · سمات الفئة (اللون عيّنات، المقاس رقائق) — **بجانب كل خيار عدد نتائجه**
-4. الترتيب: الأكثر صلة · الأحدث · الأقل سعراً · الأعلى سعراً · الأعلى تقييماً
-5. رقائق الفلاتر المطبّقة بزر «مسح الكل»
-6. شبكة بطاقات منتجات (4 أعمدة على المكتب، 2 على الجوال) · تقسيم صفحات أو «تحميل المزيد»
-**الحالات:** تحميل · فلاتر لا تُرجع شيئاً (اقتراح إزالة آخر فلتر) · فئة فارغة
-**الجوال:** زرّا «تصفية» و«ترتيب» ثابتان أعلى القائمة، والفلاتر ورقة سفلية بزر «عرض 128 نتيجة».
-**ملاحظة:** الفلاتر تنعكس في الرابط، فالتصميم يحتاج حالة «رابط مشارَك بفلاتر مطبّقة».
-
-#### ST-04 · نتائج البحث — `/search?q=`
-**المحتوى:** «نتائج «موبايل»» · تصحيح إن وُجد: «عرض نتائج «موبايل» بدل «موبيل»» · تبويبات: المنتجات · المتاجر · الفلاتر والترتيب كقائمة الفئة · شبكة النتائج.
-
-#### ST-05 · بحث بلا نتائج — حالة
-**المحتوى:** «لا نتائج لـ «سماعه بلوتوث زرقا»» · «هل تقصد: سماعة بلوتوث زرقاء؟» رابطاً · بدائل مقترحة (منتجات قريبة) · الأقسام الأكثر تصفّحاً · **لا صفحة فارغة ولا رسم كرتوني**.
-
-#### ST-06 · اقتراحات البحث — طبقة فوق الشريط · (إضافة)
-**تظهر بعد 3 أحرف.** مجموعات: منتجات (صورة صغيرة، اسم، سعر) · فئات · متاجر · آخر عمليات بحثك (قبل الكتابة) · إبراز الجزء المطابق من النص.
-**الجوال:** بملء الشاشة.
-
-#### ST-07 · صفحة المنتج — `/p/[slug]`
-**الهدف:** كل ما يلزم قرار الشراء في صفحة واحدة.
-**المحتوى:**
-1. مسار تنقّل
-2. **معرض الصور** (4:5) بصور مصغّرة وتكبير عند التمرير أو اللمس
-3. الاسم · المتجر رابطاً مع شارة «موثّق» وتقييمه · النجوم وعدد التقييمات
-4. **السعر بالرمان** · السعر قبل الخصم مشطوباً · شارة الخصم
-5. **منتقي المتغيّر:** اللون ثم المقاس (التركيبات غير المتوفرة معطّلة)
-6. **التوفّر:** «متوفر» · «بقي 3 فقط» تحت العتبة · «نفد»
-7. منتقي الكمية · **أضف إلى السلة** (زر أساسي كبير) · المفضلة · قارن
-8. **الشحن لمنطقتك:** «الشحن إلى الرياض 15.00 ر.س. · التوصيل خلال 2–4 أيام» مع تغيير المنطقة · سياسة إرجاع المتجر مختصرة
-9. تبويبات أو أقسام: الوصف · المواصفات (جدول سمات: الخامة، مدة الضمان…) · التقييمات (موثّقة بشراء، توزيع النجوم، ترتيب) · أسئلة للبائع
-10. «من المتجر نفسه» · «منتجات مشابهة» · «شوهدت مؤخراً»
-**الحالات:** تحميل · متغيّر نفد (ST-08) · تركيبة غير متوفرة · منطقة لا يشحن إليها البائع («هذا المتجر لا يشحن إلى إربد» والزر يبقى فعّالاً للإضافة مع تنبيه) · منتج بلا تقييمات
-**الجوال:** المعرض بعرض كامل بمؤشر نقاط، و**شريط ثابت أسفل الشاشة**: السعر + أضف إلى السلة.
-**LTR:** صمّم نسخة إنجليزية من هذه الشاشة.
-
-#### ST-08 · منتج نفد — حالة
-شارة «نفد» · زر الإضافة معطّل بنص «نفد» · «أبلغني عند التوفّر» · متغيّرات أخرى متوفرة إن وُجدت · بدائل مشابهة.
-
-#### ST-09 · سؤال البائع — نافذة · (إضافة)
-حقل السؤال · اسم المنتج والمتغيّر مرفقان تلقائياً · «يرد المتجر عادةً عبر رسائلك» · للزائر غير المسجّل: دعوة لتسجيل الدخول أولاً.
-
-#### ST-10 · المقارنة — `/compare` · (إضافة)
-حتى 4 منتجات من الفئة نفسها · صفوف: الصورة، السعر، التقييم، المتجر، الشحن، ثم سمات الفئة · إبراز الفروق · إزالة منتج · شريط مقارنة عائم يظهر في القوائم عند اختيار منتجين أو أكثر.
-**الجوال:** منتجان جنباً إلى جنب بتمرير أفقي.
-
-#### ST-11 · صفحة البائع — `/s/[slug]`
-**المحتوى:** غلاف · شعار (لا ينعكس) · الاسم وشارة «موثّق» · التقييم وعدده · «على بسطة منذ 2026» · الوصف · سياسة الشحن · سياسة الإرجاع · زر «راسل المتجر» · منتجات المتجر بفلاتر وترتيب · التقييمات.
-
-#### ST-12 · بائع معلَّق — حالة
-الغلاف والاسم باقيان · رسالة **محايدة لا تشهّر**: «هذا المتجر لا يستقبل طلبات حالياً.» · لا منتجات · متاجر مشابهة.
-
-#### ST-13 · السلة — `/cart` + السلة المصغّرة (درج)
-**الهدف:** سلة واحدة من عدة متاجر، بلا مفاجآت في السعر.
-**المحتوى:**
-1. **مجموعات حسب البائع** — لكل مجموعة: اسم المتجر · الأصناف (صورة، اسم، المتغيّر، سعر الوحدة، منتقي كمية، إزالة، نقل للمفضلة) · المجموع الفرعي · **شحن هذا المتجر** · مدة التوصيل
-2. **تنبيه تغيّر السعر** على الصنف: «تغيّر السعر من 99.00 إلى 79.00 ر.س. منذ أضفته»
-3. **منطقة غير مغطاة:** مجموعة ذلك المتجر وحدها معلَّمة «لا يشحن إلى منطقتك — أزل أصنافه لمتابعة الباقي»، وباقي السلة يكمل
-4. حقل الكوبون
-5. **الملخّص:** البضاعة · الشحن (مجموع المتاجر) · الضريبة · الخصم · **الإجمالي بالرمان** · عملة العرض قابلة للتبديل
-6. زر «إتمام الشراء» · «السعر يُثبَّت ويُحجز المخزون عند الدفع»
-**الحالات:** تحميل · سلة ضيف دُمجت بعد الدخول («أضفنا 2 من أصنافك السابقة») · منتج صار نفد داخل السلة
-**السلة المصغّرة:** درج جانبي بعد الإضافة: الصنف المضاف · عدد الأصناف · المجموع · «عرض السلة» و«إتمام الشراء».
-**الجوال:** الملخّص ورقة ثابتة أسفل الشاشة بالإجمالي والزر.
-
-#### ST-14 · سلة فارغة — حالة
-«سلّتك فارغة» · أقسام حقيقية للتصفّح · «شوهدت مؤخراً» · زر «تصفّح المنتجات». بلا رسم كرتوني.
-
-#### ST-15 · إتمام الشراء — `/checkout`
-**الهدف:** إتمام بخطوة واحدة، وكل كلفة ظاهرة قبل الدفع.
-**المحتوى — صفحة واحدة بأقسام متتالية:**
-- **عدّاد ثابت أعلى الصفحة:** «حجزنا أصنافك · 14:32» — يتحوّل لون التنبيه في آخر دقيقتين
-1. **التواصل:** للضيف البريد والهاتف · للمسجّل بياناته مع «تغيير»
-2. **العنوان:** العناوين المحفوظة كبطاقات اختيار · «عنوان جديد» بحقول: الدولة، المنطقة، المدينة، الحي، الشارع، المبنى، الطابق، علامة مميّزة، اسم المستلم، الهاتف · **تثبيت الموقع على خريطة**
-3. **الشحن لكل متجر:** بطاقة لكل متجر بأصنافه وطريقة شحنه وكلفتها ومدتها
-4. **الدفع:** بطاقة (حقول البطاقة من البوابة) · الدفع عند الاستلام إن أتاحه المتجر · محفظة رقمية
-5. **المراجعة:** «سيصلك طلبك في 3 شحنات من 3 متاجر» مع بطاقة لكل طلب فرعي
-6. **الملخّص الثابت:** البضاعة · الشحن · الضريبة · الخصم · **الإجمالي بالرمان** · «يُخصم منك بالريال السعودي» · زر «ادفع 1,248.50 ر.س.»
-**الحالات — كلها تُصمَّم:**
-- **نفاد عند الدخول:** الصفحة لا تفتح؛ مكانها «نفد «قميص قطني مصري»» مع «أزله وتابع بالباقي» و«عد للسلة»
-- **انتهاء المهلة:** شريط «انتهت مهلة الحجز — نعيد الحجز الآن…» ثم نجاح أو رسالة نفاد
-- **منطقة غير مغطاة لمتجر:** بطاقته معلَّمة والباقي يكمل
-- **تحقق البنك (3-D Secure):** نافذة البوابة فوق الصفحة
-- **جارٍ الدفع:** الزر في حالة تحميل والصفحة مقفلة
-- **خطأ في حقل:** تحت الحقل مباشرة
-**الجوال:** الأقسام متتالية بعناوين مطوية بعد إكمالها، والعدّاد والإجمالي والزر ثابتة.
-**LTR:** صمّم نسخة إنجليزية.
-
-#### ST-16 · فشل الدفع — `/checkout/failed`
-**سبب محدد لا عام:** «فشل الدفع: رفض البنك العملية.» · ماذا تفعل: «جرّب بطاقة أخرى أو الدفع عند الاستلام» · «سلّتك محفوظة كاملة» · زر «أعد المحاولة» · «غيّر طريقة الدفع» · **لم يُخصم منك شيء**.
-
-#### ST-17 · نجاح الطلب — `/orders/[number]/confirmed`
-«تم استلام طلبك» · رقم الطلب `BST-26-004821` قابل للنسخ · **بطاقة لكل طلب فرعي منفصلة من اللحظة الأولى:** المتجر · الأصناف · الحالة «بانتظار قبول المتجر» · موعد التوصيل المتوقّع · المبلغ المدفوع وعملته · ماذا بعد (المتجر يقبل خلال 48 ساعة، ستصلك إشعارات) · للضيف: «أنشئ حساباً بكلمة مرور لتتبّع طلباتك» · «تابع التسوّق».
-
-#### ST-18 · طلباتي — `/account/orders`
-قائمة الطلبات الأب: الرقم · التاريخ · الإجمالي · **الحالة المشتقّة** · رقائق صغيرة لحالة كل طلب فرعي · فلتر: الكل · قيد التنفيذ · مكتملة · ملغاة · بحث بالرقم.
-**الحالات:** لا طلبات بعد (اقتراح التصفّح) · تحميل.
-
-#### ST-19 · تفاصيل الطلب والتتبّع — `/account/orders/[number]`
-**المحتوى:**
-1. رأس الطلب: الرقم · التاريخ · حالة الطلب الأب · عنوان الشحن · طريقة الدفع
-2. **لكل طلب فرعي بطاقة مستقلة:** المتجر · الرقم الفرعي `BST-26-004821-B` · **خط زمني للحالات** بتواريخها · شركة الشحن و**رقم التتبّع معزولاً LTR** قابلاً للنسخ · أحداث الشحنة · الأصناف · مجموعه
-3. **الإجراءات تظهر حسب الحالة فقط:**
-   - «ألغِ» في «بانتظار قبول المتجر» و«مقبول» فقط
-   - «اطلب إرجاعاً» بعد «تم التسليم» وداخل المهلة: «متبقٍ 9 أيام للإرجاع»
-   - «افتح نزاعاً» · «قيّم المنتج» لكل صنف بعد التسليم
-   - «راسل المتجر»
-4. الملخّص المالي: البضاعة · الشحن · الضريبة · الخصم · الإجمالي · المسترد إن وُجد
-**الحالات:** طلب فرعي ملغى وإخوته مستمرون · تعذّر التوصيل · مرتجع ومسترد.
-
-#### ST-20 · طلب إرجاع — `/account/orders/[number]/return`
-اختيار الأصناف والكمية · سبب من قائمة (مقاس غير مناسب، تالف، مختلف عن الوصف، أخرى) · وصف · **صور** · معاينة المبلغ المسترد · «متبقٍ 9 أيام» · إرسال · ثم حالة الطلب: مُرسل · مقبول · مستلَم · مرفوض بسبب.
-
-#### ST-21 · النزاع — فتح ومحادثة · (إضافة)
-فتح: الطلب الفرعي · ضد المتجر · السبب · الوصف · مرفقات.
-المحادثة: خيط رسائل بين المشتري والمتجر والإدارة بأدوار مميّزة · الحالة · «تدخّلت الإدارة» · قرار الإدارة ونتيجته المالية.
-
-#### ST-22 · كتابة تقييم — نافذة أو صفحة · (إضافة)
-للصنف المستلَم فقط: النجوم · عنوان · نص · «تقييم موثّق بشراء» · حالة «بانتظار النشر».
-
-#### ST-23 · المفضلة — `/account/wishlist`
-بطاقات منتجات · تنبيه تغيّر السعر أو النفاد · نقل للسلة · إزالة.
-**الحالة الفارغة:** اقتراح أقسام.
-
-#### ST-24 · شوهدت مؤخراً — `/account/recent` · (إضافة)
-شبكة بآخر المنتجات المشاهدة · مسح السجل.
-
-#### ST-25 · الحساب — الملف والأمان والجلسات — `/account`
-**الملف:** الاسم · البريد وشارة «موثّق» أو «غير موثّق» مع «أرسل رمز التحقق» · الهاتف وتوثيقه برمز.
-**الأمان:** تغيير كلمة المرور · التحقق الثنائي (اختياري للمشتري).
-**الجلسات النشطة:** الأجهزة والمتصفحات وآخر نشاط · «إنهاء كل الجلسات».
-**التفضيلات:** اللغة · عملة العرض الافتراضية · قنوات الإشعارات (بريد، رسائل نصية، واتساب، إشعارات المتصفح).
-**الجوال:** قائمة أقسام تفتح كل واحد بصفحة.
-
-#### ST-26 · العناوين — `/account/addresses`
-بطاقات العناوين بتسمية (المنزل، العمل) · «الافتراضي» · إضافة وتعديل بحقول العنوان والخريطة · حذف.
-
-#### ST-27 · مركز الإشعارات — `/account/notifications` · (إضافة)
-قائمة زمنية: تغيّر حالة طلب · رقم تتبّع · رد متجر · قرار نزاع · غير مقروء بإبراز · «تحديد الكل كمقروء».
-يُستعمل النمط نفسه في لوحتي البائع والإدارة بكثافة مضغوطة.
-
-#### ST-28 · رسائلي — `/account/messages` · (إضافة)
-قائمة المحادثات بالمتاجر (المنتج أو الطلب المرتبط) · خيط الرسائل · مرفقات. **ليست دردشة حيّة** — رسائل غير متزامنة.
-
-#### ST-29 · كن بائعاً — `/sell` · (إضافة)
-صفحة تسويقية للبائعين: «بِع لعملاء من الخليج والشام ومصر» · **عمولة من كل بيع فقط، بلا اشتراك** · «تسعّر وتُحصّل بعملتك» · «مستحقاتك تُحرَّر بعد 14 يوماً من التسليم» · الخطوات الأربع (سجّل، ارفع وثائقك، نراجع، ابدأ البيع) · أسئلة شائعة · زر «سجّل متجرك».
-
-#### ST-30 · صفحة محتوى — `/pages/[slug]` · (إضافة)
-**قالب واحد** لـ: من نحن · الأسئلة الشائعة · سياسة الإرجاع · الشروط والأحكام · سياسة الخصوصية · تواصل معنا.
-العنوان · تاريخ آخر تحديث · فهرس للصفحات الطويلة · نص جارٍ بعرض 68 حرفاً · الأسئلة الشائعة بأكورديون.
-
-#### ST-31 · تتبّع طلب ضيف — `/track` · (إضافة)
-للمشتري بلا حساب: رقم الطلب + البريد أو الهاتف · ثم عرض ST-19 بلا إجراءات الحساب.
+### 4.4 · Variant picker
+Color as round swatches in the real color with the name on hover · size as text chips · **unavailable combinations shown disabled with a diagonal strike, not hidden** · choosing a variant updates price, images and availability in place.
 
 ---
 
-### 6.2 · مشتركة — 8 شاشات · (كلها إضافة)
+## 5 · Interactivity — what "interactive" means for this project
 
-#### SH-01 · تسجيل الدخول — `/login`
-البريد · كلمة المرور · «نسيت كلمة المرور؟» · «ليس لديك حساب؟ أنشئ حساباً» · خطأ عام «البريد أو كلمة المرور غير صحيحة» · **حالة الحظر المؤقت** بعد محاولات كثيرة: «محاولات كثيرة من هذا الجهاز. انتظر 15 دقيقة ثم أعد المحاولة.»
+Every batch is delivered as a **clickable prototype**. Minimum behavior:
 
-#### SH-02 · إنشاء حساب — `/register`
-الاسم · البريد · كلمة المرور (8 أحرف على الأقل، مؤشر قوة) · الهاتف اختياري بصيغة دولية مع اختيار الدولة · موافقة على الشروط · بعده SH-03.
+### 5.1 · Global
+- **Navigation:** header, sidebar, breadcrumbs, cards and buttons link to the batch's screens. Back works.
+- **Theme & direction toggles** in a prototype toolbar: Light/Dark and Arabic RTL / English LTR, switching live.
+- **State switcher** per screen: Default · Loading (skeleton) · Empty · Error · the screen's edge states listed in §8.
+- **Transitions:** 200ms fades and slides for drawers, sheets and dialogs; skeletons resolve to content; toasts auto-dismiss after 4 seconds.
+- **Micro-interactions:** hover, focus ring, pressed and loading states on buttons; inline validation on blur; optimistic toggles with toast confirmation.
 
-#### SH-03 · رمز التحقق — `/verify`
-«أرسلنا رمزاً من 6 أرقام إلى `+966 50 •••• 567`» · حقل 6 خانات · «ينتهي خلال 09:41» · «أعد الإرسال» بعد مهلة · بعد 5 محاولات خاطئة: «أُبطل الرمز. اطلب رمزاً جديداً.»
+### 5.2 · Flows that must work end-to-end in the prototype
+| Flow | Steps to click through |
+|------|------------------------|
+| **Buy** | Home → category → filter → product → choose color & size (price/stock update) → add to cart (mini-cart drawer) → cart (change qty, totals recalc, apply coupon) → checkout (countdown ticks, choose address, per-vendor shipping, pay) → success with split sub-orders |
+| **Checkout failure** | Pay → 3-D Secure dialog → declined → payment failed page → retry keeps cart |
+| **Track & return** | My orders → order detail (sub-order timelines) → request return (select items, upload photo) → submitted state |
+| **Vendor onboarding** | Register → documents upload (progress) → in-review → approved → pick settlement currency (confirm dialog) → store profile |
+| **Create & submit product** | Products → new → pick category (attributes appear) → build variant matrix (rows generate) → upload images → submit → blocker list → fix → in review |
+| **Fulfil an order** | Orders (accept countdown) → detail → accept → prepare → ship (tracking required) → delivered |
+| **Import** | Download template → upload file (progress) → report 488/500 with 12 rejected lines → filter by column |
+| **Admin product review** | Queue → open product → reject with reason (vendor sees it) / approve → next in queue |
+| **Payout** | Vendor: wallet → request payout (min-amount validation) · Admin: queue → approve → record transfer reference |
 
-#### SH-04 · نسيت كلمة المرور — `/forgot` و `/reset`
-إدخال البريد · «إن كان البريد مسجّلاً ستصلك رسالة» (لا يكشف وجود الحساب) · صفحة كلمة المرور الجديدة.
-
-#### SH-05 · الصفحة غير موجودة — 404
-«لم نجد هذه الصفحة» · شريط بحث · الأقسام الرئيسية · العودة للرئيسية.
-
-#### SH-06 · خلل غير متوقّع — 500
-النص من القسم 3.5 **برقم الطلب قابلاً للنسخ** · «أعد المحاولة» · «تواصل معنا».
-
-#### SH-07 · دون اتصال — PWA
-«لا اتصال بالإنترنت» · ما يُتاح دون اتصال: شوهدت مؤخراً والسلة للعرض فقط · «أعد المحاولة».
-
-#### SH-08 · دعوة تثبيت التطبيق — مكوّن
-ورقة سفلية على الجوال: أيقونة التطبيق · «ثبّت بسطة على شاشتك الرئيسية — إشعارات طلباتك بلا تطبيق من المتجر» · «ثبّت» · «لاحقاً».
+### 5.3 · Live calculations to simulate
+Cart and checkout totals (items + shipping + tax − discount) · currency switch re-renders all amounts with correct decimals · checkout countdown from 15:00 turning warning under 2:00 · vendor 48-hour accept countdown · variant matrix row generation from chosen options · import progress bar · wallet balances after a payout request.
 
 ---
 
-### 6.3 · لوحة البائع — 21 شاشة
+## 6 · Shells and navigation
 
-> التأهيل (VD-01 إلى VD-05) بصفحات كاملة بمؤشر خطوات، لا داخل صدفة اللوحة.
-> **مسار التأهيل:** تسجيل ← وثائق ← قيد المراجعة ← (قبول) ← عملة التسوية ← ملف المتجر ← الشحن ← أول منتج ← إرسال للمراجعة.
+### 6.1 · Storefront
+**Desktop header:** logo · "Categories" button with a three-level mega menu · central search bar with suggestions · display-currency switcher (`SAR ▾`) and language (`EN`) · account · wishlist with count · cart with count and total in teal.
+**Mobile header:** logo · search icon opening full-screen search · cart.
+**Mobile bottom tab bar:** Home · Categories · Search · Cart · Account.
+**Footer:** About · FAQ · Return policy · Terms · Privacy · Contact · **Sell on Basta** · payment methods · "Install the app" · copyright.
 
-#### VD-01 · تسجيل البائع — `/vendor/register`
-مؤشر خطوات: الحساب · المتجر · الوثائق · المراجعة.
-**الحساب:** الاسم · البريد · كلمة المرور · الهاتف.
-**المتجر:** اسم المتجر عربي وإنجليزي · الرابط `basta.com/s/dar-alqutn` · الدولة · نوع النشاط · الفئة الرئيسية.
+### 6.2 · Vendor Dashboard
+**Sidebar:** Home · Products · Inventory · Orders (count awaiting acceptance) · Returns & disputes · Messages · Shipping · Wallet · Reports · Store profile · Settings.
+**Top bar:** shop name with status badge (approved / in review / suspended) · quick search · notifications · account.
+**Mobile:** sidebar becomes a drawer; tables become stacked cards showing the two most important columns.
 
-#### VD-02 · رفع الوثائق — `/vendor/onboarding/documents`
-أربع بطاقات رفع: السجل التجاري · الهوية الوطنية · البطاقة الضريبية · إثبات الحساب البنكي · لكل بطاقة: الصيغ والحد (PDF أو صورة) · معاينة · استبدال · حالة كل وثيقة (مرفوعة، مقبولة، مرفوضة بسبب).
-**الحساب البنكي:** اسم صاحب الحساب · IBAN (معزول LTR) · البنك · SWIFT.
+### 6.3 · Admin Dashboard
+**Grouped sidebar:**
+- **Overview:** Dashboard
+- **Operations:** Vendors · Product review · Orders · Returns · Disputes · Customers · Product reviews
+- **Catalog:** Category tree · Attributes
+- **Money:** Commission rules · Payout requests · Currencies & FX · Reports
+- **Marketing:** Coupons · Campaigns & featured · Home, banners & menus · Content pages
+- **System:** Notification templates · Admin users · Audit log · Platform settings
 
-#### VD-03 · قيد المراجعة / مرفوض — `/vendor/onboarding/status`
-**قيد المراجعة:** «نراجع وثائق متجرك» · ماذا تفعل الآن: «أنشئ منتجاتك كمسودات، تُرسل للمراجعة بعد اعتماد متجرك» · زر لإعداد المنتجات.
-**مرفوض:** السبب مكتوباً كما كتبته الإدارة · الوثيقة المرفوضة معلَّمة · «أعد الرفع».
+**Permissions drive visibility.** Items and buttons tied to a permission the admin lacks are not shown: `vendors.approve` · `payouts.approve` · `commissions.edit` · `disputes.resolve` · `catalog.manage` · `orders.cancel`.
 
-#### VD-04 · اختيار عملة التسوية — `/vendor/onboarding/currency` · (إضافة)
-**قرار غير رجعي — يُصمَّم بجدية:** «العملة التي تسعّر بها منتجاتك وتُحصّل بها مستحقاتك» · بطاقات العملات السبع باسمها ورمزها · **تحذير صريح بلون التنبيه:** «لا يمكن تغيير العملة بعد أول بيع.» · مثال: «سعر 79.00 ر.س. يُعرض للمشتري في الأردن بالدينار، ومستحقك يبقى بالريال» · تأكيد بخانة «فهمت».
+---
 
-#### VD-05 · ملف المتجر — `/vendor/store` · (إضافة)
-الشعار (مربع) · الغلاف (عريض) مع معاينة كيف يظهر في ST-11 · الوصف عربي وإنجليزي · سياسة الشحن · سياسة الإرجاع · «معاينة صفحة متجري».
+## 7 · Screen inventory overview — 86 screens
 
-#### VD-06 · لوحة المؤشرات — `/vendor`
-**بطاقات إحصاء:** مبيعات الأسبوع (بالرمان وخط شرارة) · طلبات بانتظار القبول **مع أقرب مهلة** «أقربها ينتهي خلال 5 ساعات» · منتجات بلغت عتبة النفاد · منتجات قيد المراجعة ومرفوضة · الرصيد المعلّق والمتاح.
-**جداول مختصرة:** أحدث الطلبات · تنبيهات المخزون · منتجات مرفوضة بأسبابها.
-**شريط حالة المتجر** إن كان قيد المراجعة أو معلَّقاً.
-**حالة بلا بيانات:** صفوف مثال **معلَّمة صراحةً «مثال»** لا هيكل فارغ، مع «أضف أول منتج».
+| Surface | Count | Codes |
+|---------|-------|-------|
+| Storefront | 31 | ST-01 … ST-31 |
+| Shared (auth & system) | 8 | SH-01 … SH-08 |
+| Vendor Dashboard | 21 | VD-01 … VD-21 |
+| Admin Dashboard | 26 | AD-01 … AD-26 |
 
-#### VD-07 · قائمة المنتجات — `/vendor/products`
-**الجدول:** صورة · الاسم · SKU (أو «3 متغيّرات») · السعر (نطاق إن تعدّد) · المتوفر · **الحالة** · آخر تعديل · إجراءات.
-**الحالات بشارات:** مسودة · **قيد المراجعة** · منشور · **مرفوض (مع السبب عند التمرير)** · مؤرشف.
-**أعلى الجدول:** تبويبات بعدد كل حالة · بحث بالاسم أو SKU · «أضف منتجاً» · «استيراد».
-**تحديد جماعي:** إرسال للمراجعة · إيقاف · حذف.
-**الحالات:** لا منتجات بعد (اختيار: أضف يدوياً أو استورد ملفاً) · تحميل.
+**(added)** marks a screen that was not in the original 47-screen inventory but is required by the requirements or the technical proposal. §12 maps the original 47.
 
-#### VD-08 · إنشاء وتحرير منتج — `/vendor/products/new` و `/[id]`
-**الهدف:** أهم شاشة للبائع — يجب أن تكون سريعة الفهم.
-**أعلى الصفحة:** الاسم · **شارة الحالة** · للمرفوض: شريط بسبب الرفض · أزرار: «حفظ كمسودة» · **«أرسل للمراجعة»** · «معاينة».
-**الأقسام:**
-1. **الأساسيات:** الاسم عربي (إلزامي) وإنجليزي · الفئة بمنتقي شجري (**اختيارها يحدّد السمات أدناه**) · الماركة
-2. **الوصف:** عربي وإنجليزي بمحرّر بسيط
-3. **الصور:** رفع متعدد بالسحب وترتيب · «الصورة الأولى هي الرئيسية» · ربط صورة بمتغيّر · قواعد ظاهرة: JPEG أو PNG أو WebP، حتى 10 م.ب، أقصر ضلع 300 بكسل · حالة الرفض لكل صورة بسببها · حد 10 صور
-4. **سمات الفئة:** كل سمة بنوع حقلها (قائمة، رقم بوحدته، نص، نعم/لا) · **الإلزامية معلَّمة بنجمة** · الموروثة من الفئة الأم معلَّمة «من ملابس وأحذية»
-5. **المتغيّرات — محرّر المصفوفة:**
-   - اختيار سمات التمييز (اللون، المقاس) — حتى 3
-   - اختيار قيمها يولّد التركيبات: أحمر/M · أحمر/L · أزرق/M…
-   - جدول: التركيبة · SKU · **السعر بعملة التسوية** · السعر قبل الخصم · الكمية · حد التنبيه · الباركود · الوزن · تفعيل
-   - **التركيبة المكررة تُعلَّم خطأً في صفّها**، و SKU المستعمل في منتج آخر كذلك
-   - منتج بلا خيارات: صف واحد
-6. **الشحن:** الوزن والأبعاد
-**موانع الإرسال:** عند «أرسل للمراجعة» تظهر **قائمة الموانع كلها معاً**: «المتجر لم يُعتمد بعد» · «سمات إلزامية لم تُملأ: الخامة» · «لا متغيّر فعّال».
-**بعد الإرسال:** شريط «قيد المراجعة — تراجع الإدارة منتجك قبل ظهوره في المتجر» · «اسحب الإرسال».
-**الجوال:** الأقسام أكورديون، وجدول المتغيّرات بطاقة لكل تركيبة.
+---
 
-#### VD-09 · الاستيراد الجماعي — `/vendor/products/import`
-الخطوات: **نزّل القالب** (CSV عربي بأعمدته) · املأه · ارفع CSV أو Excel (حتى 5 م.ب و 5,000 سطر) · شريط تقدّم.
-شرح الأعمدة: رمز المنتج يجمع المتغيّرات · SKU موجود يُحدَّث سعره وكميته · الفئة بمعرّفها أو اسمها · الخيارات بالأسماء العربية.
-**حالة الملف المرفوض كله:** «أعمدة غير معروفة: السعر_الجديد. نزّل القالب واستعمل عناوينه كما هي.» — لم يُكتب شيء.
+## 8 · Screen specifications
 
-#### VD-10 · تقرير الاستيراد — `/vendor/products/import/[id]`
-**ملخّص:** «استُورد 488 من 500 سطر · رُفض 12» · 250 منتجاً جديداً مسودات · 0 محدَّث.
-**جدول الأسطر المرفوضة:** رقم السطر · SKU · العمود · السبب — مثال: «السطر 5 · السعر · «مجاناً» ليس مبلغاً صالحاً.» · «السطر 302 · SKU · مكرر في الملف — ورد أولاً في السطر 300.»
-**إجراءات:** «نزّل الأسطر المرفوضة لإصلاحها» · «اذهب للمنتجات المستوردة» · «أرسلها للمراجعة».
+Each screen: **Goal · Content (in order) · States · Interactions · Mobile notes.**
 
-#### VD-11 · المخزون — `/vendor/inventory`
-**الجدول:** المنتج · المتغيّر · SKU · **الموجود** · **المحجوز** (مشترون في صفحة الدفع) · **المتاح** · حد التنبيه · شارة «منخفض» · آخر حركة.
-**فلاتر:** منخفض فقط · نفد · بحث.
-**نافذة تعديل المخزون:** وضعان — «جرد فعلي: الكمية الموجودة الآن» أو «حدث: + أو −» · السبب: تعديل يدوي · تلف · مرتجع · ملاحظة · **تنبيه المحجوز** بالنص من القسم 3.5.
-**درج سجل الحركات:** التاريخ · التغيير (+5، −2) · السبب · المرجع (طلب، استيراد) · المنفّذ.
+### 8.1 · Storefront — 31 screens
 
-#### VD-12 · قائمة الطلبات — `/vendor/orders`
-**تبويبات بعدد:** بانتظار القبول · قيد التجهيز · جاهز للشحن · مشحون · مسلَّم · مرتجع · ملغى.
-**الجدول:** رقم الطلب الفرعي (LTR) · التاريخ · العميل · الأصناف · المبلغ · الحالة · **مهلة القبول بعدّاد** «متبقٍ 31 ساعة» تتحوّل للتنبيه تحت 24 وللخطر تحت ساعتين.
-**الحالة الفارغة:** «لا طلبات بعد» مع رابط ملف المتجر.
+#### ST-01 · Home — `/`
+**Goal:** discovery entry point, and trust in a marketplace the buyer doesn't know yet.
+**Content:**
+1. Hero carousel (1–5 admin-managed slides) with headline and button
+2. Top categories strip with icons: Electronics · Fashion · Beauty · Home & Kitchen · Grocery · Handmade
+3. Admin-managed campaign or "Featured products" block
+4. "Today's deals" — product cards with discounted prices
+5. "Selected shops" — vendor cards with logo and rating
+6. "Recently viewed" — only if there is history
+7. "New arrivals" per main category
+8. Trust strip: verified vendors · 14-day returns · secure payment or cash on delivery
+**States:** skeleton loading · brand-new platform with few products (sections suggest browsing, never blank)
+**Interactions:** carousel autoplays and swipes; category strip scrolls; product-card hover and wishlist toggle; "New arrivals" tabs switch categories.
+**Mobile:** full-width hero; sections scroll horizontally.
 
-#### VD-13 · تفاصيل الطلب — `/vendor/orders/[id]`
-**المحتوى:** الرقم والحالة · عدّاد القبول إن انطبق · بيانات الشحن (الاسم، الهاتف LTR، العنوان) · الأصناف · **التفصيل المالي:** البضاعة − الخصم − **العمولة (10%)** + الشحن = **صافي مستحقك** · الخط الزمني بمنفّذ كل انتقال.
-**الإجراءات حسب الحالة فقط:**
-| الحالة | الأزرار |
+#### ST-02 · All categories — `/categories` · (added)
+**Goal:** browse the full tree — essential on mobile.
+**Content:** main categories with icons; each expands to its children up to four levels (e.g. Fashion → Men's clothing).
+**Interactions:** expand/collapse with animation; mobile drills down with a back path.
+
+#### ST-03 · Category listing — `/c/[slug]`
+**Goal:** reach the right product fast by filtering.
+**Content:**
+1. Breadcrumbs · category title · result count
+2. Subcategory chips
+3. **Filters:** price range · brand · rating · shop · category attributes (color swatches, size chips) — **each option shows its result count**
+4. Sort: relevance · newest · price low–high · price high–low · top rated
+5. Applied-filter chips with "Clear all"
+6. Product grid (4 columns desktop, 2 mobile) · pagination or "Load more"
+**States:** loading · filters return nothing (suggest removing the last filter) · empty category · shared link with filters pre-applied
+**Interactions:** toggling a filter updates the grid, counts and URL chips live; price slider; sort dropdown; "Load more" appends with skeleton cards.
+**Mobile:** sticky "Filter" and "Sort" buttons; filters in a bottom sheet with "Show 128 results".
+
+#### ST-04 · Search results — `/search?q=`
+**Content:** "Results for «موبايل»" · correction if any: "Showing «موبايل» instead of «موبيل»" · tabs: Products · Shops · filters and sort as in ST-03 · results grid.
+**Interactions:** tab switch; correction link re-runs the search.
+
+#### ST-05 · No search results — state
+**Content:** "No results for «سماعه بلوتوث زرقا»" · "Did you mean: سماعة بلوتوث زرقاء?" as a link · suggested alternatives (nearby products) · most-browsed categories. **Never a blank page or cartoon.**
+
+#### ST-06 · Search suggestions — overlay on the search bar · (added)
+**Appears after 3 characters.** Groups: products (thumbnail, name, price) · categories · shops · recent searches (before typing) · matched part of the text highlighted.
+**Interactions:** typing filters suggestions live; arrow keys move highlight; Enter opens results; Esc closes. **Mobile:** full screen.
+
+#### ST-07 · Product page — `/p/[slug]`
+**Goal:** everything needed to decide, on one page.
+**Content:**
+1. Breadcrumbs
+2. **Gallery** (4:5) with thumbnails and zoom
+3. Name · shop link with "Verified" badge and rating · stars and review count
+4. **Price in teal** · struck compare-at price · discount badge
+5. **Variant picker:** color, then size (unavailable combinations disabled)
+6. **Availability:** "In stock" · "Only 3 left" under the threshold · "Sold out"
+7. Quantity stepper · **Add to cart** (large primary) · wishlist · compare
+8. **Shipping to your area:** "Shipping to Riyadh 15.00 SAR · delivered in 2–4 days" with change-location · shop's return policy summary
+9. Tabs or sections: Description · Specifications (attribute table: material, warranty…) · Reviews (verified purchase, star distribution, sort) · Questions to the shop
+10. "More from this shop" · "Similar products" · "Recently viewed"
+**States:** loading · variant sold out (ST-08) · unavailable combination · shop doesn't ship to the buyer's area (button still adds, with a warning) · no reviews yet
+**Interactions:** variant selection swaps images, price and stock live; quantity capped by stock with a hint; add to cart opens the mini-cart drawer; gallery zoom; location change recalculates shipping; tabs.
+**Mobile:** full-width swipe gallery with dots; **sticky bottom bar** with price + Add to cart.
+**LTR:** design an English version of this screen.
+
+#### ST-08 · Product sold out — state
+"Sold out" badge · add button disabled with "Sold out" text · "Notify me when available" · other in-stock variants if any · similar alternatives.
+**Interactions:** "Notify me" toggles to a confirmed state with a toast.
+
+#### ST-09 · Ask the shop — modal · (added)
+Question field · product and variant attached automatically · "The shop usually replies in your messages" · guests prompted to sign in first.
+**Interactions:** character counter; send → success toast; modal closes.
+
+#### ST-10 · Compare — `/compare` · (added)
+Up to 4 products from the same category · rows: image, price, rating, shop, shipping, then category attributes · highlight differences toggle · remove a product · floating compare bar appears in listings when two or more are chosen.
+**Interactions:** "Highlight differences" switch; remove animates column out. **Mobile:** two products side by side with horizontal scroll.
+
+#### ST-11 · Shop page — `/s/[slug]`
+**Content:** cover · logo (never mirrored) · name and "Verified" badge · rating and count · "On Basta since 2026" · description · shipping policy · return policy · "Message the shop" · shop products with filters and sort · reviews.
+
+#### ST-12 · Suspended shop — state
+Cover and name remain · **neutral, non-shaming** message: "هذا المتجر لا يستقبل طلبات حالياً" (This shop isn't taking orders right now) · no products · similar shops.
+
+#### ST-13 · Cart — `/cart` + mini-cart drawer
+**Goal:** one cart across several shops, no price surprises.
+**Content:**
+1. **Groups by shop** — each: shop name · items (image, name, variant, unit price, quantity stepper, remove, move to wishlist) · subtotal · **this shop's shipping** · delivery time
+2. **Price-changed alert** on an item: "Price changed from 99.00 to 79.00 SAR since you added it"
+3. **Uncovered area:** only that shop's group is flagged "Doesn't ship to your area — remove its items to continue with the rest"; the rest proceeds
+4. Coupon field
+5. **Summary:** items · shipping (all shops) · tax · discount · **total in teal** · switchable display currency
+6. "Checkout" button · "Price is locked and stock reserved at checkout"
+**States:** loading · guest cart merged after sign-in ("We added 2 items from your previous cart") · an item became sold out inside the cart
+**Interactions:** quantity changes recalculate group subtotal, shipping and total with a brief highlight; remove with undo toast; coupon apply → success or specific error; currency switch re-renders amounts.
+**Mini-cart:** side drawer after adding: added item · item count · total · "View cart" and "Checkout".
+**Mobile:** summary as a sticky bottom sheet with total and button.
+
+#### ST-14 · Empty cart — state
+"Your cart is empty" · real categories to browse · "Recently viewed" · "Browse products" button. No cartoon.
+
+#### ST-15 · Checkout — `/checkout`
+**Goal:** one-step completion, every cost visible before paying.
+**Content — one page with sequential sections:**
+- **Sticky countdown at the top:** "We reserved your items · 14:32" — turns warning color in the last two minutes
+1. **Contact:** email and phone for guests · account details with "Change" for members
+2. **Address:** saved addresses as selectable cards · "New address" with fields: country, region, city, district, street, building, floor, landmark, recipient name, phone · **pin on a map**
+3. **Shipping per shop:** a card per shop with its items, shipping method, cost and delivery time
+4. **Payment:** card (gateway fields) · cash on delivery if the shop allows · digital wallet
+5. **Review:** "Your order arrives in 3 shipments from 3 shops" with a card per sub-order
+6. **Sticky summary:** items · shipping · tax · discount · **total in teal** · "Charged in Saudi riyals" · button "ادفع 1,248.50 ر.س."
+**States — design all:**
+- **Out of stock on entry:** page doesn't open; instead "«قميص قطني مصري» sold out" with "Remove and continue" and "Back to cart"
+- **Reservation expired:** banner "Reservation expired — reserving again…" then success or sold-out message
+- **Uncovered area for one shop:** its card flagged, the rest continues
+- **3-D Secure:** gateway dialog over the page
+- **Processing payment:** button loading, page locked
+- **Field error:** directly under the field
+**Interactions:** countdown ticks live; completed sections collapse to a summary with "Edit"; address card selection updates shipping; new-address form validates on blur and map pin moves; payment method switch reveals fields; pay → processing → success or failure.
+**Mobile:** sections stack with collapsed headers after completion; countdown, total and button sticky.
+**LTR:** design an English version.
+
+#### ST-16 · Payment failed — `/checkout/failed`
+**Specific reason, not generic:** "Payment failed: the bank declined it." · what to do: "Try another card or cash on delivery" · "Your cart is saved in full" · "Try again" · "Change payment method" · **nothing was charged**.
+
+#### ST-17 · Order placed — `/orders/[number]/confirmed`
+"We received your order" · order number `BST-26-004821` with copy · **a separate card per sub-order from the first moment:** shop · items · status "Waiting for the shop to accept" · expected delivery · amount paid and currency · what's next (shop accepts within 48 hours, notifications will follow) · for guests: "Create a password to track your orders" · "Continue shopping".
+**Interactions:** copy order number → toast; guest password field inline.
+
+#### ST-18 · My orders — `/account/orders`
+List of parent orders: number · date · total · **derived status** · small chips for each sub-order status · filter: all · in progress · completed · canceled · search by number.
+**States:** no orders yet (suggest browsing) · loading.
+
+#### ST-19 · Order detail & tracking — `/account/orders/[number]`
+**Content:**
+1. Order header: number · date · parent order status · shipping address · payment method
+2. **A card per sub-order:** shop · sub-order number `BST-26-004821-B` · **status timeline** with dates · carrier and **tracking number isolated LTR** with copy · shipment events · items · subtotal
+3. **Actions appear by status only:**
+   - "Cancel" only in "Waiting for shop" and "Accepted"
+   - "Request a return" after "Delivered" and within the window: "9 days left to return"
+   - "Open a dispute" · "Review product" per item after delivery
+   - "Message the shop"
+4. Money summary: items · shipping · tax · discount · total · refunded if any
+**States:** one sub-order canceled while siblings continue · delivery failed · returned and refunded
+**Interactions:** timeline steps expand event details; cancel → confirmation dialog with reason → status updates; copy tracking.
+
+#### ST-20 · Return request — `/account/orders/[number]/return`
+Select items and quantity · reason list (wrong size, damaged, not as described, other) · description · **photos** · refund preview · "9 days left" · submit · then request status: submitted · approved · received · rejected with reason.
+**Interactions:** selecting items updates the refund preview; photo upload with thumbnails and remove; submit → status timeline.
+
+#### ST-21 · Dispute — open & thread · (added)
+Open: sub-order · against the shop · reason · description · attachments.
+Thread: messages between buyer, shop and admin with distinct role styling · status · "Admin joined" · admin decision and its money outcome.
+**Interactions:** composer with attachment chips; new message appends; status banner changes when admin resolves.
+
+#### ST-22 · Write a review — modal or page · (added)
+Delivered items only: stars · title · text · "Verified purchase" · state "Awaiting publication".
+**Interactions:** hover/tap star rating; required validation; submit → pending state.
+
+#### ST-23 · Wishlist — `/account/wishlist`
+Product cards · price-changed or sold-out alerts · move to cart · remove.
+**Empty state:** suggest categories.
+
+#### ST-24 · Recently viewed — `/account/recent` · (added)
+Grid of recently viewed products · clear history (with confirmation).
+
+#### ST-25 · Account — profile, security, sessions — `/account`
+**Profile:** name · email with "Verified" / "Not verified" and "Send verification code" · phone with code verification.
+**Security:** change password · two-factor (optional for buyers).
+**Active sessions:** devices and browsers with last activity · "Sign out of all sessions".
+**Preferences:** language · default display currency · notification channels (email, SMS, WhatsApp, browser notifications).
+**Interactions:** inline edit with save/cancel; sign-out-all confirmation; channel switches toggle with toast.
+**Mobile:** a list of sections, each opening its own page.
+
+#### ST-26 · Addresses — `/account/addresses`
+Address cards with a label (Home, Work) · "Default" · add and edit with address fields and map · delete.
+**Interactions:** set default instantly; edit in a drawer; delete with undo.
+
+#### ST-27 · Notification center — `/account/notifications` · (added)
+Chronological list: order status change · tracking number · shop reply · dispute decision · unread highlighted · "Mark all as read".
+Same pattern reused in the Vendor and Admin dashboards with compact density.
+**Interactions:** click marks read and navigates; filter unread.
+
+#### ST-28 · My messages — `/account/messages` · (added)
+Conversations with shops (linked product or order) · message thread · attachments. **Not live chat** — asynchronous messages.
+
+#### ST-29 · Sell on Basta — `/sell` · (added)
+Marketing page for vendors: "Sell to customers across the Gulf, Levant and Egypt" · **commission per sale only, no subscription** · "Price and get paid in your own currency" · "Earnings released 14 days after delivery" · four steps (register, upload documents, we review, start selling) · FAQ · "Register your shop".
+**Interactions:** FAQ accordion; CTA to VD-01.
+
+#### ST-30 · Content page — `/pages/[slug]` · (added)
+**One template** for: About · FAQ · Return policy · Terms & conditions · Privacy policy · Contact.
+Title · last updated · table of contents for long pages · prose at 68 characters wide · FAQ as accordion.
+
+#### ST-31 · Guest order tracking — `/track` · (added)
+For buyers without an account: order number + email or phone · then ST-19 without account actions.
+
+---
+
+### 8.2 · Shared — 8 screens · (all added)
+
+#### SH-01 · Sign in — `/login`
+Email · password (show/hide) · "Forgot password?" · "No account? Create one" · generic error "Email or password is incorrect" · **temporary lockout state** after many attempts: "Too many attempts from this device. Wait 15 minutes, then try again."
+
+#### SH-02 · Create account — `/register`
+Name · email · password (min 8, strength meter) · optional phone in international format with country picker · accept terms · then SH-03.
+**Interactions:** strength meter updates live; inline validation.
+
+#### SH-03 · Verification code — `/verify`
+"We sent a 6-digit code to `+966 50 •••• 567`" · 6-box input · "Expires in 09:41" · "Resend" after a cooldown · after 5 wrong attempts: "The code is no longer valid. Request a new one."
+**Interactions:** auto-advance between boxes; paste fills all; countdown ticks; resend cooldown.
+
+#### SH-04 · Forgot / reset password — `/forgot`, `/reset`
+Email entry · "If this email is registered, you'll receive a message" (never reveals whether the account exists) · new-password page.
+
+#### SH-05 · Page not found — 404
+"We couldn't find this page" · search bar · main categories · back home.
+
+#### SH-06 · Unexpected failure — 500
+Copy from §3.5 **with the request reference and a copy button** · "Try again" · "Contact us".
+
+#### SH-07 · Offline — PWA
+"No internet connection" · what works offline: recently viewed and the cart (view only) · "Try again".
+
+#### SH-08 · Install prompt — component
+Mobile bottom sheet: app icon · "Install Basta on your home screen — order notifications without a store app" · "Install" · "Later".
+
+---
+
+### 8.3 · Vendor Dashboard — 21 screens
+
+> Onboarding (VD-01 to VD-05) uses full-page steps with a stepper, not the dashboard shell.
+> **Onboarding path:** register → documents → in review → (approved) → settlement currency → store profile → shipping → first product → submit for review.
+
+#### VD-01 · Vendor registration — `/vendor/register`
+Stepper: Account · Shop · Documents · Review.
+**Account:** name · email · password · phone.
+**Shop:** shop name in Arabic and English · URL `basta.com/s/dar-alqutn` (live preview) · country · business type · main category.
+**Interactions:** URL slug auto-generates from the English name and checks availability; step navigation with validation.
+
+#### VD-02 · Upload documents — `/vendor/onboarding/documents`
+Four upload cards: commercial registration · national ID · tax certificate · bank account proof · each: accepted formats and limit (PDF or image) · preview · replace · per-document status (uploaded, accepted, rejected with reason).
+**Bank account:** holder name · IBAN (LTR isolated) · bank · SWIFT.
+**Interactions:** drag-and-drop with upload progress; IBAN formats as you type.
+
+#### VD-03 · In review / rejected — `/vendor/onboarding/status`
+**In review:** "We're reviewing your shop documents" · what to do now: "Create your products as drafts — you can submit them once your shop is approved" · button to set up products.
+**Rejected:** the reason exactly as written by the admin · the rejected document flagged · "Upload again".
+
+#### VD-04 · Settlement currency — `/vendor/onboarding/currency` · (added)
+**Irreversible decision — design it seriously:** "The currency you price your products in and get paid in" · cards for the seven currencies with name and symbol · **explicit warning in warning color:** "The currency can't be changed after your first sale." · example: "A 79.00 SAR price shows to a buyer in Jordan in dinars; your earnings stay in riyals" · "I understand" checkbox.
+**Interactions:** selecting a card updates the example live; continue enabled only after the checkbox; confirmation dialog.
+
+#### VD-05 · Store profile — `/vendor/store` · (added)
+Logo (square) · cover (wide) with a live preview of how it looks on ST-11 · description in Arabic and English · shipping policy · return policy · "Preview my shop page".
+**Interactions:** image crop dialog; preview updates as you type.
+
+#### VD-06 · Dashboard home — `/vendor`
+**Stat cards:** this week's sales (teal, with sparkline) · orders awaiting acceptance **with the nearest deadline** "Nearest expires in 5 hours" · products at low stock · products in review and rejected · pending and available balance.
+**Short tables:** latest orders · stock alerts · rejected products with reasons.
+**Shop status banner** if in review or suspended.
+**No-data state:** example rows **explicitly labeled "Example"**, not an empty skeleton, with "Add your first product".
+**Interactions:** stat cards link to filtered lists; date-range switch (7 / 30 days) updates numbers and sparkline.
+
+#### VD-07 · Products — `/vendor/products`
+**Table:** image · name · SKU (or "3 variants") · price (range if several) · available · **status** · last edited · actions.
+**Status badges:** Draft · **In review** · Published · **Rejected (reason on hover)** · Archived.
+**Above the table:** tabs with a count per status · search by name or SKU · "Add product" · "Import".
+**Bulk selection:** submit for review · unpublish · delete.
+**States:** no products yet (choose: add manually or import a file) · loading.
+**Interactions:** tabs filter; search filters as you type; row checkboxes reveal the bulk bar; row click opens VD-08.
+
+#### VD-08 · Create / edit product — `/vendor/products/new`, `/[id]`
+**Goal:** the vendor's most important screen — must be quick to understand.
+**Header:** name · **status badge** · for rejected: banner with the rejection reason · for published: note "Editing content sends it back to review; price and stock don't" · buttons: "Save draft" · **"Submit for review"** · "Preview".
+**Sections:**
+1. **Basics:** name in Arabic (required) and English · category via tree picker (**choosing it defines the attributes below**) · brand
+2. **Description:** Arabic and English with a simple editor
+3. **Images:** multi-upload with drag and reorder · "The first image is the main one" · link an image to a variant · rules shown: JPEG, PNG or WebP, up to 10 MB, shortest side 300px · per-image rejection with its reason · max 10 images
+4. **Category attributes:** each with its field type (list, number with unit, text, yes/no) · **required ones marked with an asterisk** · inherited ones labeled "from Fashion"
+5. **Variants — matrix editor:**
+   - choose distinguishing attributes (color, size) — up to 3
+   - choosing their values generates combinations: Red/M · Red/L · Blue/M…
+   - table: combination · SKU · **price in settlement currency** · compare-at price · quantity · alert threshold · barcode · weight · active
+   - **a duplicate combination is flagged as an error in its row**, and so is a SKU used by another product
+   - product without options: a single row
+6. **Shipping:** weight and dimensions
+**Submit blockers:** on "Submit for review" **all blockers show together**: "Shop not approved yet" · "Required attributes missing: Material" · "No active variant".
+**After submitting:** banner "In review — the admin reviews your product before it appears in the store" · "Withdraw submission".
+**Interactions:** category change swaps the attribute panel; toggling option values adds/removes matrix rows live; bulk-fill a column (e.g. same price for all); image drag-reorder; unsaved-changes guard; submit → blocker list or in-review banner.
+**Mobile:** sections as accordions; the variant table becomes a card per combination.
+
+#### VD-09 · Bulk import — `/vendor/products/import`
+Steps: **download the template** (Arabic CSV with its columns) · fill it · upload CSV or Excel (up to 5 MB and 5,000 rows) · progress bar.
+Column guide: product code groups variants · an existing SKU updates its price and quantity · category by slug or name · options by Arabic names.
+**Whole-file rejection state:** "Unknown columns: السعر_الجديد. Download the template and use its headers as they are." — nothing was written.
+**Interactions:** drag-and-drop; animated progress; rejection state replaces the dropzone.
+
+#### VD-10 · Import report — `/vendor/products/import/[id]`
+**Summary:** "Imported 488 of 500 rows · 12 rejected" · 250 new products as drafts · 0 updated.
+**Rejected rows table:** row number · SKU · column · reason — e.g. "Row 5 · Price · «مجاناً» is not a valid amount." · "Row 302 · SKU · duplicated in the file — first seen on row 300."
+**Actions:** "Download rejected rows to fix" · "Go to imported products" · "Submit them for review".
+**Interactions:** filter rejected rows by column; row expands full reason.
+
+#### VD-11 · Inventory — `/vendor/inventory`
+**Table:** product · variant · SKU · **on hand** · **reserved** (buyers in checkout) · **available** · alert threshold · "Low" badge · last movement.
+**Filters:** low only · sold out · search.
+**Adjust-stock dialog:** two modes — "Stock count: quantity on hand now" or "Event: + or −" · reason: manual adjustment · damage · return · note · **reserved warning** using the copy in §3.5.
+**Movements drawer:** date · change (+5, −2) · reason · reference (order, import) · actor.
+**Interactions:** mode switch changes the input; entering a value below reserved shows the warning inline and disables save; drawer slides in.
+
+#### VD-12 · Orders — `/vendor/orders`
+**Tabs with counts:** awaiting acceptance · preparing · ready to ship · shipped · delivered · returned · canceled.
+**Table:** sub-order number (LTR) · date · customer · items · amount · status · **acceptance countdown** "31 h left", turning warning under 24h and danger under 2h.
+**Empty state:** "No orders yet" with a link to the store profile.
+**Interactions:** countdowns tick; tab switch; row opens VD-13.
+
+#### VD-13 · Order detail — `/vendor/orders/[id]`
+**Content:** number and status · acceptance countdown if applicable · shipping details (name, phone LTR, address) · items · **money breakdown:** items − discount − **commission (10%)** + shipping = **your net earnings** · timeline with the actor of each transition.
+**Actions by status only:**
+| Status | Buttons |
 |--------|---------|
-| بانتظار القبول | اقبل · ارفض (سبب إلزامي) |
-| مقبول | ابدأ التجهيز |
-| قيد التجهيز | جاهز للشحن |
-| جاهز للشحن | اشحن (**شركة الشحن ورقم التتبّع إلزاميان**) |
-| مشحون | تم التسليم · تعذّر التوصيل |
-| تعذّر التوصيل | أعد المحاولة · أعِد للمتجر |
-| طلب إرجاع | اقبل الإرجاع · ارفض (سبب إلزامي) |
-**ملاحظة:** «بعد بدء التجهيز لا يستطيع العميل الإلغاء.»
+| Awaiting acceptance | Accept · Reject (reason required) |
+| Accepted | Start preparing |
+| Preparing | Ready to ship |
+| Ready to ship | Ship (**carrier and tracking number required**) |
+| Shipped | Delivered · Delivery failed |
+| Delivery failed | Retry · Return to shop |
+| Return requested | Accept return · Reject (reason required) |
+**Note:** "After preparing starts, the customer can no longer cancel."
+**Interactions:** each button advances the status in the prototype and appends to the timeline; ship opens a form that validates the tracking number; reject opens a reason dialog.
 
-#### VD-14 · المرتجعات والنزاعات — `/vendor/returns` · (إضافة)
-تبويبان. **المرتجعات:** الطلب · الأصناف · السبب · صور العميل · الحالة · قبول أو رفض بسبب · تأكيد الاستلام. **النزاعات:** خيط المحادثة (ST-21) · «النزاع المفتوح يجمّد تحرير رصيد هذا الطلب».
+#### VD-14 · Returns & disputes — `/vendor/returns` · (added)
+Two tabs. **Returns:** order · items · reason · customer photos · status · accept or reject with reason · confirm receipt. **Disputes:** the thread (as ST-21) · "An open dispute freezes this order's balance release".
 
-#### VD-15 · الرسائل — `/vendor/messages` · (إضافة)
-صندوق وارد: العميل · المنتج أو الطلب · آخر رسالة · غير مقروء · خيط المحادثة · ردود سريعة.
+#### VD-15 · Messages — `/vendor/messages` · (added)
+Inbox: customer · product or order · last message · unread · thread · quick replies.
+**Interactions:** selecting a conversation opens the thread; quick reply chips insert text.
 
-#### VD-16 · مناطق الشحن — `/vendor/shipping`
-**قائمة المناطق:** الاسم («الرياض الكبرى») · التغطية · عدد الأسعار · تفعيل.
-**تحرير منطقة:** التغطية بدول ومناطق ومدن متعددة · **الأسعار:** طريقة — ثابت · بالوزن (سعر لكل كغ) · مجاني فوق مبلغ · السعر بعملة التسوية · مدة التوصيل من–إلى أيام.
-**معاينة:** «عميل في جدة يدفع 20.00 ر.س. ويستلم خلال 3–5 أيام».
-**تنبيه:** «المناطق غير المغطاة لا يستطيع عملاؤها الشراء منك.»
+#### VD-16 · Shipping zones — `/vendor/shipping`
+**Zones list:** name ("Greater Riyadh") · coverage · number of rates · active toggle.
+**Edit zone:** coverage by countries, regions and cities (multi-select) · **rates:** method — flat · by weight (price per kg) · free over an amount · price in settlement currency · delivery time from–to days.
+**Preview:** "A customer in Jeddah pays 20.00 SAR and receives in 3–5 days".
+**Warning:** "Customers in areas you don't cover can't buy from you."
+**Interactions:** method switch changes the fields; preview recalculates for a chosen city.
 
-#### VD-17 · المحفظة وكشف الحساب — `/vendor/wallet`
-**ثلاث بطاقات أرصدة بالرمان:** **معلّق** («يُحرَّر بعد 14 يوماً من التسليم») · **متاح** (زر «اطلب سحباً») · **مسحوب**.
-**الرصيد السالب — حالة مصمَّمة:** شريط خطر: «رصيدك −50.00 ر.س. بسبب استرداد بعد تحرير الرصيد (طلب BST-26-004821-B). يُخصم تلقائياً من مستحقاتك القادمة، والسحب متوقف حتى التسوية.»
-**كشف الحساب:** التاريخ · النوع (بيع، عمولة، شحن، تحرير رصيد، استرداد، سحب، تسوية) · المرجع · الجيب (معلّق، متاح) · المبلغ (دائن ومدين) · الرصيد بعده · نطاق تاريخ · **تصدير**.
-**قادم للتحرير:** جدول الطلبات المسلَّمة وموعد تحرير كل منها، وما جمّده نزاع.
+#### VD-17 · Wallet & statement — `/vendor/wallet`
+**Three balance cards in teal:** **Pending** ("released 14 days after delivery") · **Available** ("Request payout" button) · **Withdrawn**.
+**Negative balance — designed state:** danger banner: "Your balance is −50.00 SAR because of a refund after release (order BST-26-004821-B). It is deducted automatically from upcoming earnings, and payouts are paused until settled."
+**Statement:** date · type (sale, commission, shipping, release, refund, payout, adjustment) · reference · bucket (pending, available) · amount (credit/debit) · running balance · date range · **export**.
+**Upcoming releases:** delivered orders and each release date, and what a dispute froze.
+**Interactions:** date range filters the statement; export shows a toast; "Request payout" opens VD-18.
 
-#### VD-18 · طلب سحب — `/vendor/wallet/payout`
-المتاح الآن · حقل المبلغ مع «اسحب الكل» · **الحد الأدنى بعملتك** «187.50 ر.س.» · الحساب البنكي المستلم (IBAN مقنّع) · تأكيد.
-**سجل طلبات السحب** بخط زمني: مطلوب · معتمد · قيد التحويل · مدفوع (مع مرجع التحويل) · أو مرفوض بسبب («أُعيد المبلغ لرصيدك المتاح»).
+#### VD-18 · Payout request — `/vendor/wallet/payout`
+Available now · amount field with "Withdraw all" · **minimum in your currency** "187.50 SAR" · receiving bank account (masked IBAN) · confirm.
+**Payout history** with a timeline: requested · approved · transferring · paid (with transfer reference) · or rejected with reason ("The amount returned to your available balance").
+**Interactions:** amount validates against available and minimum live; confirm dialog; new request appears at the top of the history.
 
-#### VD-19 · التقارير — `/vendor/reports` · (إضافة)
-نطاق تاريخ · المبيعات والطلبات بمخطط · أفضل المنتجات مبيعاً · العمولات المدفوعة · معدل الإرجاع · **تصدير Excel أو CSV** · كل المبالغ بعملة التسوية.
+#### VD-19 · Reports — `/vendor/reports` · (added)
+Date range · sales and orders chart · top-selling products · commissions paid · return rate · **export Excel or CSV** · all amounts in settlement currency.
+**Interactions:** range switch updates chart and tables; chart tooltips.
 
-#### VD-20 · الإعدادات — `/vendor/settings` · (إضافة)
-الحساب والأمان (كلمة المرور، التحقق الثنائي، الجلسات) · الحسابات البنكية (إضافة، افتراضي، حالة التحقق) · تفضيلات الإشعارات · **عملة التسوية للعرض فقط** مع «لا تتغيّر بعد أول بيع».
+#### VD-20 · Settings — `/vendor/settings` · (added)
+Account & security (password, two-factor, sessions) · bank accounts (add, default, verification status) · notification preferences · **settlement currency shown read-only** with "Can't change after first sale".
 
-#### VD-21 · الإشعارات — `/vendor/notifications`
-نمط ST-27 بكثافة مضغوطة: طلب جديد · اقتراب مهلة القبول · منتج اعتُمد أو رُفض · مخزون منخفض · نزاع · تحرير رصيد · حالة سحب.
-
----
-
-### 6.4 · لوحة الإدارة — 26 شاشة
-
-#### AD-01 · دخول الإدارة — `/admin/login` · (إضافة)
-البريد وكلمة المرور ثم **خطوة إلزامية: رمز التحقق الثنائي** من 6 أرقام · «رمز التحقق الثنائي مطلوب وصحيح» عند الخطأ.
-
-#### AD-02 · تفعيل التحقق الثنائي الإلزامي — `/admin/2fa/setup` · (إضافة)
-للإداري الجديد **قبل أي شيء آخر:** «فعّل التحقق الثنائي أولاً — إلزامي على الحسابات الإدارية» · رمز QR والسرّ نصاً · حقل التأكيد · **لا زر تخطٍّ**.
-
-#### AD-03 · لوحة المؤشرات — `/admin`
-**مؤشرات مجمَّعة حسب العملة** (لا يُجمع مبلغان بعملتين): المبيعات · عمولات المنصة · إيراد هامش الصرف · متوسط قيمة الطلب · معدل التحويل · بائعون نشطون.
-**طوابير تحتاج إجراء:** بائعون بانتظار المراجعة · **منتجات بانتظار المراجعة** · طلبات سحب · نزاعات مفتوحة · طلبات فرعية تجاوزت مهلة القبول.
-**تنبيهات النظام:** انحراف في التدقيق الليلي (إن وُجد) بلون الخطر.
-
-#### AD-04 · مراجعة البائعين — `/admin/vendors/pending`
-**طابور** الأقدم أولاً: المتجر · الدولة · تاريخ التسجيل · الوثائق (4 مؤشرات) · مدة الانتظار · «راجع».
-
-#### AD-05 · ملف بائع — `/admin/vendors/[id]`
-**الرأس:** الشعار · الاسم · **الحالة** · عملة التسوية · الدولة.
-**تبويبات:**
-- **الوثائق:** معاينة كل وثيقة · قبول أو رفض لكل منها بسبب
-- **القرار:** اعتمد · ارفض (سبب إلزامي) · **علّق** (سبب إلزامي، مع «الطلبات القائمة تُكمَل والمستحقات تُدفع») · احظر
-- **المنتجات · الطلبات · المحفظة** (أرصدة لكل عملة) · **العمولة** (قاعدة خاصة بالبائع) · **سجل التدقيق** لهذا البائع
-
-#### AD-06 · كل البائعين — `/admin/vendors` · (إضافة)
-جدول: المتجر · الحالة · العملة · المنتجات · المبيعات · التقييم · تاريخ الاعتماد · فلاتر وبحث.
-
-#### AD-07 · مراجعة المنتجات — `/admin/products/review` و `/[id]` · (إضافة — Q-15)
-**قرار محسوم:** كل منتج يُرسله بائع ينتظر اعتماد الإدارة قبل ظهوره في المتجر.
-**الطابور** الأقدم أولاً: صورة · الاسم · المتجر · الفئة · عدد المتغيّرات · السعر من · مدة الانتظار.
-**شاشة المراجعة — المنتج كما سيراه المشتري:** معرض الصور · الاسم والوصف · السمات · جدول المتغيّرات بأسعارها · بيانات المتجر وحالته.
-**الإجراءات:** **اعتمد** (يُنشر فوراً) · **ارفض** بسبب إلزامي يصل للبائع كما هو · «التالي في الطابور».
-**تبويب «كل المنتجات»:** كل الحالات، ورفض منتج منشور بسبب.
-
-#### AD-08 · شجرة الفئات — `/admin/categories`
-شجرة حتى 4 مستويات **بسحب للنقل** (نقل الفرع كاملاً) · إضافة فرع · تحرير: الاسم عربي وإنجليزي، المعرّف النصّي، الأيقونة، الترتيب، التفعيل · لوحة جانبية بسمات الفئة **الخاصة والموروثة** وإلزاميتها.
-**منع مصمَّم:** نقل فئة تحت أحد فروعها · تجاوز 4 مستويات.
-
-#### AD-09 · السمات — `/admin/attributes`
-جدول: الاسم · الرمز · النوع (قائمة، قائمة متعددة، رقم، نص، نعم/لا) · الوحدة · قابلة للتصفية · **سمة متغيّرات** · الفئات المرتبطة.
-تحرير: القيم عربي وإنجليزي ولون كل قيمة · الربط بالفئات مع «إلزامية».
-
-#### AD-10 · قواعد العمولة — `/admin/commissions`
-ثلاثة أقسام بأولوية ظاهرة **بائع ← فئة ← عامة** · لكل قاعدة: النطاق · النسبة (10%) · حد أدنى وأعلى للرسم · سارية من – إلى.
-**القواعد لا تُحذف** — «إنهاء الصلاحية» بدل الحذف · **تنبيه:** «تغيير النسبة لا يمسّ أي طلب سابق» · سجل تعديلات · يتطلب `commissions.edit`.
-
-#### AD-11 · العملات وأسعار الصرف — `/admin/currencies`
-**العملات:** الرمز · الاسم · الرمز المعروض · **الخانات العشرية** (الدينار 3) · الحد الأدنى للسحب · مفعّلة · عملة المحاسبة (USD).
-**أسعار الصرف:** لكل زوج السعر الحالي و**سجل إضافات فقط** · «أضف سعراً» — لا تعديل ولا حذف · المصدر · وقت السريان · **هامش الصرف 2%** معروضاً.
-**تنبيه:** «تحديث السعر لا يغيّر مستحقات أي طلب سابق.»
-
-#### AD-12 · الطلبات — `/admin/orders` · (إضافة)
-بحث بالرقم أو العميل أو المتجر · الطلب الأب بحالته المشتقّة وطلباته الفرعية · تفاصيل: الخط الزمني لكل فرعي · الدفع وأحداثه · الحجوزات · **إلغاء إداري قبل الشحن** بسبب (صلاحية `orders.cancel`).
-
-#### AD-13 · طلبات السحب — `/admin/payouts`
-طابور: المتجر · المبلغ وعملته · الرصيد المتاح · **مطابقة الدفتر** («الرصيد يطابق القيود» أو تحذير) · بيانات البنك · تاريخ الطلب.
-**الإجراءات — بصلاحية `payouts.approve` فقط:** اعتمد · سجّل التحويل (مرجع إلزامي) · ارفض (سبب إلزامي، «يُعاد المبلغ فوراً»).
-
-#### AD-14 · النزاعات — `/admin/disputes`
-قائمة: الطلب الفرعي · الأطراف · السبب · العمر · «رصيد مجمّد».
-**شاشة النزاع:** المحادثة كاملة · بيانات الطلب والشحن · **القرار** (صلاحية `disputes.resolve`): لصالح العميل كلياً أو جزئياً بمبلغ · **معاينة الأثر:** «يُسترد 50.00 ر.س. وتُعكس عمولة 5.00 ر.س.» · رفض · إغلاق بنص القرار.
-
-#### AD-15 · المرتجعات والاستردادات — `/admin/returns`
-المرتجعات بحالاتها · التدخّل حين يتعثّر البائع · الاستردادات: المبلغ · السبب · الحالة · مرجع البوابة · **حالة الرصيد السالب** للبائع إن نتجت.
-
-#### AD-16 · الكوبونات — `/admin/coupons`
-جدول: الرمز · النطاق (منصة أو متجر) · النوع (نسبة، مبلغ ثابت، شحن مجاني) · القيمة · الاستعمال (37 من 500) · الصلاحية · الحالة.
-**تحرير:** القيمة · حد أقصى للخصم · حد أدنى للطلب · العملة للمبلغ الثابت · حدود الاستعمال الكلي ولكل مستخدم · التواريخ · الشروط (فئة، منتج، متجر، أول طلب) · **من يتحمّل الخصم** (المنصة افتراضياً؛ تحميله على متجر يُظهر «بانتظار موافقة المتجر»).
-
-#### AD-17 · الحملات والمنتجات المميّزة — `/admin/campaigns` · (إضافة)
-حملة: الاسم · الفترة · المنتجات أو الفئات المشمولة · كوبون مرتبط · مكان الظهور · منتجات مميّزة بترتيب يدوي.
-
-#### AD-18 · صفحات المحتوى — `/admin/pages`
-قائمة الصفحات (من نحن، الشروط…) · محرّر: العنوان · المعرّف النصّي · المحتوى المنسّق · منشورة · معاينة.
-
-#### AD-19 · الرئيسية والبانرات والقوائم — `/admin/storefront` · (إضافة)
-**البانرات:** مكان الظهور (بطل الرئيسية، منتصف الرئيسية، أعلى الفئة) · الصورة بمقاساتها · العنوان · الرابط · الجدولة · الترتيب بالسحب · التفعيل.
-**أقسام الرئيسية:** ترتيب وتفعيل. **القوائم:** روابط الترويسة والتذييل.
-
-#### AD-20 · قوالب الإشعارات — `/admin/notifications/templates` · (إضافة)
-مصفوفة: الحدث × القناة (بريد، رسالة نصية، واتساب، إشعار متصفح، داخل التطبيق) × اللغة · محرّر: العنوان · النص · **رقائق المتغيّرات** `{{order_number}}` · **معاينة ببيانات مثال** · إرسال تجريبي.
-
-#### AD-21 · العملاء — `/admin/customers` · (إضافة)
-جدول: الاسم · البريد والهاتف · الطلبات · تاريخ التسجيل · الحالة · ملف: الطلبات · النزاعات · الجلسات · تعليق الحساب بسبب.
-
-#### AD-22 · مراجعات المنتجات — `/admin/reviews` · (إضافة)
-تقييمات بانتظار النشر: النجوم · النص · المنتج · «موثّق بشراء» · انشر · ارفض بسبب.
-
-#### AD-23 · مستخدمو الإدارة والصلاحيات — `/admin/users`
-جدول: الاسم · البريد · **حالة التحقق الثنائي** · الصلاحيات · آخر دخول.
-**دعوة إداري:** البريد · الصلاحيات كمربعات بشرح كل واحدة · «يُلزم بتفعيل التحقق الثنائي عند أول دخول».
-
-#### AD-24 · سجل التدقيق — `/admin/audit`
-بحث وفلاتر: المنفّذ · الإجراء · نوع الكيان · نطاق تاريخ.
-الصف: الوقت · المنفّذ ودوره · الإجراء · الكيان · العنوان IP.
-**درج التفاصيل:** القيم قبل وبعد بفروق ملوّنة.
-**للقراءة فقط** — لا زر تعديل ولا حذف في أي مكان.
-
-#### AD-25 · التقارير — `/admin/reports`
-نطاق تاريخ · المبيعات · العمولات · إيراد هامش الصرف · البائعون النشطون · متوسط قيمة الطلب · معدل التحويل.
-**مجمَّعة حسب العملة**، ونسخة موحّدة بالدولار **يُذكر بجانب كل رقم محوَّل سعر الصرف المستخدم**.
-**تصدير Excel و CSV.**
-
-#### AD-26 · إعدادات المنصة والضرائب — `/admin/settings` · (إضافة)
-**الإعدادات:** فترة تعليق الرصيد (14 يوماً) · مهلة الإرجاع (14) · مهلة حجز المخزون (15 دقيقة) · مهلة قبول البائع (48 ساعة) · العمولة الافتراضية (10%) · صلاحية السلة (168 ساعة) · هامش الصرف (2%) · عملة المحاسبة (USD) · من يتحمّل الكوبون افتراضياً (المنصة).
-**تنبيه لكل إعداد مالي** يوضّح أثره · سجل تعديلات.
-**الضرائب لكل دولة:** السعودية 15% مضافة · الإمارات 5% مضافة · الأردن 16% شاملة · مصر 14% شاملة · الكويت 0%.
+#### VD-21 · Notifications — `/vendor/notifications`
+ST-27 pattern in compact density: new order · accept deadline approaching · product approved or rejected · published product sent back to review · low stock · dispute · balance released · payout status.
 
 ---
 
-## 7 · الحالات وتسمياتها وألوانها
+### 8.4 · Admin Dashboard — 26 screens
 
-> اللون دلالي دائماً، لا من ألوان العلامة. والنص بجانب اللون.
+#### AD-01 · Admin sign in — `/admin/login` · (added)
+Email and password, then a **mandatory two-factor code step** (6 digits) · "A valid two-factor code is required" on error.
 
-### 7.1 · الطلب الفرعي — للمشتري والبائع
-| الحالة | التسمية | اللون |
-|--------|---------|-------|
-| `awaiting_vendor` | بانتظار قبول المتجر | تنبيه |
-| `accepted` | مقبول | معلومة |
-| `preparing` | قيد التجهيز | معلومة |
-| `ready_to_ship` | جاهز للشحن | معلومة |
-| `shipped` | تم الشحن | معلومة |
-| `delivery_failed` | تعذّر التوصيل | خطر |
-| `delivered` | تم التسليم | نجاح |
-| `return_requested` | طلب إرجاع | تنبيه |
-| `returned` | مُرتجَع | محايد |
-| `refunded` | مُسترَد | محايد |
-| `completed` | مكتمل | نجاح |
-| `rejected_by_vendor` | رفضه المتجر | خطر |
-| `canceled_by_customer` | ألغيتَه / ألغاه العميل | محايد |
-| `canceled_by_admin` | ألغته الإدارة | محايد |
+#### AD-02 · Mandatory two-factor setup — `/admin/2fa/setup` · (added)
+For a new admin **before anything else:** "Turn on two-factor first — it is mandatory for admin accounts" · QR code and text secret · confirmation field · **no skip button**.
 
-### 7.2 · الطلب الأب — مشتقّة
-بانتظار الدفع (تنبيه) · فشل الدفع (خطر) · قيد التنفيذ (معلومة) · مكتمل جزئياً (معلومة) · مكتمل (نجاح) · ملغى (محايد) · مُسترَد (محايد)
+#### AD-03 · Dashboard — `/admin`
+**Metrics grouped by currency** (never add two currencies together): sales · platform commission · FX spread revenue · average order value · conversion rate · active vendors.
+**Queues needing action:** vendors awaiting review · **products awaiting review** · payout requests · open disputes · sub-orders past the acceptance deadline.
+**System alerts:** nightly audit drift (if any) in danger color.
+**Interactions:** currency tabs switch the metric set; queue cards link to their screens.
 
-### 7.3 · المنتج
-مسودة (محايد) · **قيد المراجعة (تنبيه)** · منشور (نجاح) · **مرفوض (خطر، مع السبب)** · مؤرشف (محايد)
+#### AD-04 · Vendor review queue — `/admin/vendors/pending`
+**Queue**, oldest first: shop · country · registration date · documents (4 indicators) · waiting time · "Review".
 
-### 7.4 · البائع
-قيد المراجعة (تنبيه) · معتمد (نجاح) · معلَّق (خطر) · محظور (خطر)
+#### AD-05 · Vendor profile — `/admin/vendors/[id]`
+**Header:** logo · name · **status** · settlement currency · country.
+**Tabs:**
+- **Documents:** preview each · accept or reject each with reason
+- **Decision:** approve · reject (reason required) · **suspend** (reason required, with "Existing orders are completed and earnings are paid") · ban
+- **Products · Orders · Wallet** (balances per currency) · **Commission** (vendor-specific rule) · **Audit log** for this vendor
+**Interactions:** document viewer with zoom; decision buttons open reason dialogs; status badge updates.
 
-### 7.5 · طلب السحب
-مطلوب (تنبيه) · معتمد (معلومة) · قيد التحويل (معلومة) · مدفوع (نجاح) · مرفوض (خطر)
+#### AD-06 · All vendors — `/admin/vendors` · (added)
+Table: shop · status · currency · products · sales · rating · approval date · filters and search.
 
-### 7.6 · الدفع
-بانتظار الدفع · يتطلب تحققاً · مفوَّض · محصَّل · مسترد جزئياً · مسترد · فشل · ملغى
+#### AD-07 · Product review — `/admin/products/review`, `/[id]` · (added — Q-15)
+**Settled decision:** every product a vendor submits waits for admin approval before it appears in the store — including published products sent back after a content edit (Q-16).
+**Queue**, oldest first: image · name · shop · category · variant count · price from · waiting time · badge "New" or "Edited after publishing".
+**Review screen — the product as the buyer will see it:** gallery · name and description · attributes · variants table with prices · shop details and status. For edited products: **what changed since approval** highlighted.
+**Actions:** **Approve** (publishes immediately) · **Reject** with a required reason sent to the vendor verbatim · "Next in queue".
+**"All products" tab:** every status; rejecting a published product with a reason.
+**Interactions:** approve → toast and auto-advance to the next product; reject → reason dialog with preset reasons plus free text; keyboard shortcuts A / R / N shown.
+**Mobile 400:** required — reviewers work from phones.
+
+#### AD-08 · Category tree — `/admin/categories`
+Tree up to 4 levels with **drag to move** (moves the whole branch) · add child · edit: name Arabic and English, slug, icon, sort, active · side panel with the category's **own and inherited** attributes and whether required.
+**Designed prevention:** moving a category under one of its own children · exceeding 4 levels.
+**Interactions:** drag with drop indicators; invalid drop shows a reason tooltip; inline rename.
+
+#### AD-09 · Attributes — `/admin/attributes`
+Table: name · code · type (list, multi-list, number, text, yes/no) · unit · filterable · **variant axis** · linked categories.
+Edit: values in Arabic and English with a color per value · link to categories with "required".
+
+#### AD-10 · Commission rules — `/admin/commissions`
+Three sections with visible priority **vendor → category → global** · each rule: scope · rate (10%) · minimum and maximum fee · effective from – to.
+**Rules are never deleted** — "End validity" instead of delete · **warning:** "Changing a rate doesn't affect any past order" · change history · requires `commissions.edit`.
+
+#### AD-11 · Currencies & FX rates — `/admin/currencies`
+**Currencies:** code · name · display symbol · **decimal places** (dinar 3) · minimum payout · active · accounting currency (USD).
+**FX rates:** current rate per pair and an **append-only history** · "Add rate" — no edit, no delete · source · effective time · **FX spread 2%** shown.
+**Warning:** "Updating a rate doesn't change earnings of any past order."
+
+#### AD-12 · Orders — `/admin/orders` · (added)
+Search by number, customer or shop · parent order with derived status and its sub-orders · detail: timeline per sub-order · payment and its events · reservations · **admin cancellation before shipping** with reason (`orders.cancel`).
+
+#### AD-13 · Payout requests — `/admin/payouts`
+Queue: shop · amount and currency · available balance · **ledger reconciliation** ("Balance matches entries" or a warning) · bank details · request date.
+**Actions — only with `payouts.approve`:** approve · record transfer (reference required) · reject (reason required, "Amount returned immediately").
+
+#### AD-14 · Disputes — `/admin/disputes`
+List: sub-order · parties · reason · age · "Balance frozen".
+**Dispute screen:** full thread · order and shipment details · **decision** (`disputes.resolve`): fully or partially for the customer with an amount · **impact preview:** "50.00 SAR refunded and 5.00 SAR commission reversed" · reject · close with a written decision.
+**Interactions:** partial amount input updates the impact preview live.
+
+#### AD-15 · Returns & refunds — `/admin/returns`
+Returns by status · step in when a shop stalls · refunds: amount · reason · status · gateway reference · **vendor negative balance** if one resulted.
+
+#### AD-16 · Coupons — `/admin/coupons`
+Table: code · scope (platform or shop) · type (percent, fixed amount, free shipping) · value · usage (37 of 500) · validity · status.
+**Edit:** value · maximum discount · minimum order · currency for fixed amounts · total and per-user limits · dates · conditions (category, product, shop, first order) · **who funds the discount** (platform by default; charging a shop shows "Awaiting shop consent").
+**Interactions:** type switch changes value fields; live example "On a 200.00 SAR order the customer saves 20.00 SAR".
+
+#### AD-17 · Campaigns & featured products — `/admin/campaigns` · (added)
+Campaign: name · period · included products or categories · linked coupon · placement · featured products with manual drag ordering.
+
+#### AD-18 · Content pages — `/admin/pages`
+Pages list (About, Terms…) · editor: title · slug · rich content · published · preview.
+
+#### AD-19 · Home, banners & menus — `/admin/storefront` · (added)
+**Banners:** placement (home hero, home middle, category top) · image with required sizes · title · link · schedule · drag ordering · active.
+**Home sections:** order and enable. **Menus:** header and footer links.
+**Interactions:** drag reorder; live home preview beside the editor.
+
+#### AD-20 · Notification templates — `/admin/notifications/templates` · (added)
+Matrix: event × channel (email, SMS, WhatsApp, browser push, in-app) × language · editor: subject · body · **variable chips** `{{order_number}}` · **preview with sample data** · send test.
+**Interactions:** clicking a chip inserts the variable; preview renders as you type.
+
+#### AD-21 · Customers — `/admin/customers` · (added)
+Table: name · email and phone · orders · signup date · status · profile: orders · disputes · sessions · suspend account with reason.
+
+#### AD-22 · Product reviews — `/admin/reviews` · (added)
+Reviews awaiting publication: stars · text · product · "Verified purchase" · publish · reject with reason.
+
+#### AD-23 · Admin users & permissions — `/admin/users`
+Table: name · email · **two-factor status** · permissions · last sign-in.
+**Invite admin:** email · permissions as checkboxes with an explanation of each · "Must enable two-factor at first sign-in".
+
+#### AD-24 · Audit log — `/admin/audit`
+Search and filters: actor · action · entity type · date range.
+Row: time · actor and role · action · entity · IP address.
+**Detail drawer:** before/after values with colored diffs.
+**Read-only** — no edit or delete button anywhere.
+
+#### AD-25 · Reports — `/admin/reports`
+Date range · sales · commissions · FX spread revenue · active vendors · average order value · conversion rate.
+**Grouped by currency**, plus a unified USD view that **shows the FX rate used next to every converted number**.
+**Export Excel and CSV.**
+
+#### AD-26 · Platform settings & taxes — `/admin/settings` · (added)
+**Settings:** balance hold period (14 days) · return window (14) · stock reservation time (15 minutes) · vendor accept deadline (48 hours) · default commission (10%) · cart expiry (168 hours) · FX spread (2%) · accounting currency (USD) · default coupon funder (platform).
+**A warning per financial setting** explaining its effect · change history.
+**Taxes per country:** Saudi Arabia 15% added · UAE 5% added · Jordan 16% included · Egypt 14% included · Kuwait 0%.
+**Interactions:** editing a financial setting requires a confirmation dialog that restates the effect.
 
 ---
 
-## 8 · البيانات النموذجية — استعملها في كل الشاشات
+## 9 · Statuses — labels and colors
 
-### 8.1 · المتاجر
-| المتجر | القسم | العملة | المدينة | التقييم |
-|--------|-------|--------|---------|---------|
-| **دار القطن** | ملابس وأحذية | SAR | الرياض | 4.7 (312) |
-| **تقنية الشام** | إلكترونيات وأجهزة | JOD | عمّان | 4.5 (128) |
-| **بيت العود** | جمال وعناية | AED | دبي | 4.8 (540) |
-| **سوق الحِرفة** | يدويّات وحرف | EGP | القاهرة | 4.6 (87) |
+> Colors are semantic, never brand colors. Text always accompanies color.
 
-### 8.2 · المنتجات
-| المنتج | المتجر | السعر | قبل الخصم | المتغيّرات |
-|--------|--------|-------|-----------|------------|
-| قميص قطني مصري | دار القطن | 79.00 ر.س. | 99.00 ر.س. | أحمر، أزرق، أسود × S إلى XXL |
-| بنطال كتان واسع | دار القطن | 149.00 ر.س. | — | بيج، رمادي × M، L، XL |
-| سماعات لاسلكية بعزل الضوضاء | تقنية الشام | 45.500 د.أ. | 52.000 د.أ. | أسود، أبيض |
-| هاتف ذكي 256 GB | تقنية الشام | 389.000 د.أ. | — | 128 GB، 256 GB × أسود، أزرق |
-| عطر عود ملكي 100 مل | بيت العود | 320.00 د.إ. | — | — |
-| سلة خوص يدوية | سوق الحِرفة | 450.00 ج.م. | 520.00 ج.م. | صغيرة، كبيرة |
+### 9.1 · Sub-order — buyer and vendor
+| Status | Arabic label | English | Color |
+|--------|--------------|---------|-------|
+| `awaiting_vendor` | بانتظار قبول المتجر | Waiting for shop | warning |
+| `accepted` | مقبول | Accepted | info |
+| `preparing` | قيد التجهيز | Preparing | info |
+| `ready_to_ship` | جاهز للشحن | Ready to ship | info |
+| `shipped` | تم الشحن | Shipped | info |
+| `delivery_failed` | تعذّر التوصيل | Delivery failed | danger |
+| `delivered` | تم التسليم | Delivered | success |
+| `return_requested` | طلب إرجاع | Return requested | warning |
+| `returned` | مُرتجَع | Returned | neutral |
+| `refunded` | مُسترَد | Refunded | neutral |
+| `completed` | مكتمل | Completed | success |
+| `rejected_by_vendor` | رفضه المتجر | Rejected by shop | danger |
+| `canceled_by_customer` | ألغاه العميل | Canceled by customer | neutral |
+| `canceled_by_admin` | ألغته الإدارة | Canceled by admin | neutral |
 
-### 8.3 · أرقام ونصوص
-- رقم الطلب: `BST-26-004821` · الفرعي: `BST-26-004821-A` · `-B` · `-C`
-- SKU: `TS01-RED-M` · رقم التتبّع: `SA1029384756` · الهاتف: `+966 50 123 4567`
+### 9.2 · Parent order — derived
+بانتظار الدفع Pending payment (warning) · فشل الدفع Payment failed (danger) · قيد التنفيذ Processing (info) · مكتمل جزئياً Partially completed (info) · مكتمل Completed (success) · ملغى Canceled (neutral) · مُسترَد Refunded (neutral)
+
+### 9.3 · Product
+مسودة Draft (neutral) · **قيد المراجعة In review (warning)** · منشور Published (success) · **مرفوض Rejected (danger, with reason)** · مؤرشف Archived (neutral)
+
+### 9.4 · Vendor
+قيد المراجعة In review (warning) · معتمد Approved (success) · معلَّق Suspended (danger) · محظور Banned (danger)
+
+### 9.5 · Payout request
+مطلوب Requested (warning) · معتمد Approved (info) · قيد التحويل Transferring (info) · مدفوع Paid (success) · مرفوض Rejected (danger)
+
+### 9.6 · Payment
+Pending · Requires action · Authorized · Captured · Partially refunded · Refunded · Failed · Voided
+
+---
+
+## 10 · Sample data — use across all screens
+
+### 10.1 · Shops
+| Shop | Category | Currency | City | Rating |
+|------|----------|----------|------|--------|
+| **دار القطن** (Dar Al-Qutn) | Fashion | SAR | Riyadh | 4.7 (312) |
+| **تقنية الشام** (Taqniyat Al-Sham) | Electronics | JOD | Amman | 4.5 (128) |
+| **بيت العود** (Bayt Al-Oud) | Beauty | AED | Dubai | 4.8 (540) |
+| **سوق الحِرفة** (Souq Al-Hirfa) | Handmade | EGP | Cairo | 4.6 (87) |
+
+### 10.2 · Products
+| Product | Shop | Price | Compare-at | Variants |
+|---------|------|-------|------------|----------|
+| قميص قطني مصري · Egyptian Cotton Shirt | دار القطن | 79.00 ر.س. | 99.00 ر.س. | Red, Blue, Black × S to XXL |
+| بنطال كتان واسع · Wide Linen Trousers | دار القطن | 149.00 ر.س. | — | Beige, Grey × M, L, XL |
+| سماعات لاسلكية بعزل الضوضاء · Noise-cancelling Wireless Headphones | تقنية الشام | 45.500 د.أ. | 52.000 د.أ. | Black, White |
+| هاتف ذكي 256 GB · Smartphone 256 GB | تقنية الشام | 389.000 د.أ. | — | 128 GB, 256 GB × Black, Blue |
+| عطر عود ملكي 100 مل · Royal Oud Perfume 100 ml | بيت العود | 320.00 د.إ. | — | — |
+| سلة خوص يدوية · Handwoven Wicker Basket | سوق الحِرفة | 450.00 ج.م. | 520.00 ج.م. | Small, Large |
+
+### 10.3 · Numbers and text
+- Order number: `BST-26-004821` · sub-orders: `BST-26-004821-A` · `-B` · `-C`
+- SKU: `TS01-RED-M` · tracking: `SA1029384756` · phone: `+966 50 123 4567`
 - IBAN: `SA03 8000 0000 6080 1016 7519`
-- التواريخ ميلادية بأسماء الأشهر العربية وأرقام لاتينية: `13 سبتمبر 2026` · `15:42`
-- العميل: نور الحاج · العنوان: الرياض، حي الملقا، شارع أنس بن مالك، مبنى 12
-- سلة نموذجية من 3 متاجر: البضاعة 1,160.00 · الشحن 45.00 · الضريبة 58.00 · الخصم −14.50 · **الإجمالي 1,248.50 ر.س.**
-- الفئات: إلكترونيات وأجهزة ← هواتف ذكية · ملابس وأحذية ← ملابس رجالية، ملابس نسائية · جمال وعناية · منزل ومطبخ · بقالة ومواد غذائية · يدويّات وحرف
-- السمات: اللون · المقاس · السعة التخزينية · الخامة (إلزامية للملابس) · مدة الضمان (بالأشهر)
+- Dates are Gregorian with Arabic month names and Latin digits: `13 سبتمبر 2026` · `15:42`
+- Customer: نور الحاج (Noor Al-Hajj) · address: Riyadh, Al-Malqa district, Anas Ibn Malik St., building 12
+- Sample 3-shop cart: items 1,160.00 · shipping 45.00 · tax 58.00 · discount −14.50 · **total 1,248.50 SAR**
+- Categories: Electronics → Smartphones · Fashion → Men's clothing, Women's clothing · Beauty · Home & Kitchen · Grocery · Handmade
+- Attributes: Color · Size · Storage · Material (required for clothing) · Warranty (months)
 
 ---
 
-## 9 · خارج النطاق — لا تصمّمه
+## 11 · Out of scope — don't design
 
-تطبيقات موبايل أصلية · دردشة حيّة فورية · برنامج ولاء ونقاط وإحالات · محرّك توصيات ذكي · مزادات أو مساومة · اشتراكات منتجات متكررة · شحن دولي بجمارك · محفظة مشترٍ مسبقة الدفع · مستودعات متعددة للبائع · **اشتراكات للبائعين**.
+Native mobile apps · real-time live chat · loyalty points and referrals · AI recommendation engine · auctions or haggling · recurring product subscriptions · international shipping with customs · prepaid buyer wallet · multiple warehouses per vendor · **vendor subscriptions**.
 
-**مسائل مفتوحة — صمّم الحالة الحالية ولا تحسمها:**
-- هل يعيد تعديلُ منتج منشور المنتجَ للمراجعة؟ **الحالي: لا**
-- شاشة دعوة موظفين للمتجر: الدور موجود، والشاشة غير محسومة
-- صفحات المحتوى بالعربية فقط حالياً
-- مزوّد الخريطة وبوابة الدفع غير محسومين — صمّم بشكل محايد بلا شعارات مزوّدين
-
----
-
-## 10 · مطابقة الجرد الأصلي (47) برموزه
-
-| الأصلي | الرمز | | الأصلي | الرمز | | الأصلي | الرمز |
-|--------|-------|---|--------|-------|---|--------|-------|
-| الرئيسية | ST-01 | | تسجيل البائع | VD-01 | | لوحة المؤشرات | AD-03 |
-| قائمة الفئة | ST-03 | | رفع الوثائق | VD-02 | | مراجعة البائعين | AD-04 |
-| نتائج البحث | ST-04 | | حالة قيد المراجعة | VD-03 | | ملف بائع | AD-05 |
-| بحث بلا نتائج | ST-05 | | لوحة المؤشرات | VD-06 | | شجرة الفئات | AD-08 |
-| صفحة المنتج | ST-07 | | قائمة المنتجات | VD-07 | | السمات | AD-09 |
-| منتج نفد | ST-08 | | تحرير منتج | VD-08 | | قواعد العمولة | AD-10 |
-| صفحة البائع | ST-11 | | الاستيراد الجماعي | VD-09 | | العملات وأسعار الصرف | AD-11 |
-| بائع معلَّق | ST-12 | | تقرير أخطاء الاستيراد | VD-10 | | طلبات السحب | AD-13 |
-| السلة | ST-13 | | المخزون | VD-11 | | النزاعات | AD-14 |
-| سلة فارغة | ST-14 | | قائمة الطلبات | VD-12 | | المرتجعات | AD-15 |
-| إتمام الشراء | ST-15 | | تفاصيل الطلب | VD-13 | | الكوبونات | AD-16 |
-| فشل الدفع | ST-16 | | مناطق الشحن | VD-16 | | صفحات المحتوى | AD-18 |
-| نجاح الطلب | ST-17 | | المحفظة وكشف الحساب | VD-17 | | مستخدمو الإدارة | AD-23 |
-| طلباتي | ST-18 | | طلب سحب | VD-18 | | سجل التدقيق | AD-24 |
-| تفاصيل الطلب | ST-19 | | | | | التقارير | AD-25 |
-| طلب إرجاع | ST-20 | | | | | | |
-| المفضلة | ST-23 | | | | | | |
-| الحساب والعناوين | ST-25 + ST-26 | | | | | | |
-
-**الإضافات — 39:** ST-02 · 06 · 09 · 10 · 21 · 22 · 24 · 27 · 28 · 29 · 30 · 31 · SH-01 إلى 08 · VD-04 · 05 · 14 · 15 · 19 · 20 · 21 · AD-01 · 02 · 06 · 07 · 12 · 17 · 19 · 20 · 21 · 22 · 26.
-> كثير منها حالات ونوافذ وقوالب صغيرة، لكنها **توسّع نطاق المرحلة 02** المسعَّر على 47 شاشة. تُراجَع كطلب تغيير قبل البدء بها.
+**Open items — design the current behavior, don't decide them:**
+- A "shop staff" invitation screen: the role exists, the screen isn't decided
+- Content pages are Arabic-only for now
+- Map provider and payment gateway aren't chosen — keep them neutral, no provider logos
 
 ---
 
-## 11 · دفعات التصميم وأوامرها الجاهزة
+## 12 · Mapping of the original 47 screens
 
-**الترتيب مقصود:** ورقة المكوّنات أولاً، ثم لوحة البائع لأن المرحلة 06 التالية في التنفيذ، ثم المتجر، ثم الإدارة.
-في كل دفعة: الصق القسم 0، ثم الأمر أدناه، ثم أقسام الشاشات المذكورة من القسم 6.
+| Original (Arabic) | Code | | Original | Code | | Original | Code |
+|---|---|---|---|---|---|---|---|
+| الرئيسية · Home | ST-01 | | تسجيل البائع · Vendor registration | VD-01 | | لوحة المؤشرات · Dashboard | AD-03 |
+| قائمة الفئة · Category listing | ST-03 | | رفع الوثائق · Documents | VD-02 | | مراجعة البائعين · Vendor review | AD-04 |
+| نتائج البحث · Search results | ST-04 | | حالة قيد المراجعة · In review | VD-03 | | ملف بائع · Vendor profile | AD-05 |
+| بحث بلا نتائج · No results | ST-05 | | لوحة المؤشرات · Dashboard | VD-06 | | شجرة الفئات · Category tree | AD-08 |
+| صفحة المنتج · Product page | ST-07 | | قائمة المنتجات · Products | VD-07 | | السمات · Attributes | AD-09 |
+| منتج نفد · Sold out | ST-08 | | تحرير منتج · Product editor | VD-08 | | قواعد العمولة · Commission rules | AD-10 |
+| صفحة البائع · Shop page | ST-11 | | الاستيراد الجماعي · Bulk import | VD-09 | | العملات وأسعار الصرف · Currencies & FX | AD-11 |
+| بائع معلَّق · Suspended shop | ST-12 | | تقرير أخطاء الاستيراد · Import report | VD-10 | | طلبات السحب · Payouts | AD-13 |
+| السلة · Cart | ST-13 | | المخزون · Inventory | VD-11 | | النزاعات · Disputes | AD-14 |
+| سلة فارغة · Empty cart | ST-14 | | قائمة الطلبات · Orders | VD-12 | | المرتجعات · Returns | AD-15 |
+| إتمام الشراء · Checkout | ST-15 | | تفاصيل الطلب · Order detail | VD-13 | | الكوبونات · Coupons | AD-16 |
+| فشل الدفع · Payment failed | ST-16 | | مناطق الشحن · Shipping zones | VD-16 | | صفحات المحتوى · Content pages | AD-18 |
+| نجاح الطلب · Order placed | ST-17 | | المحفظة وكشف الحساب · Wallet | VD-17 | | مستخدمو الإدارة · Admin users | AD-23 |
+| طلباتي · My orders | ST-18 | | طلب سحب · Payout request | VD-18 | | سجل التدقيق · Audit log | AD-24 |
+| تفاصيل الطلب · Order detail | ST-19 | | | | | التقارير · Reports | AD-25 |
+| طلب إرجاع · Return request | ST-20 | | | | | | |
+| المفضلة · Wishlist | ST-23 | | | | | | |
+| الحساب والعناوين · Account & addresses | ST-25 + ST-26 | | | | | | |
 
-### الدفعة 0 — الأساس
-```
-صمّم ورقة المكوّنات لبسطة: كل مكوّنات القسم 4 بحالاتها السبع، بالسمتين الفاتحة والداكنة،
-بالكثافتين المريحة والمضغوطة، RTL. وأضف ورقة الألوان والطباعة من القسم 2 وشارات الحالات من القسم 7.
-```
+**Added — 39:** ST-02 · 06 · 09 · 10 · 21 · 22 · 24 · 27 · 28 · 29 · 30 · 31 · SH-01 to 08 · VD-04 · 05 · 14 · 15 · 19 · 20 · 21 · AD-01 · 02 · 06 · 07 · 12 · 17 · 19 · 20 · 21 · 22 · 26.
+> Many are small states, dialogs or templates, but they **expand Phase 02's scope**, which was priced on 47 screens. To be confirmed as a change request before starting them.
 
-### الدفعة 1 — تأهيل البائع
-```
-صمّم شاشات تأهيل البائع VD-01 إلى VD-05 بمؤشر خطوات، سطح مكتب 1440 وجوال 400.
-VD-04 قرار غير رجعي: اجعل تحذيره واضحاً دون ترهيب.
-```
+---
 
-### الدفعة 2 — لوحة البائع: المنتجات والمخزون
-```
-صمّم VD-06 إلى VD-11 بكثافة مضغوطة داخل صدفة لوحة البائع (القسم 5.2).
-أعطِ VD-08 (تحرير المنتج) أكبر عناية: محرّر مصفوفة المتغيّرات وقائمة موانع الإرسال للمراجعة.
-صمّم VD-10 بمثال 488 من 500 و 12 سطراً مرفوضاً.
-```
+## 13 · Design batches with ready prompts
 
-### الدفعة 3 — لوحة البائع: الطلبات والمال
-```
-صمّم VD-12 إلى VD-21. في VD-13 الأزرار حسب الحالة من جدولها فقط.
-في VD-17 صمّم حالتي الرصيد العادي والرصيد السالب.
-```
+**The order is deliberate:** components first, then the Vendor Dashboard (Phase 06 is next in development), then the Storefront, then Admin.
+In each batch: paste §0, then the prompt below, then the named screen specs from §8.
 
-### الدفعة 4 — المتجر: الاكتشاف
+### Batch 0 — Foundations
 ```
-صمّم ST-01 إلى ST-12 و ST-29 و SH-05 بكثافة مريحة، سطح مكتب 1440 وجوال 400.
-ST-07 (صفحة المنتج) بنسخة إنجليزية LTR إضافية.
-```
-
-### الدفعة 5 — المتجر: السلة والشراء وما بعده
-```
-صمّم ST-13 إلى ST-22 و ST-31. سلة من 3 متاجر بعملات مختلفة معروضة بعملة عرض واحدة.
-في ST-15 صمّم كل الحالات المذكورة، والعدّاد التنازلي ظاهر، ونسخة LTR إضافية.
-الطلبات الفرعية منفصلة من صفحة التأكيد حتى التتبّع.
+Design Basta's interactive component sheet: every component in §4 with its seven states, in light and
+dark themes, in comfortable and compact density, RTL. Make states demonstrable: hover, focus, pressed,
+loading and error are triggerable in the prototype. Add the color and type sheets from §2 and the
+status badges from §9. Include the prototype toolbar: Light/Dark and RTL/LTR toggles.
 ```
 
-### الدفعة 6 — المتجر: الحساب والمشترك
+### Batch 1 — Vendor onboarding
 ```
-صمّم ST-23 إلى ST-28 و ST-30 و SH-01 إلى SH-04 و SH-06 إلى SH-08.
-```
-
-### الدفعة 7 — الإدارة: التشغيل
-```
-صمّم AD-01 إلى AD-07 و AD-12 إلى AD-15 و AD-21 و AD-22 بكثافة مضغوطة داخل صدفة الإدارة (القسم 5.3).
-الأزرار المرتبطة بصلاحية تظهر لمن يملكها. AD-07 طابور مراجعة المنتجات: السرعة أولاً.
-الجوال 400 لطوابير المراجعة وطلبات السحب فقط، والباقي سطح مكتب.
+Design vendor onboarding VD-01 to VD-05 as a clickable flow with a stepper, desktop 1440 and mobile 400.
+Steps validate before continuing; uploads show progress; VD-04 is irreversible — make its warning clear
+without being alarming, with the confirmation dialog.
 ```
 
-### الدفعة 8 — الإدارة: الكتالوج والمال والتسويق والنظام
+### Batch 2 — Vendor: products & inventory
 ```
-صمّم AD-08 إلى AD-11 و AD-16 إلى AD-20 و AD-23 إلى AD-26.
-المال مجمَّع حسب العملة دائماً. سجل التدقيق وأسعار الصرف للإضافة فقط: لا أزرار تعديل ولا حذف.
+Design VD-06 to VD-11 in compact density inside the vendor shell (§6.2), fully interactive.
+Give VD-08 (product editor) the most care: category change swaps attributes, the variant matrix
+generates rows live, images reorder by drag, and "Submit for review" shows the blocker list or the
+in-review banner. VD-10 uses the 488-of-500 example with 12 rejected rows.
 ```
 
-### الدفعة 9 — المراجعة الشاملة
+### Batch 3 — Vendor: orders & money
 ```
-راجع كل الشاشات: نسخ السمة الداكنة لـ ST-01 و ST-07 و ST-15 و VD-06 و AD-03،
-وكل الحالات الحرجة: فارغة، تحميل، خطأ، نفاد، انتهاء مهلة، منطقة غير مغطاة، رصيد سالب، بائع معلَّق.
+Design VD-12 to VD-21, interactive. In VD-13 the buttons follow the status table and clicking them
+advances the order. Countdowns tick. In VD-17 design both the normal and the negative-balance state;
+VD-18 validates the amount against the minimum live.
+```
+
+### Batch 4 — Storefront: discovery
+```
+Design ST-01 to ST-12, ST-29 and SH-05 in comfortable density, desktop 1440 and mobile 400, as a
+clickable flow from Home to a product. Filters update results and counts live; variant selection updates
+price, images and stock. ST-07 also gets an English LTR version.
+```
+
+### Batch 5 — Storefront: cart, checkout & after purchase
+```
+Design ST-13 to ST-22 and ST-31 as one working purchase flow. A cart from 3 shops in different
+currencies shown in one display currency; quantities and coupons recalculate totals. In ST-15 design
+every listed state, the countdown ticks from 15:00, and an English LTR version. Sub-orders stay
+separate from confirmation to tracking.
+```
+
+### Batch 6 — Storefront: account & shared
+```
+Design ST-23 to ST-28, ST-30, SH-01 to SH-04 and SH-06 to SH-08, interactive: OTP boxes auto-advance,
+password strength updates live, sessions can be signed out with confirmation.
+```
+
+### Batch 7 — Admin: operations
+```
+Design AD-01 to AD-07, AD-12 to AD-15, AD-21 and AD-22 in compact density inside the admin shell (§6.3).
+Permission-bound buttons appear only for holders. AD-07 product review is built for speed: approve
+auto-advances, reject asks for a reason, keyboard shortcuts shown. Mobile 400 for the review queue and
+payouts only; the rest desktop.
+```
+
+### Batch 8 — Admin: catalog, money, marketing & system
+```
+Design AD-08 to AD-11, AD-16 to AD-20 and AD-23 to AD-26, interactive: the category tree drags with
+valid/invalid drop feedback, coupon examples recalculate, template variables insert and preview live.
+Money is always grouped by currency. Audit log and FX rates are append-only: no edit or delete buttons.
+```
+
+### Batch 9 — Full review
+```
+Review all screens: dark-theme versions of ST-01, ST-07, ST-15, VD-06 and AD-03, and every critical
+state: empty, loading, error, sold out, reservation expired, uncovered area, negative balance,
+suspended shop, published product sent back to review. Check every interaction in §5.2 end to end.
 ```
 
 ---
 
-## 12 · قائمة قبول كل شاشة
+## 14 · Acceptance checklist per screen
 
-- [ ] سطح مكتب 1440 وجوال 400 — بلا تمرير أفقي على الجوال
-- [ ] RTL صحيح: الأسهم منعكسة، والشعار لا، واللاتيني معزول
-- [ ] الرمان على المبالغ وحدها
-- [ ] المبالغ بخانات عملتها وأرقام لاتينية
-- [ ] كل حالة لها نص بجانب لونها
-- [ ] حالات التحميل والفارغ والخطأ مصمَّمة
-- [ ] الأزرار = الإجراءات المسموحة فقط
-- [ ] رسائل الخطأ: ما حدث، ولماذا، وما التالي
-- [ ] بيانات القسم 8 لا نصوص وهمية
-- [ ] هدف اللمس 44 بكسل، والتركيز مرئي
-- [ ] القيم من رموز القسم 2 — لا لون ولا مسافة خارجها
+- [ ] Desktop 1440 and mobile 400 — no horizontal scroll on mobile
+- [ ] Correct RTL: arrows mirrored, logo not, Latin runs isolated
+- [ ] Teal on amounts only; burgundy never used for money
+- [ ] Amounts with their currency's decimals and Latin digits
+- [ ] Every status has text next to its color
+- [ ] Loading, empty and error states designed and switchable
+- [ ] Buttons = allowed actions only
+- [ ] Destructive actions outlined with icon and text; filled red only in confirmation dialogs
+- [ ] Error copy: what happened, why, what next
+- [ ] §10 sample data, no placeholder text
+- [ ] 44px touch targets, visible focus ring
+- [ ] Values from §2 tokens only — no color or spacing outside them
+- [ ] Interactive: navigation works, controls change state, calculations update, flows in §5.2 click through
