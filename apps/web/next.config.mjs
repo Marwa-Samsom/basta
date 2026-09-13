@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // بناء الفحص (npm run verify) يكتب في مجلد منفصل: البناء في .next نفسه الذي
+  // يستعمله خادم التطوير الشغّال يُفسد حالته فيرجع 500 — وقع مرة فعلاً
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   // tokens.css يعيش خارج apps/web عمداً — مصدر حقيقة واحد يشاركه التصميم والتنفيذ

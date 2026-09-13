@@ -128,7 +128,15 @@ printf '  \033[32m✓\033[0m %s\n' \
   "$(printf '%s' "$test_out" | sed -e 's/\x1b\[[0-9;]*m//g' | grep -oE 'Tests +[0-9]+ passed.*' | tail -1)"
 
 say "البناء"
-npm run build >/dev/null 2>&1 || die "البناء"
+# مجلد بناء منفصل للواجهة: verify يُشغَّل غالباً وخادم التطوير يعمل على .next
+# و next build يعيد كتابة next-env.d.ts ليشير إلى مجلد بنائه. يُستعاد بعده ولو فشل البناء،
+# وإلا بقي الملف الملتزَم يتقلّب بين .next و .next-verify ويُلتزم مرجع إلى مجلد لا يوجد في نسخة أخرى
+next_env="apps/web/next-env.d.ts"
+next_env_backup="$(mktemp)"
+cp "$next_env" "$next_env_backup"
+trap 'cp "$next_env_backup" "$next_env"; rm -f "$next_env_backup"' EXIT
+NEXT_DIST_DIR=.next-verify npm run build >/dev/null 2>&1 || die "البناء"
+cp "$next_env_backup" "$next_env"; rm -f "$next_env_backup"; trap - EXIT
 ok "api و web يُبنيان"
 
 printf '\n\033[32m\033[1m✅ البيئة أُعيد بناؤها من الصفر وكل الفحوص تمرّ\033[0m\n'
