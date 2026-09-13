@@ -5,9 +5,13 @@
 
    قواعد الاستخدام:
    1. كل لون في التطبيق يأتي من متغيّر هنا. أي hex في ملف مكوّن خطأ يوقفه فحص CI.
-   2. الرمان (--price) محجوز للمال وحده — سعر، خصم، مجموع. لا يُستعمل زينةً.
+   2. الفيروزي الداكن (--price) محجوز للمال وحده — سعر، خصم، مجموع، رصيد. لا يُستعمل زينةً.
    3. المسافات من سلّم 4px حصراً. لا 5px ولا 13px.
    4. الخصائص المنطقية فقط: inline-start/end لا left/right. المنصة تعمل RTL و LTR.
+
+   الهوية اللونية — قرار صاحب المشروع (13 سبتمبر 2026): تدرّجات العنّابي مع البيج،
+   بدل النيلي والرمان. كل زوج نص/خلفية أدناه مقيس بمعيار WCAG AA على السمتين،
+   والجدول في docs/02-design/DESIGN-SYSTEM.md §6.
    ========================================================================== */
 
 /* ---------- 1 · الخطوط ---------- */
@@ -48,47 +52,50 @@
 /* لا تُستعمل مباشرة في المكوّنات — الأدوار في القسم 3 هي الواجهة */
 
 :root {
-  /* النيلي — لون العلامة. مأخوذ من نيلة الصبّاغين، لا من أزرق افتراضي */
-  --indigo-50:  #EEF1F8;
-  --indigo-100: #DCE2F0;
-  --indigo-200: #B4C0DF;
-  --indigo-300: #8598C9;
-  --indigo-400: #5570AF;
-  --indigo-500: #2A4480;  /* الأساس */
-  --indigo-600: #22376A;
-  --indigo-700: #1A2B53;
-  --indigo-800: #14213F;
-  --indigo-900: #0E1729;
+  /* العنّابي — لون العلامة */
+  --burgundy-50:  #FBF1F3;
+  --burgundy-100: #F4DDE2;
+  --burgundy-200: #E6B6C1;
+  --burgundy-300: #D08A9B;
+  --burgundy-400: #B05A70;
+  --burgundy-500: #8C2F46;  /* الأساس */
+  --burgundy-600: #74243A;
+  --burgundy-700: #5C1B2E;
+  --burgundy-800: #451422;
+  --burgundy-900: #2E0D17;
 
-  /* الرمان — للمال وحده */
-  --pom-50:  #FBEEF2;
-  --pom-100: #F5DAE2;
-  --pom-300: #D98FA5;
-  --pom-500: #B23A5B;
-  --pom-600: #962E4B;
-  --pom-700: #78243B;
+  /* الفيروزي الداكن — للمال وحده. مكمّل العنّابي على دائرة الألوان فلا يشتبه به،
+     وبعيد عن أخضر النجاح بما يكفي — والمال رقم دائماً والنجاح شارة بنص */
+  --teal-50:  #E3F2F0;
+  --teal-100: #C4E5E1;
+  --teal-300: #5CC6B8;
+  --teal-500: #0E6B66;
+  --teal-600: #0B5652;
+  --teal-700: #08403D;
+  --teal-900: #0F2624;
 
-  /* محايدات بميل نيلي بارد — رماديّ خالص يقرأ كغير مقصود */
-  --neutral-0:   #FFFFFF;
-  --neutral-25:  #FAFBFC;
-  --neutral-50:  #F4F6F9;
-  --neutral-100: #E8EBF1;
-  --neutral-200: #D5DAE4;
-  --neutral-300: #B3BBCA;
-  --neutral-400: #8A94A8;
-  --neutral-500: #656F84;
-  --neutral-600: #4B5468;
-  --neutral-700: #363E4F;
-  --neutral-800: #232A38;
-  --neutral-850: #1A202B;
-  --neutral-900: #121722;
-  --neutral-950: #0B0F17;
+  /* البيج — محايدات دافئة. رماديّ بارد بجانب العنّابي يقرأ كغير مقصود */
+  --beige-0:   #FFFFFF;
+  --beige-25:  #FDFAF6;
+  --beige-50:  #F8F3EC;
+  --beige-100: #F0E8DD;
+  --beige-200: #E3D7C7;
+  --beige-300: #CBBBA6;
+  --beige-350: #A89680;
+  --beige-400: #958470;  /* حدود الحقول في الفاتح — 3:1 */
+  --beige-500: #7D6C5B;
+  --beige-600: #6B5C4D;
+  --beige-700: #4A3F35;
+  --beige-800: #332B24;
+  --beige-850: #28211C;
+  --beige-900: #1E1814;
+  --beige-950: #14100D;
 
-  /* دلالية — منفصلة تماماً عن لون العلامة */
-  --green-100: #DAF0E5;  --green-500: #15795A;  --green-600: #0F5F47;  --green-900:#0B2E24;
-  --amber-100: #FAEED2;  --amber-500: #9A6B08;  --amber-600: #7D5606;  --amber-900:#332401;
-  --red-100:   #FADEDB;  --red-500:   #C0392B;  --red-600:   #9E2B20;  --red-900:  #3A100C;
-  --sky-100:   #D9E9F6;  --sky-500:   #2C6FA8;  --sky-600:   #235887;  --sky-900:  #0C2436;
+  /* دلالية — منفصلة عن العلامة. الخطر أحمر برتقالي (زاوية 11°) لا عنّابي (345°) */
+  --green-100:  #E3F1E6;  --green-500:  #2F7A3E;  --green-600:  #25622F;  --green-900:  #13261A;
+  --orange-100: #FBEBDD;  --orange-500: #9A4F0B;  --orange-600: #7E4009;  --orange-900: #2E1C0B;
+  --red-100:    #FBE3DD;  --red-500:    #C23A1A;  --red-600:    #A12E13;  --red-900:    #331410;
+  --blue-100:   #E1EBF4;  --blue-500:   #2D5F8B;  --blue-600:   #244C70;  --blue-900:   #0F1E2C;
 }
 
 /* ---------- 3 · الأدوار — السمة الفاتحة ---------- */
@@ -97,52 +104,52 @@
 
 :root {
   /* الأسطح */
-  --surface-page:    var(--neutral-50);
-  --surface-card:    var(--neutral-0);
-  --surface-raised:  var(--neutral-0);
-  --surface-sunken:  var(--neutral-100);
-  --surface-inverse: var(--neutral-850);
+  --surface-page:    var(--beige-50);
+  --surface-card:    var(--beige-0);
+  --surface-raised:  var(--beige-0);
+  --surface-sunken:  var(--beige-100);
+  --surface-inverse: var(--beige-850);
 
   /* النص */
-  --text-strong: var(--neutral-900);
-  --text-body:   var(--neutral-700);
-  --text-muted:  var(--neutral-500);
-  --text-faint:  var(--neutral-400);
-  --text-on-brand:   var(--neutral-0);
-  --text-on-inverse: var(--neutral-50);
+  --text-strong: var(--beige-900);
+  --text-body:   var(--beige-700);
+  --text-muted:  var(--beige-600);
+  --text-faint:  var(--beige-500);
+  --text-on-brand:   var(--beige-0);
+  --text-on-inverse: var(--beige-50);
 
   /* الحدود */
-  --border-subtle: var(--neutral-100);
-  --border-default: var(--neutral-200);
-  --border-strong: var(--neutral-300);
+  --border-subtle:  var(--beige-100);
+  --border-default: var(--beige-200);
+  --border-strong:  var(--beige-400);  /* حدود الحقول والأزرار الثانوية — 3:1 */
 
   /* العلامة */
-  --brand:         var(--indigo-500);
-  --brand-hover:   var(--indigo-600);
-  --brand-active:  var(--indigo-700);
-  --brand-subtle:  var(--indigo-50);
-  --brand-border:  var(--indigo-200);
-  --brand-text:    var(--indigo-600);
+  --brand:         var(--burgundy-500);
+  --brand-hover:   var(--burgundy-600);
+  --brand-active:  var(--burgundy-700);
+  --brand-subtle:  var(--burgundy-50);
+  --brand-border:  var(--burgundy-200);
+  --brand-text:    var(--burgundy-600);
 
-  /* المال — الرمان. محجوز: سعر، خصم، مجموع، رصيد */
-  --price:        var(--pom-500);
-  --price-subtle: var(--pom-50);
-  --price-border: var(--pom-100);
+  /* المال — الفيروزي. محجوز: سعر، خصم، مجموع، رصيد */
+  --price:        var(--teal-500);
+  --price-subtle: var(--teal-50);
+  --price-border: var(--teal-100);
 
-  /* الدلالات */
-  --success: var(--green-500); --success-subtle: var(--green-100); --success-text: var(--green-600);
-  --warning: var(--amber-500); --warning-subtle: var(--amber-100); --warning-text: var(--amber-600);
-  --danger:  var(--red-500);   --danger-subtle:  var(--red-100);   --danger-text:  var(--red-600);
-  --info:    var(--sky-500);   --info-subtle:    var(--sky-100);   --info-text:    var(--sky-600);
+  /* الدلالات — النص على الخلفية الخفيفة يأخذ درجة -text الأدكن */
+  --success: var(--green-500);  --success-subtle: var(--green-100);  --success-text: var(--green-600);
+  --warning: var(--orange-500); --warning-subtle: var(--orange-100); --warning-text: var(--orange-600);
+  --danger:  var(--red-500);    --danger-subtle:  var(--red-100);    --danger-text:  var(--red-600);
+  --info:    var(--blue-500);   --info-subtle:    var(--blue-100);   --info-text:    var(--blue-600);
 
   /* التركيز — لون واحد لكل الواجهة، لا يتغيّر بتغيّر المكوّن */
-  --focus-ring: var(--indigo-400);
+  --focus-ring: var(--burgundy-400);
 
-  /* الظلال — خافتة، بميل نيلي لا أسود خالص */
-  --shadow-sm: 0 1px 2px rgba(18, 23, 34, 0.06);
-  --shadow-md: 0 2px 6px rgba(18, 23, 34, 0.08), 0 1px 2px rgba(18, 23, 34, 0.04);
-  --shadow-lg: 0 8px 24px rgba(18, 23, 34, 0.10), 0 2px 6px rgba(18, 23, 34, 0.05);
-  --shadow-overlay: 0 16px 48px rgba(18, 23, 34, 0.18);
+  /* الظلال — خافتة، بميل بني دافئ لا أسود خالص */
+  --shadow-sm: 0 1px 2px rgba(30, 24, 20, 0.06);
+  --shadow-md: 0 2px 6px rgba(30, 24, 20, 0.08), 0 1px 2px rgba(30, 24, 20, 0.04);
+  --shadow-lg: 0 8px 24px rgba(30, 24, 20, 0.10), 0 2px 6px rgba(30, 24, 20, 0.05);
+  --shadow-overlay: 0 16px 48px rgba(30, 24, 20, 0.18);
 }
 
 /* ---------- 4 · الأدوار — السمة الداكنة ---------- */
@@ -151,41 +158,41 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --surface-page:    var(--neutral-950);
-    --surface-card:    var(--neutral-900);
-    --surface-raised:  var(--neutral-850);
-    --surface-sunken:  var(--neutral-950);
-    --surface-inverse: var(--neutral-100);
+    --surface-page:    var(--beige-950);
+    --surface-card:    var(--beige-900);
+    --surface-raised:  var(--beige-850);
+    --surface-sunken:  var(--beige-950);
+    --surface-inverse: var(--beige-100);
 
-    --text-strong: var(--neutral-25);
-    --text-body:   var(--neutral-200);
-    --text-muted:  var(--neutral-400);
-    --text-faint:  var(--neutral-500);
-    --text-on-brand:   var(--neutral-0);
-    --text-on-inverse: var(--neutral-900);
+    --text-strong: var(--beige-25);
+    --text-body:   var(--beige-200);
+    --text-muted:  var(--beige-350);
+    --text-faint:  var(--beige-400);
+    --text-on-brand:   var(--beige-900);
+    --text-on-inverse: var(--beige-900);
 
-    --border-subtle:  var(--neutral-850);
-    --border-default: var(--neutral-800);
-    --border-strong:  var(--neutral-700);
+    --border-subtle:  var(--beige-850);
+    --border-default: var(--beige-800);
+    --border-strong:  var(--beige-500);
 
-    /* النيلي يُرفع في الداكن — الأساس يغرق في الخلفية ويسقط التباين */
-    --brand:        var(--indigo-300);
-    --brand-hover:  var(--indigo-200);
-    --brand-active: var(--indigo-100);
-    --brand-subtle: var(--indigo-900);
-    --brand-border: var(--indigo-700);
-    --brand-text:   var(--indigo-300);
+    /* العنّابي يُرفع في الداكن — الأساس يغرق في الخلفية، والنص على الزر يصير داكناً */
+    --brand:        var(--burgundy-300);
+    --brand-hover:  var(--burgundy-200);
+    --brand-active: var(--burgundy-100);
+    --brand-subtle: var(--burgundy-900);
+    --brand-border: var(--burgundy-700);
+    --brand-text:   var(--burgundy-300);
 
-    --price:        var(--pom-300);
-    --price-subtle: #2A1620;
-    --price-border: var(--pom-700);
+    --price:        var(--teal-300);
+    --price-subtle: var(--teal-900);
+    --price-border: var(--teal-700);
 
-    --success: #4FBF95; --success-subtle: var(--green-900); --success-text: #4FBF95;
-    --warning: #E0A93C; --warning-subtle: var(--amber-900); --warning-text: #E0A93C;
-    --danger:  #E8776A; --danger-subtle:  var(--red-900);   --danger-text:  #E8776A;
-    --info:    #5FA3D8; --info-subtle:    var(--sky-900);   --info-text:    #5FA3D8;
+    --success: #6CC287; --success-subtle: var(--green-900);  --success-text: #6CC287;
+    --warning: #E39A4B; --warning-subtle: var(--orange-900); --warning-text: #E39A4B;
+    --danger:  #F07A66; --danger-subtle:  var(--red-900);    --danger-text:  #F07A66;
+    --info:    #7FB2E0; --info-subtle:    var(--blue-900);   --info-text:    #7FB2E0;
 
-    --focus-ring: var(--indigo-300);
+    --focus-ring: var(--burgundy-300);
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -196,40 +203,40 @@
 
 /* تكرار مقصود: يجعل مبدّل السمة يغلب في الاتجاهين */
 :root[data-theme="dark"] {
-  --surface-page:    var(--neutral-950);
-  --surface-card:    var(--neutral-900);
-  --surface-raised:  var(--neutral-850);
-  --surface-sunken:  var(--neutral-950);
-  --surface-inverse: var(--neutral-100);
+  --surface-page:    var(--beige-950);
+  --surface-card:    var(--beige-900);
+  --surface-raised:  var(--beige-850);
+  --surface-sunken:  var(--beige-950);
+  --surface-inverse: var(--beige-100);
 
-  --text-strong: var(--neutral-25);
-  --text-body:   var(--neutral-200);
-  --text-muted:  var(--neutral-400);
-  --text-faint:  var(--neutral-500);
-  --text-on-brand:   var(--neutral-0);
-  --text-on-inverse: var(--neutral-900);
+  --text-strong: var(--beige-25);
+  --text-body:   var(--beige-200);
+  --text-muted:  var(--beige-350);
+  --text-faint:  var(--beige-400);
+  --text-on-brand:   var(--beige-900);
+  --text-on-inverse: var(--beige-900);
 
-  --border-subtle:  var(--neutral-850);
-  --border-default: var(--neutral-800);
-  --border-strong:  var(--neutral-700);
+  --border-subtle:  var(--beige-850);
+  --border-default: var(--beige-800);
+  --border-strong:  var(--beige-500);
 
-  --brand:        var(--indigo-300);
-  --brand-hover:  var(--indigo-200);
-  --brand-active: var(--indigo-100);
-  --brand-subtle: var(--indigo-900);
-  --brand-border: var(--indigo-700);
-  --brand-text:   var(--indigo-300);
+  --brand:        var(--burgundy-300);
+  --brand-hover:  var(--burgundy-200);
+  --brand-active: var(--burgundy-100);
+  --brand-subtle: var(--burgundy-900);
+  --brand-border: var(--burgundy-700);
+  --brand-text:   var(--burgundy-300);
 
-  --price:        var(--pom-300);
-  --price-subtle: #2A1620;
-  --price-border: var(--pom-700);
+  --price:        var(--teal-300);
+  --price-subtle: var(--teal-900);
+  --price-border: var(--teal-700);
 
-  --success: #4FBF95; --success-subtle: var(--green-900); --success-text: #4FBF95;
-  --warning: #E0A93C; --warning-subtle: var(--amber-900); --warning-text: #E0A93C;
-  --danger:  #E8776A; --danger-subtle:  var(--red-900);   --danger-text:  #E8776A;
-  --info:    #5FA3D8; --info-subtle:    var(--sky-900);   --info-text:    #5FA3D8;
+  --success: #6CC287; --success-subtle: var(--green-900);  --success-text: #6CC287;
+  --warning: #E39A4B; --warning-subtle: var(--orange-900); --warning-text: #E39A4B;
+  --danger:  #F07A66; --danger-subtle:  var(--red-900);    --danger-text:  #F07A66;
+  --info:    #7FB2E0; --info-subtle:    var(--blue-900);   --info-text:    #7FB2E0;
 
-  --focus-ring: var(--indigo-300);
+  --focus-ring: var(--burgundy-300);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -344,7 +351,7 @@ img, video { max-width: 100%; height: auto; }
   font-variant-numeric: tabular-nums;
 }
 
-/* المال — الرمان، ووزن يفصله عمّا حوله */
+/* المال — الفيروزي، ووزن يفصله عمّا حوله */
 .price {
   color: var(--price);
   font-weight: var(--weight-semi);

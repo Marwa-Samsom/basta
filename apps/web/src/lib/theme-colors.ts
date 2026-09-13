@@ -8,5 +8,5 @@
  * عند تغيير `--surface-page` في src/styles/tokens.css غيّرها هنا أيضاً.
  * الملف مستثنى صراحةً من حارس الألوان في CI لهذا السبب وحده.
  */
-export const THEME_COLOR_LIGHT = '#F4F6F9'; // = --surface-page (neutral-50)
-export const THEME_COLOR_DARK = '#0B0F17'; // = --surface-page (neutral-950)
+export const THEME_COLOR_LIGHT = '#F8F3EC'; // = --surface-page (beige-50)
+export const THEME_COLOR_DARK = '#14100D'; // = --surface-page (beige-950)
