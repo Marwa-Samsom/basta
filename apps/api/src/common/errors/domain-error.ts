@@ -70,3 +70,15 @@ export class BelowMinimumPayoutError extends DomainError {
     );
   }
 }
+
+/** مدخل يخالف قاعدة مجال لا يلتقطها التحقق الشكلي — رسالته تسمّي الحقل وسبيل التصحيح. */
+export class InvalidInputError extends DomainError {
+  readonly code = 'INVALID_INPUT';
+  readonly httpStatus = 400;
+}
+
+/** تكرار يرفضه قيد تفرّد: SKU، تركيبة متغيّر، مسار فئة. */
+export class DuplicateError extends DomainError {
+  readonly code = 'DUPLICATE';
+  readonly httpStatus = 409;
+}

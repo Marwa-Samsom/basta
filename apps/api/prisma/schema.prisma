@@ -85,7 +85,7 @@ model UserRole {
 
 model AdminPermission {
   userId     String   @db.Uuid
-  permission String // vendors.approve · payouts.approve · commissions.edit · disputes.resolve
+  permission String // vendors.approve · payouts.approve · commissions.edit · disputes.resolve · catalog.manage
   grantedBy  String?  @db.Uuid
   grantedAt  DateTime @default(now()) @db.Timestamptz
 
@@ -115,15 +115,15 @@ model RefreshToken {
 }
 
 model OtpCode {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String?   @db.Uuid
-  channel   String // sms | email
-  purpose   String // login | verify | reset
-  codeHash  String
-  attempts  Int       @default(0)
-  expiresAt DateTime  @db.Timestamptz
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String?   @db.Uuid
+  channel    String // sms | email
+  purpose    String // login | verify | reset
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @db.Timestamptz
   consumedAt DateTime? @db.Timestamptz
-  createdAt DateTime  @default(now()) @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz
 
   @@index([userId, purpose])
   @@map("otp_codes")
@@ -164,19 +164,19 @@ model AuditLog {
 /// minorUnitDigits ليس حقلاً تجميلياً: 50000 = 500.00 دولاراً و 50.000 ديناراً.
 /// أي كود يضرب في 100 ثابتاً ينتج خطأً بعشرة أضعاف في الدينار.
 model Currency {
-  code              String  @id @db.Char(3) // ISO 4217
-  nameAr            String
-  nameEn            String
-  symbol            String
-  minorUnitDigits   Int // JOD/KWD = 3 · USD/SAR = 2 · JPY = 0
+  code                String  @id @db.Char(3) // ISO 4217
+  nameAr              String
+  nameEn              String
+  symbol              String
+  minorUnitDigits     Int // JOD/KWD = 3 · USD/SAR = 2 · JPY = 0
   minPayoutMinorUnits BigInt // Q-05: لكل عملة حدّها، لا رقم مشترك
-  isActive          Boolean @default(true)
-  isBase            Boolean @default(false)
-  sort              Int     @default(0)
+  isActive            Boolean @default(true)
+  isBase              Boolean @default(false)
+  sort                Int     @default(0)
 
-  wallets       Wallet[]
-  ratesAsBase   ExchangeRate[] @relation("RateBase")
-  ratesAsQuote  ExchangeRate[] @relation("RateQuote")
+  wallets      Wallet[]
+  ratesAsBase  ExchangeRate[] @relation("RateBase")
+  ratesAsQuote ExchangeRate[] @relation("RateQuote")
 
   @@map("currencies")
 }
@@ -211,16 +211,16 @@ enum VendorStatus {
 }
 
 model Vendor {
-  id           String       @id @default(uuid()) @db.Uuid
-  ownerUserId  String       @db.Uuid
-  slug         String       @unique
-  nameAr       String
-  nameEn       String?
-  logoKey      String?
-  coverKey     String?
-  descriptionAr String?
-  descriptionEn String?
-  status       VendorStatus @default(pending)
+  id              String       @id @default(uuid()) @db.Uuid
+  ownerUserId     String       @db.Uuid
+  slug            String       @unique
+  nameAr          String
+  nameEn          String?
+  logoKey         String?
+  coverKey        String?
+  descriptionAr   String?
+  descriptionEn   String?
+  status          VendorStatus @default(pending)
   rejectionReason String?
 
   /// عملة تسعير البائع وتحصيل مستحقاته معاً — ADR-013.
@@ -238,17 +238,17 @@ model Vendor {
   createdAt  DateTime  @default(now()) @db.Timestamptz
   updatedAt  DateTime  @updatedAt @db.Timestamptz
 
-  owner         User               @relation(fields: [ownerUserId], references: [id])
-  documents     VendorDocument[]
-  bankAccounts  VendorBankAccount[]
-  products      Product[]
-  shippingZones ShippingZone[]
-  subOrders     SubOrder[]
-  wallets       Wallet[]
-  ledgerEntries LedgerEntry[]
-  payouts       PayoutRequest[]
+  owner           User                @relation(fields: [ownerUserId], references: [id])
+  documents       VendorDocument[]
+  bankAccounts    VendorBankAccount[]
+  products        Product[]
+  shippingZones   ShippingZone[]
+  subOrders       SubOrder[]
+  wallets         Wallet[]
+  ledgerEntries   LedgerEntry[]
+  payouts         PayoutRequest[]
   commissionRules CommissionRule[]
-  coupons       Coupon[]
+  coupons         Coupon[]
 
   @@index([status])
   @@index([settlementCurrency])
@@ -297,7 +297,7 @@ model Category {
   id       String  @id @default(uuid()) @db.Uuid
   parentId String? @db.Uuid
   /// مسار مادّي "/3/17/42/" — يجعل "كل منتجات الفرع" استعلاماً واحداً بـ LIKE
-  path     String
+  path     String  @unique
   depth    Int     @default(0)
   slug     String  @unique
   nameAr   String
@@ -306,14 +306,14 @@ model Category {
   sort     Int     @default(0)
   isActive Boolean @default(true)
 
-  parent     Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children   Category[] @relation("CategoryTree")
-  products   Product[]
-  attributes CategoryAttribute[]
+  parent          Category?           @relation("CategoryTree", fields: [parentId], references: [id])
+  children        Category[]          @relation("CategoryTree")
+  products        Product[]
+  attributes      CategoryAttribute[]
   commissionRules CommissionRule[]
 
   @@index([parentId])
-  @@index([path])
+  // فهرس text_pattern_ops في المهاجرة يخدم LIKE على البادئة
   @@map("categories")
 }
 
@@ -328,8 +328,8 @@ model Attribute {
   isVariantAxis Boolean @default(false)
   sort          Int     @default(0)
 
-  values     AttributeValue[]
-  categories CategoryAttribute[]
+  values         AttributeValue[]
+  categories     CategoryAttribute[]
   variantOptions VariantOptionValue[]
   productValues  ProductAttributeValue[]
 
@@ -344,7 +344,7 @@ model AttributeValue {
   hexColor    String?
   sort        Int     @default(0)
 
-  attribute      Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  attribute      Attribute               @relation(fields: [attributeId], references: [id], onDelete: Cascade)
   variantOptions VariantOptionValue[]
   productValues  ProductAttributeValue[]
 
@@ -408,35 +408,46 @@ model Product {
   createdAt     DateTime      @default(now()) @db.Timestamptz
   updatedAt     DateTime      @updatedAt @db.Timestamptz
 
-  vendor    Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  category  Category @relation(fields: [categoryId], references: [id])
-  brand     Brand?   @relation(fields: [brandId], references: [id])
-  variants  ProductVariant[]
-  images    ProductImage[]
+  vendor     Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category   Category                @relation(fields: [categoryId], references: [id])
+  brand      Brand?                  @relation(fields: [brandId], references: [id])
+  variants   ProductVariant[]
+  images     ProductImage[]
   attrValues ProductAttributeValue[]
-  reviews   Review[]
+  reviews    Review[]
   orderItems OrderItem[]
 
+  /// هدف المفتاح الأجنبي المركّب من المتغيّر — يضمن أن متغيّر المنتج لا يحمل بائعاً غير بائعه
+  @@unique([id, vendorId])
   @@index([categoryId, status, publishedAt(sort: Desc)])
   @@index([vendorId, status])
   @@map("products")
 }
 
 model ProductVariant {
-  id                      String  @id @default(uuid()) @db.Uuid
-  productId               String  @db.Uuid
-  sku                     String
-  priceMinorUnits         BigInt // ADR-001
+  id                       String    @id @default(uuid()) @db.Uuid
+  productId                String    @db.Uuid
+  /// منسوخ من المنتج ومقيَّد بمفتاح أجنبي مركّب (productId, vendorId) فلا يمكن أن يخالفه.
+  /// به يصير SKU فريداً لكل بائع كما في ERD، لا لكل منتج.
+  vendorId                 String    @db.Uuid
+  sku                      String
+  /// التركيبة: أزواج سمة:قيمة مرتّبة بمعرّف السمة، و "" للمتغيّر الافتراضي.
+  /// فهرس فريد جزئي في المهاجرة يرفض تكرارها داخل المنتج — SRS V-02.
+  optionsKey               String    @default("")
+  priceMinorUnits          BigInt // ADR-001 — بعملة تسوية البائع
   compareAtPriceMinorUnits BigInt?
-  barcode                 String?
-  weightGrams             Int?
-  lengthMm                Int?
-  widthMm                 Int?
-  heightMm                Int?
-  isActive                Boolean @default(true)
-  createdAt               DateTime @default(now()) @db.Timestamptz
+  barcode                  String?
+  weightGrams              Int?
+  lengthMm                 Int?
+  widthMm                  Int?
+  heightMm                 Int?
+  isActive                 Boolean   @default(true)
+  /// المتغيّر لا يُحذف بل يُؤرشف: حركات مخزونه للإضافة فقط (ADR-005)،
+  /// والأرشفة تحرّر SKU والتركيبة لإعادة الاستعمال.
+  archivedAt               DateTime? @db.Timestamptz
+  createdAt                DateTime  @default(now()) @db.Timestamptz
 
-  product      Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product      Product              @relation(fields: [productId, vendorId], references: [id, vendorId], onDelete: Restrict)
   inventory    Inventory?
   optionValues VariantOptionValue[]
   images       ProductImage[]
@@ -445,7 +456,8 @@ model ProductVariant {
   movements    InventoryMovement[]
   reservations StockReservation[]
 
-  @@unique([productId, sku])
+  // فريدان جزئيان في المهاجرة (WHERE "archivedAt" IS NULL):
+  //   (vendorId, sku) · (productId, optionsKey)
   @@index([productId])
   @@map("product_variants")
 }
@@ -469,6 +481,7 @@ model ProductAttributeValue {
   attributeId      String   @db.Uuid
   attributeValueId String?  @db.Uuid
   valueTextAr      String?
+  valueTextEn      String?
   valueNumber      Decimal? @db.Decimal(16, 4)
   valueBoolean     Boolean?
 
@@ -486,6 +499,7 @@ model ProductImage {
   variantId String? @db.Uuid
   fileKey   String
   altAr     String?
+  altEn     String?
   width     Int?
   height    Int?
   sort      Int     @default(0)
@@ -505,15 +519,18 @@ model ProductImage {
 /// reserved إسقاط لمجموع الحجوزات النشطة — يُدقَّق ليلياً (INV-11).
 /// قيود CHECK تُضاف في المهاجرة: onHand >= 0, reserved >= 0, reserved <= onHand
 model Inventory {
-  variantId         String   @id @db.Uuid
-  onHand            Int      @default(0)
-  reserved          Int      @default(0)
-  lowStockThreshold Int      @default(5)
-  backorderAllowed  Boolean  @default(false)
-  version           Int      @default(0)
-  updatedAt         DateTime @updatedAt @db.Timestamptz
+  variantId         String    @id @db.Uuid
+  onHand            Int       @default(0)
+  reserved          Int       @default(0)
+  lowStockThreshold Int       @default(5)
+  backorderAllowed  Boolean   @default(false)
+  /// لحظة نزول onHand إلى العتبة أو دونها، وتُمسح عند تجاوزها صعوداً.
+  /// وحدة الإشعارات (المرحلة 11) تستهلكها — المخزون يرصد ولا يرسل.
+  lowStockSince     DateTime? @db.Timestamptz
+  version           Int       @default(0)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz
 
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
   @@map("inventory")
 }
@@ -539,7 +556,7 @@ model StockReservation {
   releasedAt  DateTime?         @db.Timestamptz
   createdAt   DateTime          @default(now()) @db.Timestamptz
 
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
   // فهرس جزئي في المهاجرة: WHERE status = 'active' — يجعل مهمة التحرير رخيصة
   @@index([expiresAt])
@@ -560,7 +577,7 @@ model InventoryMovement {
   note        String?
   createdAt   DateTime @default(now()) @db.Timestamptz
 
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
   @@index([variantId, createdAt])
   @@map("inventory_movements")
@@ -589,15 +606,15 @@ model Cart {
 }
 
 model CartItem {
-  id        String   @id @default(uuid()) @db.Uuid
-  cartId    String   @db.Uuid
-  variantId String   @db.Uuid
+  id                   String   @id @default(uuid()) @db.Uuid
+  cartId               String   @db.Uuid
+  variantId            String   @db.Uuid
   /// مكرر عمداً لتجميع السلة حسب البائع بلا ربط إضافي
-  vendorId  String   @db.Uuid
-  qty       Int
+  vendorId             String   @db.Uuid
+  qty                  Int
   /// للمقارنة والتنبيه فقط — السعر النافذ هو سعر لحظة الطلب
   priceMinorUnitsAtAdd BigInt
-  addedAt   DateTime @default(now()) @db.Timestamptz
+  addedAt              DateTime @default(now()) @db.Timestamptz
 
   cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [variantId], references: [id])
@@ -608,10 +625,10 @@ model CartItem {
 }
 
 model Address {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @db.Uuid
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @db.Uuid
   label         String?
-  country       String   @db.Char(2)
+  country       String    @db.Char(2)
   region        String
   city          String
   area          String?
@@ -619,11 +636,11 @@ model Address {
   building      String?
   floor         String?
   landmark      String?
-  lat           Decimal? @db.Decimal(10, 7)
-  lng           Decimal? @db.Decimal(10, 7)
+  lat           Decimal?  @db.Decimal(10, 7)
+  lng           Decimal?  @db.Decimal(10, 7)
   recipientName String
   phone         String
-  isDefault     Boolean  @default(false)
+  isDefault     Boolean   @default(false)
   deletedAt     DateTime? @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -666,15 +683,15 @@ enum SubOrderStatus {
 /// الطلب الأب — كيان مالي واحد يقابل عملية دفع واحدة.
 /// status مشتقّ من الأبناء ولا يُحدَّث يدوياً أبداً.
 model Order {
-  id             String      @id @default(uuid()) @db.Uuid
-  orderNumber    String      @unique
-  customerUserId String?     @db.Uuid
+  id             String  @id @default(uuid()) @db.Uuid
+  orderNumber    String  @unique
+  customerUserId String? @db.Uuid
   guestEmail     String?
   guestPhone     String?
   /// ADR-011: إعادة الإرسال بالمفتاح نفسه تُرجع الطلب الأصلي لا طلباً ثانياً
-  idempotencyKey String      @unique
+  idempotencyKey String  @unique
   /// عملة التحصيل — يُخصم بها المشتري فعلياً (ADR-013)
-  currency       String      @db.Char(3)
+  currency       String  @db.Char(3)
 
   itemsSubtotalMinorUnits BigInt
   shippingTotalMinorUnits BigInt @default(0)
@@ -692,10 +709,10 @@ model Order {
   placedAt   DateTime  @default(now()) @db.Timestamptz
   canceledAt DateTime? @db.Timestamptz
 
-  customer   User?       @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
-  subOrders  SubOrder[]
-  items      OrderItem[]
-  payment    Payment?
+  customer    User?              @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
+  subOrders   SubOrder[]
+  items       OrderItem[]
+  payment     Payment?
   redemptions CouponRedemption[]
 
   @@index([customerUserId, placedAt(sort: Desc)])
@@ -728,18 +745,18 @@ model SubOrder {
 
   status SubOrderStatus @default(awaiting_vendor)
 
-  placedAt     DateTime  @default(now()) @db.Timestamptz
-  acceptedAt   DateTime? @db.Timestamptz
-  shippedAt    DateTime? @db.Timestamptz
-  deliveredAt  DateTime? @db.Timestamptz
+  placedAt      DateTime  @default(now()) @db.Timestamptz
+  acceptedAt    DateTime? @db.Timestamptz
+  shippedAt     DateTime? @db.Timestamptz
+  deliveredAt   DateTime? @db.Timestamptz
   /// ADR-007: deliveredAt + settings.hold_period_days
   holdReleaseAt DateTime? @db.Timestamptz
-  completedAt  DateTime? @db.Timestamptz
-  canceledAt   DateTime? @db.Timestamptz
-  cancelReason String?
+  completedAt   DateTime? @db.Timestamptz
+  canceledAt    DateTime? @db.Timestamptz
+  cancelReason  String?
 
-  order         Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendor        Vendor      @relation(fields: [vendorId], references: [id])
+  order         Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor        Vendor                  @relation(fields: [vendorId], references: [id])
   items         OrderItem[]
   statusHistory SubOrderStatusHistory[]
   shipment      Shipment?
@@ -842,15 +859,15 @@ model ShippingZoneRegion {
 }
 
 model ShippingRate {
-  id                   String  @id @default(uuid()) @db.Uuid
-  zoneId               String  @db.Uuid
-  method               String // flat | by_weight | free_over
-  priceMinorUnits      BigInt  @default(0)
-  perKgMinorUnits      BigInt?
-  freeOverMinorUnits   BigInt?
-  minDays              Int     @default(1)
-  maxDays              Int     @default(7)
-  isActive             Boolean @default(true)
+  id                 String  @id @default(uuid()) @db.Uuid
+  zoneId             String  @db.Uuid
+  method             String // flat | by_weight | free_over
+  priceMinorUnits    BigInt  @default(0)
+  perKgMinorUnits    BigInt?
+  freeOverMinorUnits BigInt?
+  minDays            Int     @default(1)
+  maxDays            Int     @default(7)
+  isActive           Boolean @default(true)
 
   zone ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
 
@@ -899,15 +916,15 @@ model Coupon {
   vendorId String? @db.Uuid
   type     String // percent | fixed | free_shipping
 
-  valueBps           Int?
-  valueMinorUnits    BigInt?
+  valueBps              Int?
+  valueMinorUnits       BigInt?
   maxDiscountMinorUnits BigInt?
-  minOrderMinorUnits BigInt?
-  currency           String? @db.Char(3)
+  minOrderMinorUnits    BigInt?
+  currency              String? @db.Char(3)
 
   usageLimitTotal   Int?
   usageLimitPerUser Int?
-  usedCount         Int     @default(0)
+  usedCount         Int  @default(0)
 
   /// Q-06: الحقل الحاسم — من يتحمّل الخصم في الدفتر.
   /// الافتراضي platform: كوبون تصدره المنصة تتحمّله المنصة.
@@ -926,8 +943,8 @@ model Coupon {
 }
 
 model CouponCondition {
-  id            String @id @default(uuid()) @db.Uuid
-  couponId      String @db.Uuid
+  id            String  @id @default(uuid()) @db.Uuid
+  couponId      String  @db.Uuid
   conditionType String // category | product | vendor | first_order
   refId         String? @db.Uuid
 
@@ -1026,17 +1043,17 @@ model PaymentEvent {
 }
 
 model Refund {
-  id               String    @id @default(uuid()) @db.Uuid
-  subOrderId       String    @db.Uuid
-  paymentId        String    @db.Uuid
+  id               String   @id @default(uuid()) @db.Uuid
+  subOrderId       String   @db.Uuid
+  paymentId        String   @db.Uuid
   amountMinorUnits BigInt
   reason           String
-  status           String    @default("pending")
+  status           String   @default("pending")
   providerRefundId String?
-  requestedBy      String?   @db.Uuid
-  approvedBy       String?   @db.Uuid
-  ledgerEntryId    String?   @db.Uuid
-  createdAt        DateTime  @default(now()) @db.Timestamptz
+  requestedBy      String?  @db.Uuid
+  approvedBy       String?  @db.Uuid
+  ledgerEntryId    String?  @db.Uuid
+  createdAt        DateTime @default(now()) @db.Timestamptz
 
   subOrder SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
   payment  Payment  @relation(fields: [paymentId], references: [id])
@@ -1052,17 +1069,17 @@ model Refund {
 /// لا تُحذف قاعدة أبداً — تُنهى صلاحيتها بـ effectiveTo فقط،
 /// ليبقى تفسير أي عمولة تاريخية ممكناً.
 model CommissionRule {
-  id                 String    @id @default(uuid()) @db.Uuid
-  scope              String // global | category | vendor
-  categoryId         String?   @db.Uuid
-  vendorId           String?   @db.Uuid
-  rateBps            Int
-  minFeeMinorUnits   BigInt?
-  maxFeeMinorUnits   BigInt?
-  effectiveFrom      DateTime  @db.Timestamptz
-  effectiveTo        DateTime? @db.Timestamptz
-  createdBy          String?   @db.Uuid
-  createdAt          DateTime  @default(now()) @db.Timestamptz
+  id               String    @id @default(uuid()) @db.Uuid
+  scope            String // global | category | vendor
+  categoryId       String?   @db.Uuid
+  vendorId         String?   @db.Uuid
+  rateBps          Int
+  minFeeMinorUnits BigInt?
+  maxFeeMinorUnits BigInt?
+  effectiveFrom    DateTime  @db.Timestamptz
+  effectiveTo      DateTime? @db.Timestamptz
+  createdBy        String?   @db.Uuid
+  createdAt        DateTime  @default(now()) @db.Timestamptz
 
   category Category? @relation(fields: [categoryId], references: [id])
   vendor   Vendor?   @relation(fields: [vendorId], references: [id])
@@ -1161,7 +1178,7 @@ model PayoutRequest {
 
   /// لقطة: تغيير البائع لحسابه لاحقاً لا يغيّر سجل تحويل تمّ فعلاً
   bankAccountSnapshot Json
-  ledgerEntryId       String?   @db.Uuid
+  ledgerEntryId       String? @db.Uuid
 
   requestedAt       DateTime  @default(now()) @db.Timestamptz
   approvedBy        String?   @db.Uuid
@@ -1226,16 +1243,16 @@ model ReturnRequest {
 
 /// نزاع مفتوح يجمّد holdReleaseAt ولو انقضت المدة — ADR-007
 model Dispute {
-  id           String    @id @default(uuid()) @db.Uuid
-  subOrderId   String    @db.Uuid
-  openedByUserId String  @db.Uuid
-  against      String // vendor | customer
-  reasonCode   String
-  status       String    @default("open")
-  resolution   String?
-  resolvedBy   String?   @db.Uuid
-  closedAt     DateTime? @db.Timestamptz
-  createdAt    DateTime  @default(now()) @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  subOrderId     String    @db.Uuid
+  openedByUserId String    @db.Uuid
+  against        String // vendor | customer
+  reasonCode     String
+  status         String    @default("open")
+  resolution     String?
+  resolvedBy     String?   @db.Uuid
+  closedAt       DateTime? @db.Timestamptz
+  createdAt      DateTime  @default(now()) @db.Timestamptz
 
   subOrder SubOrder         @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
   messages DisputeMessage[]
@@ -1274,9 +1291,9 @@ model Setting {
 }
 
 model NotificationTemplate {
-  code          String @db.VarChar(64)
+  code          String  @db.VarChar(64)
   channel       String // email | sms | whatsapp | push | in_app
-  locale        String @db.Char(2)
+  locale        String  @db.Char(2)
   subject       String?
   body          String
   variablesJson Json?
@@ -1315,26 +1332,26 @@ model PushSubscription {
 }
 
 model CmsPage {
-  id        String   @id @default(uuid()) @db.Uuid
-  slug      String   @unique
-  titleAr   String
-  bodyAr    String
-  isPublished Boolean @default(false)
-  updatedAt DateTime @updatedAt @db.Timestamptz
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique
+  titleAr     String
+  bodyAr      String
+  isPublished Boolean  @default(false)
+  updatedAt   DateTime @updatedAt @db.Timestamptz
 
   @@map("cms_pages")
 }
 
 model Banner {
-  id       String    @id @default(uuid()) @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
   placement String
-  imageKey String
-  linkUrl  String?
-  titleAr  String?
-  sort     Int       @default(0)
-  startsAt DateTime? @db.Timestamptz
-  endsAt   DateTime? @db.Timestamptz
-  isActive Boolean   @default(true)
+  imageKey  String
+  linkUrl   String?
+  titleAr   String?
+  sort      Int       @default(0)
+  startsAt  DateTime? @db.Timestamptz
+  endsAt    DateTime? @db.Timestamptz
+  isActive  Boolean   @default(true)
 
   @@index([placement, isActive])
   @@map("banners")

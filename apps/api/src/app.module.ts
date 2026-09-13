@@ -5,13 +5,18 @@ import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { HealthController } from './common/health.controller';
 import { IdentityModule } from './modules/identity/identity.module';
+import { CatalogModule } from './modules/catalog/public';
+import { InventoryModule } from './modules/inventory/public';
+import { VendorsModule } from './modules/vendors/public';
 
 /**
  * Modular Monolith — ADR-002.
  * كل وحدة تصدّر واجهتها من public/ فقط، وفحص CI يرفض ما عداه.
  *
  * ترتيب الإضافة يتبع مراحل الخطة:
- *   04 identity ✓ · 05 currency, catalog, inventory · 06 vendors
+ *   04 identity ✓ · 05 catalog ✓, inventory ✓, vendors (القراءة وحدها) · 06 vendors
+ *   ‏currency مؤجَّلة: الكتالوج يحتاج خانات العملة فقط وتأتي من نواة money،
+ *   وأسعار الصرف تُلقط لأول مرة عند الطلب في المرحلة 08
  *   07 search, cart · 08 pricing, checkout, orders, payments
  *   09 shipping, aftersales · 10 finance · 11 notifications, admin
  */
@@ -26,6 +31,9 @@ import { IdentityModule } from './modules/identity/identity.module';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 900_000, limit: 100 }]),
     PrismaModule,
     IdentityModule,
+    VendorsModule,
+    InventoryModule,
+    CatalogModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

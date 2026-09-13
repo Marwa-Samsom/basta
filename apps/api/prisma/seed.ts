@@ -3,6 +3,7 @@
  * عديمة الأثر عند التكرار: تشغيلها مرتين لا يضاعف شيئاً.
  */
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 
 const prisma = new PrismaClient();
 
@@ -47,6 +48,61 @@ const CATEGORIES = [
   { slug: 'home',        nameAr: 'منزل ومطبخ',         commissionBps: 1000 },
   { slug: 'grocery',     nameAr: 'بقالة ومواد غذائية', commissionBps:  500 },
   { slug: 'handmade',    nameAr: 'يدويّات وحرف',       commissionBps:  800 },
+];
+
+// المرحلة 05: سمات تكفي لمنتج حقيقي بمتغيّرات، وفروع تثبت أن الشجرة متعددة المستويات
+const SUBCATEGORIES = [
+  { parent: 'fashion', slug: 'men-clothing', nameAr: 'ملابس رجالية', nameEn: "Men's clothing" },
+  { parent: 'fashion', slug: 'women-clothing', nameAr: 'ملابس نسائية', nameEn: "Women's clothing" },
+  { parent: 'electronics', slug: 'phones', nameAr: 'هواتف ذكية', nameEn: 'Smartphones' },
+];
+
+/** [الاسم العربي، الإنجليزي، اللون] */
+type ValueSeed = readonly [valueAr: string, valueEn: string, hexColor?: string];
+
+interface AttributeSeed {
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  inputType: 'select' | 'text' | 'number' | 'boolean';
+  unit?: string;
+  isVariantAxis: boolean;
+  sort: number;
+  values: readonly ValueSeed[];
+}
+
+const ATTRIBUTES: readonly AttributeSeed[] = [
+  {
+    code: 'color', nameAr: 'اللون', nameEn: 'Color', inputType: 'select', isVariantAxis: true, sort: 1,
+    values: [
+      ['أحمر', 'Red', '#C62828'], ['أزرق', 'Blue', '#1565C0'], ['أسود', 'Black', '#212121'],
+      ['أبيض', 'White', '#FAFAFA'], ['أخضر', 'Green', '#2E7D32'], ['رمادي', 'Grey', '#757575'],
+      ['بيج', 'Beige', '#D7CCC8'],
+    ],
+  },
+  {
+    code: 'size', nameAr: 'المقاس', nameEn: 'Size', inputType: 'select', isVariantAxis: true, sort: 2,
+    values: [['XS', 'XS'], ['S', 'S'], ['M', 'M'], ['L', 'L'], ['XL', 'XL'], ['XXL', 'XXL']],
+  },
+  {
+    code: 'storage', nameAr: 'السعة التخزينية', nameEn: 'Storage', inputType: 'select', isVariantAxis: true, sort: 3,
+    values: [['64 GB', '64 GB'], ['128 GB', '128 GB'], ['256 GB', '256 GB'], ['512 GB', '512 GB']],
+  },
+  { code: 'material', nameAr: 'الخامة', nameEn: 'Material', inputType: 'text', isVariantAxis: false, sort: 4, values: [] },
+  {
+    code: 'warranty_months', nameAr: 'مدة الضمان', nameEn: 'Warranty', inputType: 'number', unit: 'شهر',
+    isVariantAxis: false, sort: 5, values: [],
+  },
+];
+
+// [فئة، سمة، إلزامية] — الفروع ترث سمات أصولها
+const CATEGORY_ATTRIBUTES: readonly (readonly [slug: string, code: string, isRequired: boolean])[] = [
+  ['fashion', 'color', false],
+  ['fashion', 'size', false],
+  ['fashion', 'material', true],
+  ['electronics', 'color', false],
+  ['electronics', 'storage', false],
+  ['electronics', 'warranty_months', false],
 ];
 
 async function main() {
@@ -102,6 +158,50 @@ async function main() {
   if (!globalRule) {
     await prisma.commissionRule.create({
       data: { scope: 'global', rateBps: 1000, effectiveFrom: new Date('2026-01-01') },
+    });
+  }
+
+  console.log('▸ الفئات الفرعية');
+  for (const [i, c] of SUBCATEGORIES.entries()) {
+    const parent = await prisma.category.findUniqueOrThrow({ where: { slug: c.parent } });
+    const existing = await prisma.category.findUnique({ where: { slug: c.slug } });
+    if (existing) {
+      await prisma.category.update({ where: { id: existing.id }, data: { nameAr: c.nameAr, nameEn: c.nameEn } });
+      continue;
+    }
+    const id = randomUUID();
+    await prisma.category.create({
+      data: {
+        id, parentId: parent.id, path: `${parent.path}${id}/`, depth: parent.depth + 1,
+        slug: c.slug, nameAr: c.nameAr, nameEn: c.nameEn, sort: i,
+      },
+    });
+  }
+
+  console.log('▸ السمات وقيمها');
+  for (const a of ATTRIBUTES) {
+    const { values, ...fields } = a;
+    const attribute = await prisma.attribute.upsert({ where: { code: a.code }, update: fields, create: fields });
+    const known = new Set(
+      (await prisma.attributeValue.findMany({ where: { attributeId: attribute.id }, select: { valueAr: true } }))
+        .map((v) => v.valueAr),
+    );
+    for (const [sort, [valueAr, valueEn, hexColor]] of values.entries()) {
+      if (known.has(valueAr)) continue;
+      await prisma.attributeValue.create({
+        data: { attributeId: attribute.id, valueAr, valueEn: valueEn ?? null, hexColor: hexColor ?? null, sort },
+      });
+    }
+  }
+
+  console.log('▸ ربط السمات بالفئات');
+  for (const [slug, code, isRequired] of CATEGORY_ATTRIBUTES) {
+    const category = await prisma.category.findUniqueOrThrow({ where: { slug } });
+    const attribute = await prisma.attribute.findUniqueOrThrow({ where: { code } });
+    await prisma.categoryAttribute.upsert({
+      where: { categoryId_attributeId: { categoryId: category.id, attributeId: attribute.id } },
+      update: { isRequired },
+      create: { categoryId: category.id, attributeId: attribute.id, isRequired },
     });
   }
 

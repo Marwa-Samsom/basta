@@ -79,6 +79,16 @@ export class ScopedRepository<T> {
     }
   }
 
+  /**
+   * كتابة جماعية محدودة بالنطاق (أرشفة متغيّرات منتج مثلاً).
+   * تُرجع العدد وحده: صفر لا يُعدّ خطأً هنا لأن «لا شيء يطابق» نتيجة مشروعة
+   * لشرط جماعي، ولا يكشف شيئاً عن صفوف بائع آخر لأن الفلتر يسبق الشرط.
+   */
+  async updateWhere(where: Record<string, unknown>, data: unknown): Promise<number> {
+    const { count } = await this.delegate.updateMany({ where: this.scoped(where), data });
+    return count;
+  }
+
   async deleteOwned(id: string): Promise<void> {
     const { count } = await this.delegate.deleteMany({ where: this.scoped({ id }) });
     if (count === 0) {
