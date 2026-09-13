@@ -426,8 +426,56 @@ export class ProductService {
       }
     }
 
+    /**
+     * Q-16 — محسوم 13 سبتمبر 2026: تعديل **المحتوى** في منتج منشور يعيده للمراجعة،
+     * والسعر والمخزون لا. المحتوى ما يراه المشتري ويمكن أن يخالف: الاسم والوصف والفئة
+     * والعلامة والسمات وتركيبات المتغيّرات — والصور في خدمة الصور.
+     * المقارنة بالقيم لا بوجود الحقل: إرسال الاسم نفسه لا يعيد المراجعة.
+     */
+    const changed = <T>(next: T | undefined, prev: T): boolean => next !== undefined && next !== prev;
+    const attributeSignature = (
+      rows: readonly {
+        attributeId: string;
+        attributeValueId: string | null;
+        valueTextAr: string | null;
+        valueTextEn: string | null;
+        valueNumber: Prisma.Decimal | null;
+        valueBoolean: boolean | null;
+      }[],
+    ): string =>
+      rows
+        .map((r) =>
+          [
+            r.attributeId,
+            r.attributeValueId ?? '',
+            r.valueTextAr ?? '',
+            r.valueTextEn ?? '',
+            r.valueNumber?.toString() ?? '',
+            r.valueBoolean ?? '',
+          ].join('¦'),
+        )
+        .sort()
+        .join('\n');
+    const optionsSignature = (variants: readonly { optionsKey: string }[]): string =>
+      variants
+        .map((v) => v.optionsKey)
+        .sort()
+        .join('\n');
+
+    const contentChanged =
+      changed(input.nameAr, current.nameAr) ||
+      changed(input.nameEn, current.nameEn) ||
+      changed(input.descriptionAr, current.descriptionAr) ||
+      changed(input.descriptionEn, current.descriptionEn) ||
+      categoryChanged ||
+      changed(input.brandId, current.brandId) ||
+      (attributes !== null && attributeSignature(attributes) !== attributeSignature(current.attrValues)) ||
+      (variantPlan !== null && optionsSignature(finalVariants) !== optionsSignature(current.variants));
+    const backToReview = current.status === 'active' && contentChanged;
+
     await this.write(async (tx) => {
       const fields: Prisma.ProductUncheckedUpdateManyInput = {};
+      if (backToReview) fields.status = 'pending_review';
       if (input.categoryId !== undefined) fields.categoryId = input.categoryId;
       if (input.brandId !== undefined) fields.brandId = input.brandId;
       if (input.nameAr !== undefined) fields.nameAr = input.nameAr;

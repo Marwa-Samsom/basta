@@ -484,6 +484,58 @@ describe('مراجعة المنتجات قبل النشر — Q-15', () => {
 });
 
 // ============================================================================
+describe('تعديل المنشور — Q-16', () => {
+  dbIt('تعديل المحتوى يعيد المنشور للمراجعة، والسعر والمخزون لا يعيدانه', async () => {
+    const A = as('a');
+    const service = app.get(ProductService);
+    const sku = `EDIT-${SUFFIX}`;
+    const product = await simpleProduct('a', sku);
+    const variantId = product.variants[0]?.id as string;
+    const status = async () => (await A.get(`/vendor/products/${product.id}`)).json().status;
+    const publish = async () => {
+      await A.post(`/vendor/products/${product.id}/publish`);
+      await service.approve(product.id);
+      expect(await status()).toBe('active');
+    };
+    await publish();
+
+    // السعر والمخزون تشغيل يومي لا محتوى — يبقى منشوراً
+    const repriced = await A.patch(`/vendor/products/${product.id}`, {
+      variants: [{ id: variantId, sku, price: '12.50', stock: 9 }],
+    });
+    expect(repriced.statusCode).toBe(200);
+    expect(repriced.json().status).toBe('active');
+    const stock = await A.patch(`/vendor/products/${product.id}/variants/${variantId}/stock`, {
+      delta: -1,
+      reason: 'damage',
+    });
+    expect(stock.statusCode).toBe(200);
+    expect(await status()).toBe('active');
+
+    // إرسال الاسم نفسه ليس تعديلاً
+    expect((await A.patch(`/vendor/products/${product.id}`, { nameAr: 'منتج بسيط' })).json().status).toBe('active');
+
+    // الاسم محتوى — يعود للمراجعة، ويبقى تاريخ نشره الأول
+    const renamed = await A.patch(`/vendor/products/${product.id}`, { nameAr: 'منتج بسيط محسَّن' });
+    expect(renamed.json().status).toBe('pending_review');
+    expect(renamed.json().publishedAt).not.toBeNull();
+
+    // الصور محتوى أيضاً
+    await publish();
+    const png = await sharp({ create: { width: 600, height: 600, channels: 3, background: { r: 90, g: 30, b: 50 } } })
+      .png()
+      .toBuffer();
+    const uploaded = await A.upload(`/vendor/products/${product.id}/images`, { name: 'p.png', type: 'image/png', data: png });
+    expect(uploaded.statusCode).toBe(201);
+    expect(await status()).toBe('pending_review');
+
+    // والمسودة لا تُرسل للمراجعة بتعديلها
+    const draft = await simpleProduct('a', `EDIT-DRAFT-${SUFFIX}`);
+    expect((await A.patch(`/vendor/products/${draft.id}`, { nameAr: 'اسم جديد للمسودة' })).json().status).toBe('draft');
+  });
+});
+
+// ============================================================================
 describe('بوابة 05 · البند الثالث — الاستيراد الجماعي', () => {
   const HEADER = ['رمز_المنتج', 'SKU', 'الاسم_عربي', 'الفئة', 'السعر', 'السعر_قبل_الخصم', 'الكمية', 'الخيار_1', 'قيمة_الخيار_1', 'الخيار_2', 'قيمة_الخيار_2'];
 
