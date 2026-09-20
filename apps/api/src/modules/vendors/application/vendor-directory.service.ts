@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 
-export type VendorStatus = 'pending' | 'approved' | 'suspended' | 'banned';
+import type { VendorLifecycle } from '../domain/onboarding';
+
+/** الاسم القديم محفوظ لمن يستورده؛ المصدر الآن دورة الحياة في المجال. */
+export type VendorStatus = VendorLifecycle;
 
 export interface VendorSummary {
   readonly id: string;

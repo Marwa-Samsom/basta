@@ -1,0 +1,506 @@
+/**
+ * بوابة المرحلة 06 — البندان الأول والثاني، عبر الواجهة البرمجية الحيّة.
+ *
+ * 1. بائع يكمل الرحلة من التسجيل إلى نشر أول منتج بلا تدخّل يدوي إلا الاعتماد.
+ * 2. بائع معلَّق لا يبيع: لا ينشر، ولا تظهر منتجاته المنشورة سابقاً.
+ *
+ * التطبيق يُقلع بتهيئة الخادم نفسها (configureApp)، فالطلبات تمرّ بالحارس
+ * والتحقق ومرشّح الأخطاء كما تمرّ طلبات بائع حقيقي.
+ */
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { Test } from '@nestjs/testing';
+import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { AppModule } from '../../app.module';
+import { configureApp } from '../../app.setup';
+import { NobleCryptoPlugin, ScureBase32Plugin, generateSecret, generateSync } from 'otplib';
+import { hashPassword } from '../identity/public';
+import { DOCUMENT_TYPES } from './domain/onboarding';
+import { DOCUMENTS_ROOT } from './infrastructure/document-storage';
+
+const prisma = new PrismaClient();
+let app: NestFastifyApplication;
+let dbUp = false;
+
+const SUFFIX = `vd${Date.now()}`;
+const PASSWORD = 'كلمة-مرور-اختبار-طويلة';
+const IBAN = 'JO94CBJO0010000000000131000302';
+
+let sellerToken = '';
+let sellerUserId = '';
+let adminToken = '';
+let vendorId = '';
+let createdVendorIds: string[] = [];
+
+const api = (url: string, token?: string) => ({
+  url: `/api/v1${url}`,
+  ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+});
+
+/** طلب multipart بملف واحد — كما ترسله الشاشة من المتصفّح */
+function multipart(fileName: string, content: Buffer): { payload: Buffer; headers: Record<string, string> } {
+  const boundary = `----basta${randomUUID()}`;
+  const head = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
+      `Content-Type: application/pdf\r\n\r\n`,
+  );
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return {
+    payload: Buffer.concat([head, content, tail]),
+    headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+  };
+}
+
+const pdf = (label: string): Buffer =>
+  Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.from(label.padEnd(64, ' '))]);
+
+/**
+ * الإداري يدخل بتحقق ثنائي فعليّ لا بتخطّيه: 2FA إلزامي على الإدارة (SRS A-07)
+ * ورمز الدخول بلا تحقق «محدود» لا يفتح مساراً إدارياً. الاختبار يسلك الطريق
+ * نفسه الذي يسلكه مراجع حقيقي — ولذلك يثبت أن الطريق سالك.
+ */
+const totpCrypto = new NobleCryptoPlugin();
+const totpBase32 = new ScureBase32Plugin();
+let adminTotpSecret = '';
+
+async function registerUser(email: string, roles: ('customer' | 'admin')[]): Promise<string> {
+  const isAdmin = roles.includes('admin');
+  if (isAdmin) adminTotpSecret = generateSecret();
+  const user = await prisma.user.create({
+    data: {
+      email,
+      fullName: 'مستخدم اختبار',
+      passwordHash: await hashPassword(PASSWORD),
+      roles: { create: roles.map((role) => ({ role })) },
+      ...(isAdmin
+        ? {
+            permissions: { create: [{ permission: 'vendors.review' }, { permission: 'catalog.manage' }] },
+            totpSecretEnc: adminTotpSecret,
+            totpEnabledAt: new Date(),
+          }
+        : {}),
+    },
+  });
+  return user.id;
+}
+
+const totpCode = (): string =>
+  generateSync({ strategy: 'totp', secret: adminTotpSecret, crypto: totpCrypto, base32: totpBase32 });
+
+async function login(email: string, totp?: string): Promise<string> {
+  const res = await app.inject({
+    method: 'POST',
+    ...api('/auth/login'),
+    payload: { email, password: PASSWORD, ...(totp ? { totp } : {}) },
+  });
+  expect(res.statusCode, res.body).toBe(200);
+  expect(res.json().requiresTotpSetup).toBe(false);
+  return res.json().tokens.accessToken;
+}
+
+beforeAll(async () => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbUp = true;
+  } catch {
+    console.warn('\n⚠ لا قاعدة بيانات — اختبارات تأهيل البائع الحيّة متخطّاة.\n');
+    return;
+  }
+
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  await configureApp(app);
+  await app.init();
+  await app.getHttpAdapter().getInstance().ready();
+
+  sellerUserId = await registerUser(`seller.${SUFFIX}@basta.test`, ['customer']);
+  sellerToken = await login(`seller.${SUFFIX}@basta.test`);
+
+  await registerUser(`admin.${SUFFIX}@basta.test`, ['admin']);
+  adminToken = await login(`admin.${SUFFIX}@basta.test`, totpCode());
+}, 60_000);
+
+afterAll(async () => {
+  for (const id of createdVendorIds) {
+    await rm(`${DOCUMENTS_ROOT}/${id}`, { recursive: true, force: true }).catch(() => undefined);
+  }
+  await app?.close();
+  await prisma.$disconnect();
+});
+
+describe('بوابة 06 · البند الأول — الرحلة كاملة بلا تدخّل يدوي', () => {
+  it('VD-01: عميل يسجّل متجراً فيصير بائعاً بطلب واحد', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/apply', sellerToken),
+      payload: {
+        nameAr: 'دار القطن',
+        nameEn: `Dar AlQutn ${SUFFIX}`,
+        country: 'JO',
+        businessType: 'company',
+      },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const view = res.json().vendor;
+    // الرمز القديم صدر لعميل بلا متجر: الرحلة تكمل بالرمز الجديد لا بخروج وعودة
+    expect(res.json().tokens.accessToken).toBeTruthy();
+    sellerToken = res.json().tokens.accessToken;
+    vendorId = view.id;
+    createdVendorIds.push(vendorId);
+
+    expect(view.status).toBe('pending');
+    expect(view.slug).toBe(`dar-alqutn-${SUFFIX}`);
+    // العملة تُقترح من البلد ولا تُترك فارغة — ADR-013
+    expect(view.settlementCurrency).toBe('JOD');
+    expect(view.settlementCurrencyLocked).toBe(false);
+    // أربعة موانع للوثائق وواحد للحساب البنكي
+    expect(view.blockers).toHaveLength(5);
+    expect(view.canSubmit).toBe(false);
+
+    const roles = await prisma.userRole.findMany({ where: { userId: sellerUserId } });
+    expect(roles.map((r) => r.role)).toContain('vendor_owner');
+  });
+
+  it('VD-01: الرابط المستعمَل يُقترح له بديل لا يُرفض جافاً', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({
+      method: 'GET',
+      ...api(`/vendor/onboarding/slug-available?value=Dar AlQutn ${SUFFIX}`, sellerToken),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      slug: `dar-alqutn-${SUFFIX}`,
+      available: false,
+      suggestion: `dar-alqutn-${SUFFIX}-2`,
+    });
+  });
+
+  it('لا متجرين على حساب واحد', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/apply', sellerToken),
+      payload: { nameAr: 'متجر ثانٍ', country: 'JO' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('DUPLICATE');
+  });
+
+  it('VD-02: الإرسال قبل اكتمال النواقص مرفوض، والموانع تُعاد مجتمعة', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({ method: 'POST', ...api('/vendor/onboarding/submit', sellerToken) });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().details.blockers).toHaveLength(5);
+  });
+
+  it('VD-02: ملف ليس PDF ولا صورة يُرفض بمحتواه لا بامتداده', async () => {
+    if (!dbUp) return;
+    const fake = multipart('hack.pdf', Buffer.from('<?php system($_GET[0]); ?>'));
+    const res = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/documents/commercial_register', sellerToken),
+      headers: {
+        authorization: `Bearer ${sellerToken}`,
+        ...fake.headers,
+      },
+      payload: fake.payload,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toMatch(/PDF/);
+  });
+
+  it('VD-02: رفع الوثائق الأربع والحساب البنكي يُفرغ قائمة الموانع', async () => {
+    if (!dbUp) return;
+    for (const type of DOCUMENT_TYPES) {
+      const file = multipart(`${type}.pdf`, pdf(type));
+      const res = await app.inject({
+        method: 'POST',
+        ...api(`/vendor/onboarding/documents/${type}`, sellerToken),
+        headers: { authorization: `Bearer ${sellerToken}`, ...file.headers },
+        payload: file.payload,
+      });
+      expect(res.statusCode, res.body).toBe(201);
+    }
+
+    const bad = await app.inject({
+      method: 'PUT',
+      ...api('/vendor/onboarding/bank', sellerToken),
+      payload: { holderName: 'مروة سمسوم', iban: 'JO00WRONG000000000000', bankName: 'البنك العربي' },
+    });
+    expect(bad.statusCode).toBe(400);
+
+    const ok = await app.inject({
+      method: 'PUT',
+      ...api('/vendor/onboarding/bank', sellerToken),
+      payload: { holderName: 'مروة سمسوم', iban: IBAN, bankName: 'البنك العربي' },
+    });
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.json().blockers).toHaveLength(0);
+    expect(ok.json().canSubmit).toBe(true);
+  });
+
+  it('الوثيقة لا تُخدَم برابط عام، وتنزيلها مصادَق', async () => {
+    if (!dbUp) return;
+    const view = await app.inject({ method: 'GET', ...api('/vendor/onboarding', sellerToken) });
+    const doc = view.json().documents[0];
+    expect(doc.downloadPath).toMatch(/^\/vendor\/onboarding\/documents\//);
+
+    const anonymous = await app.inject({ method: 'GET', ...api(doc.downloadPath) });
+    expect(anonymous.statusCode).toBe(401);
+
+    const owner = await app.inject({ method: 'GET', ...api(doc.downloadPath, sellerToken) });
+    expect(owner.statusCode).toBe(200);
+    expect(owner.headers['content-type']).toBe('application/pdf');
+    expect(owner.headers['content-disposition']).toMatch(/^attachment/);
+    expect(owner.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('VD-03: الإرسال ينقل الطلب إلى قيد المراجعة ويجمّد التعديل', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({ method: 'POST', ...api('/vendor/onboarding/submit', sellerToken) });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().status).toBe('in_review');
+    expect(res.json().submittedAt).not.toBeNull();
+
+    const edit = await app.inject({
+      method: 'PATCH',
+      ...api('/vendor/onboarding/shop', sellerToken),
+      payload: { nameAr: 'اسم جديد أثناء المراجعة' },
+    });
+    expect(edit.statusCode).toBe(409);
+  });
+
+  it('AD-04: الطلب يظهر في طابور المراجعة بالأقدم أولاً', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({ method: 'GET', ...api('/admin/vendors?status=in_review', adminToken) });
+    expect(res.statusCode, res.body).toBe(200);
+    const mine = res.json().items.find((v: { id: string }) => v.id === vendorId);
+    expect(mine).toBeDefined();
+    expect(mine.documentsTotal).toBe(4);
+  });
+
+  it('AD-05: الرفض يعيد الطلب قابلاً للإصلاح بسبب يقرأه البائع', async () => {
+    if (!dbUp) return;
+    const empty = await app.inject({
+      method: 'POST',
+      ...api(`/admin/vendors/${vendorId}/reject`, adminToken),
+      payload: { reason: 'قصير' },
+    });
+    expect(empty.statusCode).toBe(400);
+
+    const reason = 'صورة السجل التجاري غير واضحة — أعد تصويرها كاملة بإضاءة جيدة.';
+    const res = await app.inject({
+      method: 'POST',
+      ...api(`/admin/vendors/${vendorId}/reject`, adminToken),
+      payload: { reason },
+    });
+    expect(res.statusCode, res.body).toBe(204);
+
+    const view = await app.inject({ method: 'GET', ...api('/vendor/onboarding', sellerToken) });
+    expect(view.json().status).toBe('rejected');
+    expect(view.json().rejectionReason).toBe(reason);
+    // ويستطيع الإصلاح: التعديل مفتوح ثانيةً
+    expect(view.json().canSubmit).toBe(true);
+  });
+
+  it('البائع يصلح ويرسل ثانيةً، والإدارة تعتمد', async () => {
+    if (!dbUp) return;
+    const file = multipart('commercial_register.pdf', pdf('نسخة واضحة'));
+    const upload = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/documents/commercial_register', sellerToken),
+      headers: { authorization: `Bearer ${sellerToken}`, ...file.headers },
+      payload: file.payload,
+    });
+    expect(upload.statusCode).toBe(201);
+
+    const resubmit = await app.inject({ method: 'POST', ...api('/vendor/onboarding/submit', sellerToken) });
+    expect(resubmit.statusCode, resubmit.body).toBe(200);
+    expect(resubmit.json().status).toBe('in_review');
+    expect(resubmit.json().rejectionReason).toBeNull();
+
+    const approve = await app.inject({
+      method: 'POST',
+      ...api(`/admin/vendors/${vendorId}/approve`, adminToken),
+    });
+    expect(approve.statusCode, approve.body).toBe(204);
+
+    const view = await app.inject({ method: 'GET', ...api('/vendor/onboarding', sellerToken) });
+    expect(view.json().status).toBe('approved');
+    expect(view.json().approvedAt).not.toBeNull();
+    // وثائق بقيت «قيد المراجعة» تُقبل ضمناً بالاعتماد
+    const stuck = view.json().documents.filter((d: { status: string }) => d.status === 'pending');
+    expect(stuck).toHaveLength(0);
+  });
+
+  it('اعتماد ثانٍ على الطلب نفسه يُرفض بلا أثر', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({
+      method: 'POST',
+      ...api(`/admin/vendors/${vendorId}/approve`, adminToken),
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('VD-04: عملة التسوية تُثبَّت مرة واحدة ولا رجعة — ADR-013', async () => {
+    if (!dbUp) return;
+    const change = await app.inject({
+      method: 'PUT',
+      ...api('/vendor/onboarding/settlement-currency', sellerToken),
+      payload: { currency: 'SAR' },
+    });
+    expect(change.statusCode, change.body).toBe(200);
+    expect(change.json().settlementCurrency).toBe('SAR');
+
+    const lock = await app.inject({
+      method: 'PUT',
+      ...api('/vendor/onboarding/settlement-currency', sellerToken),
+      payload: { currency: 'JOD', lock: true },
+    });
+    expect(lock.statusCode).toBe(200);
+    expect(lock.json().settlementCurrencyLocked).toBe(true);
+
+    const after = await app.inject({
+      method: 'PUT',
+      ...api('/vendor/onboarding/settlement-currency', sellerToken),
+      payload: { currency: 'USD' },
+    });
+    expect(after.statusCode).toBe(409);
+    expect(after.json().message).toMatch(/مثبَّتة/);
+  });
+
+  it('VD-05: ملف المتجر يُحفظ بعد الاعتماد', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({
+      method: 'PATCH',
+      ...api('/vendor/onboarding/profile', sellerToken),
+      payload: {
+        descriptionAr: 'أقمشة قطنية من الأردن.',
+        shippingPolicyAr: 'الشحن خلال ثلاثة أيام عمل.',
+        returnPolicyAr: 'الإرجاع خلال 14 يوماً.',
+      },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().descriptionAr).toBe('أقمشة قطنية من الأردن.');
+  });
+
+  it('VD-07: البائع المعتمَد ينشر أول منتج — الرحلة اكتملت', async () => {
+    if (!dbUp) return;
+    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'men-clothing' } });
+    // «الخامة» سمة إلزامية على فرع الأزياء — بلا ملئها يرفض النشر، وهذا مقصود
+    const material = await prisma.attribute.findFirstOrThrow({ where: { code: 'material' } });
+    const create = await app.inject({
+      method: 'POST',
+      ...api('/vendor/products', sellerToken),
+      payload: {
+        nameAr: 'قميص قطني',
+        nameEn: 'Cotton shirt',
+        categoryId: category.id,
+        attributes: [{ attributeId: material.id, text: 'قطن 100%' }],
+        variants: [{ sku: `SH-${SUFFIX}`, price: '19.900', stock: 5 }],
+      },
+    });
+    expect(create.statusCode, create.body).toBe(201);
+    const productId = create.json().id;
+
+    const publish = await app.inject({
+      method: 'POST',
+      ...api(`/vendor/products/${productId}/publish`, sellerToken),
+    });
+    expect(publish.statusCode, publish.body).toBe(200);
+    // Q-15: النشر يضع المنتج في مراجعة الإدارة لا في المتجر مباشرةً
+    expect(publish.json().status).toBe('pending_review');
+  });
+});
+
+describe('بوابة 06 · البند الثاني — المعلَّق لا يبيع', () => {
+  it('التعليق يمنع النشر فوراً', async () => {
+    if (!dbUp) return;
+    const suspend = await app.inject({
+      method: 'POST',
+      ...api(`/admin/vendors/${vendorId}/suspend`, adminToken),
+      payload: { reason: 'شكاوى متكرّرة على عدم الشحن خلال المدة المعلنة.' },
+    });
+    expect(suspend.statusCode, suspend.body).toBe(204);
+
+    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'men-clothing' } });
+    const material = await prisma.attribute.findFirstOrThrow({ where: { code: 'material' } });
+    const create = await app.inject({
+      method: 'POST',
+      ...api('/vendor/products', sellerToken),
+      payload: {
+        nameAr: 'قميص آخر',
+        categoryId: category.id,
+        attributes: [{ attributeId: material.id, text: 'كتّان' }],
+        variants: [{ sku: `SH2-${SUFFIX}`, price: '22.000', stock: 3 }],
+      },
+    });
+    expect(create.statusCode, create.body).toBe(201);
+
+    const publish = await app.inject({
+      method: 'POST',
+      ...api(`/vendor/products/${create.json().id}/publish`, sellerToken),
+    });
+    expect(publish.statusCode).toBe(409);
+    /**
+     * السبب هو التعليق لا نقص في المنتج. بلا هذا التأكيد يمرّ الاختبار
+     * على منتج ناقص السمات ويبدو أن التعليق يحرس وهو لم يُستدعَ أصلاً.
+     */
+    expect(publish.json().details.reasons.join(' ')).toMatch(/المتجر لم يُعتمد/);
+  });
+
+  it('التعليق يمنع تعديل بيانات المتجر كذلك', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({
+      method: 'PATCH',
+      ...api('/vendor/onboarding/shop', sellerToken),
+      payload: { nameAr: 'اسم بعد التعليق' },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('رفع التعليق يعيد البيع', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({
+      method: 'POST',
+      ...api(`/admin/vendors/${vendorId}/reinstate`, adminToken),
+    });
+    expect(res.statusCode, res.body).toBe(204);
+
+    const view = await app.inject({ method: 'GET', ...api('/vendor/onboarding', sellerToken) });
+    expect(view.json().status).toBe('approved');
+  });
+});
+
+describe('عزل البيانات — بائع لا يرى طلب بائع آخر', () => {
+  it('بائع آخر لا يصل إلى وثائق غيره', async () => {
+    if (!dbUp) return;
+    const otherEmail = `other.${SUFFIX}@basta.test`;
+    await registerUser(otherEmail, ['customer']);
+    const otherToken = await login(otherEmail);
+
+    const apply = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/apply', otherToken),
+      payload: { nameAr: 'متجر آخر', nameEn: `Other ${SUFFIX}`, country: 'SA' },
+    });
+    expect(apply.statusCode).toBe(201);
+    createdVendorIds.push(apply.json().vendor.id);
+    const otherVendorToken = apply.json().tokens.accessToken;
+
+    const view = await app.inject({ method: 'GET', ...api('/vendor/onboarding', sellerToken) });
+    const doc = view.json().documents[0];
+
+    const res = await app.inject({ method: 'GET', ...api(doc.downloadPath, otherVendorToken) });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('حساب عميل لا يدخل طابور المراجعة الإداري', async () => {
+    if (!dbUp) return;
+    const res = await app.inject({ method: 'GET', ...api('/admin/vendors', sellerToken) });
+    expect(res.statusCode).toBe(403);
+  });
+});

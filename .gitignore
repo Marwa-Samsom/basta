@@ -30,3 +30,7 @@ apps/api/api.log
 
 # سجلات محلية
 logs/
+
+# وثائق البائعين — هوية وسجل تجاري وكشوف بنكية. لا تدخل git أبداً
+private/
+apps/api/private/

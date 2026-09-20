@@ -49,6 +49,8 @@ beforeAll(async () => {
         slug: `v-${tag}-${SUFFIX}`,
         nameAr: `متجر ${tag}`,
         status: 'approved',
+        // القيد في المخطط: المعتمَد له لحظة اعتماد — تركيبة بلا تاريخ تصف حالة لا توجد
+        approvedAt: new Date(),
         settlementCurrency: 'SAR',
         country: 'SA',
       },

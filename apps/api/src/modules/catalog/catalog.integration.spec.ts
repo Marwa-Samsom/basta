@@ -72,6 +72,7 @@ beforeAll(async () => {
         slug: `v-${tag}-${SUFFIX}`,
         nameAr: `متجر ${tag}`,
         status,
+        ...(status === 'approved' ? { approvedAt: new Date() } : {}),
         settlementCurrency: currency,
         country: 'SA',
       },

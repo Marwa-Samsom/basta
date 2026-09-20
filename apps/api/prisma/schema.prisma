@@ -203,9 +203,13 @@ model ExchangeRate {
 // 3 · البائعون
 // ============================================================================
 
+/// `pending` مسوّدة لم تُرسل بعد، و `in_review` أُرسلت وتنتظر الإدارة.
+/// الفصل بينهما وبين `rejected` متعمَّد: ثلاث حالات مختلفة لا تُشتقّ من تواريخ فارغة.
 enum VendorStatus {
   pending
+  in_review
   approved
+  rejected
   suspended
   banned
 }
@@ -224,9 +228,20 @@ model Vendor {
   rejectionReason String?
 
   /// عملة تسعير البائع وتحصيل مستحقاته معاً — ADR-013.
-  /// تغييرها بعد أول بيع ممنوع: يتطلب محفظة جديدة وتسوية القديمة.
-  settlementCurrency String @db.Char(3)
-  country            String @db.Char(2)
+  /// تُختار افتراضياً من البلد عند التسجيل، ويبقى تغييرها ممكناً حتى يثبّتها
+  /// البائع في VD-04. بعد التثبيت لا تتغيّر: محفظة جديدة وتسوية قديمة.
+  settlementCurrency         String    @db.Char(3)
+  settlementCurrencyLockedAt DateTime? @db.Timestamptz
+  country                    String    @db.Char(2)
+
+  /// individual | company — يحدّد الوثائق المتوقَّعة في المراجعة
+  businessType   String?
+  mainCategoryId String? @db.Uuid
+
+  /// لحظة إرسال الطلب للمراجعة. تُمسح عند الرفض فيعود الطلب مسوّدة قابلة للإصلاح.
+  submittedAt DateTime? @db.Timestamptz
+  rejectedAt  DateTime? @db.Timestamptz
+  suspendedAt DateTime? @db.Timestamptz
 
   shippingPolicyAr String?
   returnPolicyAr   String?
@@ -239,6 +254,7 @@ model Vendor {
   updatedAt  DateTime  @updatedAt @db.Timestamptz
 
   owner           User                @relation(fields: [ownerUserId], references: [id])
+  mainCategory    Category?           @relation(fields: [mainCategoryId], references: [id], onDelete: Restrict)
   documents       VendorDocument[]
   bankAccounts    VendorBankAccount[]
   products        Product[]
@@ -259,15 +275,22 @@ model VendorDocument {
   id           String    @id @default(uuid()) @db.Uuid
   vendorId     String    @db.Uuid
   type         String // commercial_register | national_id | tax_card | bank_proof
+  /// مفتاح في مخزن **خاص** لا في uploads العام: هوية شخصية وسجل تجاري لا يُخدمان برابط مكشوف
   fileKey      String
+  mimeType     String
+  sizeBytes    Int
+  originalName String?
   status       String    @default("pending")
   rejectReason String?
   reviewedBy   String?   @db.Uuid
   reviewedAt   DateTime? @db.Timestamptz
   createdAt    DateTime  @default(now()) @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @db.Timestamptz
 
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
+  /// وثيقة واحدة فعّالة لكل نوع: إعادة الرفع تستبدل لا تكدّس نسخاً يختار المراجع بينها
+  @@unique([vendorId, type])
   @@index([vendorId])
   @@map("vendor_documents")
 }
@@ -311,6 +334,7 @@ model Category {
   products        Product[]
   attributes      CategoryAttribute[]
   commissionRules CommissionRule[]
+  mainForVendors  Vendor[]
 
   @@index([parentId])
   // فهرس text_pattern_ops في المهاجرة يخدم LIKE على البادئة

@@ -73,6 +73,7 @@ beforeAll(async () => {
       slug: `v-${SUFFIX}`,
       nameAr: 'متجر اختبار المخزون',
       status: 'approved',
+      approvedAt: new Date(),
       settlementCurrency: 'SAR',
       country: 'SA',
     },

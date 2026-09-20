@@ -82,3 +82,14 @@ export class DuplicateError extends DomainError {
   readonly code = 'DUPLICATE';
   readonly httpStatus = 409;
 }
+
+/**
+ * تعارض حالة برسالة خاصة بموضعها.
+ * `InvalidStateTransitionError` تصف انتقالاً بين حالتين مسمّاتين؛ وهذه لما
+ * يكون السبب أدقّ من ذلك: «قيد المراجعة فلا يقبل التعديل»، «تغيّرت الحالة
+ * فحدّث الصفحة»، «العملة مثبَّتة». الرسالة تقول ما العمل، لا ما مُنع فقط.
+ */
+export class ConflictError extends DomainError {
+  readonly code = 'CONFLICT';
+  readonly httpStatus = 409;
+}
