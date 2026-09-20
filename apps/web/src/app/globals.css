@@ -463,3 +463,252 @@ textarea.field__control {
     font-size: var(--text-md);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   قشرة اللوحة — §6.2. الشريط ثابت على الشاشة الواسعة، ودرج على الضيّقة.
+   الخصائص منطقية: الشريط يقع يمين الصفحة في العربية ويساراً في الإنجليزية
+   بلا نسخة ثانية من التخطيط.
+--------------------------------------------------------------------------- */
+
+.dash {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-page);
+  font-size: var(--density-text);
+}
+
+.dash__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-block-end: 1px solid var(--border-default);
+  background: var(--surface-card);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+}
+
+.dash__brand {
+  font-family: var(--font-display);
+  font-weight: var(--weight-black);
+  color: var(--text-strong);
+  text-decoration: none;
+  margin-inline-end: auto;
+}
+
+.dash__menu { display: none; }
+
+.dash__body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-5);
+  align-items: start;
+}
+
+.dash__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  position: sticky;
+  inset-block-start: calc(var(--control-lg) + var(--space-5));
+}
+
+.dash__link {
+  padding: var(--density-pad-y) var(--density-pad-x);
+  border-radius: var(--radius-sm);
+  color: var(--text-body);
+  text-decoration: none;
+  min-height: var(--control-md);
+  display: flex;
+  align-items: center;
+}
+
+.dash__link:hover { background: var(--surface-sunken); }
+
+.dash__link[data-active='true'] {
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  font-weight: var(--weight-semi);
+}
+
+.dash__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--density-gap);
+  min-width: 0; /* بلاها يتمدّد الجدول فيدفع الشبكة كلها */
+}
+
+@media (max-width: 860px) {
+  .dash__menu { display: inline-flex; }
+  .dash__body { grid-template-columns: minmax(0, 1fr); }
+  .dash__nav {
+    position: static;
+    display: none;
+    padding: var(--space-2);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+  }
+  .dash__nav[data-open='true'] { display: flex; }
+}
+
+/* ------------------------------------------------------------------- جداول */
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--density-text);
+}
+
+.table th,
+.table td {
+  padding: var(--density-pad-y) var(--density-pad-x);
+  text-align: start;
+  border-block-end: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--text-muted);
+  font-weight: var(--weight-semi);
+  font-size: var(--text-xs);
+  background: var(--surface-sunken);
+  position: sticky;
+  inset-block-start: 0;
+}
+
+.table tbody tr:last-child td { border-block-end: none; }
+.table tbody tr:hover { background: var(--surface-sunken); }
+.table td.wrap { white-space: normal; min-width: 14rem; }
+
+/* التبويبات بعدّاداتها — VD-07 و VD-12 */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  border-block-end: 1px solid var(--border-default);
+}
+
+.tabs__tab {
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--text-muted);
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--control-md);
+  border-block-end: 2px solid transparent;
+  cursor: pointer;
+}
+
+.tabs__tab[aria-selected='true'] {
+  color: var(--brand-text);
+  border-block-end-color: var(--brand);
+  font-weight: var(--weight-semi);
+}
+
+/* بطاقة مؤشّر — VD-06 */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--density-gap);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--density-card-pad);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+.stat__label { color: var(--text-muted); font-size: var(--text-xs); }
+.stat__value { color: var(--text-strong); font-size: var(--text-xl); font-weight: var(--weight-bold); }
+.stat__note { color: var(--text-faint); font-size: var(--text-xs); }
+
+/* حالة فارغة — تقول ما التالي لا «لا يوجد» فقط */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  color: var(--text-muted);
+}
+
+/* شارة تلي رقماً في خلية جدول — بلا فاصل تلتصق: «3منخفض» */
+.badge--after { margin-inline-start: var(--space-2); }
+
+/* ---------------------------------------------------------------------------
+   الجدول على الجوال — §6: بطاقات مكدّسة لا تمرير أفقي.
+   كل خلية تحمل `data-label`، فتُعرض التسمية بجانب القيمة حين ينهار الجدول.
+   الخلايا بلا تسمية (أزرار الإجراء) تمتدّ سطراً كاملاً.
+--------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .table-wrap { overflow-x: visible; border: none; background: none; }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: 100%;
+  }
+
+  .table thead { display: none; }
+
+  .table tr {
+    margin-block-end: var(--space-3);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    padding: var(--space-2);
+  }
+
+  .table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    white-space: normal;
+    border-block-end: 1px solid var(--border-subtle);
+    padding: var(--space-2);
+  }
+
+  .table td:last-child { border-block-end: none; }
+
+  .table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    flex: none;
+    /* الخلية قد تكون .num بخطّ أحادي واتجاه لاتيني — التسمية عربية فتعود لخطّها */
+    font-family: var(--font-ui);
+    direction: rtl;
+    unicode-bidi: isolate;
+  }
+
+  /* الخلية الأولى عنوان البطاقة، وخلية الإجراءات زرّ بعرض كامل */
+  .table td:first-child {
+    font-weight: var(--weight-semi);
+    font-size: var(--text-md);
+  }
+  .table td:first-child::before { content: none; }
+  .table td:empty { display: none; }
+  .table td[data-label=''] { justify-content: stretch; }
+  .table td[data-label=''] .btn { width: 100%; }
+}

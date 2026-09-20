@@ -105,22 +105,40 @@ async function raw(path: string, options: RequestOptions, token: string | null):
   });
 }
 
-async function refresh(): Promise<Tokens | null> {
-  const current = session.read();
-  if (!current) return null;
-  const res = await fetch(`${API_BASE}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refreshToken: current.refreshToken }),
+/**
+ * تجديد واحد في كل لحظة.
+ *
+ * رمز التحديث يُستعمل **مرة واحدة** ويُدوَّر، وإعادة استعماله تُقرأ في الخادم
+ * محاولةَ سرقة فتُلغى الجلسة كلها. ولوحة تطلق ستة طلبات متوازية تنتهي
+ * صلاحيتها معاً كانت تطلق ستة تجديدات بالرمز نفسه — فيَنجح الأول وتُسقِط
+ * البقيةُ الجلسةَ. الوعد المشترك هنا يجعل الخمسة الباقية تنتظر نتيجة الأول.
+ */
+let inFlight: Promise<Tokens | null> | null = null;
+
+function refresh(): Promise<Tokens | null> {
+  if (inFlight) return inFlight;
+
+  inFlight = (async () => {
+    const current = session.read();
+    if (!current) return null;
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refreshToken: current.refreshToken }),
+    });
+    if (!res.ok) {
+      session.clear();
+      return null;
+    }
+    const data = (await res.json()) as { tokens?: Tokens } & Partial<Tokens>;
+    const tokens = data.tokens ?? (data as Tokens);
+    session.write(tokens);
+    return tokens;
+  })().finally(() => {
+    inFlight = null;
   });
-  if (!res.ok) {
-    session.clear();
-    return null;
-  }
-  const data = (await res.json()) as { tokens?: Tokens } & Partial<Tokens>;
-  const tokens = data.tokens ?? (data as Tokens);
-  session.write(tokens);
-  return tokens;
+
+  return inFlight;
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
