@@ -29,13 +29,14 @@
     "verify": "bash scripts/verify-local.sh",
     "db:backup": "bash scripts/db-backup.sh backup",
     "db:verify-restore": "bash scripts/db-backup.sh verify",
-    "verify:quick": "bash scripts/verify-local.sh --keep"
+    "verify:quick": "bash scripts/verify-local.sh --keep",
+    "search:start": ".localdb/meili/meilisearch.exe --http-addr 127.0.0.1:7701 --db-path .localdb/meili/data --master-key basta_local_dev_key_0001 --env development"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "eslint": "^9.17.0",
-    "eslint-plugin-boundaries": "^5.0.1",
+    "eslint-plugin-boundaries": "^7.2.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2"
   }

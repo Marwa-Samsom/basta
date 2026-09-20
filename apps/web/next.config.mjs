@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // بناء الفحص (npm run verify) يكتب في مجلد منفصل: البناء في .next نفسه الذي
@@ -6,7 +8,9 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   // tokens.css يعيش خارج apps/web عمداً — مصدر حقيقة واحد يشاركه التصميم والتنفيذ
-  outputFileTracingRoot: new URL('../../', import.meta.url).pathname,
+  // fileURLToPath لا .pathname: على ويندوز يعطي pathname مسار URL «/C:/Users/…»
+  // الذي لا يصلح مساراً للنظام — Next 15 تساهل معه، و Turbopack في 16 يرفضه
+  outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
   images: { formats: ['image/avif', 'image/webp'] },
   async headers() {
     return [

@@ -57,6 +57,6 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "unplugin-swc": "^1.6.0",
-    "vitest": "^2.1.8"
+    "vitest": "^5.0.1"
   }
 }
