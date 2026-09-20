@@ -16,7 +16,18 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.enableCors({ origin: process.env.NEXT_PUBLIC_SITE_URL ?? true, credentials: true });
+  /**
+   * الأفعال تُسمّى صراحةً: محوّل Fastify يسمح افتراضياً بـ GET و HEAD و POST
+   * وحدها، فكان كل PUT و PATCH و DELETE يرتدّ من المتصفّح بـ ERR_FAILED بعد
+   * اجتياز الفحص المسبق — بينما تعمل الطلبات نفسها من curl لأنه لا يفحص.
+   * حفظ الحساب البنكي (PUT) كشفها في المرحلة 06.
+   */
+  app.enableCors({
+    origin: process.env.NEXT_PUBLIC_SITE_URL ?? true,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['authorization', 'content-type'],
+  });
 
   // الحد العام أعلى حدود المسارات؛ كل مسار يضيّقه لنفسه (الاستيراد 5 م.ب)
   await app.register(multipart as never, {
