@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Basta · Account &amp; shared — ST-23…30 · SH-01…08</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--sunken);color:var(--text-body);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{color:var(--brand-hover)}
+button,input,select,textarea{font:inherit;color:inherit}
+:root{
+--font-head:'Almarai',system-ui,sans-serif;
+--font-ui:'IBM Plex Sans Arabic',system-ui,sans-serif;
+--font-mono:'IBM Plex Mono',ui-monospace,monospace;
+--page:#F8F3EC;--card:#FFFFFF;--raised:#FFFFFF;--sunken:#F0E8DD;--inverse:#28211C;--on-inverse:#FDFAF6;
+--text-strong:#1E1814;--text-body:#4A3F35;--text-muted:#6B5C4D;--text-faint:#7D6C5B;
+--border-subtle:#F0E8DD;--border-default:#E3D7C7;--border-control:#958470;
+--brand:#8C2F46;--brand-hover:#74243A;--brand-pressed:#5C1B2E;--on-brand:#FFFFFF;--brand-subtle:#FBF1F3;--brand-text:#74243A;
+--money:#0E6B66;--money-subtle:#E3F2F0;--money-border:#C4E5E1;
+--success:#2F7A3E;--warning:#9A4F0B;--danger:#C23A1A;--info:#2D5F8B;
+--success-subtle:#E3F1E6;--warning-subtle:#FBEBDD;--danger-subtle:#FBE3DD;--info-subtle:#E1EBF4;
+--success-text:#25622F;--warning-text:#7E4009;--danger-text:#A12E13;--info-text:#244C70;
+--neutral-subtle:#F0E8DD;--neutral-text:#4A3F35;
+--focus:#B05A70;
+--shadow-sm:0 1px 2px rgba(46,13,23,.07),0 1px 3px rgba(74,63,53,.07);
+--shadow-md:0 2px 4px rgba(74,63,53,.07),0 6px 14px rgba(74,63,53,.09);
+--shadow-lg:0 10px 28px rgba(74,63,53,.14);
+--shadow-overlay:0 18px 52px rgba(30,24,20,.26);
+--r-1:4px;--r-2:8px;--r-3:14px;
+--text-3xl:38px;--text-2xl:30px;--text-xl:24px;--text-lg:20px;--text-md:17px;--text-sm:13px;--text-xs:12px;--text-2xs:11px;
+--text-base:15px;--row-h:48px;--card-pad:20px;--ctrl-h:44px;--gap:16px;
+}
+[data-theme="dark"]{
+--page:#14100D;--card:#1E1814;--raised:#28211C;--sunken:#14100D;--inverse:#F0E8DD;--on-inverse:#1E1814;
+--text-strong:#FDFAF6;--text-body:#E3D7C7;--text-muted:#A89680;--text-faint:#958470;
+--border-subtle:#28211C;--border-default:#332B24;--border-control:#7D6C5B;
+--brand:#D08A9B;--brand-hover:#E6B6C1;--brand-pressed:#F4DDE2;--on-brand:#1E1814;--brand-subtle:#2E0D17;--brand-text:#D08A9B;
+--money:#5CC6B8;--money-subtle:#0F2624;--money-border:#08403D;
+--success:#6CC287;--warning:#E39A4B;--danger:#F07A66;--info:#7FB2E0;
+--success-subtle:#13261A;--warning-subtle:#2E1C0B;--danger-subtle:#331410;--info-subtle:#0F1E2C;
+--success-text:#6CC287;--warning-text:#E39A4B;--danger-text:#F07A66;--info-text:#7FB2E0;
+--neutral-subtle:#28211C;--neutral-text:#E3D7C7;
+--focus:#D08A9B;
+--shadow-sm:0 1px 2px rgba(0,0,0,.4);
+--shadow-md:0 2px 4px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.4);
+--shadow-lg:0 10px 28px rgba(0,0,0,.5);
+--shadow-overlay:0 18px 52px rgba(0,0,0,.6);
+}
+[data-density="compact"]{--text-base:13px;--row-h:32px;--card-pad:16px;--ctrl-h:36px;--gap:12px}
+[data-lang="ar"] [data-t="en"]{display:none}
+[data-lang="en"] [data-t="ar"]{display:none}
+[dir="rtl"] [data-mirror]{transform:scaleX(-1)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+[data-theme="light"] [data-seg="light"],[data-theme="dark"] [data-seg="dark"],[data-lang="ar"] [data-seg="ar"],[data-lang="en"] [data-seg="en"],[data-density="comfortable"] [data-seg="comfortable"],[data-density="compact"] [data-seg="compact"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+@keyframes bsSpin{to{transform:rotate(360deg)}}
+@keyframes bsShimmer{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+@keyframes bsToastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes bsFade{from{opacity:0}to{opacity:1}}
+@keyframes bsDrawerIn{from{transform:translateX(100%)}to{transform:none}}
+@keyframes bsSheetUp{from{transform:translateY(100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:1ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" dir="rtl" data-theme="light" data-lang="ar" data-density="comfortable" style="min-height:100vh;background:var(--sunken);color:var(--text-body);font-family:var(--font-ui)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M13 5l7 7-7 7"></path></symbol>
+<symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="M11 19l-7-7 7-7"></path></symbol>
+<symbol id="i-chev-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></symbol>
+<symbol id="i-chev-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M18.5 6l-1 14h-11L5.5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L21.5 20H2.5z"></path><path d="M12 10v4.5"></path><path d="M12 17.5h.01"></path></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 8h.01"></path></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.4l2.8 2.8L16 9.6"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.4l3.4 2"></path></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a1 1 0 011-1h9"></path></symbol>
+<symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.5"></circle><path d="M21 16l-5-5-6 6"></path></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-6.5 10-6.5S22 12 22 12s-4 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16"></path><path d="M9.5 6c.8-.3 1.6-.5 2.5-.5 6 0 10 6.5 10 6.5s-1.2 2-3.3 3.7"></path><path d="M6.3 8.3C3.5 10.3 2 12 2 12s4 6.5 10 6.5c1.4 0 2.6-.3 3.7-.8"></path></symbol>
+<symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v11h16V9"></path><path d="M3 9l2-5h14l2 5z"></path></symbol>
+<symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"></path><path d="M3 8l9 5 9-5"></path><path d="M12 13v10"></path></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-9.5A4.5 4.5 0 0112 8a4.5 4.5 0 017 2.5c0 5.1-7 9.5-7 9.5z"></path></symbol>
+<symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2.2l2.2 11h10.2l2.2-8H6"></path><circle cx="9" cy="19.5" r="1.4"></circle><circle cx="17" cy="19.5" r="1.4"></circle></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"></path></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 10-12 0c0 5-2 6-2 6h16s-2-1-2-6z"></path><path d="M13.7 20a2 2 0 01-3.4 0"></path></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"></path></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5l-8.2 8.2a4.5 4.5 0 01-6.4-6.4l8-8a3 3 0 014.3 4.3l-8 8a1.5 1.5 0 01-2.2-2.1L14 8"></path></symbol>
+<symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4L3 11l7 2.6L12.6 21z"></path><path d="M21 4l-8.4 17"></path></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect><path d="M8 10.5V8a4 4 0 018 0v2.5"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z"></path><path d="M9 12.2l2.2 2.2L15.5 10"></path></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.3 5.7"></path><path d="M20 4v7h-7"></path></symbol>
+<symbol id="i-device" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="13" height="12" rx="2"></rect><path d="M8 20h6"></path><rect x="17.5" y="9" width="4" height="11" rx="1.2"></rect></symbol>
+<symbol id="i-wifi-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"></path><path d="M5 12.5a11 11 0 013.5-2.3"></path><path d="M2 8.8A16 16 0 0110 5.2"></path><path d="M14.5 5.6A16 16 0 0122 8.8"></path><path d="M15.6 10.4a11 11 0 013.4 2.1"></path><path d="M8.8 16.2A6 6 0 0112 15c1.2 0 2.3.3 3.2 1"></path><path d="M12 20h.01"></path></symbol>
+<symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></symbol>
+<symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"></path><path d="M14 3v5h5"></path></symbol>
+<symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 108.5-8.5c-3 0-5.6 1.6-7 4"></path><path d="M3.5 3.5v4h4"></path><path d="M12 7.5V12l3 1.8"></path></symbol>
+<symbol id="i-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a9 9 0 109 9"></path></symbol>
+</defs></svg>
+
+<header style="position:sticky;top:0;z-index:60;background:var(--card);border-block-end:1px solid var(--border-default);box-shadow:var(--shadow-sm)">
+  <div style="max-width:1600px;margin:0 auto;padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-family:var(--font-head);font-weight:800;font-size:20px;color:var(--brand)">بسطة</span>
+    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.08em">ST-23…30 · SH-01…08</span>
+    <div style="display:flex;gap:6px">
+      <a href="Basta Component Sheet.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">الورقة</a>
+      <a href="Basta Storefront Discovery.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">المتجر</a>
+      <a href="Basta Storefront Purchase.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">الشراء</a>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border-default)"></div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="light" onClick="{{ setLight }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">فاتح</button>
+      <button type="button" data-seg="dark" onClick="{{ setDark }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">داكن</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="ar" onClick="{{ setAr }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">عربي</button>
+      <button type="button" data-seg="en" onClick="{{ setEn }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">English</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="comfortable" onClick="{{ setComfortable }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">مريحة</button>
+      <button type="button" data-seg="compact" onClick="{{ setCompact }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">مضغوطة</button>
+    </div>
+    <div style="margin-inline-start:auto;display:flex;align-items:center;gap:6px">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">STATE</span>
+      <div style="display:flex;gap:4px">
+        <sc-for list="{{ stateTabs }}" as="p" hint-placeholder-count="5">
+          <button type="button" onClick="{{ p.go }}" style="height:28px;padding:0 9px;border:1px solid {{ p.border }};border-radius:var(--r-1);background:{{ p.bg }};color:{{ p.fg }};font-size:11px;cursor:pointer">{{ p.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  <div style="max-width:1600px;margin:0 auto;padding:0 24px 9px;display:flex;gap:4px;flex-wrap:wrap">
+    <sc-for list="{{ screenTabs }}" as="t" hint-placeholder-count="13">
+      <button type="button" onClick="{{ t.go }}" style="height:26px;padding:0 9px;border:1px solid {{ t.border }};border-radius:var(--r-1);background:{{ t.bg }};color:{{ t.fg }};font-family:var(--font-mono);font-size:11px;cursor:pointer">{{ t.code }}</button>
+    </sc-for>
+  </div>
+</header>
+
+<div style="padding:20px 16px 60px;display:grid;justify-items:center">
+  <div style="width:1440px;zoom:{{ fit }};background:var(--page);border:1px solid var(--border-default);border-radius:var(--r-3);box-shadow:var(--shadow-lg);overflow:hidden;min-height:760px">
+
+    <div style="display:{{ chromeDisplay }};background:var(--card);border-block-end:1px solid var(--border-default);padding:12px 32px;align-items:center;gap:16px">
+      <span style="font-family:var(--font-head);font-weight:800;font-size:22px;color:var(--brand)">بسطة</span>
+      <span style="position:relative;display:flex;align-items:center;flex:1;max-width:420px">
+        <svg width="17" height="17" style="position:absolute;inset-inline-start:11px;color:var(--text-faint);pointer-events:none"><use href="#i-search"></use></svg>
+        <input type="text" placeholder="ابحث عن منتج أو متجر" style="height:var(--ctrl-h);width:100%;padding-inline:34px 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm)" />
+      </span>
+      <span style="margin-inline-start:auto;display:flex;align-items:center;gap:10px">
+        <button type="button" onClick="{{ goNotifications }}" aria-label="الإشعارات" style="position:relative;width:var(--ctrl-h);height:var(--ctrl-h);border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)">
+          <svg width="18" height="18"><use href="#i-bell"></use></svg>
+          <sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:6px;inset-inline-end:6px;width:7px;height:7px;border-radius:999px;background:var(--danger)"></span></sc-if>
+        </button>
+        <button type="button" onClick="{{ goMessages }}" aria-label="الرسائل" style="width:var(--ctrl-h);height:var(--ctrl-h);border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)"><svg width="18" height="18"><use href="#i-msg"></use></svg></button>
+        <span style="display:flex;align-items:center;gap:8px;padding-inline-start:10px;border-inline-start:1px solid var(--border-default)">
+          <span style="width:30px;height:30px;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center;font-size:var(--text-sm);font-weight:700">ن</span>
+          <span style="font-size:var(--text-sm);color:var(--text-body)">نورة العتيبي</span>
+        </span>
+      </span>
+    </div>
+
+    <div style="display:{{ loadingDisplay }};padding:40px;gap:16px;flex-direction:column">
+      <span style="height:28px;width:260px;border-radius:var(--r-1);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out infinite"></span>
+      <span style="height:200px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .15s infinite"></span>
+      <span style="height:200px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .3s infinite"></span>
+    </div>
+
+    <div style="display:{{ errorDisplay }};padding:80px 40px;place-items:center;text-align:center;gap:12px">
+      <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-alert"></use></svg></span>
+      <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong)">حدث خلل غير متوقّع ولم يكتمل طلبك</span>
+      <span style="font-size:var(--text-base);color:var(--text-muted);max-width:56ch;line-height:1.8">أعد المحاولة، وإن تكرّر أبلغنا بالرقم <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">req-8f3a2c</span>.</span>
+      <button type="button" onClick="{{ retry }}" style="margin-top:6px;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-refresh"></use></svg>أعد المحاولة</button>
+    </div>
+
+    <div style="display:{{ contentDisplay }};padding:26px 32px 44px;min-width:0">
+
+      <sc-if value="{{ isAccountArea }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:220px minmax(0,1fr);gap:24px;align-items:start">
+        <nav style="display:grid;gap:3px;position:sticky;top:16px">
+          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:.06em;padding:0 10px 6px">حسابي</span>
+          <sc-for list="{{ accountNav }}" as="n" hint-placeholder-count="7">
+            <button type="button" onClick="{{ n.go }}" style="height:40px;padding:0 11px;border:0;border-radius:var(--r-1);background:{{ n.bg }};color:{{ n.fg }};font-size:var(--text-sm);font-weight:{{ n.weight }};display:flex;align-items:center;gap:10px;cursor:pointer;text-align:start" style-hover="background:var(--sunken)">
+              <svg width="17" height="17" style="flex:none"><use href="{{ n.icon }}"></use></svg>
+              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.label }}</span>
+              <sc-if value="{{ n.count }}" hint-placeholder-val="{{ false }}">
+                <span style="height:19px;min-width:19px;padding:0 6px;border-radius:999px;background:{{ n.countBg }};color:{{ n.countFg }};font-family:var(--font-mono);font-size:var(--text-2xs);display:inline-flex;align-items:center;justify-content:center">{{ n.count }}</span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </nav>
+
+        <div style="min-width:0">
+
+          <sc-if value="{{ isST23 }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;gap:16px">
+            <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+              <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);margin:0">قائمة الرغبات</h1>
+              <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ wishCountText }}</span>
+            </div>
+            <sc-if value="{{ wishEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:52px 24px;display:grid;justify-items:center;gap:11px;text-align:center">
+                <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-heart"></use></svg></span>
+                <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">قائمة رغباتك فارغة</span>
+                <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">احفظ ما يعجبك بضغطة على القلب، ونخبرك إن تغيّر سعره أو قارب النفاد.</span>
+                <span style="display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin-top:6px">
+                  <sc-for list="{{ wishSuggestions }}" as="c" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ c.go }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-sm);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">{{ c.label }}</button>
+                  </sc-for>
+                </span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ wishHasItems }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+                <sc-for list="{{ wishItems }}" as="w" hint-placeholder-count="6">
+                  <div style="border:1px solid {{ w.border }};border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm);display:grid;align-content:start">
+                    <span style="position:relative;display:block">
+                      <span style="display:grid;place-items:center;aspect-ratio:4/5;background:var(--sunken);color:var(--text-faint);opacity:{{ w.imgOpacity }}"><svg width="30" height="30"><use href="#i-image"></use></svg></span>
+                      <sc-if value="{{ w.flag }}" hint-placeholder-val="{{ false }}">
+                        <span style="position:absolute;top:10px;inset-inline-start:10px;height:24px;padding:0 10px;border-radius:999px;background:{{ w.flagBg }};color:{{ w.flagFg }};font-size:var(--text-2xs);font-weight:700;display:inline-flex;align-items:center;gap:5px">{{ w.flag }}</span>
+                      </sc-if>
+                      <button type="button" onClick="{{ w.remove }}" aria-label="أزل من الرغبات" style="position:absolute;top:8px;inset-inline-end:8px;width:32px;height:32px;border:1px solid var(--border-default);border-radius:999px;background:var(--card);color:var(--brand);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow-sm)" style-hover="background:var(--brand-subtle)"><svg width="16" height="16"><use href="#i-heart"></use></svg></button>
+                    </span>
+                    <div style="padding:12px;display:grid;gap:7px">
+                      <span style="font-size:var(--text-sm);color:var(--text-strong);line-height:1.5;min-height:2.8em">{{ w.name }}</span>
+                      <span style="display:inline-flex;align-items:center;gap:5px;font-size:var(--text-2xs);color:var(--text-muted)"><svg width="12" height="12" style="flex:none"><use href="#i-store"></use></svg>{{ w.shop }}</span>
+                      <span style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+                        <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ w.price }}</span>
+                        <sc-if value="{{ w.oldPrice }}" hint-placeholder-val="{{ false }}">
+                          <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);text-decoration:line-through">{{ w.oldPrice }}</span>
+                        </sc-if>
+                      </span>
+                      <sc-if value="{{ w.note }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size:var(--text-2xs);color:{{ w.noteColor }};font-weight:600;line-height:1.6">{{ w.note }}</span>
+                      </sc-if>
+                      <button type="button" onClick="{{ w.move }}" disabled="{{ w.soldOut }}" style="height:38px;border:0;border-radius:var(--r-1);background:{{ w.btnBg }};color:{{ w.btnFg }};font-size:var(--text-sm);font-weight:600;cursor:{{ w.btnCursor }};display:inline-flex;align-items:center;justify-content:center;gap:7px"><svg width="15" height="15"><use href="#i-cart"></use></svg>{{ w.btnLabel }}</button>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isST24 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:16px">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);margin:0">شوهدت مؤخّراً</h1>
+              <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ recentCountText }}</span>
+              <button type="button" onClick="{{ askClearRecent }}" disabled="{{ recentEmpty }}" style="margin-inline-start:auto;height:var(--ctrl-h);padding:0 14px;border:1px solid {{ clearBorder }};border-radius:var(--r-1);background:transparent;color:{{ clearColor }};font-size:var(--text-sm);font-weight:600;cursor:{{ clearCursor }};display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--danger-subtle)"><svg width="15" height="15"><use href="#i-trash"></use></svg>امسح السجلّ</button>
+            </div>
+            <sc-if value="{{ recentEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:52px 24px;display:grid;justify-items:center;gap:11px;text-align:center">
+                <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-history"></use></svg></span>
+                <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">لا سجلّ مشاهدة بعد</span>
+                <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">ما تتصفّحه يظهر هنا لتعود إليه بسرعة. السجلّ محفوظ على جهازك ويمكنك مسحه في أي وقت.</span>
+                <button type="button" onClick="{{ goDiscovery }}" style="margin-top:6px;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer">تصفّح المتجر</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ recentHasItems }}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{ recentGroups }}" as="g" hint-placeholder-count="2">
+                <div style="display:grid;gap:11px">
+                  <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ g.label }}</span>
+                  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px">
+                    <sc-for list="{{ g.items }}" as="p" hint-placeholder-count="5">
+                      <button type="button" onClick="{{ p.open }}" style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm);display:grid;align-content:start;cursor:pointer;padding:0;text-align:start" style-hover="box-shadow:var(--shadow-md)">
+                        <span style="display:grid;place-items:center;aspect-ratio:1;background:var(--sunken);color:var(--text-faint)"><svg width="26" height="26"><use href="#i-image"></use></svg></span>
+                        <span style="padding:10px;display:grid;gap:5px">
+                          <span style="font-size:var(--text-xs);color:var(--text-strong);line-height:1.5;min-height:2.6em">{{ p.name }}</span>
+                          <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--money)">{{ p.price }}</span>
+                          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">{{ p.when }}</span>
+                        </span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </sc-if>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isST25 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:16px">
+            <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);margin:0">الحساب</h1>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;border-block-end:1px solid var(--border-default);padding-bottom:10px">
+              <sc-for list="{{ acctTabs }}" as="t" hint-placeholder-count="3">
+                <button type="button" onClick="{{ t.pick }}" style="height:36px;padding:0 14px;border:1px solid {{ t.border }};border-radius:var(--r-1);background:{{ t.bg }};color:{{ t.fg }};font-size:var(--text-sm);font-weight:600;cursor:pointer">{{ t.label }}</button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ acctProfile }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start">
+                <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:16px">
+                  <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">البيانات الشخصية</span>
+                  <label style="display:grid;gap:6px">
+                    <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">الاسم الكامل</span>
+                    <input type="text" value="{{ profName }}" onChange="{{ onProfName }}" style="height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                  </label>
+                  <div style="display:grid;gap:6px">
+                    <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">البريد الإلكتروني</span>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                      <input type="text" value="{{ profEmail }}" onChange="{{ onProfEmail }}" dir="ltr" style="flex:1;min-width:200px;height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base)" />
+                      <span style="height:28px;padding:0 11px;border-radius:999px;background:{{ emailBadgeBg }};color:{{ emailBadgeFg }};font-size:var(--text-xs);font-weight:600;display:inline-flex;align-items:center;gap:6px;flex:none"><svg width="13" height="13"><use href="{{ emailBadgeIcon }}"></use></svg>{{ emailBadge }}</span>
+                    </div>
+                    <sc-if value="{{ emailUnverified }}" hint-placeholder-val="{{ false }}">
+                      <button type="button" onClick="{{ sendEmailCode }}" style="width:fit-content;height:34px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">أرسل رمز التحقّق</button>
+                    </sc-if>
+                  </div>
+                  <div style="display:grid;gap:6px">
+                    <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">رقم الجوال</span>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                      <input type="text" value="{{ profPhone }}" onChange="{{ onProfPhone }}" dir="ltr" style="flex:1;min-width:200px;height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-base)" />
+                      <span style="height:28px;padding:0 11px;border-radius:999px;background:{{ phoneBadgeBg }};color:{{ phoneBadgeFg }};font-size:var(--text-xs);font-weight:600;display:inline-flex;align-items:center;gap:6px;flex:none"><svg width="13" height="13"><use href="{{ phoneBadgeIcon }}"></use></svg>{{ phoneBadge }}</span>
+                    </div>
+                    <sc-if value="{{ phoneUnverified }}" hint-placeholder-val="{{ true }}">
+                      <button type="button" onClick="{{ verifyPhone }}" style="width:fit-content;height:34px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">تحقّق بالرمز</button>
+                    </sc-if>
+                  </div>
+                  <div style="display:grid;gap:7px;padding-top:4px">
+                    <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">لغة الواجهة وعملة العرض</span>
+                    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px">
+                      <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+                        <button type="button" onClick="{{ setAr }}" style="flex:1;height:var(--ctrl-h);border:0;background:var(--card);color:var(--text-body);font-size:var(--text-sm);cursor:pointer" data-seg="ar">العربية</button>
+                        <button type="button" onClick="{{ setEn }}" style="flex:1;height:var(--ctrl-h);border:0;border-inline-start:1px solid var(--border-control);background:var(--card);color:var(--text-body);font-size:var(--text-sm);cursor:pointer" data-seg="en">English</button>
+                      </div>
+                      <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+                        <sc-for list="{{ currencyOpts }}" as="c" hint-placeholder-count="3">
+                          <button type="button" onClick="{{ c.pick }}" style="flex:1;height:var(--ctrl-h);border:0;border-inline-start:1px solid var(--border-control);background:{{ c.bg }};color:{{ c.fg }};font-size:var(--text-sm);font-weight:600;cursor:pointer">{{ c.label }}</button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:10px;flex-wrap:wrap;padding-top:4px">
+                    <button type="button" onClick="{{ saveProfile }}" style="height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">احفظ التغييرات</button>
+                    <span style="display:{{ profDirtyDisplay }};align-items:center;gap:7px;font-size:var(--text-xs);color:var(--warning-text)"><span style="width:7px;height:7px;border-radius:999px;background:var(--warning)"></span>تغييرات غير محفوظة</span>
+                  </div>
+                </div>
+                <div style="background:var(--card);border:1px solid var(--danger);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:10px">
+                  <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--danger-text)">حذف الحساب</span>
+                  <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">يُحذف حسابك وبياناتك الشخصية. طلباتك السابقة تبقى في سجلّ المتاجر للفواتير والضريبة.</span>
+                  <button type="button" onClick="{{ askDelete }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-sm);font-weight:600;cursor:pointer;width:fit-content" style-hover="background:var(--danger-subtle)">احذف حسابي</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ acctSecurity }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start">
+                <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:14px">
+                  <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">تغيير كلمة المرور</span>
+                  <label style="display:grid;gap:6px">
+                    <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">كلمة المرور الحالية</span>
+                    <input type="password" value="{{ pwCurrent }}" onChange="{{ onPwCurrent }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                  </label>
+                  <label style="display:grid;gap:6px">
+                    <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">كلمة المرور الجديدة</span>
+                    <span style="position:relative;display:flex">
+                      <input type="{{ pwNewType }}" value="{{ pwNew }}" onChange="{{ onPwNew }}" dir="ltr" style="height:var(--ctrl-h);padding-inline:12px 44px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                      <button type="button" onClick="{{ togglePwNew }}" aria-label="إظهار كلمة المرور" style="position:absolute;inset-inline-end:4px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;border:0;background:transparent;color:var(--text-muted);cursor:pointer;border-radius:var(--r-1)" style-hover="background:var(--sunken)"><svg width="18" height="18"><use href="{{ pwNewIcon }}"></use></svg></button>
+                    </span>
+                    <span style="display:flex;align-items:center;gap:8px">
+                      <span style="flex:1;height:5px;border-radius:999px;background:var(--sunken);overflow:hidden"><span style="display:block;height:100%;width:{{ pwBarW }};background:{{ pwBarColor }};transition:width .2s ease-out"></span></span>
+                      <span style="font-size:var(--text-xs);color:{{ pwBarColor }};font-weight:600">{{ pwBarLabel }}</span>
+                    </span>
+                  </label>
+                  <button type="button" onClick="{{ savePassword }}" style="height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:{{ pwSaveBg }};color:{{ pwSaveFg }};font-size:var(--text-base);font-weight:600;cursor:{{ pwSaveCursor }};width:fit-content">حدّث كلمة المرور</button>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7">تحديث كلمة المرور ينهي كل الجلسات الأخرى على الأجهزة الأخرى.</span>
+                </div>
+                <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:14px;align-content:start">
+                  <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">التحقّق بخطوتين</span>
+                  <div style="display:flex;align-items:flex-start;gap:12px;padding:13px;border:1px solid {{ tfaBorder }};border-radius:var(--r-1);background:{{ tfaBg }}">
+                    <svg width="20" height="20" style="flex:none;color:{{ tfaColor }};margin-top:1px"><use href="#i-shield"></use></svg>
+                    <span style="display:grid;gap:3px;min-width:0;flex:1">
+                      <span style="font-size:var(--text-sm);font-weight:700;color:{{ tfaColor }}">{{ tfaTitle }}</span>
+                      <span style="font-size:var(--text-xs);color:var(--text-body);line-height:1.7">{{ tfaBody }}</span>
+                    </span>
+                    <button type="button" onClick="{{ toggleTfa }}" role="switch" aria-checked="{{ tfaOn }}" style="width:48px;height:27px;flex:none;border:0;border-radius:999px;background:{{ tfaSwBg }};position:relative;cursor:pointer;padding:0">
+                      <span style="position:absolute;top:2px;inset-inline-start:{{ tfaSwX }};width:23px;height:23px;border-radius:999px;background:#FFFFFF;box-shadow:var(--shadow-sm);transition:inset-inline-start .16s ease-out"></span>
+                    </button>
+                  </div>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7">اختياري للمشترين، وإلزامي لحسابات التجّار والإدارة.</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ acctSessions }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+                <div style="padding:13px 16px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">الجلسات النشطة</span>
+                  <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ sessionCountText }}</span>
+                  <button type="button" onClick="{{ revokeAll }}" style="margin-inline-start:auto;height:36px;padding:0 13px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--danger-subtle)">أنهِ كل الجلسات الأخرى</button>
+                </div>
+                <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="4">
+                  <div style="padding:13px 16px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:{{ s.bg }}">
+                    <span style="width:38px;height:38px;flex:none;border-radius:var(--r-1);background:var(--sunken);color:var(--text-muted);display:grid;place-items:center"><svg width="19" height="19"><use href="#i-device"></use></svg></span>
+                    <span style="display:grid;gap:3px;min-width:0;flex:1">
+                      <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">{{ s.device }}</span>
+                        <sc-if value="{{ s.current }}" hint-placeholder-val="{{ false }}">
+                          <span style="height:20px;padding:0 8px;border-radius:999px;background:var(--success-subtle);color:var(--success-text);font-size:var(--text-2xs);font-weight:600;display:inline-flex;align-items:center">هذا الجهاز</span>
+                        </sc-if>
+                      </span>
+                      <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ s.where }} · {{ s.when }}</span>
+                    </span>
+                    <sc-if value="{{ s.canRevoke }}" hint-placeholder-val="{{ true }}">
+                      <button type="button" onClick="{{ s.revoke }}" style="height:34px;padding:0 12px;flex:none;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--danger-subtle)">أنهِ الجلسة</button>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isST26 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:16px">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);margin:0">العناوين</h1>
+              <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ addrCountText }}</span>
+              <button type="button" onClick="{{ addAddress }}" style="margin-inline-start:auto;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-plus"></use></svg>أضف عنواناً</button>
+            </div>
+            <div style="display:{{ undoDisplay }};align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--inverse);color:var(--on-inverse)">
+              <svg width="17" height="17" style="flex:none"><use href="#i-trash"></use></svg>
+              <span style="font-size:var(--text-sm);font-weight:600">حُذف العنوان «{{ undoLabel }}»</span>
+              <button type="button" onClick="{{ undoDelete }}" style="margin-inline-start:auto;height:32px;padding:0 13px;border:1px solid var(--on-inverse);border-radius:var(--r-1);background:transparent;color:var(--on-inverse);font-size:var(--text-xs);font-weight:700;cursor:pointer">تراجع</button>
+            </div>
+            <sc-if value="{{ addrEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:52px 24px;display:grid;justify-items:center;gap:11px;text-align:center">
+                <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-pin"></use></svg></span>
+                <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">لا عناوين محفوظة</span>
+                <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">أضف عنواناً الآن ليكون جاهزاً عند الدفع، أو أضفه أثناء إتمام الطلب.</span>
+                <button type="button" onClick="{{ addAddress }}" style="margin-top:6px;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer">أضف عنواناً</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ addrHasItems }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+                <sc-for list="{{ addresses }}" as="a" hint-placeholder-count="3">
+                  <div style="background:var(--card);border:1.5px solid {{ a.border }};border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:10px;align-content:start">
+                    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                      <span style="height:26px;padding:0 11px;border-radius:999px;background:var(--sunken);color:var(--text-strong);font-size:var(--text-xs);font-weight:700;display:inline-flex;align-items:center;gap:6px"><svg width="13" height="13"><use href="#i-pin"></use></svg>{{ a.label }}</span>
+                      <sc-if value="{{ a.isDefault }}" hint-placeholder-val="{{ false }}">
+                        <span style="height:26px;padding:0 11px;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);font-size:var(--text-xs);font-weight:700;display:inline-flex;align-items:center;gap:6px"><svg width="13" height="13"><use href="#i-check"></use></svg>الافتراضي</span>
+                      </sc-if>
+                    </div>
+                    <span style="font-size:var(--text-base);color:var(--text-strong);font-weight:600">{{ a.name }}</span>
+                    <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">{{ a.lines }}</span>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ a.phone }}</span>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:4px">
+                      <sc-if value="{{ a.canDefault }}" hint-placeholder-val="{{ true }}">
+                        <button type="button" onClick="{{ a.makeDefault }}" style="height:36px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">اجعله الافتراضي</button>
+                      </sc-if>
+                      <button type="button" onClick="{{ a.edit }}" style="height:36px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">حرّر</button>
+                      <button type="button" onClick="{{ a.remove }}" style="height:36px;padding:0 12px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-xs);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--danger-subtle)"><svg width="13" height="13"><use href="#i-trash"></use></svg>احذف</button>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isST27 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:16px">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);margin:0">الإشعارات</h1>
+              <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ notifCountText }}</span>
+              <span style="margin-inline-start:auto;display:flex;gap:8px;flex-wrap:wrap">
+                <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+                  <button type="button" onClick="{{ notifAll }}" style="height:var(--ctrl-h);padding:0 14px;border:0;background:{{ notifAllBg }};color:{{ notifAllFg }};font-size:var(--text-sm);font-weight:600;cursor:pointer">الكل</button>
+                  <button type="button" onClick="{{ notifUnread }}" style="height:var(--ctrl-h);padding:0 14px;border:0;border-inline-start:1px solid var(--border-control);background:{{ notifUnreadBg }};color:{{ notifUnreadFg }};font-size:var(--text-sm);font-weight:600;cursor:pointer">غير المقروء</button>
+                </div>
+                <button type="button" onClick="{{ markAllRead }}" disabled="{{ noUnread }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid {{ markBorder }};border-radius:var(--r-1);background:transparent;color:{{ markColor }};font-size:var(--text-sm);font-weight:600;cursor:{{ markCursor }};display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--sunken)"><svg width="15" height="15"><use href="#i-check"></use></svg>علّم الكل كمقروء</button>
+              </span>
+            </div>
+            <sc-if value="{{ notifEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:52px 24px;display:grid;justify-items:center;gap:11px;text-align:center">
+                <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-bell"></use></svg></span>
+                <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">{{ notifEmptyTitle }}</span>
+                <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">{{ notifEmptyBody }}</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ notifHasItems }}" hint-placeholder-val="{{ true }}">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+                <sc-for list="{{ notifGroups }}" as="g" hint-placeholder-count="3">
+                  <div>
+                    <div style="padding:9px 16px;background:var(--sunken);border-block-end:1px solid var(--border-subtle)">
+                      <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);letter-spacing:.06em">{{ g.label }}</span>
+                    </div>
+                    <sc-for list="{{ g.items }}" as="n" hint-placeholder-count="3">
+                      <button type="button" onClick="{{ n.open }}" style="width:100%;display:flex;align-items:flex-start;gap:12px;padding:13px 16px;border:0;border-block-end:1px solid var(--border-subtle);background:{{ n.bg }};cursor:pointer;text-align:start" style-hover="background:var(--sunken)">
+                        <span style="width:34px;height:34px;flex:none;border-radius:var(--r-1);background:{{ n.iconBg }};color:{{ n.iconFg }};display:grid;place-items:center"><svg width="17" height="17"><use href="{{ n.icon }}"></use></svg></span>
+                        <span style="display:grid;gap:3px;min-width:0;flex:1">
+                          <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                            <span style="font-size:var(--text-sm);font-weight:{{ n.weight }};color:var(--text-strong);line-height:1.5">{{ n.title }}</span>
+                            <sc-if value="{{ n.unread }}" hint-placeholder-val="{{ false }}">
+                              <span style="width:8px;height:8px;flex:none;border-radius:999px;background:var(--brand)"></span>
+                            </sc-if>
+                          </span>
+                          <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7">{{ n.body }}</span>
+                        </span>
+                        <span style="display:grid;gap:4px;justify-items:end;flex:none">
+                          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);white-space:nowrap">{{ n.time }}</span>
+                          <svg width="15" height="15" data-mirror style="color:var(--text-muted)"><use href="#i-chev-end"></use></svg>
+                        </span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isST28 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:16px">
+            <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+              <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);margin:0">رسائلي</h1>
+              <span style="font-size:var(--text-xs);color:var(--text-muted)">رسائل غير فورية مع المتاجر — يردّ المتجر عادةً خلال يوم عمل.</span>
+            </div>
+            <sc-if value="{{ msgEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:52px 24px;display:grid;justify-items:center;gap:11px;text-align:center">
+                <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-msg"></use></svg></span>
+                <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">لا رسائل بعد</span>
+                <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">راسل المتجر من صفحة المنتج أو من تفاصيل الطلب إن احتجت سؤالاً عن مقاس أو شحنة.</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ msgHasItems }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;align-items:start;min-height:520px">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+                <sc-for list="{{ threads }}" as="t" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ t.open }}" style="width:100%;display:flex;align-items:flex-start;gap:10px;padding:13px;border:0;border-block-end:1px solid var(--border-subtle);background:{{ t.bg }};cursor:pointer;text-align:start" style-hover="background:var(--sunken)">
+                    <span style="width:36px;height:36px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="17" height="17"><use href="#i-store"></use></svg></span>
+                    <span style="display:grid;gap:3px;min-width:0;flex:1">
+                      <span style="display:flex;align-items:center;gap:7px">
+                        <span style="font-size:var(--text-sm);font-weight:{{ t.weight }};color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.shop }}</span>
+                        <sc-if value="{{ t.unread }}" hint-placeholder-val="{{ false }}"><span style="width:8px;height:8px;flex:none;border-radius:999px;background:var(--brand)"></span></sc-if>
+                      </span>
+                      <span style="font-size:var(--text-2xs);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.preview }}</span>
+                      <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">{{ t.time }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;min-height:520px">
+                <div style="padding:13px 16px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:11px;flex-wrap:wrap">
+                  <span style="width:34px;height:34px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="16" height="16"><use href="#i-store"></use></svg></span>
+                  <span style="display:grid;gap:2px;min-width:0">
+                    <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ activeShop }}</span>
+                    <span style="font-size:var(--text-2xs);color:var(--text-muted)">{{ activeContext }}</span>
+                  </span>
+                  <button type="button" onClick="{{ openContext }}" style="margin-inline-start:auto;height:34px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">{{ activeContextBtn }}</button>
+                </div>
+                <div style="padding:16px;display:grid;gap:12px;flex:1;overflow-y:auto;background:var(--sunken)">
+                  <sc-for list="{{ activeMessages }}" as="m" hint-placeholder-count="4">
+                    <div style="display:flex;justify-content:{{ m.align }}">
+                      <div style="max-width:78%;min-width:0;display:grid;gap:5px">
+                        <div style="display:flex;align-items:center;gap:7px">
+                          <span style="height:18px;padding:0 7px;border-radius:999px;background:{{ m.tagBg }};color:{{ m.tagFg }};font-family:var(--font-mono);font-size:var(--text-2xs);display:inline-flex;align-items:center">{{ m.role }}</span>
+                          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">{{ m.time }}</span>
+                        </div>
+                        <div style="padding:11px 13px;border:1px solid {{ m.border }};border-radius:var(--r-2);background:{{ m.bubbleBg }};font-size:var(--text-sm);color:var(--text-body);line-height:1.7">{{ m.text }}</div>
+                        <sc-if value="{{ m.file }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:inline-flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--card);width:fit-content">
+                            <span style="width:28px;height:28px;flex:none;border-radius:var(--r-1);background:var(--sunken);color:var(--text-muted);display:grid;place-items:center"><svg width="15" height="15"><use href="#i-clip"></use></svg></span>
+                            <span style="display:grid;gap:2px"><span style="font-size:var(--text-xs);color:var(--text-strong);font-weight:600">{{ m.file }}</span><span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)">{{ m.size }}</span></span>
+                          </span>
+                        </sc-if>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="padding:12px 16px;border-block-start:1px solid var(--border-subtle);display:grid;gap:9px">
+                  <textarea rows="2" value="{{ msgDraft }}" onChange="{{ onMsgDraft }}" placeholder="اكتب رسالتك للمتجر…" style="padding:10px 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.7;resize:none;width:100%"></textarea>
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <button type="button" onClick="{{ attach }}" aria-label="إرفاق ملف" style="width:38px;height:38px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)"><svg width="17" height="17"><use href="#i-clip"></use></svg></button>
+                    <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">{{ msgCount }} / 1000</span>
+                    <button type="button" onClick="{{ sendMsg }}" style="margin-inline-start:auto;height:38px;padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--brand-hover)"><svg width="15" height="15" data-mirror><use href="#i-send"></use></svg>أرسل</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </sc-if>
+          </div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isST30 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:18px;max-width:1120px;margin:0 auto">
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <sc-for list="{{ pageTabs }}" as="t" hint-placeholder-count="6">
+            <button type="button" onClick="{{ t.pick }}" style="height:34px;padding:0 13px;border:1px solid {{ t.border }};border-radius:999px;background:{{ t.bg }};color:{{ t.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:{{ pageCols }};gap:26px;align-items:start">
+          <sc-if value="{{ pageHasToc }}" hint-placeholder-val="{{ true }}">
+            <nav style="position:sticky;top:16px;background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:14px;box-shadow:var(--shadow-sm);display:grid;gap:4px">
+              <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:.06em;padding-bottom:5px">المحتويات</span>
+              <sc-for list="{{ pageToc }}" as="t" hint-placeholder-count="5">
+                <a href="{{ t.href }}" style="font-size:var(--text-sm);color:var(--text-body);text-decoration:none;padding:6px 8px;border-radius:var(--r-1);line-height:1.5" style-hover="background:var(--sunken);color:var(--brand-text)">{{ t.label }}</a>
+              </sc-for>
+            </nav>
+          </sc-if>
+          <article style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:28px;box-shadow:var(--shadow-sm);min-width:0">
+            <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong);margin:0 0 8px;line-height:1.3">{{ pageTitle }}</h1>
+            <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-xs);color:var(--text-muted);margin-bottom:22px"><svg width="14" height="14"><use href="#i-clock"></use></svg>آخر تحديث {{ pageUpdated }}</span>
+            <sc-if value="{{ pageIsProse }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;gap:22px;max-width:68ch">
+                <sc-for list="{{ pageSections }}" as="s" hint-placeholder-count="4">
+                  <section id="{{ s.id }}" style="display:grid;gap:9px">
+                    <h2 style="font-family:var(--font-head);font-weight:700;font-size:var(--text-lg);color:var(--text-strong);margin:0;line-height:1.4">{{ s.title }}</h2>
+                    <sc-for list="{{ s.paras }}" as="p" hint-placeholder-count="2">
+                      <p style="margin:0;font-size:var(--text-base);color:var(--text-body);line-height:1.95;text-wrap:pretty">{{ p }}</p>
+                    </sc-for>
+                  </section>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ pageIsFaq }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;gap:10px;max-width:68ch">
+                <sc-for list="{{ faqItems }}" as="f" hint-placeholder-count="6">
+                  <div style="border:1px solid {{ f.border }};border-radius:var(--r-2);background:{{ f.bg }};overflow:hidden">
+                    <button type="button" onClick="{{ f.toggle }}" style="width:100%;padding:14px 16px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;gap:12px;text-align:start">
+                      <span style="flex:1;min-width:0;font-size:var(--text-base);font-weight:600;color:var(--text-strong);line-height:1.6">{{ f.q }}</span>
+                      <span style="width:26px;height:26px;flex:none;border-radius:999px;background:var(--sunken);color:var(--text-muted);display:grid;place-items:center;transform:{{ f.rotate }}"><svg width="15" height="15"><use href="#i-chev-down"></use></svg></span>
+                    </button>
+                    <sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:0 16px 15px">
+                        <p style="margin:0;font-size:var(--text-base);color:var(--text-body);line-height:1.95;max-width:64ch">{{ f.a }}</p>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ pageIsContact }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;gap:16px;max-width:64ch">
+                <p style="margin:0;font-size:var(--text-base);color:var(--text-body);line-height:1.95">اكتب لنا وسنردّ خلال يوم عمل واحد. إن كان سؤالك عن طلب بعينه، افتح الطلب واستخدم «راسل المتجر» ليصل سؤالك للتاجر مباشرة.</p>
+                <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px">
+                  <label style="display:grid;gap:6px"><span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">الاسم</span><input type="text" value="{{ ctName }}" onChange="{{ onCtName }}" style="height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" /></label>
+                  <label style="display:grid;gap:6px"><span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">البريد الإلكتروني</span><input type="text" value="{{ ctEmail }}" onChange="{{ onCtEmail }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" /></label>
+                </div>
+                <label style="display:grid;gap:6px"><span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">رسالتك</span><textarea rows="4" value="{{ ctBody }}" onChange="{{ onCtBody }}" style="padding:11px 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.8;resize:vertical;width:100%"></textarea></label>
+                <button type="button" onClick="{{ sendContact }}" style="height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;width:fit-content" style-hover="background:var(--brand-hover)">أرسل</button>
+              </div>
+            </sc-if>
+          </article>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isAuth }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;place-items:center;padding:36px 16px;min-height:660px">
+        <div style="width:100%;max-width:{{ authWidth }};display:grid;gap:18px">
+          <div style="display:grid;justify-items:center;gap:9px;text-align:center">
+            <span style="font-family:var(--font-head);font-weight:800;font-size:28px;color:var(--brand)">بسطة</span>
+            <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);line-height:1.4">{{ authTitle }}</span>
+            <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">{{ authSub }}</span>
+          </div>
+
+          <div style="background:var(--card);border:1px solid {{ authCardBorder }};border-radius:var(--r-2);padding:24px;box-shadow:var(--shadow-md);display:grid;gap:15px">
+
+            <sc-if value="{{ isSH01 }}" hint-placeholder-val="{{ false }}">
+              <div style="display:{{ lockDisplay }};align-items:flex-start;gap:11px;padding:13px;border:1px solid var(--danger);border-radius:var(--r-1);background:var(--danger-subtle)">
+                <svg width="18" height="18" style="flex:none;color:var(--danger-text);margin-top:1px"><use href="#i-lock"></use></svg>
+                <span style="display:grid;gap:3px;min-width:0">
+                  <span style="font-size:var(--text-sm);font-weight:700;color:var(--danger-text)">محاولات كثيرة — الحساب موقوف مؤقتاً</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-body);line-height:1.7">جرّب بعد <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-weight:600">{{ lockClock }}</span>، أو أعد تعيين كلمة المرور الآن.</span>
+                </span>
+              </div>
+              <div style="display:{{ signinErrDisplay }};align-items:center;gap:9px;padding:11px 13px;border:1px solid var(--danger);border-radius:var(--r-1);background:var(--danger-subtle)">
+                <svg width="16" height="16" style="flex:none;color:var(--danger-text)"><use href="#i-alert"></use></svg>
+                <span style="font-size:var(--text-sm);color:var(--danger-text);line-height:1.6">البريد الإلكتروني أو كلمة المرور غير صحيحة</span>
+              </div>
+              <label style="display:grid;gap:6px">
+                <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">البريد الإلكتروني</span>
+                <input type="text" value="{{ inEmail }}" onChange="{{ onInEmail }}" disabled="{{ authLocked }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ inEmailBorder }};border-radius:var(--r-1);background:{{ authFieldBg }};color:var(--text-strong);font-size:var(--text-base);width:100%" />
+              </label>
+              <label style="display:grid;gap:6px">
+                <span style="display:flex;align-items:baseline;gap:10px"><span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">كلمة المرور</span><button type="button" onClick="{{ goForgot }}" style="margin-inline-start:auto;border:0;background:transparent;padding:0;color:var(--brand);font-size:var(--text-xs);cursor:pointer;text-decoration:underline">نسيت كلمة المرور؟</button></span>
+                <span style="position:relative;display:flex">
+                  <input type="{{ inPwType }}" value="{{ inPw }}" onChange="{{ onInPw }}" disabled="{{ authLocked }}" dir="ltr" style="height:var(--ctrl-h);padding-inline:12px 44px;border:1px solid {{ inPwBorder }};border-radius:var(--r-1);background:{{ authFieldBg }};color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                  <button type="button" onClick="{{ toggleInPw }}" aria-label="إظهار كلمة المرور" style="position:absolute;inset-inline-end:4px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;border:0;background:transparent;color:var(--text-muted);cursor:pointer;border-radius:var(--r-1)" style-hover="background:var(--sunken)"><svg width="18" height="18"><use href="{{ inPwIcon }}"></use></svg></button>
+                </span>
+              </label>
+              <button type="button" onClick="{{ doSignIn }}" disabled="{{ authLocked }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:{{ signinBg }};color:{{ signinFg }};font-size:var(--text-base);font-weight:700;cursor:{{ signinCursor }};display:inline-flex;align-items:center;justify-content:center;gap:8px">{{ signinLabel }}</button>
+              <span style="font-size:var(--text-2xs);color:var(--text-faint);text-align:center">للتجربة: أي بريد مع كلمة المرور <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">basta-2026</span> · غيرها يرفض، وبعد 5 محاولات يُوقَف مؤقتاً</span>
+            </sc-if>
+
+            <sc-if value="{{ isSH02 }}" hint-placeholder-val="{{ false }}">
+              <label style="display:grid;gap:6px">
+                <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">الاسم الكامل</span>
+                <input type="text" value="{{ regName }}" onChange="{{ onRegName }}" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ regNameBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                <sc-if value="{{ regNameErr }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--danger-text)"><svg width="13" height="13" style="flex:none"><use href="#i-alert"></use></svg>{{ regNameErr }}</span></sc-if>
+              </label>
+              <label style="display:grid;gap:6px">
+                <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">البريد الإلكتروني</span>
+                <input type="text" value="{{ regEmail }}" onChange="{{ onRegEmail }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ regEmailBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                <sc-if value="{{ regEmailErr }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--danger-text)"><svg width="13" height="13" style="flex:none"><use href="#i-alert"></use></svg>{{ regEmailErr }}</span></sc-if>
+              </label>
+              <label style="display:grid;gap:6px">
+                <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">كلمة المرور</span>
+                <span style="position:relative;display:flex">
+                  <input type="{{ regPwType }}" value="{{ regPw }}" onChange="{{ onRegPw }}" dir="ltr" style="height:var(--ctrl-h);padding-inline:12px 44px;border:1px solid {{ regPwBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                  <button type="button" onClick="{{ toggleRegPw }}" aria-label="إظهار كلمة المرور" style="position:absolute;inset-inline-end:4px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;border:0;background:transparent;color:var(--text-muted);cursor:pointer;border-radius:var(--r-1)" style-hover="background:var(--sunken)"><svg width="18" height="18"><use href="{{ regPwIcon }}"></use></svg></button>
+                </span>
+                <span style="display:flex;align-items:center;gap:8px">
+                  <span style="flex:1;height:5px;border-radius:999px;background:var(--sunken);overflow:hidden"><span style="display:block;height:100%;width:{{ regBarW }};background:{{ regBarColor }};transition:width .2s ease-out"></span></span>
+                  <span style="font-size:var(--text-xs);color:{{ regBarColor }};font-weight:600">{{ regBarLabel }}</span>
+                </span>
+                <span style="font-size:var(--text-xs);color:var(--text-faint)">ثمانية أحرف على الأقل مع رقم واحد.</span>
+              </label>
+              <div style="display:grid;gap:6px">
+                <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">رقم الجوال <span style="color:var(--text-faint);font-weight:400">— اختياري</span></span>
+                <div style="display:flex;gap:8px">
+                  <div style="position:relative;flex:none">
+                    <button type="button" onClick="{{ toggleCountry }}" style="height:var(--ctrl-h);padding:0 11px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm);display:flex;align-items:center;gap:7px;cursor:pointer">
+                      <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">{{ regDial }}</span>
+                      <svg width="14" height="14" style="color:var(--text-muted)"><use href="#i-chev-down"></use></svg>
+                    </button>
+                    <div style="display:{{ countryMenu }};position:absolute;top:100%;inset-inline-start:0;z-index:20;margin-top:4px;min-width:190px;background:var(--raised);border:1px solid var(--border-default);border-radius:var(--r-1);box-shadow:var(--shadow-lg);overflow:hidden">
+                      <sc-for list="{{ countryList }}" as="c" hint-placeholder-count="5">
+                        <button type="button" onClick="{{ c.pick }}" style="width:100%;height:38px;padding:0 12px;border:0;background:transparent;color:var(--text-body);font-size:var(--text-sm);text-align:start;cursor:pointer;display:flex;align-items:center;gap:9px" style-hover="background:var(--sunken)"><span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);color:var(--text-muted)">{{ c.dial }}</span>{{ c.name }}</button>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <input type="text" value="{{ regPhone }}" onChange="{{ onRegPhone }}" dir="ltr" placeholder="55 012 8844" style="flex:1;min-width:0;height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-base)" />
+                </div>
+              </div>
+              <button type="button" onClick="{{ toggleTerms }}" style="display:flex;align-items:flex-start;gap:10px;border:0;background:transparent;padding:0;cursor:pointer;text-align:start">
+                <span style="width:20px;height:20px;flex:none;margin-top:1px;border:2px solid {{ termsBorder }};border-radius:var(--r-1);background:{{ termsBg }};display:grid;place-items:center;color:var(--on-brand)"><svg width="13" height="13" style="opacity:{{ termsOpacity }}"><use href="#i-check"></use></svg></span>
+                <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.7">أوافق على <a href="#terms" onClick="{{ goTerms }}">الشروط والأحكام</a> و<a href="#privacy" onClick="{{ goPrivacy }}">سياسة الخصوصية</a>.</span>
+              </button>
+              <button type="button" onClick="{{ doRegister }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:{{ regBg }};color:{{ regFg }};font-size:var(--text-base);font-weight:700;cursor:{{ regCursor }}">أنشئ الحساب</button>
+            </sc-if>
+
+            <sc-if value="{{ isSH03 }}" hint-placeholder-val="{{ false }}">
+              <span style="display:flex;align-items:center;gap:9px;padding:11px 13px;border:1px solid var(--info);border-radius:var(--r-1);background:var(--info-subtle)">
+                <svg width="16" height="16" style="flex:none;color:var(--info-text)"><use href="#i-info"></use></svg>
+                <span style="font-size:var(--text-sm);color:var(--info-text);line-height:1.6">أرسلنا رمزاً من ست خانات إلى <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-weight:600">+966 50 •••• 567</span></span>
+              </span>
+              <div dir="ltr" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px">
+                <sc-for list="{{ otpCells }}" as="d" hint-placeholder-count="6">
+                  <input type="text" inputMode="numeric" maxLength="6" value="{{ d.val }}" onChange="{{ d.onInput }}" onKeyDown="{{ d.onKeyDown }}" onPaste="{{ d.onPaste }}" ref="{{ d.ref }}" disabled="{{ otpLocked }}" style="height:56px;text-align:center;border:1.5px solid {{ d.border }};border-radius:var(--r-1);background:{{ d.bg }};color:{{ d.color }};font-family:var(--font-mono);font-size:var(--text-xl);font-weight:600" />
+                </sc-for>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <span style="display:inline-flex;align-items:center;gap:7px;font-size:var(--text-sm);color:{{ otpExpColor }}"><svg width="15" height="15" style="flex:none"><use href="#i-clock"></use></svg>ينتهي بعد <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-weight:600">{{ otpClock }}</span></span>
+                <button type="button" onClick="{{ otpResend }}" disabled="{{ resendDisabled }}" style="height:36px;padding:0 12px;border:1px solid {{ resendBorder }};border-radius:var(--r-1);background:transparent;color:{{ resendColor }};font-size:var(--text-xs);font-weight:600;cursor:{{ resendCursor }}">{{ resendLabel }}</button>
+              </div>
+              <div style="display:{{ otpMsgDisplay }};align-items:center;gap:9px;padding:11px 13px;border:1px solid {{ otpMsgBorder }};border-radius:var(--r-1);background:{{ otpMsgBg }}">
+                <svg width="16" height="16" style="flex:none;color:{{ otpMsgColor }}"><use href="{{ otpMsgIcon }}"></use></svg>
+                <span style="font-size:var(--text-sm);color:{{ otpMsgColor }};line-height:1.6">{{ otpMsg }}</span>
+              </div>
+              <button type="button" onClick="{{ otpVerify }}" disabled="{{ otpLocked }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:{{ otpBtnBg }};color:{{ otpBtnFg }};font-size:var(--text-base);font-weight:700;cursor:{{ otpBtnCursor }}">تحقّق</button>
+              <span style="font-size:var(--text-2xs);color:var(--text-faint);text-align:center">للتجربة: الرمز الصحيح <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">482913</span> · بعد 5 محاولات خاطئة يبطل الرمز</span>
+            </sc-if>
+
+            <sc-if value="{{ isSH04 }}" hint-placeholder-val="{{ false }}">
+              <sc-if value="{{ fpAsk }}" hint-placeholder-val="{{ true }}">
+                <label style="display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">البريد الإلكتروني</span>
+                  <input type="text" value="{{ fpEmail }}" onChange="{{ onFpEmail }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ fpBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                  <sc-if value="{{ fpErr }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--danger-text)"><svg width="13" height="13" style="flex:none"><use href="#i-alert"></use></svg>{{ fpErr }}</span></sc-if>
+                </label>
+                <button type="button" onClick="{{ fpSend }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer" style-hover="background:var(--brand-hover)">أرسل رابط إعادة التعيين</button>
+                <button type="button" onClick="{{ goSignIn }}" style="border:0;background:transparent;padding:0;color:var(--brand);font-size:var(--text-sm);cursor:pointer;text-decoration:underline;justify-self:center">عُد إلى الدخول</button>
+              </sc-if>
+              <sc-if value="{{ fpSent }}" hint-placeholder-val="{{ false }}">
+                <div style="display:grid;justify-items:center;gap:11px;text-align:center;padding:8px 0">
+                  <span style="width:50px;height:50px;border-radius:var(--r-2);background:var(--info-subtle);color:var(--info-text);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-msg"></use></svg></span>
+                  <span style="font-size:var(--text-base);color:var(--text-body);line-height:1.9;max-width:52ch">إن كان هذا البريد مسجّلاً لدينا فستصلك رسالة بخطوات إعادة التعيين خلال دقائق. تحقّق من مجلّد البريد غير المرغوب أيضاً.</span>
+                  <button type="button" onClick="{{ fpToReset }}" style="height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer">افتح صفحة تعيين كلمة جديدة</button>
+                  <button type="button" onClick="{{ fpBack }}" style="border:0;background:transparent;padding:0;color:var(--brand);font-size:var(--text-sm);cursor:pointer;text-decoration:underline">جرّب بريداً آخر</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ fpReset }}" hint-placeholder-val="{{ false }}">
+                <label style="display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">كلمة المرور الجديدة</span>
+                  <span style="position:relative;display:flex">
+                    <input type="{{ rsPwType }}" value="{{ rsPw }}" onChange="{{ onRsPw }}" dir="ltr" style="height:var(--ctrl-h);padding-inline:12px 44px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                    <button type="button" onClick="{{ toggleRsPw }}" aria-label="إظهار كلمة المرور" style="position:absolute;inset-inline-end:4px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;border:0;background:transparent;color:var(--text-muted);cursor:pointer;border-radius:var(--r-1)" style-hover="background:var(--sunken)"><svg width="18" height="18"><use href="{{ rsPwIcon }}"></use></svg></button>
+                  </span>
+                  <span style="display:flex;align-items:center;gap:8px">
+                    <span style="flex:1;height:5px;border-radius:999px;background:var(--sunken);overflow:hidden"><span style="display:block;height:100%;width:{{ rsBarW }};background:{{ rsBarColor }};transition:width .2s ease-out"></span></span>
+                    <span style="font-size:var(--text-xs);color:{{ rsBarColor }};font-weight:600">{{ rsBarLabel }}</span>
+                  </span>
+                </label>
+                <label style="display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">أعد كتابتها</span>
+                  <input type="password" value="{{ rsPw2 }}" onChange="{{ onRsPw2 }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ rsPw2Border }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                  <sc-if value="{{ rsPw2Err }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--danger-text)"><svg width="13" height="13" style="flex:none"><use href="#i-alert"></use></svg>{{ rsPw2Err }}</span></sc-if>
+                </label>
+                <button type="button" onClick="{{ rsSave }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:{{ rsBg }};color:{{ rsFg }};font-size:var(--text-base);font-weight:700;cursor:{{ rsCursor }}">احفظ كلمة المرور وادخل</button>
+              </sc-if>
+            </sc-if>
+          </div>
+
+          <div style="display:{{ authFooterDisplay }};justify-content:center;gap:7px;font-size:var(--text-sm);color:var(--text-muted);flex-wrap:wrap">
+            <span>{{ authFooterText }}</span>
+            <button type="button" onClick="{{ authFooterGo }}" style="border:0;background:transparent;padding:0;color:var(--brand);font-size:var(--text-sm);font-weight:700;cursor:pointer;text-decoration:underline">{{ authFooterLink }}</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isSH06 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;place-items:center;padding:80px 20px;min-height:620px;text-align:center">
+        <div style="display:grid;justify-items:center;gap:14px;max-width:60ch">
+          <span style="width:64px;height:64px;border-radius:var(--r-3);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="32" height="32"><use href="#i-alert"></use></svg></span>
+          <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong);margin:0;line-height:1.35">حدث خلل غير متوقّع ولم يكتمل طلبك</h1>
+          <p style="margin:0;font-size:var(--text-md);color:var(--text-body);line-height:1.9">أعد المحاولة، وإن تكرّر أبلغنا بالرقم أدناه. بياناتك محفوظة ولم يُفقد شيء.</p>
+          <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--card)">
+            <span style="font-size:var(--text-xs);color:var(--text-muted)">رقم الطلب المرجعي</span>
+            <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-base);font-weight:600;color:var(--text-strong)">req-8f3a2c</span>
+            <button type="button" onClick="{{ copyRef }}" aria-label="انسخ الرقم" style="width:34px;height:34px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)"><svg width="16" height="16"><use href="#i-copy"></use></svg></button>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px">
+            <button type="button" onClick="{{ retry }}" style="height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-refresh"></use></svg>أعد المحاولة</button>
+            <button type="button" onClick="{{ goContact }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">تواصل معنا</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isSH07 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;place-items:center;padding:70px 20px;min-height:620px">
+        <div style="display:grid;justify-items:center;gap:14px;max-width:62ch;text-align:center">
+          <span style="width:64px;height:64px;border-radius:var(--r-3);background:var(--neutral-subtle);color:var(--text-muted);display:grid;place-items:center"><svg width="32" height="32"><use href="#i-wifi-off"></use></svg></span>
+          <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong);margin:0;line-height:1.35">لا يوجد اتصال بالإنترنت</h1>
+          <p style="margin:0;font-size:var(--text-md);color:var(--text-body);line-height:1.9">تحقّق من اتصالك ثم أعد المحاولة. بعض ما تصفّحته يبقى متاحاً للعرض دون اتصال.</p>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;margin-top:4px">
+            <button type="button" onClick="{{ goRecent }}" style="padding:16px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:grid;gap:7px;justify-items:center;text-align:center" style-hover="border-color:var(--brand);box-shadow:var(--shadow-sm)">
+              <span style="width:38px;height:38px;border-radius:var(--r-1);background:var(--sunken);color:var(--text-muted);display:grid;place-items:center"><svg width="19" height="19"><use href="#i-history"></use></svg></span>
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">شوهدت مؤخّراً</span>
+              <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7">للعرض فقط — آخر 8 منتجات محفوظة على جهازك</span>
+            </button>
+            <button type="button" onClick="{{ goCartOffline }}" style="padding:16px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:grid;gap:7px;justify-items:center;text-align:center" style-hover="border-color:var(--brand);box-shadow:var(--shadow-sm)">
+              <span style="width:38px;height:38px;border-radius:var(--r-1);background:var(--sunken);color:var(--text-muted);display:grid;place-items:center"><svg width="19" height="19"><use href="#i-cart"></use></svg></span>
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">السلة</span>
+              <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7">للعرض فقط — لا يمكن إتمام الدفع دون اتصال</span>
+            </button>
+          </div>
+          <button type="button" onClick="{{ retryOnline }}" style="margin-top:6px;height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-refresh"></use></svg>أعد المحاولة</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isSH08 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:18px;justify-items:center;padding:30px 20px">
+        <span style="font-size:var(--text-sm);color:var(--text-muted);text-align:center;max-width:60ch;line-height:1.8">مكوّن دعوة التثبيت يظهر كورقة سفلية على الهاتف بعد زيارتين. هنا معروض في إطار هاتف 400 بكسل ليُراجَع بحجمه الحقيقي.</span>
+        <div style="width:400px;border:1px solid var(--border-default);border-radius:var(--r-3);background:var(--sunken);box-shadow:var(--shadow-lg);overflow:hidden;position:relative;min-height:560px">
+          <div style="padding:12px 16px;background:var(--card);border-block-end:1px solid var(--border-default);display:flex;align-items:center;gap:10px">
+            <span style="font-family:var(--font-head);font-weight:800;font-size:18px;color:var(--brand)">بسطة</span>
+            <span style="margin-inline-start:auto;display:flex;gap:8px;color:var(--text-muted)"><svg width="19" height="19"><use href="#i-search"></use></svg><svg width="19" height="19"><use href="#i-cart"></use></svg></span>
+          </div>
+          <div style="padding:14px;display:grid;gap:11px;opacity:.55">
+            <span style="height:140px;border-radius:var(--r-2);background:var(--border-default)"></span>
+            <span style="height:16px;width:60%;border-radius:var(--r-1);background:var(--border-default)"></span>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px">
+              <span style="height:120px;border-radius:var(--r-2);background:var(--border-default)"></span>
+              <span style="height:120px;border-radius:var(--r-2);background:var(--border-default)"></span>
+            </div>
+          </div>
+          <div style="display:{{ installDisplay }};position:absolute;inset-inline:0;bottom:0;background:var(--raised);border-start-start-radius:var(--r-3);border-start-end-radius:var(--r-3);box-shadow:var(--shadow-overlay);flex-direction:column;animation:bsSheetUp .24s ease-out">
+            <div style="padding:10px 0 0;display:grid;place-items:center"><span style="width:40px;height:4px;border-radius:999px;background:var(--border-default)"></span></div>
+            <div style="padding:16px;display:grid;gap:13px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="width:52px;height:52px;flex:none;border-radius:12px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;font-family:var(--font-head);font-weight:800;font-size:22px">ب</span>
+                <span style="display:grid;gap:3px;min-width:0">
+                  <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-md);color:var(--text-strong);line-height:1.4">ثبّت بسطة على شاشتك</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.6">إشعارات الطلبات دون متجر تطبيقات</span>
+                </span>
+              </div>
+              <div style="display:grid;gap:7px">
+                <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-xs);color:var(--text-body)"><svg width="14" height="14" style="flex:none;color:var(--success-text)"><use href="#i-check"></use></svg>تتبّع شحناتك بإشعار فوري</span>
+                <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-xs);color:var(--text-body)"><svg width="14" height="14" style="flex:none;color:var(--success-text)"><use href="#i-check"></use></svg>يفتح أسرع ويعمل جزئياً دون اتصال</span>
+              </div>
+              <div style="display:grid;gap:9px">
+                <button type="button" onClick="{{ doInstall }}" style="height:48px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px" style-hover="background:var(--brand-hover)"><svg width="17" height="17"><use href="#i-download"></use></svg>ثبّت الآن</button>
+                <button type="button" onClick="{{ laterInstall }}" style="height:44px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">لاحقاً</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:{{ installHiddenDisplay }};position:absolute;inset-inline:0;bottom:0;padding:16px;display:grid;place-items:center">
+            <button type="button" onClick="{{ showInstall }}" style="height:40px;padding:0 14px;border:1px dashed var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm);font-weight:600;cursor:pointer">أعِد عرض دعوة التثبيت</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ recentAskDisplay }};position:fixed;inset:0;z-index:110;align-items:center;justify-content:center;padding:24px;background:rgba(30,24,20,.55);animation:bsFade .2s ease-out" onClick="{{ closeRecentAsk }}">
+  <div onClick="{{ stopClick }}" style="background:var(--raised);border-radius:var(--r-3);box-shadow:var(--shadow-overlay);width:100%;max-width:460px;overflow:hidden">
+    <div style="padding:18px 20px;display:grid;gap:10px">
+      <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">امسح سجلّ المشاهدة؟</span>
+      <span style="font-size:var(--text-base);color:var(--text-body);line-height:1.8">يُحذف سجلّ المنتجات التي تصفّحتها على هذا الجهاز. لا يؤثّر على قائمة رغباتك ولا على طلباتك.</span>
+    </div>
+    <div style="padding:14px 20px;border-block-start:1px solid var(--border-subtle);display:flex;gap:10px;justify-content:flex-end">
+      <button type="button" onClick="{{ closeRecentAsk }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">إلغاء</button>
+      <button type="button" onClick="{{ doClearRecent }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-base);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px" style-hover="background:var(--danger-subtle)"><svg width="16" height="16"><use href="#i-trash"></use></svg>امسح السجلّ</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ deleteAskDisplay }};position:fixed;inset:0;z-index:110;align-items:center;justify-content:center;padding:24px;background:rgba(30,24,20,.55);animation:bsFade .2s ease-out" onClick="{{ closeDeleteAsk }}">
+  <div onClick="{{ stopClick }}" style="background:var(--raised);border-radius:var(--r-3);box-shadow:var(--shadow-overlay);width:100%;max-width:500px;overflow:hidden">
+    <div style="padding:18px 20px;display:grid;gap:12px">
+      <span style="display:flex;align-items:center;gap:10px">
+        <span style="width:34px;height:34px;flex:none;border-radius:var(--r-1);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="18" height="18"><use href="#i-alert"></use></svg></span>
+        <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">حذف حسابك نهائياً؟</span>
+      </span>
+      <span style="font-size:var(--text-base);color:var(--text-body);line-height:1.8">لا يمكن التراجع. تُحذف بياناتك الشخصية وعناوينك وقائمة رغباتك. تبقى فواتير طلباتك السابقة لدى المتاجر للمدة التي يفرضها النظام الضريبي.</span>
+      <label style="display:grid;gap:6px">
+        <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">اكتب <span style="font-family:var(--font-mono);color:var(--danger-text)">حذف</span> للتأكيد</span>
+        <input type="text" value="{{ delConfirm }}" onChange="{{ onDelConfirm }}" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ delBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+      </label>
+    </div>
+    <div style="padding:14px 20px;border-block-start:1px solid var(--border-subtle);display:flex;gap:10px;justify-content:flex-end">
+      <button type="button" onClick="{{ closeDeleteAsk }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">إلغاء</button>
+      <button type="button" onClick="{{ doDelete }}" disabled="{{ delDisabled }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid {{ delBtnBorder }};border-radius:var(--r-1);background:transparent;color:{{ delBtnColor }};font-size:var(--text-base);font-weight:700;cursor:{{ delCursor }}">احذف حسابي نهائياً</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ toastDisplay }};position:fixed;bottom:24px;inset-inline-start:24px;z-index:120;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-2);background:{{ toastBg }};color:{{ toastFg }};box-shadow:var(--shadow-lg);animation:bsToastIn .22s ease-out;max-width:540px">
+  <svg width="18" height="18" style="flex:none"><use href="{{ toastIcon }}"></use></svg>
+  <span style="font-size:var(--text-sm);font-weight:600;line-height:1.6">{{ toastMsg }}</span>
+  <button type="button" onClick="{{ closeToast }}" aria-label="إغلاق" style="margin-inline-start:8px;width:26px;height:26px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;opacity:.75"><svg width="15" height="15"><use href="#i-x"></use></svg></button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;defaultDirection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rtl&quot;,&quot;ltr&quot;],&quot;default&quot;:&quot;rtl&quot;,&quot;tsType&quot;:&quot;'rtl'|'ltr'&quot;},&quot;defaultDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;comfortable&quot;,&quot;compact&quot;],&quot;default&quot;:&quot;comfortable&quot;,&quot;tsType&quot;:&quot;'comfortable'|'compact'&quot;},&quot;defaultScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ST-23&quot;,&quot;ST-24&quot;,&quot;ST-25&quot;,&quot;ST-26&quot;,&quot;ST-27&quot;,&quot;ST-28&quot;,&quot;ST-30&quot;,&quot;SH-01&quot;,&quot;SH-02&quot;,&quot;SH-03&quot;,&quot;SH-04&quot;,&quot;SH-06&quot;,&quot;SH-07&quot;,&quot;SH-08&quot;],&quot;default&quot;:&quot;ST-23&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'ST-23', pstate: 'default', fit: 1, toast: null,
+    wishRemoved: [], recent: null, recentAsk: false,
+    acctTab: 'profile',
+    profName: 'نورة العتيبي', profEmail: 'noura@example.com', profPhone: '+966 55 012 8844',
+    emailVerified: true, phoneVerified: false, profDirty: false,
+    currency: 'SAR',
+    pwCurrent: '', pwNew: '', pwNewShown: false, tfaOn: false,
+    revoked: [], addrDeleted: null, addrDefault: 1, addrRemoved: [],
+    deleteAsk: false
+  };
+
+  componentDidMount() {
+    const r = this.rootEl;
+    if (r) {
+      if (this.props.defaultTheme === 'dark') r.setAttribute('data-theme', 'dark');
+      if (this.props.defaultDirection === 'ltr') { r.setAttribute('dir', 'ltr'); r.setAttribute('data-lang', 'en'); }
+      if (this.props.defaultDensity) r.setAttribute('data-density', this.props.defaultDensity);
+    }
+    if (this.props.defaultScreen) this.setState({ screen: this.props.defaultScreen });
+    try {
+      const hand = localStorage.getItem('basta.account.screen');
+      if (hand) { localStorage.removeItem('basta.account.screen'); this.setState({ screen: hand }); }
+      const pg = localStorage.getItem('basta.account.page');
+      if (pg) { localStorage.removeItem('basta.account.page'); this.setState({ page: pg }); }
+    } catch (e) {}
+    this._fit = () => {
+      const w = (this.rootEl ? this.rootEl.clientWidth : window.innerWidth) - 40;
+      this.setState({ fit: Math.min(1, Math.max(0.3, w / 1440)) });
+    };
+    this._fit();
+    window.addEventListener('resize', this._fit);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this._fit); clearTimeout(this._toastT); clearTimeout(this._undoT); }
+  set(k, v) { if (this.rootEl) this.rootEl.setAttribute(k, v); }
+  toast(msg, kind) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: { msg: msg, kind: kind || 'success' } });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), 4200);
+  }
+  go(screen) { this.setState({ screen: screen }); }
+  money(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ر.س.'; }
+
+  renderVals() {
+    const st = this.state, S = (o) => this.setState(o);
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const out = {};
+
+    out.rootRef = (el) => { this.rootEl = el; };
+    out.fit = st.fit;
+    out.setLight = () => this.set('data-theme', 'light');
+    out.setDark = () => this.set('data-theme', 'dark');
+    out.setAr = () => { this.set('dir', 'rtl'); this.set('data-lang', 'ar'); };
+    out.setEn = () => { this.set('dir', 'ltr'); this.set('data-lang', 'en'); };
+    out.setCompact = () => this.set('data-density', 'compact');
+    out.setComfortable = () => this.set('data-density', 'comfortable');
+
+    const codes = ['ST-23', 'ST-24', 'ST-25', 'ST-26', 'ST-27', 'ST-28', 'ST-30', 'SH-01', 'SH-02', 'SH-03', 'SH-04', 'SH-06', 'SH-07', 'SH-08'];
+    out.screenTabs = codes.map(c => ({
+      code: c,
+      bg: st.screen === c ? 'var(--brand)' : 'var(--card)',
+      fg: st.screen === c ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.screen === c ? 'var(--brand)' : 'var(--border-control)',
+      go: () => this.go(c)
+    }));
+    const pstates = [['default', 'طبيعي'], ['loading', 'تحميل'], ['empty', 'فارغ'], ['error', 'خطأ'], ['edge', 'الحدّ']];
+    out.stateTabs = pstates.map(p => ({
+      label: p[1],
+      bg: P === p[0] ? 'var(--brand)' : 'var(--card)',
+      fg: P === p[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: P === p[0] ? 'var(--brand)' : 'var(--border-control)',
+      go: () => S({ pstate: p[0] })
+    }));
+    out.loadingDisplay = P === 'loading' ? 'flex' : 'none';
+    out.errorDisplay = P === 'error' ? 'grid' : 'none';
+    out.contentDisplay = (P === 'loading' || P === 'error') ? 'none' : 'block';
+    out.retry = () => { S({ pstate: 'default' }); this.toast('أُعيد التحميل بنجاح'); };
+
+    const accountCodes = ['ST-23', 'ST-24', 'ST-25', 'ST-26', 'ST-27', 'ST-28'];
+    out.isAccountArea = accountCodes.indexOf(st.screen) >= 0;
+    out.chromeDisplay = out.isAccountArea || st.screen === 'ST-30' ? 'flex' : 'none';
+    accountCodes.concat(['ST-30']).forEach(c => { out['is' + c.replace('-', '')] = st.screen === c; });
+    out.hasUnread = !empty;
+    out.goNotifications = () => this.go('ST-27');
+    out.goMessages = () => this.go('ST-28');
+    out.goDiscovery = () => { window.location.href = encodeURI('Basta Storefront Discovery.dc.html'); };
+
+    const navDefs = [
+      { label: 'طلباتي', icon: '#i-package', ext: 'ST-18' },
+      { label: 'قائمة الرغبات', icon: '#i-heart', screen: 'ST-23' },
+      { label: 'شوهدت مؤخّراً', icon: '#i-history', screen: 'ST-24' },
+      { label: 'الحساب', icon: '#i-user', screen: 'ST-25' },
+      { label: 'العناوين', icon: '#i-pin', screen: 'ST-26' },
+      { label: 'الإشعارات', icon: '#i-bell', screen: 'ST-27', count: empty ? '' : '4' },
+      { label: 'رسائلي', icon: '#i-msg', screen: 'ST-28', count: empty ? '' : '2' }
+    ];
+    out.accountNav = navDefs.map(n => {
+      const here = n.screen === st.screen;
+      return {
+        label: n.label, icon: n.icon, count: n.count || '',
+        bg: here ? 'var(--brand-subtle)' : 'transparent',
+        fg: here ? 'var(--brand-text)' : 'var(--text-body)',
+        weight: here ? '700' : '500',
+        countBg: here ? 'var(--brand)' : 'var(--sunken)',
+        countFg: here ? 'var(--on-brand)' : 'var(--text-muted)',
+        go: () => {
+          if (n.screen) this.go(n.screen);
+          else { try { localStorage.setItem('basta.purchase.screen', n.ext); } catch (e) {} window.location.href = encodeURI('Basta Storefront Purchase.dc.html'); }
+        }
+      };
+    });
+
+    /* ST-23 wishlist */
+    const wishDefs = [
+      { id: 1, name: 'قميص قطني مصري بأكمام طويلة', shop: 'دار القطن', price: 79, old: 92, state: 'drop' },
+      { id: 2, name: 'مكبّر صوت بلوتوث XL-900 مقاوم للماء', shop: 'إلكترونيات الخليج', price: 349, old: 0, state: 'ok' },
+      { id: 3, name: 'طقم مفارش قطن — كينج', shop: 'دار القطن', price: 240, old: 0, state: 'sold' },
+      { id: 4, name: 'عطر عود مركّز 12 مل', shop: 'بيت العطور', price: 420, old: 380, state: 'rise' },
+      { id: 5, name: 'وشاح قطني مصبوغ يدوياً', shop: 'دار القطن', price: 58, old: 0, state: 'low' },
+      { id: 6, name: 'سجادة صوف يدوية 120×180', shop: 'حرف الشام', price: 1280, old: 0, state: 'ok' }
+    ];
+    const wish = empty ? [] : wishDefs.filter(w => st.wishRemoved.indexOf(w.id) < 0);
+    out.wishEmpty = wish.length === 0;
+    out.wishHasItems = wish.length > 0;
+    out.wishCountText = wish.length + ' منتجاً محفوظاً';
+    out.wishSuggestions = [
+      { label: 'أزياء', go: () => this.goDisc() },
+      { label: 'إلكترونيات', go: () => this.goDisc() },
+      { label: 'المنزل والمطبخ', go: () => this.goDisc() },
+      { label: 'الجمال والعناية', go: () => this.goDisc() }
+    ].map(s => ({ label: s.label, go: () => { window.location.href = encodeURI('Basta Storefront Discovery.dc.html'); } }));
+    out.wishItems = wish.map(w => {
+      const sold = w.state === 'sold';
+      const drop = w.state === 'drop';
+      const rise = w.state === 'rise';
+      const low = w.state === 'low';
+      return {
+        name: edge && w.id === 1 ? 'قميص قطني مصري بأكمام طويلة مطرّز يدوياً بخيط حريري — قصّة كلاسيكية بقياسات من S إلى XXL' : w.name,
+        shop: w.shop,
+        price: this.money(w.price),
+        oldPrice: w.old ? this.money(w.old) : '',
+        border: sold ? 'var(--border-default)' : 'var(--border-subtle)',
+        imgOpacity: sold ? 0.5 : 1,
+        flag: sold ? 'نفد' : (drop ? 'انخفض السعر' : (rise ? 'ارتفع السعر' : '')),
+        flagBg: sold ? 'var(--neutral-subtle)' : (drop ? 'var(--success-subtle)' : 'var(--warning-subtle)'),
+        flagFg: sold ? 'var(--neutral-text)' : (drop ? 'var(--success-text)' : 'var(--warning-text)'),
+        note: sold ? 'نفد من المتجر — نخبرك إن توفّر' : (drop ? 'انخفض 13.00 ر.س. منذ حفظه' : (rise ? 'ارتفع 40.00 ر.س. منذ حفظه' : (low ? 'بقي 3 فقط' : ''))),
+        noteColor: sold ? 'var(--text-muted)' : (drop ? 'var(--success-text)' : (rise ? 'var(--warning-text)' : 'var(--warning-text)')),
+        soldOut: sold,
+        btnLabel: sold ? 'أخبرني عند التوفّر' : 'انقله إلى السلة',
+        btnBg: sold ? 'var(--sunken)' : 'var(--brand)',
+        btnFg: sold ? 'var(--text-muted)' : 'var(--on-brand)',
+        btnCursor: sold ? 'pointer' : 'pointer',
+        move: () => {
+          if (sold) { this.toast('سنخبرك عند توفّر «' + w.name + '»'); return; }
+          S({ wishRemoved: st.wishRemoved.concat([w.id]) });
+          this.toast('نُقل إلى السلة — ' + w.name);
+        },
+        remove: () => { S({ wishRemoved: st.wishRemoved.concat([w.id]) }); this.toast('أُزيل من قائمة الرغبات'); }
+      };
+    });
+
+    /* ST-24 recently viewed */
+    const recentCleared = st.recent === 'cleared';
+    const recentItems = (empty || recentCleared) ? [] : [
+      { g: 'اليوم', name: 'قميص قطني مصري', price: 79, when: 'قبل ساعة' },
+      { g: 'اليوم', name: 'مكبّر صوت XL-900', price: 349, when: 'قبل 3 ساعات' },
+      { g: 'اليوم', name: 'عطر عود مركّز', price: 420, when: 'قبل 4 ساعات' },
+      { g: 'اليوم', name: 'بنطال كتان واسع', price: 149, when: 'قبل 5 ساعات' },
+      { g: 'اليوم', name: 'وشاح قطني', price: 58, when: 'قبل 6 ساعات' },
+      { g: 'أمس', name: 'طقم مناشف قطن', price: 185, when: 'أمس · 20:10' },
+      { g: 'أمس', name: 'سجادة صوف يدوية', price: 1280, when: 'أمس · 18:42' },
+      { g: 'أمس', name: 'طقم مفارش كينج', price: 240, when: 'أمس · 17:05' }
+    ];
+    out.recentEmpty = recentItems.length === 0;
+    out.recentHasItems = recentItems.length > 0;
+    out.recentCountText = recentItems.length + ' منتجاً';
+    out.clearBorder = recentItems.length ? 'var(--danger)' : 'var(--border-default)';
+    out.clearColor = recentItems.length ? 'var(--danger-text)' : 'var(--text-faint)';
+    out.clearCursor = recentItems.length ? 'pointer' : 'not-allowed';
+    out.askClearRecent = () => { if (recentItems.length) S({ recentAsk: true }); };
+    const groups = [];
+    recentItems.forEach(it => {
+      let g = groups.filter(x => x.label === it.g)[0];
+      if (!g) { g = { label: it.g, items: [] }; groups.push(g); }
+      g.items.push({ name: it.name, price: this.money(it.price), when: it.when, open: () => this.openProduct() });
+    });
+    out.recentGroups = groups;
+
+    /* ST-25 account */
+    const tabs = [['profile', 'الملف الشخصي'], ['security', 'الأمان'], ['sessions', 'الجلسات']];
+    out.acctTabs = tabs.map(t => ({
+      label: t[1],
+      bg: st.acctTab === t[0] ? 'var(--brand)' : 'transparent',
+      fg: st.acctTab === t[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.acctTab === t[0] ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ acctTab: t[0] })
+    }));
+    out.acctProfile = st.acctTab === 'profile';
+    out.acctSecurity = st.acctTab === 'security';
+    out.acctSessions = st.acctTab === 'sessions';
+    out.profName = empty ? '' : st.profName;
+    out.profEmail = empty ? '' : st.profEmail;
+    out.profPhone = empty ? '' : st.profPhone;
+    out.onProfName = (e) => S({ profName: e.target.value, profDirty: true });
+    out.onProfEmail = (e) => S({ profEmail: e.target.value, profDirty: true, emailVerified: false });
+    out.onProfPhone = (e) => S({ profPhone: e.target.value, profDirty: true, phoneVerified: false });
+    const ev = st.emailVerified && !empty;
+    out.emailBadge = ev ? 'موثّق' : 'غير موثّق';
+    out.emailBadgeBg = ev ? 'var(--success-subtle)' : 'var(--warning-subtle)';
+    out.emailBadgeFg = ev ? 'var(--success-text)' : 'var(--warning-text)';
+    out.emailBadgeIcon = ev ? '#i-check-circle' : '#i-alert';
+    out.emailUnverified = !ev;
+    out.sendEmailCode = () => { this.go('SH-03'); this.toast('أُرسل رمز التحقّق إلى بريدك'); };
+    const pv = st.phoneVerified && !empty;
+    out.phoneBadge = pv ? 'موثّق' : 'غير موثّق';
+    out.phoneBadgeBg = pv ? 'var(--success-subtle)' : 'var(--warning-subtle)';
+    out.phoneBadgeFg = pv ? 'var(--success-text)' : 'var(--warning-text)';
+    out.phoneBadgeIcon = pv ? '#i-check-circle' : '#i-alert';
+    out.phoneUnverified = !pv;
+    out.verifyPhone = () => { this.go('SH-03'); this.toast('أُرسل رمز التحقّق إلى جوالك'); };
+    const curDefs = [['SAR', 'ر.س.'], ['AED', 'د.إ.'], ['JOD', 'د.أ.']];
+    out.currencyOpts = curDefs.map(c => ({
+      label: c[1],
+      bg: st.currency === c[0] ? 'var(--brand)' : 'var(--card)',
+      fg: st.currency === c[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      pick: () => { S({ currency: c[0], profDirty: true }); }
+    }));
+    out.profDirtyDisplay = st.profDirty ? 'flex' : 'none';
+    out.saveProfile = () => { S({ profDirty: false }); this.toast('حُفظت بياناتك'); };
+    out.askDelete = () => S({ deleteAsk: true });
+    out.pwCurrent = st.pwCurrent;
+    out.onPwCurrent = (e) => S({ pwCurrent: e.target.value });
+    out.pwNew = st.pwNew;
+    out.onPwNew = (e) => S({ pwNew: e.target.value });
+    out.pwNewType = st.pwNewShown ? 'text' : 'password';
+    out.pwNewIcon = st.pwNewShown ? '#i-eye-off' : '#i-eye';
+    out.togglePwNew = () => S({ pwNewShown: !st.pwNewShown });
+    const pwv = st.pwNew;
+    const strength = pwv.length >= 12 && /[0-9]/.test(pwv) && /[^a-z0-9]/i.test(pwv) ? 3 : (pwv.length >= 8 && /[0-9]/.test(pwv) ? 2 : (pwv.length ? 1 : 0));
+    out.pwBarW = ['0%', '33%', '66%', '100%'][strength];
+    out.pwBarColor = ['var(--text-faint)', 'var(--danger-text)', 'var(--warning-text)', 'var(--success-text)'][strength];
+    out.pwBarLabel = ['—', 'ضعيفة', 'متوسطة', 'قوية'][strength];
+    const canPw = st.pwCurrent.length > 0 && strength >= 2;
+    out.pwSaveBg = canPw ? 'var(--brand)' : 'var(--sunken)';
+    out.pwSaveFg = canPw ? 'var(--on-brand)' : 'var(--text-faint)';
+    out.pwSaveCursor = canPw ? 'pointer' : 'not-allowed';
+    out.savePassword = () => {
+      if (!canPw) { this.toast('اكتب كلمة المرور الحالية وكلمة جديدة قوية', 'warning'); return; }
+      S({ pwCurrent: '', pwNew: '' });
+      this.toast('حُدّثت كلمة المرور وأُنهيت الجلسات الأخرى');
+    };
+    out.tfaOn = st.tfaOn;
+    out.tfaTitle = st.tfaOn ? 'التحقّق بخطوتين مُفعَّل' : 'التحقّق بخطوتين غير مُفعَّل';
+    out.tfaBody = st.tfaOn ? 'نطلب رمزاً من تطبيق المصادقة عند الدخول من جهاز جديد.' : 'فعّله لتأمين حسابك برمز إضافي عند الدخول من جهاز جديد.';
+    out.tfaBorder = st.tfaOn ? 'var(--success)' : 'var(--border-default)';
+    out.tfaBg = st.tfaOn ? 'var(--success-subtle)' : 'var(--sunken)';
+    out.tfaColor = st.tfaOn ? 'var(--success-text)' : 'var(--text-strong)';
+    out.tfaSwBg = st.tfaOn ? 'var(--brand)' : 'var(--border-control)';
+    out.tfaSwX = st.tfaOn ? '23px' : '2px';
+    out.toggleTfa = () => { S({ tfaOn: !st.tfaOn }); this.toast(st.tfaOn ? 'أُوقف التحقّق بخطوتين' : 'فُعّل التحقّق بخطوتين'); };
+    const sessDefs = [
+      { id: 1, device: 'iPhone 15 · Safari', where: 'الرياض، السعودية', when: 'نشطة الآن', current: true },
+      { id: 2, device: 'MacBook Air · Chrome', where: 'الرياض، السعودية', when: 'آخر نشاط قبل ساعتين', current: false },
+      { id: 3, device: 'Galaxy S23 · Chrome', where: 'جدة، السعودية', when: 'آخر نشاط أمس', current: false },
+      { id: 4, device: 'Windows 11 · Edge', where: 'عمّان، الأردن', when: 'آخر نشاط 8 سبتمبر', current: false }
+    ];
+    const sessions = (empty ? sessDefs.slice(0, 1) : sessDefs).filter(s => st.revoked.indexOf(s.id) < 0);
+    out.sessions = sessions.map(s => ({
+      device: s.device, where: s.where, when: s.when, current: s.current, canRevoke: !s.current,
+      bg: s.current ? 'var(--success-subtle)' : 'transparent',
+      revoke: () => { S({ revoked: st.revoked.concat([s.id]) }); this.toast('أُنهيت الجلسة على ' + s.device); }
+    }));
+    out.sessionCountText = sessions.length + ' جلسة';
+    out.revokeAll = () => { S({ revoked: sessDefs.filter(s => !s.current).map(s => s.id) }); this.toast('أُنهيت كل الجلسات الأخرى'); };
+
+    /* ST-26 addresses */
+    const addrDefs = [
+      { id: 1, label: 'المنزل', name: 'نورة العتيبي', lines: 'الرياض · حي النرجس · شارع أنس بن مالك · مبنى 24، شقة 3 · 13327', phone: '+966 55 012 8844' },
+      { id: 2, label: 'العمل', name: 'نورة العتيبي', lines: 'الرياض · حي العليا · طريق الملك فهد · برج المملكة، الطابق 12 · 12611', phone: '+966 55 012 8844' },
+      { id: 3, label: 'منزل العائلة', name: 'سارة العتيبي', lines: 'جدة · حي الروضة · شارع الأمير سلطان · فيلا 8 · 23434', phone: '+966 50 771 2290' }
+    ];
+    const addrs = empty ? [] : addrDefs.filter(a => st.addrRemoved.indexOf(a.id) < 0);
+    out.addrEmpty = addrs.length === 0;
+    out.addrHasItems = addrs.length > 0;
+    out.addrCountText = addrs.length + ' عنواناً';
+    out.addresses = addrs.map(a => ({
+      label: a.label, name: a.name, lines: a.lines, phone: a.phone,
+      isDefault: a.id === st.addrDefault,
+      canDefault: a.id !== st.addrDefault,
+      border: a.id === st.addrDefault ? 'var(--brand)' : 'var(--border-subtle)',
+      makeDefault: () => { S({ addrDefault: a.id }); this.toast('صار «' + a.label + '» العنوان الافتراضي'); },
+      edit: () => this.toast('محرّر العنوان يفتح في دُرج جانبي — نفس نموذج الدفع ST-15'),
+      remove: () => {
+        clearTimeout(this._undoT);
+        S({ addrRemoved: st.addrRemoved.concat([a.id]), addrDeleted: a });
+        this._undoT = setTimeout(() => this.setState({ addrDeleted: null }), 6000);
+      }
+    }));
+    out.undoDisplay = st.addrDeleted ? 'flex' : 'none';
+    out.undoLabel = st.addrDeleted ? st.addrDeleted.label : '';
+    out.undoDelete = () => {
+      const a = st.addrDeleted;
+      if (!a) return;
+      clearTimeout(this._undoT);
+      S({ addrRemoved: st.addrRemoved.filter(x => x !== a.id), addrDeleted: null });
+      this.toast('استُرجع العنوان «' + a.label + '»');
+    };
+    out.addAddress = () => this.toast('نموذج العنوان الجديد بخريطة ودبّوس — نفس مكوّن الورقة 25');
+
+    /* ST-27 notifications */
+    const notifDefs = [
+      { id: 1, g: 'اليوم', k: 'order', title: 'شُحن طلبك BST-26-004821-A', body: 'رقم التتبّع SPL-88213394 · التوصيل المتوقّع 16 سبتمبر', time: 'قبل 20 د', icon: '#i-package', tone: 'brand' },
+      { id: 2, g: 'اليوم', k: 'msg', title: 'ردّ متجر دار القطن على رسالتك', body: 'أرسلنا لك بطاقة شحن مجاني للاستبدال.', time: 'قبل ساعة', icon: '#i-msg', tone: 'info' },
+      { id: 3, g: 'اليوم', k: 'order', title: 'قُبل طلبك من إلكترونيات الخليج', body: 'BST-26-004830-B · يُجهَّز خلال يومين', time: 'قبل 3 س', icon: '#i-check-circle', tone: 'success' },
+      { id: 4, g: 'أمس', k: 'dispute', title: 'صدر قرار في نزاعك', body: 'قُبل الإرجاع وأُعيد المبلغ 185.00 ر.س. إلى بطاقتك.', time: 'أمس · 16:40', icon: '#i-shield', tone: 'success' },
+      { id: 5, g: 'أمس', k: 'order', title: 'سُلّم طلبك BST-26-004818-B', body: 'قيّم المنتجات لتساعد المشترين بعدك.', time: 'أمس · 12:05', icon: '#i-package', tone: 'neutral' },
+      { id: 6, g: 'هذا الأسبوع', k: 'price', title: 'انخفض سعر منتج في قائمة رغباتك', body: 'قميص قطني مصري — 79.00 ر.س. بدل 92.00 ر.س.', time: '11 سبتمبر', icon: '#i-heart', tone: 'money' },
+      { id: 7, k: 'order', g: 'هذا الأسبوع', title: 'أُلغي طلب لعدم توفّر المخزون', body: 'BST-26-004799-A · أُعيد المبلغ كاملاً خلال 3 أيام عمل.', time: '10 سبتمبر', icon: '#i-alert', tone: 'danger' }
+    ];
+    const readIds = st.notifRead || [];
+    const toneMap = {
+      brand: ['var(--brand-subtle)', 'var(--brand-text)'],
+      info: ['var(--info-subtle)', 'var(--info-text)'],
+      success: ['var(--success-subtle)', 'var(--success-text)'],
+      danger: ['var(--danger-subtle)', 'var(--danger-text)'],
+      money: ['var(--money-subtle)', 'var(--money)'],
+      neutral: ['var(--neutral-subtle)', 'var(--neutral-text)']
+    };
+    const notifAll = empty ? [] : notifDefs;
+    const unreadSet = notifAll.filter(n => readIds.indexOf(n.id) < 0 && n.id <= 4);
+    const onlyUnread = st.notifFilter === 'unread';
+    const notifShown = onlyUnread ? unreadSet : notifAll;
+    out.notifCountText = unreadSet.length ? unreadSet.length + ' غير مقروء' : 'كل الإشعارات مقروءة';
+    out.notifAllBg = onlyUnread ? 'var(--card)' : 'var(--brand)';
+    out.notifAllFg = onlyUnread ? 'var(--text-body)' : 'var(--on-brand)';
+    out.notifUnreadBg = onlyUnread ? 'var(--brand)' : 'var(--card)';
+    out.notifUnreadFg = onlyUnread ? 'var(--on-brand)' : 'var(--text-body)';
+    out.notifAll = () => S({ notifFilter: 'all' });
+    out.notifUnread = () => S({ notifFilter: 'unread' });
+    out.noUnread = unreadSet.length === 0;
+    out.markBorder = unreadSet.length ? 'var(--border-control)' : 'var(--border-default)';
+    out.markColor = unreadSet.length ? 'var(--text-strong)' : 'var(--text-faint)';
+    out.markCursor = unreadSet.length ? 'pointer' : 'not-allowed';
+    out.markAllRead = () => { if (unreadSet.length) { S({ notifRead: notifDefs.map(n => n.id) }); this.toast('عُلّمت كل الإشعارات كمقروءة'); } };
+    out.notifEmpty = notifShown.length === 0;
+    out.notifHasItems = notifShown.length > 0;
+    out.notifEmptyTitle = empty ? 'لا إشعارات بعد' : 'لا إشعارات غير مقروءة';
+    out.notifEmptyBody = empty ? 'نخبرك هنا بتغيّر حالة طلباتك وردود المتاجر وقرارات النزاعات.' : 'قرأتَ كل شيء. بدّل إلى «الكل» لتصفّح السجلّ.';
+    const ngroups = [];
+    notifShown.forEach(n => {
+      let g = ngroups.filter(x => x.label === n.g)[0];
+      if (!g) { g = { label: n.g, items: [] }; ngroups.push(g); }
+      const unread = readIds.indexOf(n.id) < 0 && n.id <= 4;
+      g.items.push({
+        title: n.title, body: n.body, time: n.time, icon: n.icon, unread: unread,
+        weight: unread ? '700' : '500',
+        bg: unread ? 'var(--brand-subtle)' : 'transparent',
+        iconBg: toneMap[n.tone][0], iconFg: toneMap[n.tone][1],
+        open: () => {
+          S({ notifRead: readIds.concat([n.id]) });
+          if (n.k === 'msg') this.go('ST-28');
+          else if (n.k === 'price') this.go('ST-23');
+          else { try { localStorage.setItem('basta.purchase.screen', 'ST-19'); } catch (e) {} window.location.href = encodeURI('Basta Storefront Purchase.dc.html'); }
+        }
+      });
+    });
+    out.notifGroups = ngroups;
+
+    /* ST-28 messages */
+    const threadDefs = [
+      { id: 1, shop: 'دار القطن', preview: 'أرسلنا لك بطاقة شحن مجاني للاستبدال.', time: 'قبل ساعة', unread: true, context: 'بخصوص الطلب BST-26-004821-A', ctxBtn: 'افتح الطلب', ctxKind: 'order' },
+      { id: 2, shop: 'إلكترونيات الخليج', preview: 'نعم، الضمان سنتان من تاريخ الشراء.', time: 'أمس', unread: true, context: 'بخصوص منتج مكبّر صوت XL-900', ctxBtn: 'افتح المنتج', ctxKind: 'product' },
+      { id: 3, shop: 'بيت العطور', preview: 'شكراً لك، سعدنا بخدمتك.', time: '9 سبتمبر', unread: false, context: 'بخصوص الطلب BST-26-004802-B', ctxBtn: 'افتح الطلب', ctxKind: 'order' }
+    ];
+    const threads = empty ? [] : threadDefs;
+    out.msgEmpty = threads.length === 0;
+    out.msgHasItems = threads.length > 0;
+    const activeId = st.activeThread || 1;
+    const active = threads.filter(t => t.id === activeId)[0] || threads[0] || { shop: '', context: '', ctxBtn: '' };
+    out.threads = threads.map(t => ({
+      shop: t.shop, preview: t.preview, time: t.time, unread: t.unread && t.id !== activeId,
+      weight: t.unread ? '700' : '500',
+      bg: t.id === activeId ? 'var(--brand-subtle)' : 'transparent',
+      open: () => S({ activeThread: t.id })
+    }));
+    out.activeShop = active.shop;
+    out.activeContext = active.context;
+    out.activeContextBtn = active.ctxBtn;
+    out.openContext = () => {
+      if (active.ctxKind === 'order') { try { localStorage.setItem('basta.purchase.screen', 'ST-19'); } catch (e) {} window.location.href = encodeURI('Basta Storefront Purchase.dc.html'); }
+      else this.openProduct();
+    };
+    const convos = {
+      1: [
+        { role: 'buyer', text: 'وصلني القميص بلون مختلف عن الصورة، هل أستبدله؟', time: '14:02' },
+        { role: 'buyer', text: 'هذه صورة المنتج كما وصلني.', time: '14:03', file: 'IMG_2291.jpg', size: '1.8 MB' },
+        { role: 'shop', text: 'أعتذر عن هذا. أرسلنا لك بطاقة شحن مجاني للاستبدال، والمقاس نفسه متوفّر بالأحمر.', time: '14:20' }
+      ],
+      2: [
+        { role: 'buyer', text: 'هل الضمان يغطي البطارية؟', time: 'أمس · 11:10' },
+        { role: 'shop', text: 'نعم، الضمان سنتان من تاريخ الشراء ويشمل البطارية والأعطال المصنعية.', time: 'أمس · 13:35' }
+      ],
+      3: [
+        { role: 'buyer', text: 'وصل الطلب، شكراً لكم.', time: '9 سبتمبر · 10:02' },
+        { role: 'shop', text: 'شكراً لك، سعدنا بخدمتك.', time: '9 سبتمبر · 10:40' }
+      ]
+    };
+    const roleStyle = {
+      buyer: { role: 'أنا', align: 'flex-end', tagBg: 'var(--brand-subtle)', tagFg: 'var(--brand-text)', bubbleBg: 'var(--brand-subtle)', border: 'var(--brand)' },
+      shop: { role: 'المتجر', align: 'flex-start', tagBg: 'var(--neutral-subtle)', tagFg: 'var(--neutral-text)', bubbleBg: 'var(--card)', border: 'var(--border-default)' }
+    };
+    const sent = (st.sentMessages || {})[activeId] || [];
+    out.activeMessages = (convos[activeId] || []).concat(sent).map(m => Object.assign({}, roleStyle[m.role], { text: m.text, time: m.time, file: m.file || '', size: m.size || '' }));
+    out.msgDraft = st.msgDraft || '';
+    out.msgCount = (st.msgDraft || '').length;
+    out.onMsgDraft = (e) => S({ msgDraft: e.target.value });
+    out.attach = () => this.toast('أُرفق الملف receipt-4821.pdf');
+    out.sendMsg = () => {
+      const t = (st.msgDraft || '').trim();
+      if (!t) { this.toast('اكتب رسالة أولاً', 'warning'); return; }
+      const next = Object.assign({}, st.sentMessages);
+      next[activeId] = (next[activeId] || []).concat([{ role: 'buyer', text: t, time: 'الآن' }]);
+      S({ sentMessages: next, msgDraft: '' });
+      this.toast('أُرسلت رسالتك — يردّ المتجر عادةً خلال يوم عمل');
+    };
+
+    /* ST-30 content pages */
+    const pageKey = st.page || 'about';
+    const pageDefs = {
+      about: {
+        label: 'من نحن', title: 'من نحن', updated: '2 سبتمبر 2026', kind: 'prose',
+        sections: [
+          { id: 'who', title: 'ما هي بسطة', paras: ['بسطة سوق إلكتروني يجمع متاجر صغيرة ومتوسطة من الخليج والشام ومصر في مكان واحد. المشتري يطلب من عدة متاجر في سلة واحدة، ويصله كل طلب فرعي من متجره مباشرة.', 'لا نملك المخزون ولا نبيع منتجاتنا؛ دورنا أن نوفّر واجهة موثوقة، ودفعاً آمناً، وحكماً عادلاً عند الخلاف.'] },
+          { id: 'how', title: 'كيف نكسب', paras: ['نأخذ عمولة على كل عملية بيع تتم عبر المنصّة، بلا اشتراك شهري ولا رسوم إدراج. إن لم يبع التاجر شيئاً فلا يدفع شيئاً.'] },
+          { id: 'trust', title: 'الثقة والحماية', paras: ['تُراجَع مستندات كل متجر قبل النشر، وتبقى أموال الطلب محجوزة حتى يتسلّم المشتري طلبه بأربعة عشر يوماً، فإن حدث خلاف تفصل فيه الإدارة بقرار مكتوب يظهر للطرفين.'] },
+          { id: 'where', title: 'أين نعمل', paras: ['نخدم حالياً السعودية والإمارات وقطر والكويت وعُمان والأردن ومصر، ونضيف أسواقاً جديدة بحسب جاهزية الشحن والدفع فيها.'] }
+        ]
+      },
+      faq: { label: 'الأسئلة الشائعة', title: 'الأسئلة الشائعة', updated: '10 سبتمبر 2026', kind: 'faq' },
+      returns: {
+        label: 'سياسة الإرجاع', title: 'سياسة الإرجاع', updated: '28 أغسطس 2026', kind: 'prose',
+        sections: [
+          { id: 'window', title: 'مدة الإرجاع', paras: ['يحقّ لك طلب الإرجاع خلال أربعة عشر يوماً من تاريخ التسليم، ما لم يذكر المتجر مدة أطول في صفحته.', 'تبدأ المدة من يوم التسليم الفعلي المسجّل لدى شركة الشحن، لا من يوم الطلب.'] },
+          { id: 'condition', title: 'حالة المنتج', paras: ['يُقبل الإرجاع إذا كان المنتج غير مستعمل وبعلّامته وتغليفه الأصلي. المنتجات المخصّصة بطلبك، ومنتجات العناية الشخصية المفتوحة، لا تُرجَع إلا إن وصلت تالفة أو مخالفة للوصف.'] },
+          { id: 'cost', title: 'من يدفع الشحن', paras: ['إن كان سبب الإرجاع خطأً من المتجر — منتج تالف أو مخالف للوصف — فالمتجر يتحمّل الشحن. إن كان الإرجاع لتغيّر رأيك فتتحمّل أنت أجرة الشحن، وتُخصم من المبلغ المُعاد.'] },
+          { id: 'refund', title: 'متى يصلك المبلغ', paras: ['بعد استلام المتجر للمنتج وفحصه، يُعاد المبلغ إلى وسيلة الدفع نفسها خلال ثلاثة إلى خمسة أيام عمل. إن اختلفتما، افتح نزاعاً وتفصل الإدارة خلال يومي عمل.'] }
+        ]
+      },
+      terms: {
+        label: 'الشروط والأحكام', title: 'الشروط والأحكام', updated: '1 سبتمبر 2026', kind: 'prose',
+        sections: [
+          { id: 'acc', title: 'الحساب', paras: ['تلتزم بصحة بياناتك وبحماية كلمة مرورك. أي نشاط يتم من حسابك يُعدّ صادراً عنك ما لم تبلّغنا بالاختراق فور علمك به.'] },
+          { id: 'orders', title: 'الطلبات والعقد', paras: ['العقد ينعقد بينك وبين المتجر البائع، وبسطة وسيط يوفّر المنصّة وخدمة الدفع وحلّ الخلاف. لكل طلب فرعي حالته الخاصة ومسؤوليته على متجره.'] },
+          { id: 'pay', title: 'الدفع والأسعار', paras: ['تُعرض الأسعار شاملة ضريبة القيمة المضافة حيثما تنطبق، ويُحصَّل المبلغ بعملة التحصيل المذكورة عند الدفع. سعر التحويل يُحدَّد يوم الدفع.'] },
+          { id: 'ban', title: 'الاستخدام الممنوع', paras: ['يُمنع بيع المنتجات المقلّدة أو المحظورة نظاماً، والتلاعب بالتقييمات، ومحاولة إتمام البيع خارج المنصّة للتهرّب من العمولة أو من حماية المشتري.'] }
+        ]
+      },
+      privacy: {
+        label: 'سياسة الخصوصية', title: 'سياسة الخصوصية', updated: '1 سبتمبر 2026', kind: 'prose',
+        sections: [
+          { id: 'collect', title: 'ما نجمعه', paras: ['نجمع ما تزوّدنا به عند التسجيل والطلب: الاسم والبريد والجوال وعناوين الشحن، وسجلّ طلباتك ورسائلك مع المتاجر.'] },
+          { id: 'use', title: 'كيف نستخدمه', paras: ['نستخدم بياناتك لتنفيذ طلباتك وحماية الحسابات ومنع الاحتيال وتحسين نتائج البحث. لا نبيع بياناتك لأطراف ثالثة.'] },
+          { id: 'share', title: 'مع من نشاركه', paras: ['يرى المتجر البائع اسمك وعنوان الشحن ورقم جوالك لتسليم طلبك فقط. وتصل بيانات الدفع إلى مزوّد الدفع مباشرة دون أن نحتفظ برقم بطاقتك.'] },
+          { id: 'rights', title: 'حقوقك', paras: ['يمكنك تعديل بياناتك أو حذف حسابك من صفحة الحساب. تبقى فواتير الطلبات السابقة محفوظة للمدة التي يفرضها النظام الضريبي.'] }
+        ]
+      },
+      contact: { label: 'تواصل معنا', title: 'تواصل معنا', updated: '14 سبتمبر 2026', kind: 'contact' }
+    };
+    const page = pageDefs[pageKey];
+    out.pageTabs = Object.keys(pageDefs).map(k => ({
+      label: pageDefs[k].label,
+      bg: pageKey === k ? 'var(--brand)' : 'var(--card)',
+      fg: pageKey === k ? 'var(--on-brand)' : 'var(--text-body)',
+      border: pageKey === k ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ page: k })
+    }));
+    out.pageTitle = page.title;
+    out.pageUpdated = page.updated;
+    out.pageIsProse = page.kind === 'prose';
+    out.pageIsFaq = page.kind === 'faq';
+    out.pageIsContact = page.kind === 'contact';
+    out.pageHasToc = page.kind === 'prose';
+    out.pageCols = page.kind === 'prose' ? '230px minmax(0,1fr)' : 'minmax(0,1fr)';
+    out.pageSections = page.sections || [];
+    out.pageToc = (page.sections || []).map(s => ({ label: s.title, href: '#' + s.id }));
+    const faqDefs = [
+      { q: 'متى يصلني طلبي؟', a: 'كل متجر يذكر مدّة تجهيزه في صفحته، ويضاف إليها وقت الشحن. تجد التوصيل المتوقّع في صفحة الطلب، ويتحدّث فور شحن المتجر للشحنة.' },
+      { q: 'طلبت من ثلاثة متاجر — هل تصلني الطلبات معاً؟', a: 'لا. سلتك تُقسَّم إلى طلب فرعي لكل متجر، ويشحن كل متجر شحنته على حدة. لذلك قد تصلك الطرود في أيام مختلفة، ولكل طرد رقم تتبّع خاص.' },
+      { q: 'هل أدفع رسوم شحن لكل متجر؟', a: 'نعم، لأن كل متجر يشحن من مستودعه. تُعرض رسوم الشحن مفصّلة لكل متجر في السلة قبل الدفع، وبعض المتاجر يوفّر شحناً مجانياً فوق مبلغ معيّن.' },
+      { q: 'كيف أُرجع منتجاً؟', a: 'افتح الطلب واضغط «اطلب إرجاعاً» خلال أربعة عشر يوماً من التسليم، واختر المنتجات والسبب. يردّ المتجر خلال يومي عمل، وإن رفض يمكنك رفع الأمر للإدارة.' },
+      { q: 'متى يُعاد المبلغ؟', a: 'بعد استلام المتجر للمنتج وفحصه، يُعاد المبلغ إلى وسيلة الدفع نفسها خلال ثلاثة إلى خمسة أيام عمل حسب البنك.' },
+      { q: 'هل الدفع آمن؟', a: 'تصل بيانات بطاقتك إلى مزوّد الدفع مباشرة ولا نحتفظ برقمها. ويبقى المبلغ محجوزاً لدينا حتى يتسلّم المشتري طلبه، حمايةً للطرفين.' },
+      { q: 'كيف أصبح بائعاً على بسطة؟', a: 'سجّل متجرك، وارفع سجلك التجاري وهويتك وشهادتك الضريبية وإثبات حسابك البنكي. تُراجَع المستندات عادةً خلال يوم عمل واحد، ويمكنك تجهيز منتجاتك كمسودّات أثناء المراجعة.' }
+    ];
+    const faqOpen = st.faqOpen === undefined ? 0 : st.faqOpen;
+    out.faqItems = faqDefs.map((f, i) => ({
+      q: f.q, a: f.a, open: faqOpen === i,
+      border: faqOpen === i ? 'var(--brand)' : 'var(--border-subtle)',
+      bg: faqOpen === i ? 'var(--brand-subtle)' : 'var(--card)',
+      rotate: faqOpen === i ? 'rotate(180deg)' : 'none',
+      toggle: () => S({ faqOpen: faqOpen === i ? -1 : i })
+    }));
+    out.ctName = st.ctName || '';
+    out.ctEmail = st.ctEmail || '';
+    out.ctBody = st.ctBody || '';
+    out.onCtName = (e) => S({ ctName: e.target.value });
+    out.onCtEmail = (e) => S({ ctEmail: e.target.value });
+    out.onCtBody = (e) => S({ ctBody: e.target.value });
+    out.sendContact = () => {
+      if (!(st.ctBody || '').trim()) { this.toast('اكتب رسالتك أولاً', 'warning'); return; }
+      S({ ctBody: '' });
+      this.toast('وصلتنا رسالتك — نردّ خلال يوم عمل واحد');
+    };
+    out.goContact = () => S({ screen: 'ST-30', page: 'contact' });
+    out.goTerms = () => S({ screen: 'ST-30', page: 'terms' });
+    out.goPrivacy = () => S({ screen: 'ST-30', page: 'privacy' });
+
+    /* SH auth screens */
+    const authCodes = ['SH-01', 'SH-02', 'SH-03', 'SH-04'];
+    out.isAuth = authCodes.indexOf(st.screen) >= 0;
+    out.isSH01 = st.screen === 'SH-01';
+    out.isSH02 = st.screen === 'SH-02';
+    out.isSH03 = st.screen === 'SH-03';
+    out.isSH04 = st.screen === 'SH-04';
+    out.isSH06 = st.screen === 'SH-06';
+    out.isSH07 = st.screen === 'SH-07';
+    out.isSH08 = st.screen === 'SH-08';
+    out.authWidth = st.screen === 'SH-02' ? '520px' : '440px';
+    const authTitles = {
+      'SH-01': ['ادخل إلى حسابك', 'تابع طلباتك وقائمة رغباتك من أي جهاز.'],
+      'SH-02': ['أنشئ حسابك', 'دقيقة واحدة، ثم نرسل لك رمز تحقّق من ست خانات.'],
+      'SH-03': ['أكّد رقم جوالك', 'اكتب الرمز أو الصقه كاملاً في الخانة الأولى.'],
+      'SH-04': ['استعادة كلمة المرور', 'نرسل لك رابطاً لتعيين كلمة مرور جديدة.']
+    };
+    out.authTitle = (authTitles[st.screen] || ['', ''])[0];
+    out.authSub = (authTitles[st.screen] || ['', ''])[1];
+    const locked = edge && st.screen === 'SH-01' ? true : !!st.authLocked;
+    out.authLocked = locked;
+    out.authCardBorder = locked ? 'var(--danger)' : 'var(--border-subtle)';
+    out.authFieldBg = locked ? 'var(--sunken)' : 'var(--card)';
+    out.lockDisplay = locked ? 'flex' : 'none';
+    out.lockClock = '14:38';
+    out.inEmail = empty ? '' : (st.inEmail === undefined ? 'noura@example.com' : st.inEmail);
+    out.inPw = st.inPw || '';
+    out.onInEmail = (e) => S({ inEmail: e.target.value, signinErr: false });
+    out.onInPw = (e) => S({ inPw: e.target.value, signinErr: false });
+    out.inPwType = st.inPwShown ? 'text' : 'password';
+    out.inPwIcon = st.inPwShown ? '#i-eye-off' : '#i-eye';
+    out.toggleInPw = () => S({ inPwShown: !st.inPwShown });
+    out.signinErrDisplay = st.signinErr && !locked ? 'flex' : 'none';
+    out.inEmailBorder = st.signinErr && !locked ? 'var(--danger)' : 'var(--border-control)';
+    out.inPwBorder = st.signinErr && !locked ? 'var(--danger)' : 'var(--border-control)';
+    out.signinBg = locked ? 'var(--sunken)' : 'var(--brand)';
+    out.signinFg = locked ? 'var(--text-faint)' : 'var(--on-brand)';
+    out.signinCursor = locked ? 'not-allowed' : 'pointer';
+    out.signinLabel = locked ? 'موقوف مؤقتاً' : 'ادخل';
+    out.doSignIn = () => {
+      if (locked) return;
+      if ((st.inPw || '') === 'basta-2026') { S({ signinErr: false, signinTries: 0 }); this.go('ST-25'); this.toast('أهلاً بعودتك، نورة'); return; }
+      const tries = (st.signinTries || 0) + 1;
+      if (tries >= 5) { S({ signinTries: tries, authLocked: true, signinErr: false }); this.toast('محاولات كثيرة — أُوقف الدخول مؤقتاً', 'warning'); }
+      else S({ signinTries: tries, signinErr: true });
+    };
+    out.goForgot = () => S({ screen: 'SH-04', fpStage: 'ask' });
+    out.goSignIn = () => S({ screen: 'SH-01' });
+    out.authFooterDisplay = (st.screen === 'SH-01' || st.screen === 'SH-02') ? 'flex' : 'none';
+    out.authFooterText = st.screen === 'SH-01' ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟';
+    out.authFooterLink = st.screen === 'SH-01' ? 'أنشئ حساباً' : 'ادخل';
+    out.authFooterGo = () => S({ screen: st.screen === 'SH-01' ? 'SH-02' : 'SH-01' });
+
+    out.regName = st.regName === undefined ? '' : st.regName;
+    out.regEmail = st.regEmail === undefined ? '' : st.regEmail;
+    out.regPw = st.regPw || '';
+    out.regPhone = st.regPhone || '';
+    out.onRegName = (e) => S({ regName: e.target.value, regNameErr: '' });
+    out.onRegEmail = (e) => S({ regEmail: e.target.value, regEmailErr: '' });
+    out.onRegPw = (e) => S({ regPw: e.target.value });
+    out.onRegPhone = (e) => S({ regPhone: e.target.value });
+    out.regPwType = st.regPwShown ? 'text' : 'password';
+    out.regPwIcon = st.regPwShown ? '#i-eye-off' : '#i-eye';
+    out.toggleRegPw = () => S({ regPwShown: !st.regPwShown });
+    out.regNameErr = st.regNameErr || '';
+    out.regEmailErr = st.regEmailErr || '';
+    out.regNameBorder = out.regNameErr ? 'var(--danger)' : 'var(--border-control)';
+    out.regEmailBorder = out.regEmailErr ? 'var(--danger)' : 'var(--border-control)';
+    const rpw = st.regPw || '';
+    const rstr = rpw.length >= 12 && /[0-9]/.test(rpw) && /[^a-z0-9]/i.test(rpw) ? 3 : (rpw.length >= 8 && /[0-9]/.test(rpw) ? 2 : (rpw.length ? 1 : 0));
+    out.regBarW = ['0%', '33%', '66%', '100%'][rstr];
+    out.regBarColor = ['var(--text-faint)', 'var(--danger-text)', 'var(--warning-text)', 'var(--success-text)'][rstr];
+    out.regBarLabel = ['—', 'ضعيفة', 'متوسطة', 'قوية'][rstr];
+    out.regPwBorder = rpw && rstr < 2 ? 'var(--danger)' : 'var(--border-control)';
+    const dialDefs = [
+      { name: 'السعودية', dial: '+966' }, { name: 'الإمارات', dial: '+971' }, { name: 'قطر', dial: '+974' },
+      { name: 'الكويت', dial: '+965' }, { name: 'الأردن', dial: '+962' }, { name: 'مصر', dial: '+20' }
+    ];
+    out.regDial = st.regDial || '+966';
+    out.countryMenu = st.countryOpen ? 'block' : 'none';
+    out.toggleCountry = () => S({ countryOpen: !st.countryOpen });
+    out.countryList = dialDefs.map(c => ({ name: c.name, dial: c.dial, pick: () => S({ regDial: c.dial, countryOpen: false }) }));
+    const termsOn = !!st.terms;
+    out.termsBg = termsOn ? 'var(--brand)' : 'transparent';
+    out.termsBorder = termsOn ? 'var(--brand)' : 'var(--border-control)';
+    out.termsOpacity = termsOn ? 1 : 0;
+    out.toggleTerms = () => S({ terms: !termsOn });
+    const canReg = (st.regName || '').trim() && /.+@.+\..+/.test(st.regEmail || '') && rstr >= 2 && termsOn;
+    out.regBg = canReg ? 'var(--brand)' : 'var(--sunken)';
+    out.regFg = canReg ? 'var(--on-brand)' : 'var(--text-faint)';
+    out.regCursor = canReg ? 'pointer' : 'not-allowed';
+    out.doRegister = () => {
+      const errs = {};
+      if (!(st.regName || '').trim()) errs.regNameErr = 'اكتب اسمك الكامل.';
+      if (!/.+@.+\..+/.test(st.regEmail || '')) errs.regEmailErr = 'البريد غير صحيح — اكتبه بالشكل name@example.com';
+      if (Object.keys(errs).length) { S(errs); return; }
+      if (rstr < 2) { this.toast('كلمة المرور ثمانية أحرف على الأقل مع رقم', 'warning'); return; }
+      if (!termsOn) { this.toast('وافق على الشروط لإنشاء الحساب', 'warning'); return; }
+      S({ screen: 'SH-03', otp: ['', '', '', '', '', ''], otpTries: 0, otpLocked: false, otpMsg: null, otpSecs: 581 });
+      this.toast('أُرسل رمز التحقّق');
+    };
+
+    const otp = st.otp || ['', '', '', '', '', ''];
+    const otpLocked = !!st.otpLocked;
+    out.otpLocked = otpLocked;
+    if (!this.otpEls) this.otpEls = [];
+    const setOtp = (arr, extra) => S(Object.assign({ otp: arr, otpMsg: null }, extra || {}));
+    out.otpCells = otp.map((d, i) => ({
+      val: d,
+      border: otpLocked ? 'var(--border-default)' : (st.otpMsg && st.otpMsg.kind === 'error' ? 'var(--danger)' : (d ? 'var(--brand)' : 'var(--border-control)')),
+      bg: otpLocked ? 'var(--sunken)' : (st.otpMsg && st.otpMsg.kind === 'error' ? 'var(--danger-subtle)' : (d ? 'var(--brand-subtle)' : 'var(--card)')),
+      color: otpLocked ? 'var(--text-faint)' : (st.otpMsg && st.otpMsg.kind === 'error' ? 'var(--danger-text)' : 'var(--text-strong)'),
+      ref: (el) => { this.otpEls[i] = el; },
+      onInput: (e) => {
+        const v = (e.target.value || '').replace(/\D/g, '');
+        if (v.length > 1) {
+          const arr = otp.slice();
+          v.slice(0, 6).split('').forEach((ch, k) => { if (i + k < 6) arr[i + k] = ch; });
+          setOtp(arr);
+          const last = Math.min(5, i + v.length - 1);
+          if (this.otpEls[last]) this.otpEls[last].focus();
+          return;
+        }
+        const arr = otp.slice();
+        arr[i] = v.slice(-1);
+        setOtp(arr);
+        if (v && i < 5 && this.otpEls[i + 1]) this.otpEls[i + 1].focus();
+      },
+      onKeyDown: (e) => { if (e.key === 'Backspace' && !otp[i] && i > 0 && this.otpEls[i - 1]) this.otpEls[i - 1].focus(); },
+      onPaste: (e) => {
+        const txt = ((e.clipboardData && e.clipboardData.getData('text')) || '').replace(/\D/g, '');
+        if (!txt) return;
+        e.preventDefault();
+        const arr = ['', '', '', '', '', ''];
+        txt.slice(0, 6).split('').forEach((ch, k) => { arr[k] = ch; });
+        setOtp(arr);
+        if (this.otpEls[5]) this.otpEls[5].focus();
+        this.toast('لُصق الرمز في الخانات الست');
+      }
+    }));
+    const osecs = st.otpSecs === undefined ? 581 : st.otpSecs;
+    out.otpClock = Math.floor(osecs / 60) + ':' + String(osecs % 60).padStart(2, '0');
+    out.otpExpColor = osecs < 60 ? 'var(--danger-text)' : 'var(--text-muted)';
+    const cd = st.resendCd || 0;
+    out.resendDisabled = cd > 0;
+    out.resendLabel = cd > 0 ? 'أعد الإرسال بعد ' + cd + 'ث' : 'أعد إرسال الرمز';
+    out.resendBorder = cd > 0 ? 'var(--border-default)' : 'var(--border-control)';
+    out.resendColor = cd > 0 ? 'var(--text-faint)' : 'var(--text-strong)';
+    out.resendCursor = cd > 0 ? 'not-allowed' : 'pointer';
+    out.otpResend = () => {
+      if (cd > 0) return;
+      S({ resendCd: 45, otpSecs: 600, otp: ['', '', '', '', '', ''], otpMsg: null, otpTries: 0, otpLocked: false });
+      this.toast('أُرسل رمز جديد');
+      clearInterval(this._cdT);
+      this._cdT = setInterval(() => {
+        this.setState(s => {
+          const n = (s.resendCd || 0) - 1;
+          if (n <= 0) { clearInterval(this._cdT); return { resendCd: 0 }; }
+          return { resendCd: n };
+        });
+      }, 1000);
+    };
+    out.otpBtnBg = otpLocked ? 'var(--sunken)' : 'var(--brand)';
+    out.otpBtnFg = otpLocked ? 'var(--text-faint)' : 'var(--on-brand)';
+    out.otpBtnCursor = otpLocked ? 'not-allowed' : 'pointer';
+    out.otpVerify = () => {
+      if (otpLocked) return;
+      const code = otp.join('');
+      if (code.length < 6) { S({ otpMsg: { kind: 'error', text: 'أكمل الخانات الست' } }); return; }
+      if (code === '482913') {
+        S({ otpMsg: { kind: 'ok', text: 'تم التحقّق — جارٍ فتح حسابك' }, phoneVerified: true });
+        setTimeout(() => this.setState({ screen: 'ST-25', acctTab: 'profile' }), 700);
+        return;
+      }
+      const tries = (st.otpTries || 0) + 1;
+      if (tries >= 5) S({ otpTries: tries, otpLocked: true, otpMsg: { kind: 'error', text: 'لم يعد الرمز صالحاً. اطلب رمزاً جديداً.' } });
+      else S({ otpTries: tries, otpMsg: { kind: 'error', text: 'رمز غير صحيح — بقيت ' + (5 - tries) + ' محاولات' } });
+    };
+    out.otpMsg = st.otpMsg ? st.otpMsg.text : '';
+    out.otpMsgDisplay = st.otpMsg ? 'flex' : 'none';
+    const okMsg = st.otpMsg && st.otpMsg.kind === 'ok';
+    out.otpMsgColor = okMsg ? 'var(--success-text)' : 'var(--danger-text)';
+    out.otpMsgBorder = okMsg ? 'var(--success)' : 'var(--danger)';
+    out.otpMsgBg = okMsg ? 'var(--success-subtle)' : 'var(--danger-subtle)';
+    out.otpMsgIcon = okMsg ? '#i-check-circle' : '#i-alert';
+
+    const fpStage = st.fpStage || 'ask';
+    out.fpAsk = fpStage === 'ask';
+    out.fpSent = fpStage === 'sent';
+    out.fpReset = fpStage === 'reset';
+    out.fpEmail = st.fpEmail || '';
+    out.onFpEmail = (e) => S({ fpEmail: e.target.value, fpErr: '' });
+    out.fpErr = st.fpErr || '';
+    out.fpBorder = out.fpErr ? 'var(--danger)' : 'var(--border-control)';
+    out.fpSend = () => {
+      if (!/.+@.+\..+/.test(st.fpEmail || '')) { S({ fpErr: 'اكتب بريداً صحيحاً بالشكل name@example.com' }); return; }
+      S({ fpStage: 'sent' });
+    };
+    out.fpBack = () => S({ fpStage: 'ask' });
+    out.fpToReset = () => S({ fpStage: 'reset' });
+    out.rsPw = st.rsPw || '';
+    out.rsPw2 = st.rsPw2 || '';
+    out.onRsPw = (e) => S({ rsPw: e.target.value });
+    out.onRsPw2 = (e) => S({ rsPw2: e.target.value });
+    out.rsPwType = st.rsPwShown ? 'text' : 'password';
+    out.rsPwIcon = st.rsPwShown ? '#i-eye-off' : '#i-eye';
+    out.toggleRsPw = () => S({ rsPwShown: !st.rsPwShown });
+    const rs = st.rsPw || '';
+    const rsStr = rs.length >= 12 && /[0-9]/.test(rs) && /[^a-z0-9]/i.test(rs) ? 3 : (rs.length >= 8 && /[0-9]/.test(rs) ? 2 : (rs.length ? 1 : 0));
+    out.rsBarW = ['0%', '33%', '66%', '100%'][rsStr];
+    out.rsBarColor = ['var(--text-faint)', 'var(--danger-text)', 'var(--warning-text)', 'var(--success-text)'][rsStr];
+    out.rsBarLabel = ['—', 'ضعيفة', 'متوسطة', 'قوية'][rsStr];
+    const rsMatch = (st.rsPw2 || '') === '' || (st.rsPw2 || '') === rs;
+    out.rsPw2Err = rsMatch ? '' : 'الكلمتان غير متطابقتين.';
+    out.rsPw2Border = rsMatch ? 'var(--border-control)' : 'var(--danger)';
+    const canRs = rsStr >= 2 && rs === (st.rsPw2 || '') && rs.length > 0;
+    out.rsBg = canRs ? 'var(--brand)' : 'var(--sunken)';
+    out.rsFg = canRs ? 'var(--on-brand)' : 'var(--text-faint)';
+    out.rsCursor = canRs ? 'pointer' : 'not-allowed';
+    out.rsSave = () => {
+      if (!canRs) { this.toast('اكتب كلمة قوية وطابقها في الحقلين', 'warning'); return; }
+      S({ screen: 'ST-25', rsPw: '', rsPw2: '', fpStage: 'ask', authLocked: false, signinTries: 0 });
+      this.toast('حُدّثت كلمة المرور ودخلت إلى حسابك');
+    };
+
+    /* SH-06 / SH-07 / SH-08 */
+    out.copyRef = () => this.toast('نُسخ الرقم req-8f3a2c');
+    out.goRecent = () => this.go('ST-24');
+    out.goCartOffline = () => this.toast('السلة للعرض فقط دون اتصال', 'warning');
+    out.retryOnline = () => { this.go('ST-23'); this.toast('عاد الاتصال — حُدّثت الصفحة'); };
+    const installHidden = !!st.installHidden;
+    out.installDisplay = installHidden ? 'none' : 'flex';
+    out.installHiddenDisplay = installHidden ? 'grid' : 'none';
+    out.doInstall = () => { S({ installHidden: true }); this.toast('أُضيفت بسطة إلى شاشتك الرئيسية'); };
+    out.laterInstall = () => { S({ installHidden: true }); this.toast('أخفينا الدعوة — نسألك بعد أسبوع'); };
+    out.showInstall = () => S({ installHidden: false });
+
+    /* dialogs */
+    out.stopClick = (e) => { e.stopPropagation(); };
+    out.recentAskDisplay = st.recentAsk ? 'flex' : 'none';
+    out.closeRecentAsk = () => S({ recentAsk: false });
+    out.doClearRecent = () => { S({ recent: 'cleared', recentAsk: false }); this.toast('مُسح سجلّ المشاهدة'); };
+    out.deleteAskDisplay = st.deleteAsk ? 'flex' : 'none';
+    out.closeDeleteAsk = () => S({ deleteAsk: false, delConfirm: '' });
+    out.delConfirm = st.delConfirm || '';
+    out.onDelConfirm = (e) => S({ delConfirm: e.target.value });
+    const delOk = (st.delConfirm || '').trim() === 'حذف';
+    out.delBorder = delOk ? 'var(--success)' : 'var(--border-control)';
+    out.delDisabled = !delOk;
+    out.delBtnBorder = delOk ? 'var(--danger)' : 'var(--border-default)';
+    out.delBtnColor = delOk ? 'var(--danger-text)' : 'var(--text-faint)';
+    out.delCursor = delOk ? 'pointer' : 'not-allowed';
+    out.doDelete = () => {
+      if (!delOk) return;
+      S({ deleteAsk: false, delConfirm: '', screen: 'SH-01' });
+      this.toast('حُذف حسابك — نأسف لرحيلك');
+    };
+
+    /* toast */
+    out.toastMsg = st.toast ? st.toast.msg : '';
+    out.toastDisplay = st.toast ? 'flex' : 'none';
+    out.toastBg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-subtle)' : 'var(--inverse)';
+    out.toastFg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-text)' : 'var(--on-inverse)';
+    out.toastIcon = st.toast && st.toast.kind === 'warning' ? '#i-alert' : '#i-check-circle';
+    out.closeToast = () => S({ toast: null });
+
+    return out;
+  }
+
+  openProduct() {
+    try { localStorage.setItem('basta.discovery.screen', 'ST-10'); } catch (e) {}
+    window.location.href = encodeURI('Basta Storefront Discovery.dc.html');
+  }
+}
+</script>
+</body>
+</html>

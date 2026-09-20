@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Basta · Admin operations — AD-08…11 · 16…20 · 23…26</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--sunken);color:var(--text-body);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{color:var(--brand-hover)}
+button,input,select,textarea{font:inherit;color:inherit}
+:root{
+--font-head:'Almarai',system-ui,sans-serif;
+--font-ui:'IBM Plex Sans Arabic',system-ui,sans-serif;
+--font-mono:'IBM Plex Mono',ui-monospace,monospace;
+--page:#F8F3EC;--card:#FFFFFF;--raised:#FFFFFF;--sunken:#F0E8DD;--inverse:#28211C;--on-inverse:#FDFAF6;
+--text-strong:#1E1814;--text-body:#4A3F35;--text-muted:#6B5C4D;--text-faint:#7D6C5B;
+--border-subtle:#F0E8DD;--border-default:#E3D7C7;--border-control:#958470;
+--brand:#8C2F46;--brand-hover:#74243A;--brand-pressed:#5C1B2E;--on-brand:#FFFFFF;--brand-subtle:#FBF1F3;--brand-text:#74243A;
+--money:#0E6B66;--money-subtle:#E3F2F0;--money-border:#C4E5E1;
+--success:#2F7A3E;--warning:#9A4F0B;--danger:#C23A1A;--info:#2D5F8B;
+--success-subtle:#E3F1E6;--warning-subtle:#FBEBDD;--danger-subtle:#FBE3DD;--info-subtle:#E1EBF4;
+--success-text:#25622F;--warning-text:#7E4009;--danger-text:#A12E13;--info-text:#244C70;
+--neutral-subtle:#F0E8DD;--neutral-text:#4A3F35;
+--focus:#B05A70;
+--shadow-sm:0 1px 2px rgba(46,13,23,.07),0 1px 3px rgba(74,63,53,.07);
+--shadow-md:0 2px 4px rgba(74,63,53,.07),0 6px 14px rgba(74,63,53,.09);
+--shadow-lg:0 10px 28px rgba(74,63,53,.14);
+--shadow-overlay:0 18px 52px rgba(30,24,20,.26);
+--r-1:4px;--r-2:8px;--r-3:14px;
+--text-3xl:38px;--text-2xl:30px;--text-xl:24px;--text-lg:20px;--text-md:17px;--text-sm:13px;--text-xs:12px;--text-2xs:11px;
+--text-base:15px;--row-h:48px;--card-pad:20px;--ctrl-h:40px;--gap:16px;
+}
+[data-theme="dark"]{
+--page:#14100D;--card:#1E1814;--raised:#28211C;--sunken:#14100D;--inverse:#F0E8DD;--on-inverse:#1E1814;
+--text-strong:#FDFAF6;--text-body:#E3D7C7;--text-muted:#A89680;--text-faint:#958470;
+--border-subtle:#28211C;--border-default:#332B24;--border-control:#7D6C5B;
+--brand:#D08A9B;--brand-hover:#E6B6C1;--brand-pressed:#F4DDE2;--on-brand:#1E1814;--brand-subtle:#2E0D17;--brand-text:#D08A9B;
+--money:#5CC6B8;--money-subtle:#0F2624;--money-border:#08403D;
+--success:#6CC287;--warning:#E39A4B;--danger:#F07A66;--info:#7FB2E0;
+--success-subtle:#13261A;--warning-subtle:#2E1C0B;--danger-subtle:#331410;--info-subtle:#0F1E2C;
+--success-text:#6CC287;--warning-text:#E39A4B;--danger-text:#F07A66;--info-text:#7FB2E0;
+--neutral-subtle:#28211C;--neutral-text:#E3D7C7;
+--focus:#D08A9B;
+--shadow-sm:0 1px 2px rgba(0,0,0,.4);
+--shadow-md:0 2px 4px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.4);
+--shadow-lg:0 10px 28px rgba(0,0,0,.5);
+--shadow-overlay:0 18px 52px rgba(0,0,0,.6);
+}
+[data-density="compact"]{--text-base:13px;--row-h:32px;--card-pad:14px;--ctrl-h:32px;--gap:10px}
+[data-lang="ar"] [data-t="en"]{display:none}
+[data-lang="en"] [data-t="ar"]{display:none}
+[dir="rtl"] [data-mirror]{transform:scaleX(-1)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+[data-theme="light"] [data-seg="light"],[data-theme="dark"] [data-seg="dark"],[data-lang="ar"] [data-seg="ar"],[data-lang="en"] [data-seg="en"],[data-density="comfortable"] [data-seg="comfortable"],[data-density="compact"] [data-seg="compact"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+@keyframes bsSpin{to{transform:rotate(360deg)}}
+@keyframes bsShimmer{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+@keyframes bsToastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes bsFade{from{opacity:0}to{opacity:1}}
+@keyframes bsDrawerIn{from{transform:translateX(100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:1ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" dir="rtl" data-theme="light" data-lang="ar" data-density="compact" style="min-height:100vh;background:var(--sunken);color:var(--text-body);font-family:var(--font-ui)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M13 5l7 7-7 7"></path></symbol>
+<symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="M11 19l-7-7 7-7"></path></symbol>
+<symbol id="i-chev-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></symbol>
+<symbol id="i-chev-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L21.5 20H2.5z"></path><path d="M12 10v4.5"></path><path d="M12 17.5h.01"></path></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 8h.01"></path></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.4l2.8 2.8L16 9.6"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.4l3.4 2"></path></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a1 1 0 011-1h9"></path></symbol>
+<symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.5"></circle><path d="M21 16l-5-5-6 6"></path></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-6.5 10-6.5S22 12 22 12s-4 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16"></path><path d="M9.5 6c.8-.3 1.6-.5 2.5-.5 6 0 10 6.5 10 6.5s-1.2 2-3.3 3.7"></path><path d="M6.3 8.3C3.5 10.3 2 12 2 12s4 6.5 10 6.5c1.4 0 2.6-.3 3.7-.8"></path></symbol>
+<symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v11h16V9"></path><path d="M3 9l2-5h14l2 5z"></path></symbol>
+<symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"></path><path d="M3 8l9 5 9-5"></path><path d="M12 13v10"></path></symbol>
+<symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"></rect><path d="M16 12.5h3"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"></path><path d="M10 20V4"></path><path d="M16 20v-7"></path><path d="M22 20H2"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"></path><path d="M6 8h12"></path><path d="M6 8l-3 6h6z"></path><path d="M18 8l-3 6h6z"></path></symbol>
+<symbol id="i-return" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.3 5.7"></path><path d="M20 4v7h-7"></path></symbol>
+<symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.9-3.2 3.4-5 6.5-5s5.6 1.8 6.5 5"></path><path d="M16 5.2a3.5 3.5 0 010 5.6"></path><path d="M18 15c2 .6 3.2 2.2 3.7 4"></path></symbol>
+<symbol id="i-star-fill" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z"></path><path d="M9 12.2l2.2 2.2L15.5 10"></path></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect><path d="M8 10.5V8a4 4 0 018 0v2.5"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></symbol>
+<symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"></path><path d="M14 3v5h5"></path></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h10v9H3z"></path><path d="M13 10h4l4 3v3h-8z"></path><circle cx="7" cy="18" r="1.8"></circle><circle cx="17" cy="18" r="1.8"></circle></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"></path></symbol>
+<symbol id="i-zoom-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path><path d="M11 8.5v5"></path><path d="M8.5 11h5"></path></symbol>
+<symbol id="i-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a9 9 0 109 9"></path></symbol>
+</defs></svg>
+
+<header style="position:sticky;top:0;z-index:60;background:var(--card);border-block-end:1px solid var(--border-default);box-shadow:var(--shadow-sm)">
+  <div style="max-width:1600px;margin:0 auto;padding:9px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-family:var(--font-head);font-weight:800;font-size:19px;color:var(--brand)">بسطة</span>
+    <span style="height:22px;padding:0 9px;border-radius:var(--r-1);background:var(--inverse);color:var(--on-inverse);font-family:var(--font-mono);font-size:10px;display:inline-flex;align-items:center;letter-spacing:.06em">ADMIN · SYSTEM</span>
+    <div style="display:flex;gap:6px">
+      <a href="Basta Component Sheet.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">الورقة</a>
+      <a href="Basta Admin Operations.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">عمليات الإدارة</a>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border-default)"></div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="light" onClick="{{ setLight }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">فاتح</button>
+      <button type="button" data-seg="dark" onClick="{{ setDark }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">داكن</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="ar" onClick="{{ setAr }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">عربي</button>
+      <button type="button" data-seg="en" onClick="{{ setEn }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">English</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="compact" onClick="{{ setCompact }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">مضغوطة</button>
+      <button type="button" data-seg="comfortable" onClick="{{ setComfortable }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">مريحة</button>
+    </div>
+    <div style="margin-inline-start:auto;display:flex;align-items:center;gap:10px">
+      <span style="display:flex;align-items:center;gap:6px">
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">ROLE</span>
+        <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+          <sc-for list="{{ roleTabs }}" as="r" hint-placeholder-count="2">
+            <button type="button" onClick="{{ r.pick }}" style="height:28px;padding:0 10px;border:0;border-inline-start:1px solid var(--border-control);background:{{ r.bg }};color:{{ r.fg }};font-size:11px;font-weight:600;cursor:pointer">{{ r.label }}</button>
+          </sc-for>
+        </div>
+      </span>
+      <span style="display:flex;align-items:center;gap:6px">
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">STATE</span>
+        <div style="display:flex;gap:4px">
+          <sc-for list="{{ stateTabs }}" as="p" hint-placeholder-count="5">
+            <button type="button" onClick="{{ p.go }}" style="height:28px;padding:0 9px;border:1px solid {{ p.border }};border-radius:var(--r-1);background:{{ p.bg }};color:{{ p.fg }};font-size:11px;cursor:pointer">{{ p.label }}</button>
+          </sc-for>
+        </div>
+      </span>
+    </div>
+  </div>
+  <div style="max-width:1600px;margin:0 auto;padding:0 24px 8px;display:flex;gap:4px;flex-wrap:wrap">
+    <sc-for list="{{ screenTabs }}" as="t" hint-placeholder-count="13">
+      <button type="button" onClick="{{ t.go }}" style="height:26px;padding:0 9px;border:1px solid {{ t.border }};border-radius:var(--r-1);background:{{ t.bg }};color:{{ t.fg }};font-family:var(--font-mono);font-size:11px;cursor:pointer">{{ t.code }}</button>
+    </sc-for>
+  </div>
+</header>
+
+<div style="padding:18px 16px 56px;display:grid;justify-items:center">
+  <div style="width:1440px;zoom:{{ fit }};background:var(--page);border:1px solid var(--border-default);border-radius:var(--r-3);box-shadow:var(--shadow-lg);overflow:hidden;min-height:820px;display:grid;grid-template-columns:228px minmax(0,1fr)">
+    <aside style="background:var(--inverse);padding:14px 0;display:flex;flex-direction:column;gap:3px">
+      <div style="padding:0 16px 12px;display:flex;align-items:center;gap:9px;border-block-end:1px solid rgba(255,255,255,.12);margin-bottom:8px">
+        <span style="width:32px;height:32px;flex:none;border-radius:var(--r-1);background:var(--brand);color:#FFFFFF;display:grid;place-items:center;font-family:var(--font-head);font-weight:800;font-size:16px">ب</span>
+        <span style="display:grid;gap:2px;min-width:0">
+          <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--on-inverse)">الكتالوج والنظام</span>
+          <span style="font-size:var(--text-2xs);color:rgba(255,255,255,.6)">{{ roleLabel }}</span>
+        </span>
+      </div>
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="13">
+        <button type="button" onClick="{{ n.go }}" style="margin:0 8px;height:34px;padding:0 10px;border:0;border-radius:var(--r-1);background:{{ n.bg }};color:{{ n.fg }};font-size:var(--text-sm);font-weight:{{ n.weight }};display:flex;align-items:center;gap:9px;cursor:pointer;text-align:start" style-hover="background:rgba(255,255,255,.08)">
+          <svg width="16" height="16" style="flex:none"><use href="{{ n.icon }}"></use></svg>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.label }}</span>
+        </button>
+      </sc-for>
+    </aside>
+
+    <div style="display:flex;flex-direction:column;min-width:0">
+      <div style="background:var(--card);border-block-end:1px solid var(--border-default);padding:9px 20px;display:flex;align-items:center;gap:12px">
+        <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">{{ pageTitle }}</span>
+        <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">{{ screen }}</span>
+        <span style="margin-inline-start:auto;display:flex;align-items:center;gap:7px">
+          <span style="width:26px;height:26px;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center;font-size:var(--text-xs);font-weight:700">{{ adminInitial }}</span>
+          <span style="font-size:var(--text-sm);color:var(--text-body)">{{ adminName }}</span>
+        </span>
+      </div>
+
+      <div style="display:{{ loadingDisplay }};padding:22px;gap:13px;flex-direction:column">
+        <span style="height:24px;width:220px;border-radius:var(--r-1);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out infinite"></span>
+        <span style="height:90px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .12s infinite"></span>
+        <span style="height:260px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .24s infinite"></span>
+      </div>
+
+      <div style="display:{{ errorDisplay }};padding:72px 40px;place-items:center;text-align:center;gap:12px">
+        <span style="width:50px;height:50px;border-radius:var(--r-2);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="25" height="25"><use href="#i-alert"></use></svg></span>
+        <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">حدث خلل غير متوقّع ولم يكتمل طلبك</span>
+        <span style="font-size:var(--text-base);color:var(--text-muted);max-width:56ch;line-height:1.8">أعد المحاولة، وإن تكرّر أبلغ الفريق التقني بالرقم <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">req-8f3a2c</span>.</span>
+        <button type="button" onClick="{{ retry }}" style="margin-top:4px;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-return"></use></svg>أعد المحاولة</button>
+      </div>
+
+      <div style="display:{{ contentDisplay }};padding:18px 20px 36px;min-width:0">
+        <sc-if value="{{ isAD08 }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start;min-width:0">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="padding:11px 14px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">الشجرة — حتى 4 مستويات</span>
+              <span style="font-size:var(--text-xs);color:var(--text-muted)">اسحب من المقبض لنقل الفرع كاملاً.</span>
+              <button type="button" onClick="{{ ctAddRoot }}" style="margin-inline-start:auto;height:32px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--sunken)"><svg width="14" height="14"><use href="#i-plus"></use></svg>قسم رئيسي</button>
+            </div>
+            <div style="padding:10px;display:grid;gap:2px;background:var(--sunken)">
+              <sc-for list="{{ ctTree }}" as="n" hint-placeholder-count="10">
+                <div style="display:grid;gap:2px">
+                  <span style="height:2px;border-radius:2px;background:{{ n.dropLine }};margin-inline-start:{{ n.indent }}"></span>
+                  <div draggable="true" onDragStart="{{ n.onDragStart }}" onDragOver="{{ n.onDragOver }}" onDrop="{{ n.onDrop }}" onDragEnd="{{ ctDragEnd }}" onClick="{{ n.select }}" style="margin-inline-start:{{ n.indent }};display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid {{ n.border }};border-radius:var(--r-1);background:{{ n.bg }};opacity:{{ n.opacity }};cursor:pointer">
+                    <svg width="15" height="15" style="flex:none;color:var(--text-faint);cursor:grab"><use href="#i-grip"></use></svg>
+                    <sc-if value="{{ n.renaming }}" hint-placeholder-val="{{ false }}">
+                      <input type="text" value="{{ ctRenameVal }}" onChange="{{ onCtRename }}" onBlur="{{ ctCommitRename }}" style="height:28px;flex:1;min-width:0;padding:0 8px;border:1px solid var(--brand);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm)" />
+                    </sc-if>
+                    <sc-if value="{{ n.notRenaming }}" hint-placeholder-val="{{ true }}">
+                      <span style="flex:1;min-width:0;font-size:var(--text-sm);color:var(--text-strong);font-weight:{{ n.weight }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.name }}</span>
+                    </sc-if>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">{{ n.slug }}</span>
+                    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">L{{ n.level }}</span>
+                    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">{{ n.count }}</span>
+                    <sc-if value="{{ n.inactive }}" hint-placeholder-val="{{ false }}">
+                      <span style="height:19px;padding:0 7px;border-radius:999px;background:var(--neutral-subtle);color:var(--text-faint);font-size:10px;font-weight:700;display:inline-flex;align-items:center">مخفي</span>
+                    </sc-if>
+                    <button type="button" onClick="{{ n.startRename }}" aria-label="إعادة تسمية" style="width:26px;height:26px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--card);color:var(--brand-text)"><svg width="14" height="14"><use href="#i-copy"></use></svg></button>
+                    <button type="button" onClick="{{ n.addChild }}" aria-label="أضف فرعاً" style="width:26px;height:26px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--card);color:var(--brand-text)"><svg width="14" height="14"><use href="#i-plus"></use></svg></button>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:{{ ctErrDisplay }};padding:11px 14px;border-block-start:1px solid var(--border-subtle);align-items:center;gap:9px;background:var(--danger-subtle)">
+              <svg width="16" height="16" style="flex:none;color:var(--danger-text)"><use href="#i-alert"></use></svg>
+              <span style="font-size:var(--text-xs);color:var(--danger-text);line-height:1.7">{{ ctErr }}</span>
+            </div>
+          </div>
+
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:15px;box-shadow:var(--shadow-sm);display:grid;gap:13px;position:sticky;top:14px">
+            <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">{{ ctSelName }}</span>
+            <div style="display:grid;gap:9px">
+              <label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">الاسم بالعربية</span><input type="text" value="{{ ctSelAr }}" onChange="{{ onCtSelAr }}" style="height:34px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm);width:100%" /></label>
+              <label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">Name (English)</span><input type="text" value="{{ ctSelEn }}" onChange="{{ onCtSelEn }}" dir="ltr" style="height:34px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm);width:100%" /></label>
+              <label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">المُعرّف النصّي</span><input type="text" value="{{ ctSelSlug }}" onChange="{{ onCtSelSlug }}" dir="ltr" style="height:34px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-xs);width:100%" /></label>
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px">
+                <label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">الترتيب</span><input type="text" value="{{ ctSelSort }}" onChange="{{ onCtSelSort }}" dir="ltr" style="height:34px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-xs);width:100%" /></label>
+                <div style="display:grid;gap:5px">
+                  <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">مفعّل</span>
+                  <button type="button" onClick="{{ ctToggleActive }}" role="switch" aria-checked="{{ ctSelActive }}" style="width:46px;height:26px;border:0;border-radius:999px;background:{{ ctActiveBg }};position:relative;cursor:pointer;padding:0">
+                    <span style="position:absolute;top:2px;inset-inline-start:{{ ctActiveX }};width:22px;height:22px;border-radius:999px;background:#FFFFFF;box-shadow:var(--shadow-sm);transition:inset-inline-start .16s ease-out"></span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div style="display:grid;gap:8px;padding-top:11px;border-block-start:1px solid var(--border-subtle)">
+              <span style="font-size:var(--text-xs);font-weight:700;color:var(--text-strong)">الخصائص</span>
+              <sc-for list="{{ ctAttrs }}" as="a" hint-placeholder-count="5">
+                <span style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border-subtle);border-radius:var(--r-1);background:{{ a.bg }}">
+                  <span style="font-size:var(--text-xs);color:var(--text-strong);flex:1;min-width:0">{{ a.name }}</span>
+                  <span style="height:19px;padding:0 7px;border-radius:999px;background:{{ a.tagBg }};color:{{ a.tagFg }};font-size:10px;font-weight:700;display:inline-flex;align-items:center">{{ a.tag }}</span>
+                  <sc-if value="{{ a.required }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:10px;color:var(--danger-text);font-weight:700">إلزامي</span>
+                  </sc-if>
+                </span>
+              </sc-for>
+              <button type="button" onClick="{{ ctGoAttrs }}" style="height:32px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">أدر الخصائص</button>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD10 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:13px;min-width:0">
+          <div style="display:flex;align-items:flex-start;gap:9px;padding:11px 13px;border:1px solid var(--warning);border-radius:var(--r-1);background:var(--warning-subtle)">
+            <svg width="16" height="16" style="flex:none;color:var(--warning-text);margin-top:1px"><use href="#i-alert"></use></svg>
+            <span style="font-size:var(--text-sm);color:var(--warning-text);line-height:1.7">تغيير النسبة لا يؤثّر على أي طلب سابق. القواعد لا تُحذف — تُنهى صلاحيتها بتاريخ، ويبقى سجلّ التغيير كاملاً.</span>
+          </div>
+          <div style="display:{{ cmNoPermDisplay }};align-items:center;gap:9px;padding:11px 13px;border:1px solid var(--warning);border-radius:var(--r-1);background:var(--warning-subtle)">
+            <svg width="16" height="16" style="flex:none;color:var(--warning-text)"><use href="#i-lock"></use></svg>
+            <span style="font-size:var(--text-sm);color:var(--warning-text)">التعديل يحتاج صلاحية <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">commissions.edit</span>.</span>
+          </div>
+          <sc-for list="{{ cmSections }}" as="s" hint-placeholder-count="3">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+              <div style="padding:11px 14px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="width:24px;height:24px;flex:none;border-radius:999px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;font-weight:700">{{ s.priority }}</span>
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">{{ s.title }}</span>
+                <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ s.hint }}</span>
+                <button type="button" onClick="{{ s.add }}" disabled="{{ cmDisabled }}" style="margin-inline-start:auto;height:30px;padding:0 11px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:{{ cmBtnColor }};font-size:var(--text-xs);font-weight:600;cursor:{{ cmCursor }}" style-hover="background:var(--sunken)">أضف قاعدة</button>
+              </div>
+              <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 92px 128px 128px 176px 128px;gap:10px;padding:8px 14px;border-block-end:1px solid var(--border-default)">
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">SCOPE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">RATE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">MIN FEE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">MAX FEE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">EFFECTIVE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;text-align:end">ACTION</span>
+              </div>
+              <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="2">
+                <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 92px 128px 128px 176px 128px;gap:10px;padding:10px 14px;border-block-end:1px solid var(--border-subtle);align-items:center;background:{{ r.bg }}">
+                  <span style="display:grid;gap:2px;min-width:0">
+                    <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.scope }}</span>
+                    <sc-if value="{{ r.ended }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;color:var(--text-faint)">منتهية الصلاحية</span></sc-if>
+                  </span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:{{ r.rateColor }}">{{ r.rate }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--money)">{{ r.min }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--money)">{{ r.max }}</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ r.period }}</span>
+                  <span style="display:flex;gap:6px;justify-content:flex-end">
+                    <button type="button" onClick="{{ r.edit }}" disabled="{{ cmDisabled }}" style="height:30px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:{{ cmBtnColor }};font-size:var(--text-xs);font-weight:600;cursor:{{ cmCursor }}">حرّر</button>
+                    <button type="button" onClick="{{ r.end }}" disabled="{{ r.endDisabled }}" style="height:30px;padding:0 10px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:{{ r.endColor }};font-size:var(--text-xs);font-weight:600;cursor:{{ r.endCursor }};white-space:nowrap">أنهِ الصلاحية</button>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="padding:11px 14px;border-block-end:1px solid var(--border-subtle)">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">سجلّ التغيير</span>
+            </div>
+            <sc-for list="{{ cmHistory }}" as="h" hint-placeholder-count="4">
+              <div style="padding:10px 14px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:11px;flex-wrap:wrap">
+                <span style="font-size:var(--text-xs);color:var(--text-strong);min-width:0;flex:1">{{ h.text }}</span>
+                <span style="font-size:10px;color:var(--text-muted)">{{ h.actor }}</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">{{ h.time }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD11 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:13px;min-width:0">
+          <div style="display:flex;align-items:flex-start;gap:9px;padding:11px 13px;border:1px solid var(--warning);border-radius:var(--r-1);background:var(--warning-subtle)">
+            <svg width="16" height="16" style="flex:none;color:var(--warning-text);margin-top:1px"><use href="#i-alert"></use></svg>
+            <span style="font-size:var(--text-sm);color:var(--warning-text);line-height:1.7">تحديث سعر الصرف لا يغيّر أرباح أي طلب سابق. الأسعار تُضاف ولا تُعدَّل ولا تُحذف.</span>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="padding:11px 14px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">العملات</span>
+              <span style="margin-inline-start:auto;font-size:var(--text-xs);color:var(--text-muted)">عملة المحاسبة: <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);color:var(--money);font-weight:700">USD</span></span>
+            </div>
+            <div style="overflow-x:auto"><div style="min-width:980px">
+              <div style="display:grid;grid-template-columns:90px minmax(0,1fr) 90px 104px 148px 92px 110px;gap:10px;padding:8px 14px;border-block-end:1px solid var(--border-default)">
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">CODE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">NAME</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">SYMBOL</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">DECIMALS</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">MIN PAYOUT</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">ACTIVE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">SAMPLE</span>
+              </div>
+              <sc-for list="{{ fxCurrencies }}" as="c" hint-placeholder-count="7">
+                <div style="display:grid;grid-template-columns:90px minmax(0,1fr) 90px 104px 148px 92px 110px;gap:10px;padding:10px 14px;border-block-end:1px solid var(--border-subtle);align-items:center">
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ c.code }}</span>
+                  <span style="font-size:var(--text-sm);color:var(--text-body)">{{ c.name }}</span>
+                  <span style="font-size:var(--text-sm);color:var(--money);font-weight:600">{{ c.symbol }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);color:{{ c.decColor }};font-weight:600">{{ c.dec }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--money)">{{ c.minPayout }}</span>
+                  <button type="button" onClick="{{ c.toggle }}" role="switch" aria-checked="{{ c.active }}" style="width:42px;height:23px;border:0;border-radius:999px;background:{{ c.swBg }};position:relative;cursor:pointer;padding:0;justify-self:start">
+                    <span style="position:absolute;top:2px;inset-inline-start:{{ c.swX }};width:19px;height:19px;border-radius:999px;background:#FFFFFF;box-shadow:var(--shadow-sm);transition:inset-inline-start .16s ease-out"></span>
+                  </button>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ c.sample }}</span>
+                </div>
+              </sc-for>
+            </div></div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:13px;align-items:start">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+              <div style="padding:11px 14px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">سجلّ أسعار الصرف</span>
+                <span style="height:21px;padding:0 9px;border-radius:999px;background:var(--info-subtle);color:var(--info-text);font-size:10px;font-weight:700;display:inline-flex;align-items:center">إضافة فقط</span>
+                <span style="margin-inline-start:auto;font-size:var(--text-xs);color:var(--text-muted)">هامش فرق الصرف <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);color:var(--money);font-weight:700">2%</span></span>
+              </div>
+              <div style="display:grid;grid-template-columns:130px 128px 128px minmax(0,1fr) 148px;gap:10px;padding:8px 14px;border-block-end:1px solid var(--border-default)">
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">PAIR</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">RATE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">WITH SPREAD</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">SOURCE</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">EFFECTIVE</span>
+              </div>
+              <sc-for list="{{ fxRates }}" as="r" hint-placeholder-count="6">
+                <div style="display:grid;grid-template-columns:130px 128px 128px minmax(0,1fr) 148px;gap:10px;padding:10px 14px;border-block-end:1px solid var(--border-subtle);align-items:center;background:{{ r.bg }}">
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-strong);font-weight:600">{{ r.pair }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--text-strong)">{{ r.rate }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--money);font-weight:600">{{ r.spread }}</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ r.source }}</span>
+                  <span style="display:flex;align-items:center;gap:7px">
+                    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">{{ r.time }}</span>
+                    <sc-if value="{{ r.current }}" hint-placeholder-val="{{ false }}">
+                      <span style="height:19px;padding:0 7px;border-radius:999px;background:var(--success-subtle);color:var(--success-text);font-size:10px;font-weight:700;display:inline-flex;align-items:center">الساري</span>
+                    </sc-if>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:15px;box-shadow:var(--shadow-sm);display:grid;gap:11px;align-content:start">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">أضف سعراً</span>
+              <label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">الزوج</span>
+                <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+                  <sc-for list="{{ fxPairOpts }}" as="p" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ p.pick }}" style="flex:1;height:34px;border:0;border-inline-start:1px solid var(--border-control);background:{{ p.bg }};color:{{ p.fg }};font-family:var(--font-mono);font-size:11px;font-weight:600;cursor:pointer">{{ p.label }}</button>
+                  </sc-for>
+                </div>
+              </label>
+              <label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">السعر</span><input type="text" value="{{ fxNewRate }}" onChange="{{ onFxNewRate }}" dir="ltr" placeholder="3.7503" style="height:34px;padding:0 10px;border:1px solid {{ fxNewBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-sm);width:100%" /></label>
+              <div style="padding:10px;border:1px solid var(--money-border);border-radius:var(--r-1);background:var(--money-subtle);display:grid;gap:5px">
+                <span style="font-size:10px;color:var(--text-muted)">مع الهامش 2% يصبح</span>
+                <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ fxPreview }}</span>
+              </div>
+              <button type="button" onClick="{{ fxAdd }}" disabled="{{ fxAddDisabled }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:{{ fxAddBg }};color:{{ fxAddFg }};font-size:var(--text-sm);font-weight:700;cursor:{{ fxAddCursor }}">أضف السعر</button>
+              <span style="font-size:10px;color:var(--text-muted);line-height:1.7">يُضاف السعر بتاريخ اليوم ويصبح الساري. الأسعار السابقة تبقى في السجلّ.</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD20 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:13px;min-width:0">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="padding:11px 14px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">مصفوفة الحدث × القناة</span>
+              <span style="font-size:var(--text-xs);color:var(--text-muted)">اضغط خانة لتحرير قالبها.</span>
+              <div style="margin-inline-start:auto;display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+                <button type="button" onClick="{{ ntLangAr }}" style="height:30px;padding:0 12px;border:0;background:{{ ntArBg }};color:{{ ntArFg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">العربية</button>
+                <button type="button" onClick="{{ ntLangEn }}" style="height:30px;padding:0 12px;border:0;border-inline-start:1px solid var(--border-control);background:{{ ntEnBg }};color:{{ ntEnFg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">English</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto"><div style="min-width:900px">
+              <div style="display:grid;grid-template-columns:minmax(0,1.4fr) repeat(5,110px);gap:8px;padding:9px 14px;border-block-end:1px solid var(--border-default)">
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">EVENT</span>
+                <sc-for list="{{ ntChannels }}" as="c" hint-placeholder-count="5">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;text-align:center">{{ c }}</span>
+                </sc-for>
+              </div>
+              <sc-for list="{{ ntRows }}" as="r" hint-placeholder-count="6">
+                <div style="display:grid;grid-template-columns:minmax(0,1.4fr) repeat(5,110px);gap:8px;padding:8px 14px;border-block-end:1px solid var(--border-subtle);align-items:center">
+                  <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.event }}</span>
+                  <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5">
+                    <button type="button" onClick="{{ c.pick }}" style="height:32px;border:1px solid {{ c.border }};border-radius:var(--r-1);background:{{ c.bg }};color:{{ c.fg }};font-size:10px;font-weight:700;cursor:{{ c.cursor }};display:grid;place-items:center">{{ c.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div></div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:13px;align-items:start">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:15px;box-shadow:var(--shadow-sm);display:grid;gap:12px">
+              <span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">{{ ntTitle }}</span>
+                <span style="height:21px;padding:0 9px;border-radius:999px;background:var(--neutral-subtle);color:var(--neutral-text);font-size:10px;font-weight:700;display:inline-flex;align-items:center">{{ ntChannel }}</span>
+              </span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <sc-for list="{{ ntVars }}" as="v" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ v.insert }}" style="height:28px;padding:0 10px;border:1px solid var(--brand);border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);font-family:var(--font-mono);font-size:10px;font-weight:600;cursor:pointer" style-hover="background:var(--brand);color:var(--on-brand)">{{ v.label }}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ ntHasSubject }}" hint-placeholder-val="{{ true }}">
+                <label style="display:grid;gap:5px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">الموضوع</span><input type="text" value="{{ ntSubject }}" onChange="{{ onNtSubject }}" style="height:34px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm);width:100%" /></label>
+              </sc-if>
+              <label style="display:grid;gap:5px">
+                <span style="display:flex;align-items:baseline;gap:8px"><span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">النص</span><span style="margin-inline-start:auto;font-family:var(--font-mono);font-size:10px;color:{{ ntCountColor }}">{{ ntCount }}{{ ntLimit }}</span></span>
+                <textarea rows="6" value="{{ ntBody }}" onChange="{{ onNtBody }}" style="padding:10px;border:1px solid {{ ntBodyBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-ui);font-size:var(--text-sm);line-height:1.8;resize:vertical;width:100%"></textarea>
+              </label>
+              <div style="display:flex;gap:9px;flex-wrap:wrap">
+                <button type="button" onClick="{{ ntSave }}" style="height:36px;padding:0 14px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:700;cursor:pointer" style-hover="background:var(--brand-hover)">احفظ القالب</button>
+                <button type="button" onClick="{{ ntTest }}" style="height:36px;padding:0 13px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-sm);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">أرسل تجربة</button>
+              </div>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:15px;box-shadow:var(--shadow-sm);display:grid;gap:11px;align-content:start">
+              <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">PREVIEW · ببيانات مثال</span>
+              <div style="border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--sunken);padding:14px;display:grid;gap:9px">
+                <sc-if value="{{ ntHasSubject }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong);line-height:1.6">{{ ntPreviewSubject }}</span>
+                </sc-if>
+                <div style="font-size:var(--text-sm);color:var(--text-body);line-height:1.95">
+                  <sc-for list="{{ ntPreview }}" as="seg" hint-placeholder-count="5">
+                    <span style="color:{{ seg.color }};font-weight:{{ seg.weight }};background:{{ seg.bg }};border-radius:3px;padding:{{ seg.pad }}">{{ seg.text }}</span>
+                  </sc-for>
+                </div>
+              </div>
+              <span style="font-size:10px;color:{{ ntVarColor }};line-height:1.7">{{ ntVarNote }}</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD25 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:13px;min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+              <sc-for list="{{ rpRanges }}" as="r" hint-placeholder-count="3">
+                <button type="button" onClick="{{ r.pick }}" style="height:32px;padding:0 13px;border:0;border-inline-start:1px solid var(--border-control);background:{{ r.bg }};color:{{ r.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">{{ r.label }}</button>
+              </sc-for>
+            </div>
+            <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ rpRangeLabel }}</span>
+            <span style="margin-inline-start:auto;display:flex;gap:8px">
+              <button type="button" onClick="{{ rpExportXlsx }}" style="height:32px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">تصدير Excel</button>
+              <button type="button" onClick="{{ rpExportCsv }}" style="height:32px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">تصدير CSV</button>
+            </span>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap">
+            <sc-for list="{{ rpViews }}" as="v" hint-placeholder-count="5">
+              <button type="button" onClick="{{ v.pick }}" style="height:32px;padding:0 13px;border:1px solid {{ v.border }};border-radius:999px;background:{{ v.bg }};color:{{ v.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">{{ v.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:{{ rpUsdNoteDisplay }};align-items:flex-start;gap:9px;padding:11px 13px;border:1px solid var(--info);border-radius:var(--r-1);background:var(--info-subtle)">
+            <svg width="16" height="16" style="flex:none;color:var(--info-text);margin-top:1px"><use href="#i-info"></use></svg>
+            <span style="font-size:var(--text-sm);color:var(--info-text);line-height:1.7">العرض الموحّد بالدولار — يظهر سعر الصرف المستخدم بجانب كل رقم محوَّل، والمجموع تقريبي لأغراض المقارنة فقط.</span>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="overflow-x:auto"><div style="min-width:1000px">
+              <div style="display:grid;grid-template-columns:{{ rpCols }};gap:10px;padding:9px 14px;border-block-end:1px solid var(--border-default)">
+                <sc-for list="{{ rpHead }}" as="h" hint-placeholder-count="7">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;text-align:{{ h.align }}">{{ h.label }}</span>
+                </sc-for>
+              </div>
+              <sc-for list="{{ rpRows }}" as="r" hint-placeholder-count="5">
+                <div style="display:grid;grid-template-columns:{{ rpCols }};gap:10px;padding:11px 14px;border-block-end:1px solid var(--border-subtle);align-items:center;background:{{ r.bg }}">
+                  <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="7">
+                    <span style="display:grid;gap:2px;justify-items:{{ c.justify }};min-width:0">
+                      <span dir="{{ c.dir }}" style="unicode-bidi:isolate;font-family:{{ c.font }};font-size:{{ c.size }};font-weight:{{ c.weight }};color:{{ c.color }}">{{ c.text }}</span>
+                      <sc-if value="{{ c.sub }}" hint-placeholder-val="{{ false }}">
+                        <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:9px;color:var(--text-faint)">{{ c.sub }}</span>
+                      </sc-if>
+                    </span>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div></div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD26 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start;min-width:0">
+          <div style="display:grid;gap:13px">
+            <div style="display:{{ stNoPermDisplay }};align-items:center;gap:9px;padding:11px 13px;border:1px solid var(--warning);border-radius:var(--r-1);background:var(--warning-subtle)">
+              <svg width="16" height="16" style="flex:none;color:var(--warning-text)"><use href="#i-lock"></use></svg>
+              <span style="font-size:var(--text-sm);color:var(--warning-text)">تعديل الإعدادات المالية يحتاج صلاحية <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">settings.edit</span>.</span>
+            </div>
+            <sc-for list="{{ stGroups }}" as="g" hint-placeholder-count="2">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+                <div style="padding:11px 14px;border-block-end:1px solid var(--border-subtle)">
+                  <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">{{ g.title }}</span>
+                </div>
+                <sc-for list="{{ g.rows }}" as="s" hint-placeholder-count="4">
+                  <div style="padding:13px 14px;border-block-end:1px solid var(--border-subtle);display:grid;gap:9px">
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                      <span style="display:grid;gap:3px;min-width:0;flex:1">
+                        <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">{{ s.label }}</span>
+                        <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">{{ s.key }}</span>
+                      </span>
+                      <span style="display:flex;align-items:stretch;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden;background:var(--card);flex:none;width:150px">
+                        <input type="text" value="{{ s.value }}" onChange="{{ s.onChange }}" disabled="{{ stDisabled }}" dir="ltr" style="flex:1;min-width:0;height:34px;padding:0 10px;border:0;background:{{ s.fieldBg }};color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-sm);outline:none" />
+                        <span style="display:flex;align-items:center;padding:0 9px;background:var(--sunken);color:var(--text-muted);font-size:10px;border-inline-start:1px solid var(--border-default)">{{ s.unit }}</span>
+                      </span>
+                    </div>
+                    <span style="display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border:1px solid {{ s.warnBorder }};border-radius:var(--r-1);background:{{ s.warnBg }};font-size:var(--text-xs);color:{{ s.warnColor }};line-height:1.7"><svg width="14" height="14" style="flex:none;margin-top:2px"><use href="#i-alert"></use></svg>{{ s.warn }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button type="button" onClick="{{ stSave }}" disabled="{{ stDisabled }}" style="height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:{{ stSaveBg }};color:{{ stSaveFg }};font-size:var(--text-base);font-weight:700;cursor:{{ stCursor }}">احفظ الإعدادات</button>
+              <span style="display:{{ stDirtyDisplay }};align-items:center;gap:7px;font-size:var(--text-xs);color:var(--warning-text)"><span style="width:7px;height:7px;border-radius:999px;background:var(--warning)"></span>تغييرات غير محفوظة</span>
+            </div>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden;position:sticky;top:14px">
+            <div style="padding:11px 14px;border-block-end:1px solid var(--border-subtle)">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">سجلّ التغيير</span>
+            </div>
+            <sc-for list="{{ stHistory }}" as="h" hint-placeholder-count="5">
+              <div style="padding:10px 14px;border-block-end:1px solid var(--border-subtle);display:grid;gap:3px">
+                <span style="font-size:var(--text-xs);color:var(--text-strong);line-height:1.6">{{ h.text }}</span>
+                <span style="font-size:10px;color:var(--text-faint)">{{ h.actor }} · {{ h.time }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isSysTable }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:13px;min-width:0">
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+            <sc-for list="{{ sysFilters }}" as="f" hint-placeholder-count="4">
+              <button type="button" onClick="{{ f.pick }}" style="height:32px;padding:0 12px;border:1px solid {{ f.border }};border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">{{ f.label }}<span style="font-family:var(--font-mono);font-size:10px;opacity:.75">{{ f.count }}</span></button>
+            </sc-for>
+            <span style="margin-inline-start:auto;display:flex;align-items:center;gap:8px">
+              <span style="position:relative;display:flex;align-items:center">
+                <svg width="15" height="15" style="position:absolute;inset-inline-start:9px;color:var(--text-faint);pointer-events:none"><use href="#i-search"></use></svg>
+                <input type="text" value="{{ sysQuery }}" onChange="{{ onSysQuery }}" placeholder="{{ sysSearchHint }}" style="height:var(--ctrl-h);width:240px;padding-inline:29px 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm)" />
+              </span>
+              <sc-if value="{{ sysPrimary }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ sysPrimaryGo }}" style="height:var(--ctrl-h);padding:0 14px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap" style-hover="background:var(--brand-hover)"><svg width="15" height="15"><use href="#i-plus"></use></svg>{{ sysPrimary }}</button>
+              </sc-if>
+            </span>
+          </div>
+
+          <div style="display:{{ sysNoteDisplay }};align-items:flex-start;gap:9px;padding:11px 13px;border:1px solid {{ sysNoteBorder }};border-radius:var(--r-1);background:{{ sysNoteBg }}">
+            <svg width="16" height="16" style="flex:none;color:{{ sysNoteColor }};margin-top:1px"><use href="{{ sysNoteIcon }}"></use></svg>
+            <span style="font-size:var(--text-sm);color:{{ sysNoteColor }};line-height:1.7">{{ sysNote }}</span>
+          </div>
+
+          <sc-if value="{{ sysEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:48px 22px;display:grid;justify-items:center;gap:10px;text-align:center">
+              <span style="width:48px;height:48px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="24" height="24"><use href="{{ sysEmptyIcon }}"></use></svg></span>
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-md);color:var(--text-strong)">{{ sysEmptyTitle }}</span>
+              <span style="font-size:var(--text-sm);color:var(--text-muted);max-width:52ch;line-height:1.8">{{ sysEmptyBody }}</span>
+              <button type="button" onClick="{{ sysClear }}" style="margin-top:4px;height:32px;padding:0 13px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">أزل التصفية</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ sysHasRows }}" hint-placeholder-val="{{ true }}">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="overflow-x:auto"><div style="min-width:{{ sysMinWidth }}">
+              <div style="display:grid;grid-template-columns:{{ sysCols }};gap:11px;padding:9px 14px;border-block-end:1px solid var(--border-default)">
+                <sc-for list="{{ sysHead }}" as="h" hint-placeholder-count="6">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;text-align:{{ h.align }}">{{ h.label }}</span>
+                </sc-for>
+              </div>
+              <sc-for list="{{ sysRows }}" as="r" hint-placeholder-count="7">
+                <div draggable="{{ r.draggable }}" onDragStart="{{ r.onDragStart }}" onDragOver="{{ r.onDragOver }}" onDrop="{{ r.onDrop }}" onDragEnd="{{ sysDragEnd }}" style="border-block-end:1px solid var(--border-subtle);background:{{ r.rowBg }};opacity:{{ r.opacity }};border-top:2px solid {{ r.dropLine }}">
+                  <div style="display:grid;grid-template-columns:{{ sysCols }};gap:11px;padding:11px 14px;align-items:center">
+                    <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6">
+                      <span style="display:flex;align-items:center;gap:8px;min-width:0;justify-content:{{ c.justify }}">
+                        <sc-if value="{{ c.grip }}" hint-placeholder-val="{{ false }}">
+                          <svg width="15" height="15" style="flex:none;color:var(--text-faint);cursor:grab"><use href="#i-grip"></use></svg>
+                        </sc-if>
+                        <sc-if value="{{ c.icon }}" hint-placeholder-val="{{ false }}">
+                          <span style="width:30px;height:30px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="15" height="15"><use href="{{ c.icon }}"></use></svg></span>
+                        </sc-if>
+                        <sc-if value="{{ c.isBadge }}" hint-placeholder-val="{{ false }}">
+                          <span style="height:23px;padding:0 9px;border-radius:999px;background:{{ c.badgeBg }};color:{{ c.badgeFg }};font-size:10px;font-weight:700;display:inline-flex;align-items:center;white-space:nowrap">{{ c.text }}</span>
+                        </sc-if>
+                        <sc-if value="{{ c.isStack }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:grid;gap:2px;min-width:0">
+                            <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.text }}</span>
+                            <span dir="{{ c.subDir }}" style="unicode-bidi:isolate;font-size:10px;color:var(--text-muted);font-family:{{ c.subFont }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.sub }}</span>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ c.isBar }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:grid;gap:4px;min-width:0;width:100%">
+                            <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:10px;color:var(--text-body)">{{ c.text }}</span>
+                            <span style="height:5px;border-radius:999px;background:var(--sunken);overflow:hidden"><span style="display:block;height:100%;width:{{ c.pct }};background:{{ c.barColor }}"></span></span>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ c.isToggle }}" hint-placeholder-val="{{ false }}">
+                          <button type="button" onClick="{{ c.toggle }}" role="switch" aria-checked="{{ c.on }}" style="width:42px;height:23px;border:0;border-radius:999px;background:{{ c.swBg }};position:relative;cursor:pointer;padding:0">
+                            <span style="position:absolute;top:2px;inset-inline-start:{{ c.swX }};width:19px;height:19px;border-radius:999px;background:#FFFFFF;box-shadow:var(--shadow-sm);transition:inset-inline-start .16s ease-out"></span>
+                          </button>
+                        </sc-if>
+                        <sc-if value="{{ c.isPlain }}" hint-placeholder-val="{{ true }}">
+                          <span dir="{{ c.dir }}" style="unicode-bidi:isolate;font-family:{{ c.font }};font-size:{{ c.size }};font-weight:{{ c.weight }};color:{{ c.color }};overflow:hidden;text-overflow:ellipsis;white-space:{{ c.wrap }};min-width:0;line-height:1.6">{{ c.text }}</span>
+                        </sc-if>
+                        <sc-if value="{{ c.isActions }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+                            <sc-for list="{{ c.actions }}" as="a" hint-placeholder-count="2">
+                              <button type="button" onClick="{{ a.go }}" disabled="{{ a.disabled }}" style="height:30px;padding:0 11px;border:{{ a.border }};border-radius:var(--r-1);background:{{ a.bg }};color:{{ a.fg }};font-size:var(--text-xs);font-weight:600;cursor:{{ a.cursor }};white-space:nowrap">{{ a.label }}</button>
+                            </sc-for>
+                          </span>
+                        </sc-if>
+                      </span>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ r.note }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:0 14px 11px">
+                      <span style="display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border:1px solid {{ r.noteBorder }};border-radius:var(--r-1);background:var(--card);font-size:var(--text-xs);color:{{ r.noteColor }};line-height:1.7;width:fit-content;max-width:100%"><svg width="14" height="14" style="flex:none;margin-top:2px"><use href="#i-info"></use></svg>{{ r.note }}</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div></div>
+          </div>
+          </sc-if>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ toastDisplay }};position:fixed;bottom:24px;inset-inline-start:24px;z-index:120;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-2);background:{{ toastBg }};color:{{ toastFg }};box-shadow:var(--shadow-lg);animation:bsToastIn .22s ease-out;max-width:560px">
+  <svg width="18" height="18" style="flex:none"><use href="{{ toastIcon }}"></use></svg>
+  <span style="font-size:var(--text-sm);font-weight:600;line-height:1.6">{{ toastMsg }}</span>
+  <button type="button" onClick="{{ closeToast }}" aria-label="إغلاق" style="margin-inline-start:8px;width:26px;height:26px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;opacity:.75"><svg width="15" height="15"><use href="#i-x"></use></svg></button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;defaultDirection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rtl&quot;,&quot;ltr&quot;],&quot;default&quot;:&quot;rtl&quot;,&quot;tsType&quot;:&quot;'rtl'|'ltr'&quot;},&quot;defaultDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;compact&quot;,&quot;comfortable&quot;],&quot;default&quot;:&quot;compact&quot;,&quot;tsType&quot;:&quot;'compact'|'comfortable'&quot;},&quot;defaultScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;AD-08&quot;,&quot;AD-09&quot;,&quot;AD-10&quot;,&quot;AD-11&quot;,&quot;AD-16&quot;,&quot;AD-17&quot;,&quot;AD-18&quot;,&quot;AD-19&quot;,&quot;AD-20&quot;,&quot;AD-23&quot;,&quot;AD-24&quot;,&quot;AD-25&quot;,&quot;AD-26&quot;],&quot;default&quot;:&quot;AD-08&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { screen: 'AD-08', pstate: 'default', fit: 1, toast: null, role: 'super' };
+
+  componentDidMount() {
+    const r = this.rootEl;
+    if (r) {
+      if (this.props.defaultTheme === 'dark') r.setAttribute('data-theme', 'dark');
+      if (this.props.defaultDirection === 'ltr') { r.setAttribute('dir', 'ltr'); r.setAttribute('data-lang', 'en'); }
+      if (this.props.defaultDensity) r.setAttribute('data-density', this.props.defaultDensity);
+    }
+    if (this.props.defaultScreen) this.setState({ screen: this.props.defaultScreen });
+    try {
+      const hand = localStorage.getItem('basta.adminsys.screen');
+      if (hand) { localStorage.removeItem('basta.adminsys.screen'); this.setState({ screen: hand }); }
+    } catch (e) {}
+    this._fit = () => {
+      const w = (this.rootEl ? this.rootEl.clientWidth : window.innerWidth) - 36;
+      this.setState({ fit: Math.min(1, Math.max(0.3, w / 1440)) });
+    };
+    this._fit();
+    window.addEventListener('resize', this._fit);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this._fit); clearTimeout(this._toastT); }
+  set(k, v) { if (this.rootEl) this.rootEl.setAttribute(k, v); }
+  toast(msg, kind) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: { msg: msg, kind: kind || 'success' } });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), 4200);
+  }
+  go(screen) { this.setState({ screen: screen }); }
+  money(n, code) {
+    const dec = (code === 'KWD' || code === 'JOD' || code === 'OMR') ? 3 : 2;
+    const sym = { SAR: 'ر.س.', AED: 'د.إ.', KWD: 'د.ك.', JOD: 'د.أ.', EGP: 'ج.م.', USD: '$', QAR: 'ر.ق.', OMR: 'ر.ع.' }[code || 'SAR'];
+    return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + ' ' + sym;
+  }
+
+  catalog() {
+    const st = this.state, S = (o) => this.setState(o), out = {};
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const can = st.role === 'super';
+    const M = (n, c) => this.money(n, c);
+
+    ['AD-08', 'AD-10', 'AD-11'].forEach(c => { out['is' + c.replace('-', '')] = st.screen === c; });
+
+    /* AD-08 category tree */
+    const baseTree = [
+      { id: 1, name: 'إلكترونيات', slug: 'electronics', level: 1, count: 238, active: true },
+      { id: 2, name: 'صوتيات', slug: 'audio', level: 2, count: 74, active: true },
+      { id: 3, name: 'مكبّرات بلوتوث', slug: 'bt-speakers', level: 3, count: 31, active: true },
+      { id: 4, name: 'سمّاعات رأس', slug: 'headphones', level: 3, count: 43, active: true },
+      { id: 5, name: 'أزياء', slug: 'fashion', level: 1, count: 412, active: true },
+      { id: 6, name: 'أزياء نسائية', slug: 'womens', level: 2, count: 280, active: true },
+      { id: 7, name: 'قمصان', slug: 'shirts', level: 3, count: 96, active: true },
+      { id: 8, name: 'عبايات', slug: 'abayas', level: 3, count: 180, active: true },
+      { id: 9, name: 'المنزل والمطبخ', slug: 'home', level: 1, count: 156, active: true },
+      { id: 10, name: 'مفارش', slug: 'bedding', level: 2, count: 64, active: edge ? false : true }
+    ];
+    const nodes = st.ctNodes || baseTree;
+    const subtreeLen = (i) => { let n = 1; while (i + n < nodes.length && nodes[i + n].level > nodes[i].level) n++; return n; };
+    const selId = st.ctSel || 7;
+    out.ctTree = (empty ? [] : nodes).map((n, i) => ({
+      name: n.name, slug: n.slug, level: n.level, count: n.count,
+      indent: ((n.level - 1) * 22) + 'px',
+      weight: n.level === 1 ? '700' : '500',
+      inactive: !n.active,
+      bg: n.id === selId ? 'var(--brand-subtle)' : (st.ctOver === n.id && st.ctDrag !== n.id ? (st.ctOk ? 'var(--brand-subtle)' : 'var(--danger-subtle)') : 'var(--card)'),
+      border: n.id === selId ? 'var(--brand)' : (st.ctOver === n.id && st.ctDrag !== n.id ? (st.ctOk ? 'var(--brand)' : 'var(--danger)') : 'var(--border-subtle)'),
+      opacity: st.ctDrag === n.id ? 0.45 : 1,
+      dropLine: st.ctOver === n.id && st.ctDrag !== n.id ? (st.ctOk ? 'var(--brand)' : 'var(--danger)') : 'transparent',
+      renaming: st.ctRename === n.id,
+      notRenaming: st.ctRename !== n.id,
+      select: () => S({ ctSel: n.id }),
+      startRename: () => S({ ctRename: n.id, ctRenameVal: n.name }),
+      addChild: () => {
+        if (n.level >= 4) { this.toast('لا يمكن تجاوز أربعة مستويات', 'warning'); return; }
+        const arr = nodes.slice();
+        const at = nodes.findIndex(x => x.id === n.id) + 1;
+        const nid = Math.max.apply(null, nodes.map(x => x.id)) + 1;
+        arr.splice(at, 0, { id: nid, name: 'تصنيف جديد', slug: 'new-category', level: n.level + 1, count: 0, active: true });
+        S({ ctNodes: arr, ctSel: nid, ctRename: nid, ctRenameVal: 'تصنيف جديد' });
+      },
+      onDragStart: () => S({ ctDrag: n.id, ctErr: '' }),
+      onDragOver: (e) => {
+        e.preventDefault();
+        if (st.ctDrag == null || st.ctDrag === n.id) return;
+        const di = nodes.findIndex(x => x.id === st.ctDrag);
+        const len = subtreeLen(di);
+        const inside = i > di && i < di + len;
+        const depth = Math.max.apply(null, nodes.slice(di, di + len).map(x => x.level)) - nodes[di].level;
+        const ok = !inside && (n.level + 1 + depth) <= 4;
+        const err = inside ? 'لا يمكن نقل تصنيف إلى داخل أحد فروعه.' : (!ok ? 'هذا الإفلات يصنع المستوى ' + (n.level + 1 + depth) + ' والحد أربعة مستويات.' : '');
+        if (st.ctOver !== n.id || st.ctOk !== ok) S({ ctOver: n.id, ctOk: ok, ctErr: err });
+      },
+      onDrop: (e) => {
+        e.preventDefault();
+        if (!st.ctOk || st.ctDrag == null || st.ctDrag === n.id) { S({ ctOver: null, ctDrag: null }); return; }
+        const arr = nodes.slice();
+        const di = arr.findIndex(x => x.id === st.ctDrag);
+        const len = subtreeLen(di);
+        const moved = arr.splice(di, len);
+        const ti = arr.findIndex(x => x.id === n.id);
+        const delta = (arr[ti].level + 1) - moved[0].level;
+        const shifted = moved.map(x => Object.assign({}, x, { level: x.level + delta }));
+        arr.splice(ti + 1, 0, ...shifted);
+        S({ ctNodes: arr, ctDrag: null, ctOver: null, ctErr: '' });
+        this.toast('نُقل «' + moved[0].name + '» بفرعه تحت «' + n.name + '»');
+      }
+    }));
+    out.ctDragEnd = () => S({ ctDrag: null, ctOver: null, ctErr: '' });
+    out.ctErr = st.ctErr || '';
+    out.ctErrDisplay = st.ctErr ? 'flex' : 'none';
+    out.ctRenameVal = st.ctRenameVal || '';
+    out.onCtRename = (e) => S({ ctRenameVal: e.target.value });
+    out.ctCommitRename = () => {
+      const v = (st.ctRenameVal || '').trim();
+      if (!v) { S({ ctRename: null }); return; }
+      S({ ctNodes: nodes.map(x => x.id === st.ctRename ? Object.assign({}, x, { name: v }) : x), ctRename: null });
+      this.toast('أُعيدت التسمية إلى «' + v + '»');
+    };
+    out.ctAddRoot = () => {
+      const arr = nodes.slice();
+      const nid = Math.max.apply(null, nodes.map(x => x.id)) + 1;
+      arr.push({ id: nid, name: 'قسم جديد', slug: 'new-section', level: 1, count: 0, active: true });
+      S({ ctNodes: arr, ctSel: nid, ctRename: nid, ctRenameVal: 'قسم جديد' });
+    };
+    const sel = nodes.filter(n => n.id === selId)[0] || nodes[0];
+    out.ctSelName = sel ? sel.name : '—';
+    out.ctSelAr = (st.ctEdits && st.ctEdits.ar !== undefined) ? st.ctEdits.ar : (sel ? sel.name : '');
+    out.ctSelEn = (st.ctEdits && st.ctEdits.en !== undefined) ? st.ctEdits.en : 'Shirts';
+    out.ctSelSlug = sel ? sel.slug : '';
+    out.ctSelSort = '10';
+    const setEdit = (k, v) => S({ ctEdits: Object.assign({}, st.ctEdits, { [k]: v }) });
+    out.onCtSelAr = (e) => setEdit('ar', e.target.value);
+    out.onCtSelEn = (e) => setEdit('en', e.target.value);
+    out.onCtSelSlug = (e) => S({ ctNodes: nodes.map(x => x.id === selId ? Object.assign({}, x, { slug: e.target.value }) : x) });
+    out.onCtSelSort = () => {};
+    out.ctSelActive = sel ? sel.active : true;
+    out.ctActiveBg = (sel && sel.active) ? 'var(--brand)' : 'var(--border-control)';
+    out.ctActiveX = (sel && sel.active) ? '22px' : '2px';
+    out.ctToggleActive = () => S({ ctNodes: nodes.map(x => x.id === selId ? Object.assign({}, x, { active: !x.active }) : x) });
+    out.ctAttrs = [
+      { name: 'المادة', tag: 'موروثة', own: false, required: true },
+      { name: 'طريقة العناية', tag: 'موروثة', own: false, required: false },
+      { name: 'طول الكم', tag: 'خاصة', own: true, required: true },
+      { name: 'وزن القماش', tag: 'خاصة', own: true, required: false },
+      { name: 'قابل للإرجاع', tag: 'موروثة', own: false, required: false }
+    ].map(a => ({
+      name: a.name, tag: a.tag, required: a.required,
+      bg: a.own ? 'var(--card)' : 'var(--sunken)',
+      tagBg: a.own ? 'var(--brand-subtle)' : 'var(--neutral-subtle)',
+      tagFg: a.own ? 'var(--brand-text)' : 'var(--text-muted)'
+    }));
+    out.ctGoAttrs = () => this.go('AD-09');
+
+    /* AD-10 commissions */
+    out.cmDisabled = !can;
+    out.cmCursor = can ? 'pointer' : 'not-allowed';
+    out.cmBtnColor = can ? 'var(--text-strong)' : 'var(--text-faint)';
+    out.cmNoPermDisplay = can ? 'none' : 'flex';
+    const mkRule = (scope, rate, min, max, period, ended) => ({
+      scope: scope, rate: rate + '%', min: M(min, 'SAR'), max: max ? M(max, 'SAR') : 'بلا حد',
+      period: period, ended: ended,
+      bg: ended ? 'var(--sunken)' : 'transparent',
+      rateColor: ended ? 'var(--text-faint)' : 'var(--text-strong)',
+      edit: () => { if (can) this.toast('تحرير القاعدة — التغيير لا يمسّ الطلبات السابقة'); },
+      end: () => { if (can && !ended) this.toast('أُنهيت صلاحية القاعدة بتاريخ اليوم — تبقى في السجلّ', 'warning'); },
+      endDisabled: !can || ended,
+      endColor: (!can || ended) ? 'var(--text-faint)' : 'var(--danger-text)',
+      endCursor: (!can || ended) ? 'not-allowed' : 'pointer'
+    });
+    out.cmSections = empty ? [] : [
+      { priority: '1', title: 'قواعد المتاجر', hint: 'الأعلى أولوية — تتجاوز قواعد التصنيف والقاعدة العامة', add: () => { if (can) this.toast('أضف قاعدة لمتجر بعينه'); }, rows: [mkRule('دار القطن', 8, 5, 400, '1 يناير 2026 — مفتوحة', false), mkRule('إلكترونيات الخليج', 12, 10, 0, '1 مارس 2026 — مفتوحة', false), mkRule('حرف الشام', 9, 5, 300, '1 مايو 2026 — 31 أغسطس 2026', true)] },
+      { priority: '2', title: 'قواعد التصنيفات', hint: 'تُطبَّق حين لا توجد قاعدة للمتجر', add: () => { if (can) this.toast('أضف قاعدة لتصنيف'); }, rows: [mkRule('إلكترونيات', 12, 10, 0, '1 يناير 2026 — مفتوحة', false), mkRule('أزياء', 10, 5, 500, '1 يناير 2026 — مفتوحة', false)] },
+      { priority: '3', title: 'القاعدة العامة', hint: 'تُطبَّق حين لا توجد قاعدة متجر أو تصنيف', add: () => { if (can) this.toast('القاعدة العامة واحدة فقط', 'warning'); }, rows: [mkRule('كل المنصّة', 10, 5, 0, '1 يناير 2026 — مفتوحة', false)] }
+    ];
+    out.cmHistory = empty ? [] : [
+      { text: 'عمولة «دار القطن» من 10% إلى 8%', actor: 'ريم السالم', time: '12 سبتمبر · 14:20' },
+      { text: 'أُنهيت صلاحية قاعدة «حرف الشام»', actor: 'ريم السالم', time: '31 أغسطس · 23:59' },
+      { text: 'عمولة تصنيف «إلكترونيات» من 10% إلى 12%', actor: 'ريم السالم', time: '1 مارس · 09:10' },
+      { text: 'أُنشئت القاعدة العامة 10%', actor: 'النظام', time: '1 يناير · 00:00' }
+    ];
+
+    /* AD-11 currencies + FX */
+    const curDefs = [
+      { code: 'SAR', name: 'الريال السعودي', symbol: 'ر.س.', dec: 2, min: 100, active: true },
+      { code: 'AED', name: 'الدرهم الإماراتي', symbol: 'د.إ.', dec: 2, min: 100, active: true },
+      { code: 'QAR', name: 'الريال القطري', symbol: 'ر.ق.', dec: 2, min: 100, active: true },
+      { code: 'KWD', name: 'الدينار الكويتي', symbol: 'د.ك.', dec: 3, min: 10, active: true },
+      { code: 'JOD', name: 'الدينار الأردني', symbol: 'د.أ.', dec: 3, min: 20, active: true },
+      { code: 'OMR', name: 'الريال العماني', symbol: 'ر.ع.', dec: 3, min: 10, active: edge ? false : true },
+      { code: 'EGP', name: 'الجنيه المصري', symbol: 'ج.م.', dec: 2, min: 1000, active: true },
+      { code: 'USD', name: 'الدولار — عملة المحاسبة', symbol: '$', dec: 2, min: 25, active: true }
+    ];
+    const curOff = st.curOff || [];
+    out.fxCurrencies = (empty ? [] : curDefs).map(c => {
+      const on = c.active && curOff.indexOf(c.code) < 0;
+      return {
+        code: c.code, name: c.name, symbol: c.symbol, dec: String(c.dec),
+        decColor: c.dec === 3 ? 'var(--warning-text)' : 'var(--text-strong)',
+        minPayout: M(c.min, c.code),
+        sample: M(1234.5, c.code),
+        active: on,
+        swBg: on ? 'var(--brand)' : 'var(--border-control)',
+        swX: on ? '21px' : '2px',
+        toggle: () => { if (!can) { this.toast('التعديل يحتاج صلاحية مالية', 'warning'); return; } S({ curOff: on ? curOff.concat([c.code]) : curOff.filter(x => x !== c.code) }); }
+      };
+    });
+    const rateDefs = [
+      { pair: 'USD → SAR', rate: 3.7503, source: 'مزوّد الأسعار المركزي', time: '14 سبتمبر · 08:00', current: true },
+      { pair: 'USD → AED', rate: 3.6725, source: 'مزوّد الأسعار المركزي', time: '14 سبتمبر · 08:00', current: true },
+      { pair: 'USD → JOD', rate: 0.709, source: 'مزوّد الأسعار المركزي', time: '14 سبتمبر · 08:00', current: true },
+      { pair: 'USD → SAR', rate: 3.7498, source: 'مزوّد الأسعار المركزي', time: '13 سبتمبر · 08:00', current: false },
+      { pair: 'USD → AED', rate: 3.6721, source: 'مزوّد الأسعار المركزي', time: '13 سبتمبر · 08:00', current: false },
+      { pair: 'USD → EGP', rate: 48.62, source: 'إدخال يدوي — ريم السالم', time: '12 سبتمبر · 17:30', current: true }
+    ];
+    out.fxRates = (empty ? [] : (st.fxExtra || []).concat(rateDefs)).map(r => ({
+      pair: r.pair,
+      rate: r.rate.toFixed(4),
+      spread: (r.rate * 1.02).toFixed(4),
+      source: r.source, time: r.time, current: r.current,
+      bg: r.current ? 'var(--success-subtle)' : 'transparent'
+    }));
+    const pairs = ['USD → SAR', 'USD → AED', 'USD → JOD'];
+    const fxPair = st.fxPair || pairs[0];
+    out.fxPairOpts = pairs.map(p => ({
+      label: p.replace(' → ', '→'),
+      bg: fxPair === p ? 'var(--brand)' : 'var(--card)',
+      fg: fxPair === p ? 'var(--on-brand)' : 'var(--text-body)',
+      pick: () => S({ fxPair: p })
+    }));
+    out.fxNewRate = st.fxNewRate || '';
+    out.onFxNewRate = (e) => S({ fxNewRate: e.target.value.replace(/[^0-9.]/g, '') });
+    const fxNum = Number(st.fxNewRate || 0);
+    const fxValid = fxNum > 0;
+    out.fxNewBorder = (st.fxNewRate && !fxValid) ? 'var(--danger)' : 'var(--border-control)';
+    out.fxPreview = fxValid ? (fxNum * 1.02).toFixed(4) : '—';
+    out.fxAddDisabled = !fxValid || !can;
+    out.fxAddBg = (fxValid && can) ? 'var(--brand)' : 'var(--sunken)';
+    out.fxAddFg = (fxValid && can) ? 'var(--on-brand)' : 'var(--text-faint)';
+    out.fxAddCursor = (fxValid && can) ? 'pointer' : 'not-allowed';
+    out.fxAdd = () => {
+      if (!fxValid || !can) { this.toast(can ? 'اكتب سعراً صحيحاً' : 'الإضافة تحتاج صلاحية مالية', 'warning'); return; }
+      S({ fxExtra: [{ pair: fxPair, rate: fxNum, source: 'إدخال يدوي — ' + (can ? 'ريم السالم' : 'خالد النمر'), time: '14 سبتمبر · الآن', current: true }].concat(st.fxExtra || []), fxNewRate: '' });
+      this.toast('أُضيف سعر ' + fxPair + ' = ' + fxNum.toFixed(4) + ' — لا يؤثّر على الطلبات السابقة');
+    };
+
+    return out;
+  }
+
+  sys() {
+    const st = this.state, S = (o) => this.setState(o), out = {};
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const can = st.role === 'super';
+    const M = (n, c) => this.money(n, c);
+
+    out.isAD20 = st.screen === 'AD-20';
+    out.isAD25 = st.screen === 'AD-25';
+    out.isAD26 = st.screen === 'AD-26';
+    const sysTables = ['AD-09', 'AD-16', 'AD-17', 'AD-18', 'AD-19', 'AD-23', 'AD-24'];
+    out.isSysTable = sysTables.indexOf(st.screen) >= 0;
+
+    /* AD-20 notification templates */
+    const ntEvents = [
+      { k: 'order_placed', label: 'تأكيد الطلب', ch: [1, 1, 1, 1, 1] },
+      { k: 'order_accepted', label: 'قبول المتجر للطلب', ch: [1, 0, 1, 1, 1] },
+      { k: 'shipped', label: 'شحن الطلب', ch: [1, 1, 1, 1, 1] },
+      { k: 'delivered', label: 'تسليم الطلب', ch: [1, 0, 0, 1, 1] },
+      { k: 'dispute', label: 'قرار النزاع', ch: [1, 0, 0, 1, 1] },
+      { k: 'payout', label: 'تحويل أرباح التاجر', ch: [1, 0, 0, 0, 1] }
+    ];
+    const chNames = ['EMAIL', 'SMS', 'WHATSAPP', 'PUSH', 'IN-APP'];
+    out.ntChannels = chNames;
+    const ntSelEvent = st.ntEvent || 'shipped';
+    const ntSelCh = st.ntCh === undefined ? 0 : st.ntCh;
+    out.ntRows = (empty ? [] : ntEvents).map(e => ({
+      event: e.label,
+      cells: e.ch.map((on, i) => {
+        const active = ntSelEvent === e.k && ntSelCh === i;
+        return {
+          label: on ? (active ? 'محدّد' : 'مفعّل') : 'مغلق',
+          bg: active ? 'var(--brand)' : (on ? 'var(--success-subtle)' : 'var(--neutral-subtle)'),
+          fg: active ? 'var(--on-brand)' : (on ? 'var(--success-text)' : 'var(--text-faint)'),
+          border: active ? 'var(--brand)' : (on ? 'var(--success)' : 'var(--border-default)'),
+          cursor: on ? 'pointer' : 'not-allowed',
+          pick: () => { if (on) S({ ntEvent: e.k, ntCh: i }); else this.toast('هذه القناة مغلقة لهذا الحدث', 'warning'); }
+        };
+      })
+    }));
+    const evObj = ntEvents.filter(e => e.k === ntSelEvent)[0] || ntEvents[0];
+    out.ntTitle = evObj.label;
+    out.ntChannel = chNames[ntSelCh];
+    out.ntHasSubject = ntSelCh === 0;
+    out.ntArBg = (st.ntLang || 'ar') === 'ar' ? 'var(--brand)' : 'var(--card)';
+    out.ntArFg = (st.ntLang || 'ar') === 'ar' ? 'var(--on-brand)' : 'var(--text-body)';
+    out.ntEnBg = st.ntLang === 'en' ? 'var(--brand)' : 'var(--card)';
+    out.ntEnFg = st.ntLang === 'en' ? 'var(--on-brand)' : 'var(--text-body)';
+    out.ntLangAr = () => S({ ntLang: 'ar' });
+    out.ntLangEn = () => S({ ntLang: 'en' });
+    const varMap = { 'order_number': 'BST-26-004821-A', 'customer_name': 'نورة العتيبي', 'shop_name': 'دار القطن', 'tracking_number': 'SPL-88213394', 'total': '1,362.75 ر.س.' };
+    out.ntVars = Object.keys(varMap).map(k => ({
+      label: '{{' + k + '}}',
+      insert: () => S({ ntBody: (out.ntBody || '') + ' {{' + k + '}}' })
+    }));
+    const defaultBody = 'مرحباً {{customer_name}}، شُحن طلبك {{order_number}} من {{shop_name}}. رقم التتبّع {{tracking_number}}، والتوصيل المتوقّع خلال يومين.';
+    const body = st.ntBody === undefined ? defaultBody : st.ntBody;
+    out.ntBody = body;
+    out.onNtBody = (e) => S({ ntBody: e.target.value });
+    out.ntSubject = st.ntSubject === undefined ? 'شُحن طلبك {{order_number}}' : st.ntSubject;
+    out.onNtSubject = (e) => S({ ntSubject: e.target.value });
+    const smsLimit = ntSelCh === 1;
+    out.ntLimit = smsLimit ? ' / 160' : '';
+    out.ntCount = String(body.length);
+    out.ntCountColor = smsLimit && body.length > 160 ? 'var(--danger-text)' : 'var(--text-faint)';
+    out.ntBodyBorder = smsLimit && body.length > 160 ? 'var(--danger)' : 'var(--border-control)';
+    const segs = [];
+    let unknown = 0;
+    body.split(/(\{\{[^}]*\}\})/).forEach(part => {
+      if (!part) return;
+      if (part.slice(0, 2) === '{{') {
+        const k = part.slice(2, -2).trim();
+        if (varMap[k] !== undefined) segs.push({ text: varMap[k], color: 'var(--brand-text)', weight: '700', bg: 'var(--brand-subtle)', pad: '1px 5px' });
+        else { unknown++; segs.push({ text: part, color: 'var(--danger-text)', weight: '700', bg: 'var(--danger-subtle)', pad: '1px 5px' }); }
+      } else segs.push({ text: part, color: 'var(--text-body)', weight: '400', bg: 'transparent', pad: '0' });
+    });
+    out.ntPreview = segs;
+    out.ntPreviewSubject = (out.ntSubject || '').replace(/\{\{([^}]*)\}\}/g, (m, k) => varMap[k.trim()] !== undefined ? varMap[k.trim()] : m);
+    out.ntVarNote = unknown ? unknown + ' متغيّر مجهول لن يُستبدل عند الإرسال.' : 'كل المتغيّرات معروفة وستُستبدل ببيانات الطلب.';
+    out.ntVarColor = unknown ? 'var(--danger-text)' : 'var(--text-muted)';
+    out.ntSave = () => this.toast('حُفظ قالب «' + evObj.label + '» لقناة ' + chNames[ntSelCh]);
+    out.ntTest = () => this.toast('أُرسلت رسالة تجربة إلى بريدك ببيانات المثال');
+
+    /* AD-25 reports */
+    const rpRange = st.rpRange || '30';
+    out.rpRanges = [['7', 'آخر 7 أيام'], ['30', 'آخر 30 يوماً'], ['90', 'آخر 90 يوماً']].map(r => ({
+      label: r[1],
+      bg: rpRange === r[0] ? 'var(--brand)' : 'var(--card)',
+      fg: rpRange === r[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      pick: () => S({ rpRange: r[0] })
+    }));
+    out.rpRangeLabel = rpRange === '7' ? '8 – 14 سبتمبر 2026' : (rpRange === '30' ? '16 أغسطس – 14 سبتمبر 2026' : '17 يونيو – 14 سبتمبر 2026');
+    const mult = rpRange === '7' ? 0.25 : (rpRange === '90' ? 2.8 : 1);
+    const rpView = st.rpView || 'SAR';
+    const rpData = [
+      { code: 'SAR', label: 'الريال السعودي', rate: 3.7503, sales: 1284300.5, comm: 128430.05, fx: 9640.2, vendors: 148, aov: 412.75, conv: 3.4 },
+      { code: 'AED', label: 'الدرهم الإماراتي', rate: 3.6725, sales: 486200.25, comm: 48620.03, fx: 3120.4, vendors: 62, aov: 388.4, conv: 3.1 },
+      { code: 'JOD', label: 'الدينار الأردني', rate: 0.709, sales: 94120.75, comm: 9412.08, fx: 780.5, vendors: 31, aov: 96.125, conv: 2.8 },
+      { code: 'EGP', label: 'الجنيه المصري', rate: 48.62, sales: 1840200, comm: 184020, fx: 14200, vendors: 44, aov: 1240.5, conv: 2.2 }
+    ];
+    out.rpViews = rpData.map(d => ({
+      label: d.label,
+      bg: rpView === d.code ? 'var(--brand)' : 'var(--card)',
+      fg: rpView === d.code ? 'var(--on-brand)' : 'var(--text-body)',
+      border: rpView === d.code ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ rpView: d.code })
+    })).concat([{
+      label: 'موحّد بالدولار',
+      bg: rpView === 'USD' ? 'var(--brand)' : 'var(--card)',
+      fg: rpView === 'USD' ? 'var(--on-brand)' : 'var(--text-body)',
+      border: rpView === 'USD' ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ rpView: 'USD' })
+    }]);
+    const isUsd = rpView === 'USD';
+    out.rpUsdNoteDisplay = isUsd ? 'flex' : 'none';
+    out.rpCols = isUsd ? 'minmax(0,1.1fr) 150px 150px 140px 112px 132px 104px' : 'minmax(0,1.2fr) 160px 160px 148px 120px 140px';
+    out.rpHead = (isUsd
+      ? ['CURRENCY', 'SALES (USD)', 'COMMISSION (USD)', 'FX REVENUE (USD)', 'VENDORS', 'AOV (USD)', 'CONVERSION']
+      : ['METRIC', 'VALUE', 'PREVIOUS PERIOD', 'CHANGE', 'SHARE', 'NOTE']
+    ).map((h, i, arr) => ({ label: h, align: i === arr.length - 1 ? 'end' : 'start' }));
+    const cell = (t, o) => Object.assign({ text: t, dir: 'rtl', font: 'var(--font-ui)', size: 'var(--text-sm)', weight: '500', color: 'var(--text-body)', justify: 'start', sub: '' }, o || {});
+    if (isUsd) {
+      out.rpRows = (empty ? [] : rpData).map(d => ({
+        bg: 'transparent',
+        cells: [
+          cell(d.label, { color: 'var(--text-strong)', weight: '700' }),
+          cell(M(d.sales * mult / d.rate, 'USD'), { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--money)', weight: '700', sub: '1 USD = ' + d.rate.toFixed(4) + ' ' + d.code }),
+          cell(M(d.comm * mult / d.rate, 'USD'), { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--money)', weight: '600', sub: '1 USD = ' + d.rate.toFixed(4) + ' ' + d.code }),
+          cell(M(d.fx * mult / d.rate, 'USD'), { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--money)', sub: '1 USD = ' + d.rate.toFixed(4) + ' ' + d.code }),
+          cell(String(d.vendors), { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--text-strong)' }),
+          cell(M(d.aov * mult / d.rate / mult, 'USD'), { dir: 'ltr', font: 'var(--font-mono)', sub: '1 USD = ' + d.rate.toFixed(4) + ' ' + d.code }),
+          cell(d.conv.toFixed(1) + '%', { dir: 'ltr', font: 'var(--font-mono)', justify: 'end', color: 'var(--text-strong)' })
+        ]
+      }));
+    } else {
+      const d = rpData.filter(x => x.code === rpView)[0] || rpData[0];
+      const rows = [
+        { k: 'المبيعات', v: d.sales * mult, prev: d.sales * mult * 0.89, share: '100%', note: 'إجمالي الطلبات المكتملة' },
+        { k: 'عمولة المنصّة', v: d.comm * mult, prev: d.comm * mult * 0.89, share: '10.0%', note: 'حسب قواعد العمولة السارية وقت كل طلب' },
+        { k: 'دخل فرق الصرف', v: d.fx * mult, prev: d.fx * mult * 0.96, share: '0.8%', note: 'هامش 2% على التحويل وقت الدفع' },
+        { k: 'متوسط قيمة الطلب', v: d.aov, prev: d.aov * 1.02, share: '—', note: 'لكل طلب أصلي لا طلب فرعي' }
+      ];
+      out.rpRows = (empty ? [] : rows).map(r => {
+        const delta = ((r.v - r.prev) / r.prev) * 100;
+        return {
+          bg: 'transparent',
+          cells: [
+            cell(r.k, { color: 'var(--text-strong)', weight: '700' }),
+            cell(M(r.v, d.code), { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--money)', weight: '700' }),
+            cell(M(r.prev, d.code), { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--text-muted)' }),
+            cell((delta >= 0 ? '+' : '') + delta.toFixed(1) + '%', { dir: 'ltr', font: 'var(--font-mono)', weight: '600', color: delta >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }),
+            cell(r.share, { dir: 'ltr', font: 'var(--font-mono)' }),
+            cell(r.note, { size: 'var(--text-xs)', color: 'var(--text-muted)', justify: 'end' })
+          ]
+        };
+      }).concat(empty ? [] : [{
+        bg: 'var(--sunken)',
+        cells: [
+          cell('متاجر نشطة', { color: 'var(--text-strong)', weight: '700' }),
+          cell(String(d.vendors), { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--text-strong)', weight: '700' }),
+          cell(String(d.vendors - 6), { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--text-muted)' }),
+          cell('+6', { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--success-text)', weight: '600' }),
+          cell('—', { dir: 'ltr', font: 'var(--font-mono)' }),
+          cell('متجر باع مرة واحدة على الأقل', { size: 'var(--text-xs)', color: 'var(--text-muted)', justify: 'end' })
+        ]
+      }, {
+        bg: 'var(--sunken)',
+        cells: [
+          cell('معدّل التحويل', { color: 'var(--text-strong)', weight: '700' }),
+          cell(d.conv.toFixed(1) + '%', { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--text-strong)', weight: '700' }),
+          cell((d.conv - 0.3).toFixed(1) + '%', { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--text-muted)' }),
+          cell('+0.3', { dir: 'ltr', font: 'var(--font-mono)', color: 'var(--success-text)', weight: '600' }),
+          cell('—', { dir: 'ltr', font: 'var(--font-mono)' }),
+          cell('زيارة تنتهي بطلب مدفوع', { size: 'var(--text-xs)', color: 'var(--text-muted)', justify: 'end' })
+        ]
+      }]);
+    }
+    out.rpExportXlsx = () => this.toast('صُدّر التقرير Excel — ' + out.rpRangeLabel);
+    out.rpExportCsv = () => this.toast('صُدّر التقرير CSV — ' + out.rpRangeLabel);
+
+    /* AD-26 settings */
+    out.stDisabled = !can;
+    out.stCursor = can ? 'pointer' : 'not-allowed';
+    out.stNoPermDisplay = can ? 'none' : 'flex';
+    out.stSaveBg = can ? 'var(--brand)' : 'var(--sunken)';
+    out.stSaveFg = can ? 'var(--on-brand)' : 'var(--text-faint)';
+    const stVals = st.stVals || {};
+    const mkSetting = (key, label, def, unit, warn, kind) => {
+      const v = stVals[key] !== undefined ? stVals[key] : def;
+      return {
+        key: key, label: label, value: String(v), unit: unit, warn: warn,
+        fieldBg: can ? 'transparent' : 'var(--sunken)',
+        warnBorder: kind === 'danger' ? 'var(--danger)' : 'var(--warning)',
+        warnBg: kind === 'danger' ? 'var(--danger-subtle)' : 'var(--warning-subtle)',
+        warnColor: kind === 'danger' ? 'var(--danger-text)' : 'var(--warning-text)',
+        onChange: (e) => { if (can) S({ stVals: Object.assign({}, stVals, { [key]: e.target.value.replace(/[^0-9.]/g, '') }), stDirty: true }); }
+      };
+    };
+    out.stGroups = empty ? [] : [
+      {
+        title: 'إعدادات مالية',
+        rows: [
+          mkSetting('hold_days', 'مدة حجز الرصيد بعد التسليم', 14, 'يوم', 'تقصير المدة يزيد مخاطر ردّ المبالغ بعد صرف أرباح التاجر. التغيير يسري على الطلبات الجديدة فقط.', 'danger'),
+          mkSetting('commission', 'العمولة الافتراضية', 10, '%', 'تُطبَّق فقط حين لا توجد قاعدة متجر أو تصنيف. لا تؤثّر على أي طلب سابق.', 'warn'),
+          mkSetting('fx_spread', 'هامش فرق الصرف', 2, '%', 'يُحتسب على كل تحويل عملة وقت الدفع، ويظهر كدخل للمنصّة في التقارير.', 'warn'),
+          mkSetting('min_payout', 'الحد الأدنى للتحويل', 100, 'ر.س.', 'رفع الحد يؤخّر وصول أرباح المتاجر الصغيرة ويزيد شكاواها.', 'warn')
+        ]
+      },
+      {
+        title: 'إعدادات التشغيل',
+        rows: [
+          mkSetting('return_days', 'نافذة الإرجاع', 14, 'يوم', 'تقصير النافذة يقلّل المرتجعات لكنه يخفض ثقة المشترين. يسري على الطلبات الجديدة فقط.', 'warn'),
+          mkSetting('reserve_min', 'مدة حجز المخزون في السلة', 15, 'دقيقة', 'الحجز الطويل يمنع مشترين آخرين من شراء قطع متاحة فعلياً.', 'warn'),
+          mkSetting('accept_hours', 'مهلة قبول التاجر للطلب', 48, 'ساعة', 'بعد انتهاء المهلة يُلغى الطلب الفرعي تلقائياً ويُعاد المبلغ كاملاً للمشتري.', 'danger'),
+          mkSetting('cart_hours', 'انتهاء صلاحية السلة', 168, 'ساعة', 'تُفرَّغ السلة بعد هذه المدة وتُحرَّر الحجوزات.', 'warn'),
+          mkSetting('vat', 'ضريبة القيمة المضافة', 15, '%', 'تُحتسب على العمولة والخدمات. تغييرها يتطلّب مراجعة محاسبية وإشعار التجّار.', 'danger')
+        ]
+      }
+    ];
+    out.stDirtyDisplay = st.stDirty ? 'flex' : 'none';
+    out.stSave = () => { if (!can) return; S({ stDirty: false }); this.toast('حُفظت الإعدادات — سُجّل التغيير في سجلّ التدقيق'); };
+    out.stHistory = empty ? [] : [
+      { text: 'مهلة قبول التاجر من 72 إلى 48 ساعة', actor: 'ريم السالم', time: '2 سبتمبر · 10:15' },
+      { text: 'الحد الأدنى للتحويل من 200 إلى 100 ر.س.', actor: 'ريم السالم', time: '18 أغسطس · 14:40' },
+      { text: 'هامش فرق الصرف من 2.5% إلى 2%', actor: 'ريم السالم', time: '1 أغسطس · 09:00' },
+      { text: 'نافذة الإرجاع من 7 إلى 14 يوماً', actor: 'ريم السالم', time: '12 يوليو · 16:20' },
+      { text: 'مدة حجز الرصيد 14 يوماً', actor: 'النظام', time: '1 يناير · 00:00' }
+    ];
+
+    /* shared system tables */
+    const badge = (t, kind) => ({ isBadge: true, text: t, badgeBg: 'var(--' + kind + '-subtle)', badgeFg: 'var(--' + kind + '-text)', justify: 'flex-start' });
+    const plain = (t, o) => Object.assign({ isPlain: true, text: t, dir: 'rtl', font: 'var(--font-ui)', size: 'var(--text-sm)', weight: '500', color: 'var(--text-body)', justify: 'flex-start', wrap: 'nowrap' }, o || {});
+    const mono = (t, o) => plain(t, Object.assign({ dir: 'ltr', font: 'var(--font-mono)', size: 'var(--text-xs)' }, o || {}));
+    const stack = (t, s, o) => Object.assign({ isStack: true, text: t, sub: s, subDir: 'rtl', subFont: 'var(--font-ui)', justify: 'flex-start' }, o || {});
+    const acts = (list) => ({ isActions: true, justify: 'flex-end', actions: list });
+    const btn = (label, go, kind) => ({
+      label: label, go: go, disabled: kind === 'off',
+      border: kind === 'danger' ? '1px solid var(--danger)' : (kind === 'primary' ? '0' : '1px solid var(--border-control)'),
+      bg: kind === 'primary' ? 'var(--brand)' : 'transparent',
+      fg: kind === 'primary' ? 'var(--on-brand)' : (kind === 'danger' ? 'var(--danger-text)' : (kind === 'off' ? 'var(--text-faint)' : 'var(--text-strong)')),
+      cursor: kind === 'off' ? 'not-allowed' : 'pointer'
+    });
+
+    let cfg = null;
+    if (st.screen === 'AD-09') {
+      const rows = [
+        { name: 'اللون', code: 'color', type: 'قائمة', unit: '—', filter: true, axis: true, cats: 'أزياء · أحذية' },
+        { name: 'المقاس', code: 'size', type: 'قائمة', unit: '—', filter: true, axis: true, cats: 'أزياء · أحذية' },
+        { name: 'المادة', code: 'material', type: 'قائمة', unit: '—', filter: true, axis: false, cats: 'أزياء · المنزل' },
+        { name: 'وزن القماش', code: 'fabric_weight', type: 'رقم', unit: 'g/m²', filter: false, axis: false, cats: 'قمصان' },
+        { name: 'مقاومة الماء', code: 'water_resist', type: 'قائمة', unit: '—', filter: true, axis: false, cats: 'صوتيات' },
+        { name: 'قابل للإرجاع', code: 'returnable', type: 'نعم/لا', unit: '—', filter: false, axis: false, cats: 'كل التصنيفات' },
+        { name: 'المميزات', code: 'features', type: 'قائمة متعددة', unit: '—', filter: true, axis: false, cats: 'إلكترونيات' }
+      ];
+      cfg = {
+        cols: 'minmax(0,1.1fr) 132px 124px 84px 96px 96px minmax(0,1fr) 108px',
+        minWidth: '1120px',
+        head: ['NAME', 'CODE', 'TYPE', 'UNIT', 'FILTER', 'AXIS', 'CATEGORIES', 'ACTION'],
+        searchHint: 'ابحث باسم الخصيصة أو رمزها',
+        primary: 'خصيصة جديدة',
+        primaryGo: () => this.toast('نموذج خصيصة جديدة: الاسم بالعربية والإنجليزية والنوع والقيم'),
+        filters: [['all', 'الكل'], ['axis', 'محاور المتغيّرات'], ['filter', 'قابلة للتصفية']],
+        filterFn: (r, k) => k === 'all' || (k === 'axis' && r.axis) || (k === 'filter' && r.filter),
+        match: (r, q) => r.name.indexOf(q) >= 0 || r.code.indexOf(q) >= 0,
+        rows: rows,
+        emptyIcon: '#i-file', emptyTitle: 'لا خصائص بهذه التصفية', emptyBody: 'جرّب تصفية أخرى.',
+        cell: (r) => [
+          plain(r.name, { color: 'var(--text-strong)', weight: '600' }),
+          mono(r.code),
+          plain(r.type, { size: 'var(--text-xs)' }),
+          mono(r.unit, { color: 'var(--text-muted)' }),
+          r.filter ? badge('نعم', 'success') : badge('لا', 'neutral'),
+          r.axis ? badge('محور', 'brand') : badge('—', 'neutral'),
+          plain(r.cats, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          acts([btn('حرّر', () => this.toast('تحرير «' + r.name + '»: القيم بالعربية والإنجليزية ولون لكل قيمة'))])
+        ]
+      };
+    } else if (st.screen === 'AD-16') {
+      const rows = [
+        { code: 'BASTA10', scope: 'المنصّة', type: 'نسبة', value: '10%', used: 37, limit: 500, valid: '1 – 30 سبتمبر', status: ['فعّال', 'success'], funder: 'المنصّة' },
+        { code: 'QUTN25', scope: 'دار القطن', type: 'مبلغ ثابت', value: '25.00 ر.س.', used: 112, limit: 200, valid: '5 – 20 سبتمبر', status: ['فعّال', 'success'], funder: 'المتجر' },
+        { code: 'FREESHIP', scope: 'المنصّة', type: 'شحن مجاني', value: 'شحن مجاني', used: 480, limit: 500, valid: '1 – 15 سبتمبر', status: ['قارب النفاد', 'warning'], funder: 'المنصّة' },
+        { code: 'EID2026', scope: 'المنصّة', type: 'نسبة', value: '15%', used: 500, limit: 500, valid: '1 – 10 يوليو', status: ['منتهٍ', 'neutral'], funder: 'مشترك 50/50' },
+        { code: 'GULF5', scope: 'إلكترونيات الخليج', type: 'نسبة', value: '5%', used: 8, limit: 0, valid: '10 سبتمبر — مفتوح', status: ['فعّال', 'success'], funder: 'المتجر' }
+      ];
+      cfg = {
+        cols: '132px 148px 124px 132px minmax(0,1fr) 148px 120px 128px',
+        minWidth: '1160px',
+        head: ['CODE', 'SCOPE', 'TYPE', 'VALUE', 'USAGE', 'VALIDITY', 'FUNDED BY', 'ACTION'],
+        searchHint: 'ابحث برمز الكوبون',
+        primary: 'كوبون جديد',
+        primaryGo: () => this.toast('نموذج الكوبون: النوع والقيمة والحد الأقصى للخصم وشروط التطبيق'),
+        filters: [['all', 'الكل'], ['active', 'فعّال'], ['ending', 'قارب النفاد'], ['expired', 'منتهٍ']],
+        filterFn: (r, k) => k === 'all' || (k === 'active' && r.status[0] === 'فعّال') || (k === 'ending' && r.status[1] === 'warning') || (k === 'expired' && r.status[0] === 'منتهٍ'),
+        match: (r, q) => r.code.indexOf(q.toUpperCase()) >= 0 || r.scope.indexOf(q) >= 0,
+        rows: rows,
+        note: 'مثال حيّ: على طلب بـ 200.00 ر.س. يوفّر BASTA10 مبلغ 20.00 ر.س. — يتحمّله من هو مذكور في عمود التمويل.',
+        noteKind: 'info',
+        emptyIcon: '#i-star', emptyTitle: 'لا كوبونات بهذه التصفية', emptyBody: 'جرّب تصفية أخرى أو أنشئ كوبوناً.',
+        cell: (r) => [
+          mono(r.code, { color: 'var(--text-strong)', weight: '700', size: 'var(--text-sm)' }),
+          plain(r.scope, { size: 'var(--text-xs)' }),
+          plain(r.type, { size: 'var(--text-xs)' }),
+          plain(r.value, { color: 'var(--money)', weight: '700', font: 'var(--font-mono)', dir: 'ltr', size: 'var(--text-xs)' }),
+          { isBar: true, justify: 'flex-start', text: r.limit ? r.used + ' من ' + r.limit : r.used + ' بلا حد', pct: r.limit ? Math.min(100, (r.used / r.limit) * 100) + '%' : '12%', barColor: r.limit && r.used / r.limit > 0.9 ? 'var(--warning)' : 'var(--brand)' },
+          plain(r.valid, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          badge(r.funder, r.funder === 'المنصّة' ? 'info' : (r.funder === 'المتجر' ? 'neutral' : 'warning')),
+          acts([btn('حرّر', () => this.toast('تحرير كوبون ' + r.code))])
+        ]
+      };
+    } else if (st.screen === 'AD-17') {
+      const rows = [
+        { name: 'أسبوع القطن', period: '10 – 20 سبتمبر', scope: 'تصنيف: أزياء', coupon: 'QUTN25', place: 'واجهة الرئيسية', status: ['جارية', 'success'], items: 12 },
+        { name: 'عروض الإلكترونيات', period: '1 – 30 سبتمبر', scope: '3 متاجر', coupon: 'GULF5', place: 'أعلى قسم إلكترونيات', status: ['جارية', 'success'], items: 24 },
+        { name: 'موسم العودة', period: '20 – 30 سبتمبر', scope: 'تصنيف: المنزل', coupon: '—', place: 'منتصف الرئيسية', status: ['مجدولة', 'info'], items: 8 },
+        { name: 'عيد 2026', period: '1 – 10 يوليو', scope: 'المنصّة', coupon: 'EID2026', place: 'واجهة الرئيسية', status: ['منتهية', 'neutral'], items: 40 }
+      ];
+      cfg = {
+        cols: 'minmax(0,1.2fr) 150px minmax(0,1fr) 124px 168px 124px 128px',
+        minWidth: '1140px',
+        head: ['CAMPAIGN', 'PERIOD', 'SCOPE', 'COUPON', 'PLACEMENT', 'STATUS', 'ACTION'],
+        searchHint: 'ابحث باسم الحملة',
+        primary: 'حملة جديدة',
+        primaryGo: () => this.toast('نموذج الحملة: المدة والمنتجات والكوبون والموضع'),
+        filters: [['all', 'الكل'], ['live', 'جارية'], ['scheduled', 'مجدولة'], ['ended', 'منتهية']],
+        filterFn: (r, k) => k === 'all' || (k === 'live' && r.status[0] === 'جارية') || (k === 'scheduled' && r.status[0] === 'مجدولة') || (k === 'ended' && r.status[0] === 'منتهية'),
+        match: (r, q) => r.name.indexOf(q) >= 0,
+        rows: rows,
+        note: 'المنتجات المميّزة داخل كل حملة تُرتَّب يدوياً بالسحب — افتح الحملة لترتيبها.',
+        noteKind: 'info',
+        emptyIcon: '#i-chart', emptyTitle: 'لا حملات بهذه التصفية', emptyBody: 'جرّب تصفية أخرى أو أنشئ حملة.',
+        cell: (r) => [
+          stack(r.name, r.items + ' منتجاً مميّزاً'),
+          plain(r.period, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          plain(r.scope, { size: 'var(--text-xs)' }),
+          r.coupon === '—' ? plain('—', { color: 'var(--text-faint)' }) : mono(r.coupon, { color: 'var(--brand-text)', weight: '600' }),
+          plain(r.place, { size: 'var(--text-xs)' }),
+          badge(r.status[0], r.status[1]),
+          acts([btn('رتّب المنتجات', () => this.toast('ترتيب المنتجات المميّزة بالسحب داخل «' + r.name + '»'))])
+        ]
+      };
+    } else if (st.screen === 'AD-18') {
+      const rows = [
+        { title: 'من نحن', slug: 'about', updated: '2 سبتمبر 2026', words: 320, published: true },
+        { title: 'الأسئلة الشائعة', slug: 'faq', updated: '10 سبتمبر 2026', words: 780, published: true },
+        { title: 'سياسة الإرجاع', slug: 'returns', updated: '28 أغسطس 2026', words: 540, published: true },
+        { title: 'الشروط والأحكام', slug: 'terms', updated: '1 سبتمبر 2026', words: 1240, published: true },
+        { title: 'سياسة الخصوصية', slug: 'privacy', updated: '1 سبتمبر 2026', words: 980, published: true },
+        { title: 'تواصل معنا', slug: 'contact', updated: '14 سبتمبر 2026', words: 120, published: true },
+        { title: 'دليل البائع الجديد', slug: 'seller-guide', updated: '13 سبتمبر 2026', words: 410, published: false }
+      ];
+      const pub = st.pgPub || {};
+      cfg = {
+        cols: 'minmax(0,1.2fr) 170px 160px 116px 104px 168px',
+        minWidth: '1000px',
+        head: ['PAGE', 'SLUG', 'UPDATED', 'WORDS', 'PUBLISHED', 'ACTION'],
+        searchHint: 'ابحث بعنوان الصفحة',
+        primary: 'صفحة جديدة',
+        primaryGo: () => this.toast('محرّر صفحة جديدة: العنوان والمُعرّف والمحتوى'),
+        filters: [['all', 'الكل'], ['published', 'منشورة'], ['draft', 'مسودة']],
+        filterFn: (r, k) => { const on = pub[r.slug] !== undefined ? pub[r.slug] : r.published; return k === 'all' || (k === 'published' && on) || (k === 'draft' && !on); },
+        match: (r, q) => r.title.indexOf(q) >= 0 || r.slug.indexOf(q) >= 0,
+        rows: rows,
+        emptyIcon: '#i-file', emptyTitle: 'لا صفحات بهذه التصفية', emptyBody: 'جرّب تصفية أخرى.',
+        cell: (r) => {
+          const on = pub[r.slug] !== undefined ? pub[r.slug] : r.published;
+          return [
+            plain(r.title, { color: 'var(--text-strong)', weight: '600' }),
+            mono('/pages/' + r.slug),
+            plain(r.updated, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+            mono(String(r.words), { justify: 'flex-end' }),
+            { isToggle: true, justify: 'flex-start', on: on, swBg: on ? 'var(--brand)' : 'var(--border-control)', swX: on ? '21px' : '2px', toggle: () => { S({ pgPub: Object.assign({}, pub, { [r.slug]: !on }) }); this.toast(on ? 'أُخفيت الصفحة عن المتجر' : 'نُشرت الصفحة'); } },
+            acts([btn('حرّر', () => this.toast('محرّر «' + r.title + '»')), btn('عاين', () => { try { localStorage.setItem('basta.account.screen', 'ST-30'); } catch (e) {} window.location.href = encodeURI('Basta Account & Shared.dc.html'); })])
+          ];
+        }
+      };
+    } else if (st.screen === 'AD-19') {
+      const base = [
+        { id: 1, title: 'قطن يتنفّس، مصنوع في الرياض', place: 'واجهة الرئيسية', size: '1920×640', schedule: '10 – 20 سبتمبر', active: true },
+        { id: 2, title: 'عروض الإلكترونيات', place: 'منتصف الرئيسية', size: '1200×400', schedule: '1 – 30 سبتمبر', active: true },
+        { id: 3, title: 'أعلى قسم الأزياء', place: 'أعلى التصنيف', size: '1600×300', schedule: 'مفتوح', active: true },
+        { id: 4, title: 'موسم العودة', place: 'منتصف الرئيسية', size: '1200×400', schedule: '20 – 30 سبتمبر', active: false }
+      ];
+      const order = st.bnOrder || base.map(b => b.id);
+      const rows = order.map(id => base.filter(b => b.id === id)[0]).filter(Boolean);
+      cfg = {
+        cols: '46px minmax(0,1.3fr) 170px 128px 160px 104px 128px',
+        minWidth: '1080px',
+        head: ['', 'BANNER', 'PLACEMENT', 'SIZE', 'SCHEDULE', 'ACTIVE', 'ACTION'],
+        searchHint: 'ابحث بعنوان اللافتة',
+        primary: 'لافتة جديدة',
+        primaryGo: () => this.toast('نموذج اللافتة: الصورة بالمقاس المطلوب والعنوان والرابط والجدولة'),
+        filters: [['all', 'الكل'], ['home', 'الرئيسية'], ['category', 'أعلى التصنيف']],
+        filterFn: (r, k) => k === 'all' || (k === 'home' && r.place.indexOf('الرئيسية') >= 0) || (k === 'category' && r.place.indexOf('التصنيف') >= 0),
+        match: (r, q) => r.title.indexOf(q) >= 0,
+        rows: rows,
+        note: 'اسحب الصفوف لتغيير ترتيب الظهور. الترتيب هنا هو ترتيب اللافتات في الواجهة.',
+        noteKind: 'info',
+        draggable: true,
+        emptyIcon: '#i-image', emptyTitle: 'لا لافتات بهذه التصفية', emptyBody: 'جرّب تصفية أخرى أو أضف لافتة.',
+        dragId: (r) => r.id,
+        onReorder: (fromId, toId) => {
+          const arr = order.slice();
+          const fi = arr.indexOf(fromId), ti = arr.indexOf(toId);
+          if (fi < 0 || ti < 0 || fi === ti) return;
+          arr.splice(ti, 0, arr.splice(fi, 1)[0]);
+          S({ bnOrder: arr });
+          this.toast('غُيّر ترتيب اللافتات');
+        },
+        cell: (r) => [
+          { isPlain: true, text: '', grip: true, justify: 'center', dir: 'rtl', font: 'var(--font-ui)', size: 'var(--text-sm)', weight: '500', color: 'var(--text-body)', wrap: 'nowrap' },
+          stack(r.title, 'صورة مرفوعة · تظهر في ' + r.place, { icon: '#i-image' }),
+          plain(r.place, { size: 'var(--text-xs)' }),
+          mono(r.size, { color: 'var(--text-muted)' }),
+          plain(r.schedule, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          { isToggle: true, justify: 'flex-start', on: r.active, swBg: r.active ? 'var(--brand)' : 'var(--border-control)', swX: r.active ? '21px' : '2px', toggle: () => this.toast(r.active ? 'أُخفيت اللافتة' : 'أُظهرت اللافتة') },
+          acts([btn('حرّر', () => this.toast('تحرير «' + r.title + '» مع معاينة حيّة للواجهة'))])
+        ]
+      };
+    } else if (st.screen === 'AD-23') {
+      const rows = [
+        { name: 'ريم السالم', email: 'reem@basta.sa', tfa: true, perms: 'كل الصلاحيات', last: 'الآن', role: 'مدير عام' },
+        { name: 'خالد النمر', email: 'khaled@basta.sa', tfa: true, perms: 'دعم · مراجعة منتجات', last: 'قبل ساعتين', role: 'دعم' },
+        { name: 'سارة القحطاني', email: 'sara@basta.sa', tfa: true, perms: 'مالية · تحويلات', last: 'أمس', role: 'مالية' },
+        { name: 'محمد العنزي', email: 'mohammed@basta.sa', tfa: false, perms: 'مراجعة منتجات', last: 'لم يدخل بعد', role: 'مراجع' }
+      ];
+      cfg = {
+        cols: 'minmax(0,1fr) minmax(0,1.1fr) 150px minmax(0,1fr) 140px 128px',
+        minWidth: '1080px',
+        head: ['ADMIN', 'EMAIL', 'TWO-FACTOR', 'PERMISSIONS', 'LAST SIGN-IN', 'ACTION'],
+        searchHint: 'ابحث بالاسم أو البريد',
+        primary: 'ادعُ مديراً',
+        primaryGo: () => { if (can) this.toast('دعوة مدير: البريد والصلاحيات — التحقّق بخطوتين إلزامي عند أول دخول'); else this.toast('الدعوة تحتاج صلاحية admins.manage', 'warning'); },
+        filters: [['all', 'الكل'], ['tfa_off', 'بلا تحقّق بخطوتين']],
+        filterFn: (r, k) => k === 'all' || (k === 'tfa_off' && !r.tfa),
+        match: (r, q) => r.name.indexOf(q) >= 0 || r.email.indexOf(q) >= 0,
+        rows: rows,
+        note: 'التحقّق بخطوتين إلزامي لكل حساب إدارة — الحساب بلا تفعيل لا يستطيع فتح أي شاشة.',
+        noteKind: 'warning',
+        emptyIcon: '#i-users', emptyTitle: 'لا مستخدمين بهذه التصفية', emptyBody: 'جرّب تصفية أخرى.',
+        rowNote: (r) => !r.tfa ? { text: 'لم يفعّل التحقّق بخطوتين — سيُحوَّل إلى شاشة التفعيل الإلزامي عند أول دخول ولا يمكنه تخطّيها.', kind: 'warning' } : null,
+        cell: (r) => [
+          stack(r.name, r.role),
+          mono(r.email, { color: 'var(--text-body)' }),
+          r.tfa ? badge('مفعّل', 'success') : badge('غير مفعّل', 'danger'),
+          plain(r.perms, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          plain(r.last, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          acts([btn('الصلاحيات', () => { if (can) this.toast('تحرير صلاحيات ' + r.name + ' — كل صلاحية بشرح مستقل'); else this.toast('يحتاج صلاحية admins.manage', 'warning'); }, can ? 'normal' : 'off')])
+        ]
+      };
+    } else {
+      const rows = [
+        { time: '14 سبتمبر · 15:42', actor: 'ريم السالم', role: 'مدير عام', action: 'اعتماد متجر', entity: 'VND-1041 · بيت العطور', ip: '92.101.44.18' },
+        { time: '14 سبتمبر · 15:10', actor: 'خالد النمر', role: 'دعم', action: 'رفض منتج', entity: 'PRD-88231 · طقم مفارش قطن', ip: '92.101.44.21' },
+        { time: '14 سبتمبر · 14:02', actor: 'ريم السالم', role: 'مدير عام', action: 'صرف تحويل', entity: 'PAY-2026-0412 · 8,240.00 ر.س.', ip: '92.101.44.18' },
+        { time: '14 سبتمبر · 11:35', actor: 'ريم السالم', role: 'مدير عام', action: 'قرار نزاع', entity: 'DSP-0091 · جزئي 92.50 ر.س.', ip: '92.101.44.18' },
+        { time: '13 سبتمبر · 22:14', actor: 'النظام', role: 'آلي', action: 'إلغاء طلب فرعي', entity: 'BST-26-004799-A · تجاوز مهلة القبول', ip: '—' },
+        { time: '13 سبتمبر · 17:30', actor: 'ريم السالم', role: 'مدير عام', action: 'إضافة سعر صرف', entity: 'USD→EGP 48.62', ip: '92.101.44.18' },
+        { time: '12 سبتمبر · 14:20', actor: 'ريم السالم', role: 'مدير عام', action: 'تعديل عمولة', entity: 'دار القطن · 10% ← 8%', ip: '92.101.44.18' }
+      ];
+      cfg = {
+        cols: '170px minmax(0,1fr) 150px minmax(0,1.3fr) 140px',
+        minWidth: '1060px',
+        head: ['TIME', 'ACTOR', 'ACTION', 'ENTITY', 'IP'],
+        searchHint: 'ابحث بالمنفّذ أو الكيان',
+        filters: [['all', 'الكل'], ['money', 'إجراءات مالية'], ['system', 'آلي']],
+        filterFn: (r, k) => k === 'all' || (k === 'money' && (r.action.indexOf('تحويل') >= 0 || r.action.indexOf('عمولة') >= 0 || r.action.indexOf('صرف') >= 0 || r.action.indexOf('نزاع') >= 0)) || (k === 'system' && r.actor === 'النظام'),
+        match: (r, q) => r.actor.indexOf(q) >= 0 || r.entity.indexOf(q) >= 0 || r.action.indexOf(q) >= 0,
+        rows: rows,
+        note: 'سجلّ للقراءة فقط — لا يمكن تعديل أي سطر أو حذفه من أي حساب.',
+        noteKind: 'info',
+        emptyIcon: '#i-shield', emptyTitle: 'لا سجلّات بهذه التصفية', emptyBody: 'جرّب تصفية أخرى أو ابحث بكلمة أخرى.',
+        cell: (r) => [
+          mono(r.time, { color: 'var(--text-muted)' }),
+          stack(r.actor, r.role),
+          plain(r.action, { color: 'var(--text-strong)', weight: '600', size: 'var(--text-xs)' }),
+          plain(r.entity, { size: 'var(--text-xs)', color: 'var(--text-body)' }),
+          mono(r.ip, { color: 'var(--text-faint)', justify: 'flex-start' })
+        ]
+      };
+    }
+
+    if (cfg) {
+      const fk = st.sysFilter || 'all';
+      const q = (st.sysQuery || '').trim();
+      const all = empty ? [] : cfg.rows;
+      const shown = all.filter(r => cfg.filterFn(r, fk)).filter(r => !q || cfg.match(r, q));
+      out.sysCols = cfg.cols;
+      out.sysMinWidth = cfg.minWidth;
+      out.sysSearchHint = cfg.searchHint;
+      out.sysPrimary = cfg.primary || '';
+      out.sysPrimaryGo = cfg.primaryGo || (() => {});
+      out.sysHead = cfg.head.map((h, i) => ({ label: h, align: i === cfg.head.length - 1 ? 'end' : 'start' }));
+      out.sysFilters = cfg.filters.map(f => ({
+        label: f[1],
+        count: String(f[0] === 'all' ? all.length : all.filter(r => cfg.filterFn(r, f[0])).length),
+        bg: fk === f[0] ? 'var(--brand)' : 'transparent',
+        fg: fk === f[0] ? 'var(--on-brand)' : 'var(--text-body)',
+        border: fk === f[0] ? 'var(--brand)' : 'var(--border-control)',
+        pick: () => S({ sysFilter: f[0] })
+      }));
+      out.sysQuery = st.sysQuery || '';
+      out.onSysQuery = (e) => S({ sysQuery: e.target.value });
+      out.sysClear = () => S({ sysFilter: 'all', sysQuery: '', pstate: empty ? 'default' : P });
+      out.sysEmpty = shown.length === 0;
+      out.sysHasRows = shown.length > 0;
+      out.sysEmptyIcon = cfg.emptyIcon;
+      out.sysEmptyTitle = empty ? 'لا بيانات بعد' : cfg.emptyTitle;
+      out.sysEmptyBody = empty ? 'تظهر البيانات هنا بمجرّد وجود نشاط.' : cfg.emptyBody;
+      const note = cfg.note;
+      out.sysNoteDisplay = note ? 'flex' : 'none';
+      out.sysNote = note || '';
+      const nk = cfg.noteKind || 'info';
+      out.sysNoteBorder = 'var(--' + nk + ')';
+      out.sysNoteBg = 'var(--' + nk + '-subtle)';
+      out.sysNoteColor = 'var(--' + nk + '-text)';
+      out.sysNoteIcon = nk === 'warning' ? '#i-lock' : '#i-info';
+      out.sysDragEnd = () => S({ sysDrag: null, sysOver: null });
+      out.sysRows = shown.map(r => {
+        const n = cfg.rowNote ? cfg.rowNote(r) : null;
+        const id = cfg.dragId ? cfg.dragId(r) : null;
+        return {
+          cells: cfg.cell(r),
+          draggable: !!cfg.draggable,
+          opacity: st.sysDrag === id ? 0.45 : 1,
+          dropLine: (cfg.draggable && st.sysOver === id && st.sysDrag !== id) ? 'var(--brand)' : 'transparent',
+          onDragStart: () => { if (cfg.draggable) S({ sysDrag: id }); },
+          onDragOver: (e) => { if (!cfg.draggable) return; e.preventDefault(); if (st.sysOver !== id) S({ sysOver: id }); },
+          onDrop: (e) => { if (!cfg.draggable) return; e.preventDefault(); cfg.onReorder(st.sysDrag, id); S({ sysDrag: null, sysOver: null }); },
+          rowBg: n ? 'var(--' + n.kind + '-subtle)' : 'transparent',
+          note: n ? n.text : '',
+          noteBorder: n ? 'var(--' + n.kind + ')' : 'transparent',
+          noteColor: n ? 'var(--' + n.kind + '-text)' : 'var(--text-body)'
+        };
+      });
+    }
+
+    return out;
+  }
+
+  renderVals() {
+    const st = this.state, S = (o) => this.setState(o);
+    const P = st.pstate;
+    const out = {};
+
+    out.rootRef = (el) => { this.rootEl = el; };
+    out.fit = st.fit;
+    out.screen = st.screen;
+    out.setLight = () => this.set('data-theme', 'light');
+    out.setDark = () => this.set('data-theme', 'dark');
+    out.setAr = () => { this.set('dir', 'rtl'); this.set('data-lang', 'ar'); };
+    out.setEn = () => { this.set('dir', 'ltr'); this.set('data-lang', 'en'); };
+    out.setCompact = () => this.set('data-density', 'compact');
+    out.setComfortable = () => this.set('data-density', 'comfortable');
+
+    const codes = ['AD-08','AD-09','AD-10','AD-11','AD-16','AD-17','AD-18','AD-19','AD-20','AD-23','AD-24','AD-25','AD-26'];
+    out.screenTabs = codes.map(c => ({
+      code: c,
+      bg: st.screen === c ? 'var(--brand)' : 'var(--card)',
+      fg: st.screen === c ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.screen === c ? 'var(--brand)' : 'var(--border-control)',
+      go: () => this.go(c)
+    }));
+    const pstates = [['default', 'طبيعي'], ['loading', 'تحميل'], ['empty', 'فارغ'], ['error', 'خطأ'], ['edge', 'الحدّ']];
+    out.stateTabs = pstates.map(p => ({
+      label: p[1],
+      bg: P === p[0] ? 'var(--brand)' : 'var(--card)',
+      fg: P === p[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: P === p[0] ? 'var(--brand)' : 'var(--border-control)',
+      go: () => S({ pstate: p[0] })
+    }));
+    out.loadingDisplay = P === 'loading' ? 'flex' : 'none';
+    out.errorDisplay = P === 'error' ? 'grid' : 'none';
+    out.contentDisplay = (P === 'loading' || P === 'error') ? 'none' : 'block';
+    out.retry = () => { S({ pstate: 'default' }); this.toast('أُعيد التحميل بنجاح'); };
+
+    const roles = [['super', 'مدير عام'], ['support', 'دعم']];
+    out.roleTabs = roles.map(r => ({
+      label: r[1],
+      bg: st.role === r[0] ? 'var(--brand)' : 'var(--card)',
+      fg: st.role === r[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      pick: () => S({ role: r[0] })
+    }));
+    out.roleLabel = st.role === 'super' ? 'مدير عام — كل الصلاحيات' : 'دعم — بلا صلاحيات مالية';
+    out.adminName = st.role === 'super' ? 'ريم السالم' : 'خالد النمر';
+    out.adminInitial = st.role === 'super' ? 'ر' : 'خ';
+
+    const titles = {
+      'AD-08': 'شجرة التصنيفات', 'AD-09': 'الخصائص', 'AD-10': 'قواعد العمولة', 'AD-11': 'العملات وأسعار الصرف',
+      'AD-16': 'الكوبونات', 'AD-17': 'الحملات والمنتجات المميّزة', 'AD-18': 'صفحات المحتوى', 'AD-19': 'الواجهة واللافتات',
+      'AD-20': 'قوالب الإشعارات', 'AD-23': 'مستخدمو الإدارة والصلاحيات', 'AD-24': 'سجلّ التدقيق', 'AD-25': 'التقارير', 'AD-26': 'إعدادات المنصّة والضرائب'
+    };
+    out.pageTitle = titles[st.screen] || '';
+
+    const navDefs = [
+      { label: 'شجرة التصنيفات', icon: '#i-package', screen: 'AD-08' },
+      { label: 'الخصائص', icon: '#i-file', screen: 'AD-09' },
+      { label: 'قواعد العمولة', icon: '#i-scale', screen: 'AD-10' },
+      { label: 'العملات والصرف', icon: '#i-wallet', screen: 'AD-11' },
+      { label: 'الكوبونات', icon: '#i-star', screen: 'AD-16' },
+      { label: 'الحملات', icon: '#i-chart', screen: 'AD-17' },
+      { label: 'صفحات المحتوى', icon: '#i-file', screen: 'AD-18' },
+      { label: 'الواجهة واللافتات', icon: '#i-image', screen: 'AD-19' },
+      { label: 'قوالب الإشعارات', icon: '#i-msg', screen: 'AD-20' },
+      { label: 'مستخدمو الإدارة', icon: '#i-users', screen: 'AD-23' },
+      { label: 'سجلّ التدقيق', icon: '#i-shield', screen: 'AD-24' },
+      { label: 'التقارير', icon: '#i-chart', screen: 'AD-25' },
+      { label: 'الإعدادات والضرائب', icon: '#i-lock', screen: 'AD-26' },
+      { label: 'عمليات الإدارة', icon: '#i-store', ext: 'AD-03' }
+    ];
+    out.navItems = navDefs.map(n => {
+      const here = n.screen === st.screen;
+      return {
+        label: n.label, icon: n.icon,
+        bg: here ? 'var(--brand)' : 'transparent',
+        fg: here ? '#FFFFFF' : 'rgba(255,255,255,.82)',
+        weight: here ? '700' : '500',
+        go: () => {
+          if (n.screen) this.go(n.screen);
+          else { try { localStorage.setItem('basta.admin.screen', n.ext); } catch (e) {} window.location.href = encodeURI('Basta Admin Operations.dc.html'); }
+        }
+      };
+    });
+
+    Object.assign(out, this.catalog(), this.sys());
+
+    out.toastMsg = st.toast ? st.toast.msg : '';
+    out.toastDisplay = st.toast ? 'flex' : 'none';
+    out.toastBg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-subtle)' : 'var(--inverse)';
+    out.toastFg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-text)' : 'var(--on-inverse)';
+    out.toastIcon = st.toast && st.toast.kind === 'warning' ? '#i-alert' : '#i-check-circle';
+    out.closeToast = () => S({ toast: null });
+
+    return out;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Basta · Admin operations — AD-01…07 · 12…15 · 21 · 22</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--sunken);color:var(--text-body);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{color:var(--brand-hover)}
+button,input,select,textarea{font:inherit;color:inherit}
+:root{
+--font-head:'Almarai',system-ui,sans-serif;
+--font-ui:'IBM Plex Sans Arabic',system-ui,sans-serif;
+--font-mono:'IBM Plex Mono',ui-monospace,monospace;
+--page:#F8F3EC;--card:#FFFFFF;--raised:#FFFFFF;--sunken:#F0E8DD;--inverse:#28211C;--on-inverse:#FDFAF6;
+--text-strong:#1E1814;--text-body:#4A3F35;--text-muted:#6B5C4D;--text-faint:#7D6C5B;
+--border-subtle:#F0E8DD;--border-default:#E3D7C7;--border-control:#958470;
+--brand:#8C2F46;--brand-hover:#74243A;--brand-pressed:#5C1B2E;--on-brand:#FFFFFF;--brand-subtle:#FBF1F3;--brand-text:#74243A;
+--money:#0E6B66;--money-subtle:#E3F2F0;--money-border:#C4E5E1;
+--success:#2F7A3E;--warning:#9A4F0B;--danger:#C23A1A;--info:#2D5F8B;
+--success-subtle:#E3F1E6;--warning-subtle:#FBEBDD;--danger-subtle:#FBE3DD;--info-subtle:#E1EBF4;
+--success-text:#25622F;--warning-text:#7E4009;--danger-text:#A12E13;--info-text:#244C70;
+--neutral-subtle:#F0E8DD;--neutral-text:#4A3F35;
+--focus:#B05A70;
+--shadow-sm:0 1px 2px rgba(46,13,23,.07),0 1px 3px rgba(74,63,53,.07);
+--shadow-md:0 2px 4px rgba(74,63,53,.07),0 6px 14px rgba(74,63,53,.09);
+--shadow-lg:0 10px 28px rgba(74,63,53,.14);
+--shadow-overlay:0 18px 52px rgba(30,24,20,.26);
+--r-1:4px;--r-2:8px;--r-3:14px;
+--text-3xl:38px;--text-2xl:30px;--text-xl:24px;--text-lg:20px;--text-md:17px;--text-sm:13px;--text-xs:12px;--text-2xs:11px;
+--text-base:15px;--row-h:48px;--card-pad:20px;--ctrl-h:40px;--gap:16px;
+}
+[data-theme="dark"]{
+--page:#14100D;--card:#1E1814;--raised:#28211C;--sunken:#14100D;--inverse:#F0E8DD;--on-inverse:#1E1814;
+--text-strong:#FDFAF6;--text-body:#E3D7C7;--text-muted:#A89680;--text-faint:#958470;
+--border-subtle:#28211C;--border-default:#332B24;--border-control:#7D6C5B;
+--brand:#D08A9B;--brand-hover:#E6B6C1;--brand-pressed:#F4DDE2;--on-brand:#1E1814;--brand-subtle:#2E0D17;--brand-text:#D08A9B;
+--money:#5CC6B8;--money-subtle:#0F2624;--money-border:#08403D;
+--success:#6CC287;--warning:#E39A4B;--danger:#F07A66;--info:#7FB2E0;
+--success-subtle:#13261A;--warning-subtle:#2E1C0B;--danger-subtle:#331410;--info-subtle:#0F1E2C;
+--success-text:#6CC287;--warning-text:#E39A4B;--danger-text:#F07A66;--info-text:#7FB2E0;
+--neutral-subtle:#28211C;--neutral-text:#E3D7C7;
+--focus:#D08A9B;
+--shadow-sm:0 1px 2px rgba(0,0,0,.4);
+--shadow-md:0 2px 4px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.4);
+--shadow-lg:0 10px 28px rgba(0,0,0,.5);
+--shadow-overlay:0 18px 52px rgba(0,0,0,.6);
+}
+[data-density="compact"]{--text-base:13px;--row-h:32px;--card-pad:14px;--ctrl-h:32px;--gap:10px}
+[data-lang="ar"] [data-t="en"]{display:none}
+[data-lang="en"] [data-t="ar"]{display:none}
+[dir="rtl"] [data-mirror]{transform:scaleX(-1)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+[data-theme="light"] [data-seg="light"],[data-theme="dark"] [data-seg="dark"],[data-lang="ar"] [data-seg="ar"],[data-lang="en"] [data-seg="en"],[data-density="comfortable"] [data-seg="comfortable"],[data-density="compact"] [data-seg="compact"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+@keyframes bsSpin{to{transform:rotate(360deg)}}
+@keyframes bsShimmer{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+@keyframes bsToastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes bsFade{from{opacity:0}to{opacity:1}}
+@keyframes bsDrawerIn{from{transform:translateX(100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:1ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" dir="rtl" data-theme="light" data-lang="ar" data-density="compact" style="min-height:100vh;background:var(--sunken);color:var(--text-body);font-family:var(--font-ui)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M13 5l7 7-7 7"></path></symbol>
+<symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="M11 19l-7-7 7-7"></path></symbol>
+<symbol id="i-chev-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></symbol>
+<symbol id="i-chev-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L21.5 20H2.5z"></path><path d="M12 10v4.5"></path><path d="M12 17.5h.01"></path></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 8h.01"></path></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.4l2.8 2.8L16 9.6"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.4l3.4 2"></path></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a1 1 0 011-1h9"></path></symbol>
+<symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.5"></circle><path d="M21 16l-5-5-6 6"></path></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-6.5 10-6.5S22 12 22 12s-4 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+<symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16"></path><path d="M9.5 6c.8-.3 1.6-.5 2.5-.5 6 0 10 6.5 10 6.5s-1.2 2-3.3 3.7"></path><path d="M6.3 8.3C3.5 10.3 2 12 2 12s4 6.5 10 6.5c1.4 0 2.6-.3 3.7-.8"></path></symbol>
+<symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v11h16V9"></path><path d="M3 9l2-5h14l2 5z"></path></symbol>
+<symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"></path><path d="M3 8l9 5 9-5"></path><path d="M12 13v10"></path></symbol>
+<symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"></rect><path d="M16 12.5h3"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"></path><path d="M10 20V4"></path><path d="M16 20v-7"></path><path d="M22 20H2"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"></path><path d="M6 8h12"></path><path d="M6 8l-3 6h6z"></path><path d="M18 8l-3 6h6z"></path></symbol>
+<symbol id="i-return" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.3 5.7"></path><path d="M20 4v7h-7"></path></symbol>
+<symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.9-3.2 3.4-5 6.5-5s5.6 1.8 6.5 5"></path><path d="M16 5.2a3.5 3.5 0 010 5.6"></path><path d="M18 15c2 .6 3.2 2.2 3.7 4"></path></symbol>
+<symbol id="i-star-fill" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z"></path><path d="M9 12.2l2.2 2.2L15.5 10"></path></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect><path d="M8 10.5V8a4 4 0 018 0v2.5"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></symbol>
+<symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"></path><path d="M14 3v5h5"></path></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h10v9H3z"></path><path d="M13 10h4l4 3v3h-8z"></path><circle cx="7" cy="18" r="1.8"></circle><circle cx="17" cy="18" r="1.8"></circle></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"></path></symbol>
+<symbol id="i-zoom-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path><path d="M11 8.5v5"></path><path d="M8.5 11h5"></path></symbol>
+<symbol id="i-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a9 9 0 109 9"></path></symbol>
+</defs></svg>
+
+<header style="position:sticky;top:0;z-index:60;background:var(--card);border-block-end:1px solid var(--border-default);box-shadow:var(--shadow-sm)">
+  <div style="max-width:1600px;margin:0 auto;padding:9px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-family:var(--font-head);font-weight:800;font-size:19px;color:var(--brand)">بسطة</span>
+    <span style="height:22px;padding:0 9px;border-radius:var(--r-1);background:var(--inverse);color:var(--on-inverse);font-family:var(--font-mono);font-size:10px;display:inline-flex;align-items:center;letter-spacing:.06em">ADMIN</span>
+    <div style="display:flex;gap:6px">
+      <a href="Basta Component Sheet.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">الورقة</a>
+      <a href="Basta Vendor Orders &amp; Money.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">التاجر</a>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border-default)"></div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="light" onClick="{{ setLight }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">فاتح</button>
+      <button type="button" data-seg="dark" onClick="{{ setDark }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">داكن</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="ar" onClick="{{ setAr }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">عربي</button>
+      <button type="button" data-seg="en" onClick="{{ setEn }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">English</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="compact" onClick="{{ setCompact }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">مضغوطة</button>
+      <button type="button" data-seg="comfortable" onClick="{{ setComfortable }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">مريحة</button>
+    </div>
+    <div style="margin-inline-start:auto;display:flex;align-items:center;gap:10px">
+      <span style="display:flex;align-items:center;gap:6px">
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">ROLE</span>
+        <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+          <sc-for list="{{ roleTabs }}" as="r" hint-placeholder-count="2">
+            <button type="button" onClick="{{ r.pick }}" style="height:28px;padding:0 10px;border:0;border-inline-start:1px solid var(--border-control);background:{{ r.bg }};color:{{ r.fg }};font-size:11px;font-weight:600;cursor:pointer">{{ r.label }}</button>
+          </sc-for>
+        </div>
+      </span>
+      <span style="display:flex;align-items:center;gap:6px">
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">STATE</span>
+        <div style="display:flex;gap:4px">
+          <sc-for list="{{ stateTabs }}" as="p" hint-placeholder-count="5">
+            <button type="button" onClick="{{ p.go }}" style="height:28px;padding:0 9px;border:1px solid {{ p.border }};border-radius:var(--r-1);background:{{ p.bg }};color:{{ p.fg }};font-size:11px;cursor:pointer">{{ p.label }}</button>
+          </sc-for>
+        </div>
+      </span>
+    </div>
+  </div>
+  <div style="max-width:1600px;margin:0 auto;padding:0 24px 8px;display:flex;gap:4px;flex-wrap:wrap">
+    <sc-for list="{{ screenTabs }}" as="t" hint-placeholder-count="13">
+      <button type="button" onClick="{{ t.go }}" style="height:26px;padding:0 9px;border:1px solid {{ t.border }};border-radius:var(--r-1);background:{{ t.bg }};color:{{ t.fg }};font-family:var(--font-mono);font-size:11px;cursor:pointer">{{ t.code }}</button>
+    </sc-for>
+  </div>
+</header>
+
+<div style="padding:18px 16px 56px;display:grid;justify-items:center">
+  <div style="width:1440px;zoom:{{ fit }};background:var(--page);border:1px solid var(--border-default);border-radius:var(--r-3);box-shadow:var(--shadow-lg);overflow:hidden;min-height:820px;display:grid;grid-template-columns:{{ shellCols }}">
+
+    <aside style="display:{{ sidebarDisplay }};background:var(--inverse);padding:14px 0;flex-direction:column;gap:3px">
+      <div style="padding:0 16px 12px;display:flex;align-items:center;gap:9px;border-block-end:1px solid rgba(255,255,255,.12);margin-bottom:8px">
+        <span style="width:32px;height:32px;flex:none;border-radius:var(--r-1);background:var(--brand);color:#FFFFFF;display:grid;place-items:center;font-family:var(--font-head);font-weight:800;font-size:16px">ب</span>
+        <span style="display:grid;gap:2px;min-width:0">
+          <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--on-inverse)">لوحة الإدارة</span>
+          <span style="font-size:var(--text-2xs);color:rgba(255,255,255,.6)">{{ roleLabel }}</span>
+        </span>
+      </div>
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="12">
+        <button type="button" onClick="{{ n.go }}" style="margin:0 8px;height:34px;padding:0 10px;border:0;border-radius:var(--r-1);background:{{ n.bg }};color:{{ n.fg }};font-size:var(--text-sm);font-weight:{{ n.weight }};display:flex;align-items:center;gap:9px;cursor:pointer;text-align:start" style-hover="background:rgba(255,255,255,.08)">
+          <svg width="16" height="16" style="flex:none"><use href="{{ n.icon }}"></use></svg>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.label }}</span>
+          <sc-if value="{{ n.count }}" hint-placeholder-val="{{ false }}">
+            <span style="height:18px;min-width:18px;padding:0 5px;border-radius:999px;background:{{ n.countBg }};color:{{ n.countFg }};font-family:var(--font-mono);font-size:10px;display:inline-flex;align-items:center;justify-content:center">{{ n.count }}</span>
+          </sc-if>
+        </button>
+      </sc-for>
+      <div style="margin-top:auto;padding:12px 16px 0;border-block-start:1px solid rgba(255,255,255,.12);display:grid;gap:3px">
+        <span style="font-size:var(--text-xs);color:var(--on-inverse);font-weight:600">{{ adminName }}</span>
+        <span style="font-size:var(--text-2xs);color:rgba(255,255,255,.6)">{{ roleLabel }}</span>
+      </div>
+    </aside>
+
+    <div style="display:flex;flex-direction:column;min-width:0">
+      <div style="display:{{ topbarDisplay }};background:var(--card);border-block-end:1px solid var(--border-default);padding:9px 20px;align-items:center;gap:12px">
+        <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">{{ pageTitle }}</span>
+        <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">{{ screen }}</span>
+        <span style="margin-inline-start:auto;display:flex;align-items:center;gap:9px">
+          <span style="position:relative;display:flex;align-items:center">
+            <svg width="15" height="15" style="position:absolute;inset-inline-start:9px;color:var(--text-faint);pointer-events:none"><use href="#i-search"></use></svg>
+            <input type="text" value="{{ globalQ }}" onChange="{{ onGlobalQ }}" placeholder="ابحث برقم طلب أو متجر أو عميل" style="height:var(--ctrl-h);width:260px;padding-inline:29px 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm)" />
+          </span>
+          <span style="display:flex;align-items:center;gap:7px;padding-inline-start:9px;border-inline-start:1px solid var(--border-default)">
+            <span style="width:26px;height:26px;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center;font-size:var(--text-xs);font-weight:700">{{ adminInitial }}</span>
+            <span style="font-size:var(--text-sm);color:var(--text-body)">{{ adminName }}</span>
+          </span>
+        </span>
+      </div>
+
+      <div style="display:{{ loadingDisplay }};padding:22px;gap:13px;flex-direction:column">
+        <span style="height:24px;width:220px;border-radius:var(--r-1);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out infinite"></span>
+        <span style="height:90px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .12s infinite"></span>
+        <span style="height:260px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .24s infinite"></span>
+      </div>
+
+      <div style="display:{{ errorDisplay }};padding:72px 40px;place-items:center;text-align:center;gap:12px">
+        <span style="width:50px;height:50px;border-radius:var(--r-2);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="25" height="25"><use href="#i-alert"></use></svg></span>
+        <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">حدث خلل غير متوقّع ولم يكتمل طلبك</span>
+        <span style="font-size:var(--text-base);color:var(--text-muted);max-width:56ch;line-height:1.8">أعد المحاولة، وإن تكرّر أبلغ الفريق التقني بالرقم <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">req-8f3a2c</span>.</span>
+        <button type="button" onClick="{{ retry }}" style="margin-top:4px;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-return"></use></svg>أعد المحاولة</button>
+      </div>
+
+      <div style="display:{{ contentDisplay }};padding:18px 20px 36px;min-width:0">
+        <sc-if value="{{ isAD01 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;place-items:center;padding:60px 20px;min-height:700px">
+          <div style="width:100%;max-width:440px;display:grid;gap:18px">
+            <div style="display:grid;justify-items:center;gap:9px;text-align:center">
+              <span style="width:46px;height:46px;border-radius:var(--r-2);background:var(--inverse);color:var(--on-inverse);display:grid;place-items:center;font-family:var(--font-head);font-weight:800;font-size:20px">ب</span>
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong)">دخول لوحة الإدارة</span>
+              <span style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.8">{{ ad01Sub }}</span>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:22px;box-shadow:var(--shadow-md);display:grid;gap:14px">
+              <sc-if value="{{ ad01Creds }}" hint-placeholder-val="{{ true }}">
+                <div style="display:{{ ad01ErrDisplay }};align-items:center;gap:9px;padding:11px 13px;border:1px solid var(--danger);border-radius:var(--r-1);background:var(--danger-subtle)">
+                  <svg width="16" height="16" style="flex:none;color:var(--danger-text)"><use href="#i-alert"></use></svg>
+                  <span style="font-size:var(--text-sm);color:var(--danger-text)">البريد الإلكتروني أو كلمة المرور غير صحيحة</span>
+                </div>
+                <label style="display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">البريد الإلكتروني</span>
+                  <input type="text" value="{{ ad01Email }}" onChange="{{ onAd01Email }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                </label>
+                <label style="display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">كلمة المرور</span>
+                  <span style="position:relative;display:flex">
+                    <input type="{{ ad01PwType }}" value="{{ ad01Pw }}" onChange="{{ onAd01Pw }}" dir="ltr" style="height:var(--ctrl-h);padding-inline:12px 42px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                    <button type="button" onClick="{{ toggleAd01Pw }}" aria-label="إظهار كلمة المرور" style="position:absolute;inset-inline-end:4px;top:50%;transform:translateY(-50%);width:32px;height:32px;display:grid;place-items:center;border:0;background:transparent;color:var(--text-muted);cursor:pointer;border-radius:var(--r-1)" style-hover="background:var(--sunken)"><svg width="17" height="17"><use href="{{ ad01PwIcon }}"></use></svg></button>
+                  </span>
+                </label>
+                <button type="button" onClick="{{ ad01Continue }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer" style-hover="background:var(--brand-hover)">تابع إلى رمز التحقّق</button>
+                <span style="font-size:var(--text-2xs);color:var(--text-faint);text-align:center">للتجربة: أي بريد مع كلمة المرور <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">basta-2026</span></span>
+              </sc-if>
+              <sc-if value="{{ ad01Code }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:9px;padding:11px 13px;border:1px solid var(--info);border-radius:var(--r-1);background:var(--info-subtle)">
+                  <svg width="16" height="16" style="flex:none;color:var(--info-text)"><use href="#i-shield"></use></svg>
+                  <span style="font-size:var(--text-sm);color:var(--info-text);line-height:1.6">رمز التحقّق بخطوتين إلزامي لحسابات الإدارة</span>
+                </div>
+                <div dir="ltr" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px">
+                  <sc-for list="{{ ad01Cells }}" as="d" hint-placeholder-count="6">
+                    <input type="text" inputMode="numeric" maxLength="6" value="{{ d.val }}" onChange="{{ d.onInput }}" onKeyDown="{{ d.onKeyDown }}" onPaste="{{ d.onPaste }}" ref="{{ d.ref }}" style="height:52px;text-align:center;border:1.5px solid {{ d.border }};border-radius:var(--r-1);background:{{ d.bg }};color:{{ d.color }};font-family:var(--font-mono);font-size:var(--text-lg);font-weight:600" />
+                  </sc-for>
+                </div>
+                <div style="display:{{ ad01CodeErrDisplay }};align-items:center;gap:9px;padding:11px 13px;border:1px solid var(--danger);border-radius:var(--r-1);background:var(--danger-subtle)">
+                  <svg width="16" height="16" style="flex:none;color:var(--danger-text)"><use href="#i-alert"></use></svg>
+                  <span style="font-size:var(--text-sm);color:var(--danger-text)">يلزم رمز تحقّق صحيح</span>
+                </div>
+                <button type="button" onClick="{{ ad01Verify }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer" style-hover="background:var(--brand-hover)">ادخل</button>
+                <button type="button" onClick="{{ ad01Back }}" style="border:0;background:transparent;padding:0;color:var(--brand);font-size:var(--text-sm);cursor:pointer;text-decoration:underline;justify-self:center">رجوع</button>
+                <span style="font-size:var(--text-2xs);color:var(--text-faint);text-align:center">للتجربة: الرمز <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">204815</span> · مدير جديد يُنقل إلى AD-02</span>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD02 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;place-items:center;padding:48px 20px;min-height:700px">
+          <div style="width:100%;max-width:720px;display:grid;gap:16px">
+            <div style="padding:14px 16px;border:1px solid var(--warning);border-radius:var(--r-2);background:var(--warning-subtle);display:flex;align-items:flex-start;gap:11px">
+              <svg width="19" height="19" style="flex:none;color:var(--warning-text);margin-top:2px"><use href="#i-lock"></use></svg>
+              <div style="display:grid;gap:4px">
+                <span style="font-size:var(--text-base);font-weight:700;color:var(--warning-text)">فعّل التحقّق بخطوتين أولاً — إلزامي لحسابات الإدارة</span>
+                <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">لا يمكنك الوصول إلى أي شاشة قبل التفعيل. لا يوجد تخطٍّ.</span>
+              </div>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:22px;box-shadow:var(--shadow-sm);display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:start">
+              <div style="display:grid;gap:9px;justify-items:center">
+                <div style="width:172px;height:172px;border:1.5px solid var(--border-control);border-radius:var(--r-2);background:#FFFFFF;padding:12px;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);gap:2px">
+                  <sc-for list="{{ qrCells }}" as="q" hint-placeholder-count="81">
+                    <span style="background:{{ q }};border-radius:1px"></span>
+                  </sc-for>
+                </div>
+                <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">basta admin · {{ adminName }}</span>
+              </div>
+              <div style="display:grid;gap:14px">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">امسح الرمز بتطبيق المصادقة</span>
+                <div style="display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">أو انسخ السر نصّاً</span>
+                  <div style="display:flex;gap:7px">
+                    <span dir="ltr" style="unicode-bidi:isolate;flex:1;min-width:0;height:var(--ctrl-h);padding:0 11px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--sunken);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-sm);display:flex;align-items:center;letter-spacing:.06em;overflow:hidden">JBSW Y3DP EHPK 3PXP</span>
+                    <button type="button" onClick="{{ copySecret }}" aria-label="انسخ السر" style="width:var(--ctrl-h);height:var(--ctrl-h);flex:none;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)"><svg width="17" height="17"><use href="#i-copy"></use></svg></button>
+                  </div>
+                </div>
+                <label style="display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">أكّد بالرمز من التطبيق</span>
+                  <div style="display:flex;gap:7px">
+                    <input type="text" value="{{ ad02Code }}" onChange="{{ onAd02Code }}" dir="ltr" placeholder="000000" maxLength="6" style="flex:1;min-width:0;height:var(--ctrl-h);padding:0 11px;border:1px solid {{ ad02Border }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-md);letter-spacing:.14em" />
+                    <button type="button" onClick="{{ ad02Confirm }}" style="height:var(--ctrl-h);padding:0 16px;flex:none;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:700;cursor:pointer" style-hover="background:var(--brand-hover)">فعّل وادخل</button>
+                  </div>
+                  <span style="display:{{ ad02MsgDisplay }};align-items:center;gap:6px;font-size:var(--text-xs);color:var(--danger-text)"><svg width="14" height="14" style="flex:none"><use href="#i-alert"></use></svg>{{ ad02Msg }}</span>
+                </label>
+                <span style="font-size:var(--text-2xs);color:var(--text-faint)">للتجربة: الرمز <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">204815</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD03 }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;gap:14px;min-width:0">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-size:var(--text-sm);color:var(--text-muted)">المؤشرات معروضة بعملة واحدة في كل مرة — لا نجمع عملتين في رقم واحد.</span>
+            <div style="margin-inline-start:auto;display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+              <sc-for list="{{ currencyTabs }}" as="c" hint-placeholder-count="4">
+                <button type="button" onClick="{{ c.pick }}" style="height:32px;padding:0 13px;border:0;border-inline-start:1px solid var(--border-control);background:{{ c.bg }};color:{{ c.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">{{ c.label }}<span style="font-family:var(--font-mono);font-size:10px;opacity:.75">{{ c.code }}</span></button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:11px">
+            <sc-for list="{{ metrics }}" as="m" hint-placeholder-count="6">
+              <div style="background:var(--card);border:1px solid {{ m.border }};border-radius:var(--r-2);padding:13px;box-shadow:var(--shadow-sm);display:grid;gap:6px;align-content:start">
+                <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5">{{ m.label }}</span>
+                <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:{{ m.color }};line-height:1.25">{{ m.value }}</span>
+                <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-faint)"><span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);color:{{ m.deltaColor }};font-weight:600">{{ m.delta }}</span>{{ m.sub }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;align-items:start">
+            <div style="display:grid;gap:11px">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">طوابير تنتظر إجراءً</span>
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px">
+                <sc-for list="{{ queues }}" as="q" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ q.go }}" style="text-align:start;background:var(--card);border:1px solid {{ q.border }};border-radius:var(--r-2);padding:14px;box-shadow:var(--shadow-sm);cursor:pointer;display:flex;align-items:flex-start;gap:11px" style-hover="box-shadow:var(--shadow-md)">
+                    <span style="width:34px;height:34px;flex:none;border-radius:var(--r-1);background:{{ q.iconBg }};color:{{ q.iconFg }};display:grid;place-items:center"><svg width="17" height="17"><use href="{{ q.icon }}"></use></svg></span>
+                    <span style="display:grid;gap:3px;min-width:0;flex:1">
+                      <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ q.label }}</span>
+                      <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.6">{{ q.sub }}</span>
+                    </span>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;color:{{ q.countColor }};flex:none">{{ q.count }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+              <div style="padding:12px 14px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">آخر ما جرى</span>
+                <span style="margin-inline-start:auto;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">audit · AD-24</span>
+              </div>
+              <sc-for list="{{ auditFeed }}" as="a" hint-placeholder-count="6">
+                <div style="padding:10px 14px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:flex-start;gap:10px">
+                  <span style="width:26px;height:26px;flex:none;border-radius:999px;background:var(--sunken);color:var(--text-muted);display:grid;place-items:center"><svg width="13" height="13"><use href="{{ a.icon }}"></use></svg></span>
+                  <span style="display:grid;gap:2px;min-width:0;flex:1">
+                    <span style="font-size:var(--text-xs);color:var(--text-strong);line-height:1.6">{{ a.text }}</span>
+                    <span style="font-size:10px;color:var(--text-faint)">{{ a.actor }} · {{ a.time }}</span>
+                  </span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD04 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:13px;min-width:0">
+          <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap">
+            <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ vqCountText }}</span>
+            <span style="font-size:var(--text-xs);color:var(--text-muted)">الأقدم أولاً — الانتظار فوق يومي عمل يظهر بالأحمر.</span>
+          </div>
+          <sc-if value="{{ vqEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:48px 22px;display:grid;justify-items:center;gap:10px;text-align:center">
+              <span style="width:48px;height:48px;border-radius:var(--r-2);background:var(--success-subtle);color:var(--success-text);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-check-circle"></use></svg></span>
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-md);color:var(--text-strong)">لا طلبات اعتماد معلّقة</span>
+              <span style="font-size:var(--text-sm);color:var(--text-muted);max-width:50ch;line-height:1.8">كل طلبات المتاجر مُراجَعة. ستظهر الطلبات الجديدة هنا فور إرسال التاجر لمستنداته.</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ vqHasRows }}" hint-placeholder-val="{{ true }}">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="overflow-x:auto"><div style="min-width:1020px">
+              <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 104px 116px 176px 128px 104px;gap:11px;padding:9px 14px;border-block-end:1px solid var(--border-default)">
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">SHOP</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">COUNTRY</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">REGISTERED</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">DOCUMENTS</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">WAITING</span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;text-align:end">ACTION</span>
+              </div>
+              <sc-for list="{{ vqRows }}" as="v" hint-placeholder-count="6">
+                <div style="display:grid;grid-template-columns:minmax(0,1.3fr) 104px 116px 176px 128px 104px;gap:11px;padding:11px 14px;border-block-end:1px solid var(--border-subtle);align-items:center;background:{{ v.rowBg }}">
+                  <span style="display:flex;align-items:center;gap:9px;min-width:0">
+                    <span style="width:32px;height:32px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="16" height="16"><use href="#i-store"></use></svg></span>
+                    <span style="display:grid;gap:2px;min-width:0">
+                      <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ v.name }}</span>
+                      <span style="font-size:10px;color:var(--text-muted)">{{ v.owner }}</span>
+                    </span>
+                  </span>
+                  <span style="font-size:var(--text-xs);color:var(--text-body)">{{ v.country }}</span>
+                  <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ v.date }}</span>
+                  <span style="display:flex;gap:5px">
+                    <sc-for list="{{ v.docs }}" as="d" hint-placeholder-count="4">
+                      <span title="{{ d.title }}" style="width:34px;height:26px;border-radius:var(--r-1);background:{{ d.bg }};color:{{ d.fg }};display:grid;place-items:center;font-size:10px;font-weight:700">{{ d.short }}</span>
+                    </sc-for>
+                  </span>
+                  <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:{{ v.waitBg }};color:{{ v.waitFg }};font-size:var(--text-2xs);font-weight:600;justify-self:start;white-space:nowrap"><svg width="12" height="12"><use href="#i-clock"></use></svg>{{ v.wait }}</span>
+                  <button type="button" onClick="{{ v.review }}" style="justify-self:end;height:32px;padding:0 13px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">راجع</button>
+                </div>
+              </sc-for>
+            </div></div>
+          </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isTable }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:13px;min-width:0">
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+            <sc-for list="{{ tblFilters }}" as="f" hint-placeholder-count="4">
+              <button type="button" onClick="{{ f.pick }}" style="height:32px;padding:0 12px;border:1px solid {{ f.border }};border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">{{ f.label }}<span style="font-family:var(--font-mono);font-size:10px;opacity:.75">{{ f.count }}</span></button>
+            </sc-for>
+            <span style="margin-inline-start:auto;position:relative;display:flex;align-items:center">
+              <svg width="15" height="15" style="position:absolute;inset-inline-start:9px;color:var(--text-faint);pointer-events:none"><use href="#i-search"></use></svg>
+              <input type="text" value="{{ tblQuery }}" onChange="{{ onTblQuery }}" placeholder="{{ tblSearchHint }}" style="height:var(--ctrl-h);width:250px;padding-inline:29px 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm)" />
+            </span>
+          </div>
+
+          <div style="display:{{ tblNoteDisplay }};align-items:flex-start;gap:9px;padding:11px 13px;border:1px solid {{ tblNoteBorder }};border-radius:var(--r-1);background:{{ tblNoteBg }}">
+            <svg width="16" height="16" style="flex:none;color:{{ tblNoteColor }};margin-top:1px"><use href="{{ tblNoteIcon }}"></use></svg>
+            <span style="font-size:var(--text-sm);color:{{ tblNoteColor }};line-height:1.7">{{ tblNote }}</span>
+          </div>
+
+          <sc-if value="{{ tblEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:48px 22px;display:grid;justify-items:center;gap:10px;text-align:center">
+              <span style="width:48px;height:48px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="24" height="24"><use href="{{ tblEmptyIcon }}"></use></svg></span>
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-md);color:var(--text-strong)">{{ tblEmptyTitle }}</span>
+              <span style="font-size:var(--text-sm);color:var(--text-muted);max-width:52ch;line-height:1.8">{{ tblEmptyBody }}</span>
+              <button type="button" onClick="{{ tblClear }}" style="margin-top:4px;height:32px;padding:0 13px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">أزل التصفية</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ tblHasRows }}" hint-placeholder-val="{{ true }}">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="overflow-x:auto"><div style="min-width:{{ tblMinWidth }}">
+              <div style="display:grid;grid-template-columns:{{ tblCols }};gap:11px;padding:9px 14px;border-block-end:1px solid var(--border-default)">
+                <sc-for list="{{ tblHead }}" as="h" hint-placeholder-count="6">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em;text-align:{{ h.align }}">{{ h.label }}</span>
+                </sc-for>
+              </div>
+              <sc-for list="{{ tblRows }}" as="r" hint-placeholder-count="7">
+                <div style="border-block-end:1px solid var(--border-subtle);background:{{ r.rowBg }}">
+                  <div style="display:grid;grid-template-columns:{{ tblCols }};gap:11px;padding:11px 14px;align-items:center">
+                    <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6">
+                      <span style="display:flex;align-items:center;gap:8px;min-width:0;justify-content:{{ c.justify }}">
+                        <sc-if value="{{ c.icon }}" hint-placeholder-val="{{ false }}">
+                          <span style="width:30px;height:30px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="15" height="15"><use href="{{ c.icon }}"></use></svg></span>
+                        </sc-if>
+                        <sc-if value="{{ c.isBadge }}" hint-placeholder-val="{{ false }}">
+                          <span style="height:23px;padding:0 9px;border-radius:999px;background:{{ c.badgeBg }};color:{{ c.badgeFg }};font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:5px;white-space:nowrap">{{ c.text }}</span>
+                        </sc-if>
+                        <sc-if value="{{ c.isStack }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:grid;gap:2px;min-width:0">
+                            <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.text }}</span>
+                            <span dir="{{ c.subDir }}" style="unicode-bidi:isolate;font-size:10px;color:var(--text-muted);font-family:{{ c.subFont }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.sub }}</span>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ c.isPlain }}" hint-placeholder-val="{{ true }}">
+                          <span dir="{{ c.dir }}" style="unicode-bidi:isolate;font-family:{{ c.font }};font-size:{{ c.size }};font-weight:{{ c.weight }};color:{{ c.color }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">{{ c.text }}</span>
+                        </sc-if>
+                        <sc-if value="{{ c.isStars }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:inline-flex;gap:2px;color:var(--warning)">
+                            <sc-for list="{{ c.stars }}" as="s" hint-placeholder-count="5">
+                              <svg width="14" height="14"><use href="{{ s }}"></use></svg>
+                            </sc-for>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ c.isActions }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+                            <sc-for list="{{ c.actions }}" as="a" hint-placeholder-count="2">
+                              <button type="button" onClick="{{ a.go }}" disabled="{{ a.disabled }}" style="height:30px;padding:0 11px;border:{{ a.border }};border-radius:var(--r-1);background:{{ a.bg }};color:{{ a.fg }};font-size:var(--text-xs);font-weight:600;cursor:{{ a.cursor }};white-space:nowrap">{{ a.label }}</button>
+                            </sc-for>
+                          </span>
+                        </sc-if>
+                      </span>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ r.note }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:0 14px 11px">
+                      <span style="display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border:1px solid {{ r.noteBorder }};border-radius:var(--r-1);background:{{ r.noteBg }};font-size:var(--text-xs);color:{{ r.noteColor }};line-height:1.7;width:fit-content;max-width:100%"><svg width="14" height="14" style="flex:none;margin-top:2px"><use href="{{ r.noteIcon }}"></use></svg>{{ r.note }}</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div></div>
+          </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD07 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start;min-width:0">
+          <div style="display:grid;gap:11px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <sc-for list="{{ prFilters }}" as="f" hint-placeholder-count="3">
+                <button type="button" onClick="{{ f.pick }}" style="height:30px;padding:0 11px;border:1px solid {{ f.border }};border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">{{ f.label }}<span style="font-family:var(--font-mono);font-size:10px;opacity:.75">{{ f.count }}</span></button>
+              </sc-for>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden;max-height:680px;overflow-y:auto">
+              <sc-for list="{{ prQueue }}" as="p" hint-placeholder-count="6">
+                <button type="button" onClick="{{ p.pick }}" style="width:100%;display:flex;align-items:flex-start;gap:10px;padding:11px;border:0;border-block-end:1px solid var(--border-subtle);background:{{ p.bg }};cursor:pointer;text-align:start" style-hover="background:var(--sunken)">
+                  <span style="width:42px;height:42px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="19" height="19"><use href="#i-image"></use></svg></span>
+                  <span style="display:grid;gap:3px;min-width:0;flex:1">
+                    <span style="font-size:var(--text-sm);font-weight:{{ p.weight }};color:var(--text-strong);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</span>
+                    <span style="font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.shop }} · {{ p.cat }}</span>
+                    <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                      <span style="height:19px;padding:0 7px;border-radius:999px;background:{{ p.kindBg }};color:{{ p.kindFg }};font-size:10px;font-weight:700;display:inline-flex;align-items:center">{{ p.kind }}</span>
+                      <span style="font-family:var(--font-mono);font-size:10px;color:{{ p.waitColor }}">{{ p.wait }}</span>
+                    </span>
+                  </span>
+                </button>
+              </sc-for>
+              <sc-if value="{{ prQueueEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:40px 18px;display:grid;justify-items:center;gap:9px;text-align:center">
+                  <span style="width:44px;height:44px;border-radius:var(--r-2);background:var(--success-subtle);color:var(--success-text);display:grid;place-items:center"><svg width="22" height="22"><use href="#i-check-circle"></use></svg></span>
+                  <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">لا منتجات تنتظر المراجعة</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7">راجعت الطابور كاملاً.</span>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="display:grid;gap:13px;min-width:0">
+            <sc-if value="{{ prHasActive }}" hint-placeholder-val="{{ true }}">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:16px;box-shadow:var(--shadow-sm);display:grid;gap:13px">
+              <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+                <div style="display:grid;gap:4px;min-width:0;flex:1">
+                  <span style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                    <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong);line-height:1.35">{{ prName }}</span>
+                    <span style="height:24px;padding:0 10px;border-radius:999px;background:{{ prKindBg }};color:{{ prKindFg }};font-size:10px;font-weight:700;display:inline-flex;align-items:center">{{ prKind }}</span>
+                  </span>
+                  <span style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:var(--text-xs);color:var(--text-muted)">
+                    <span style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13"><use href="#i-store"></use></svg>{{ prShop }}</span>
+                    <span>{{ prCat }}</span>
+                    <span>{{ prVariants }} متغيّراً</span>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);color:var(--money);font-weight:600">{{ prPrice }}</span>
+                  </span>
+                </div>
+                <span style="display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;background:{{ prWaitBg }};color:{{ prWaitFg }};font-size:var(--text-2xs);font-weight:600;flex:none"><svg width="13" height="13"><use href="#i-clock"></use></svg>{{ prWait }}</span>
+              </div>
+
+              <sc-if value="{{ prIsEdit }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid var(--info);border-radius:var(--r-1);background:var(--info-subtle);padding:12px;display:grid;gap:9px">
+                  <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);font-weight:700;color:var(--info-text)"><svg width="16" height="16"><use href="#i-info"></use></svg>عُدّل بعد النشر — هذه هي الفروق فقط</span>
+                  <sc-for list="{{ prDiffs }}" as="d" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:110px minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:start;padding:8px;border-radius:var(--r-1);background:var(--card)">
+                      <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">{{ d.field }}</span>
+                      <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7;text-decoration:line-through">{{ d.before }}</span>
+                      <span style="font-size:var(--text-xs);color:var(--success-text);line-height:1.7;font-weight:600">{{ d.after }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px">
+                <sc-for list="{{ prImages }}" as="im" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ im.zoom }}" style="position:relative;aspect-ratio:1;border:1px solid {{ im.border }};border-radius:var(--r-1);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center;cursor:zoom-in;padding:0" style-hover="border-color:var(--brand)">
+                    <svg width="22" height="22"><use href="#i-image"></use></svg>
+                    <sc-if value="{{ im.flag }}" hint-placeholder-val="{{ false }}">
+                      <span style="position:absolute;inset-block-end:0;inset-inline:0;padding:4px;background:var(--danger);color:#FFFFFF;font-size:9px;line-height:1.4">{{ im.flag }}</span>
+                    </sc-if>
+                  </button>
+                </sc-for>
+              </div>
+
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+                <div style="display:grid;gap:7px">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">DESCRIPTION</span>
+                  <p style="margin:0;font-size:var(--text-sm);color:var(--text-body);line-height:1.9;max-width:62ch">{{ prDesc }}</p>
+                </div>
+                <div style="display:grid;gap:7px;align-content:start">
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">ATTRIBUTES &amp; VARIANTS</span>
+                  <sc-for list="{{ prAttrs }}" as="a" hint-placeholder-count="4">
+                    <span style="display:flex;justify-content:space-between;gap:10px;font-size:var(--text-xs);color:var(--text-body);padding-bottom:6px;border-block-end:1px solid var(--border-subtle)"><span style="color:var(--text-muted)">{{ a.k }}</span><span style="font-weight:600;color:var(--text-strong)">{{ a.v }}</span></span>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:9px;flex-wrap:wrap;padding-top:4px;border-block-start:1px solid var(--border-subtle)">
+                <button type="button" onClick="{{ prApprove }}" style="margin-top:12px;height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-check"></use></svg>اعتمد وانشر</button>
+                <button type="button" onClick="{{ prOpenReject }}" style="margin-top:12px;height:var(--ctrl-h);padding:0 16px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-sm);font-weight:600;cursor:pointer" style-hover="background:var(--danger-subtle)">ارفض بسبب</button>
+                <span style="margin-top:12px;margin-inline-start:auto;display:flex;align-items:center;gap:7px;font-size:var(--text-xs);color:var(--text-muted)"><svg width="14" height="14"><use href="#i-info"></use></svg>الرفض يُرسل السبب للتاجر ويبقي المنتج مسودة.</span>
+              </div>
+            </div>
+            </sc-if>
+            <sc-if value="{{ prNoActive }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:60px 22px;display:grid;justify-items:center;gap:10px;text-align:center">
+                <span style="width:48px;height:48px;border-radius:var(--r-2);background:var(--success-subtle);color:var(--success-text);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-check-circle"></use></svg></span>
+                <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-md);color:var(--text-strong)">انتهى الطابور</span>
+                <span style="font-size:var(--text-sm);color:var(--text-muted);max-width:50ch;line-height:1.8">لا منتجات تنتظر المراجعة الآن. ستظهر المنتجات الجديدة والمعدّلة بعد النشر هنا مباشرة.</span>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD14 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start;min-width:0">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+            <div style="padding:11px 13px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:8px">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">النزاعات المفتوحة</span>
+              <span style="margin-inline-start:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">{{ dpCount }}</span>
+            </div>
+            <sc-for list="{{ dpList }}" as="d" hint-placeholder-count="3">
+              <button type="button" onClick="{{ d.pick }}" style="width:100%;display:grid;gap:5px;padding:12px 13px;border:0;border-block-end:1px solid var(--border-subtle);background:{{ d.bg }};cursor:pointer;text-align:start" style-hover="background:var(--sunken)">
+                <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-body)">{{ d.no }}</span>
+                <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong);line-height:1.5">{{ d.reason }}</span>
+                <span style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+                  <span style="height:20px;padding:0 8px;border-radius:999px;background:var(--danger-subtle);color:var(--danger-text);font-size:10px;font-weight:700;display:inline-flex;align-items:center">رصيد مجمَّد</span>
+                  <span style="font-family:var(--font-mono);font-size:10px;color:{{ d.ageColor }}">{{ d.age }}</span>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;gap:13px;min-width:0">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:15px;box-shadow:var(--shadow-sm);display:grid;gap:11px">
+              <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+                <div style="display:grid;gap:4px;min-width:0;flex:1">
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--text-body)">{{ dpNo }}</span>
+                  <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-md);color:var(--text-strong);line-height:1.4">{{ dpReason }}</span>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ dpBuyer }} ضدّ {{ dpShop }} · فُتح {{ dpOpened }}</span>
+                </div>
+                <div style="display:grid;gap:4px;justify-items:end;flex:none">
+                  <span style="font-size:10px;color:var(--text-muted)">قيمة الطلب الفرعي</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--money)">{{ dpTotal }}</span>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px">
+                <sc-for list="{{ dpFacts }}" as="f" hint-placeholder-count="3">
+                  <span style="display:grid;gap:3px;padding:10px;border:1px solid var(--border-subtle);border-radius:var(--r-1);background:var(--sunken)">
+                    <span style="font-size:10px;color:var(--text-muted)">{{ f.k }}</span>
+                    <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong);line-height:1.5">{{ f.v }}</span>
+                  </span>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:13px;align-items:start">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+                <div style="padding:11px 13px;border-block-end:1px solid var(--border-subtle)">
+                  <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">مجرى النزاع</span>
+                </div>
+                <div style="padding:13px;display:grid;gap:11px;max-height:420px;overflow-y:auto;background:var(--sunken)">
+                  <sc-for list="{{ dpThread }}" as="m" hint-placeholder-count="4">
+                    <div style="display:flex;justify-content:{{ m.align }}">
+                      <div style="max-width:86%;min-width:0;display:grid;gap:5px">
+                        <span style="display:flex;align-items:center;gap:7px">
+                          <span style="height:18px;padding:0 7px;border-radius:999px;background:{{ m.tagBg }};color:{{ m.tagFg }};font-family:var(--font-mono);font-size:10px;display:inline-flex;align-items:center">{{ m.role }}</span>
+                          <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">{{ m.time }}</span>
+                        </span>
+                        <span style="padding:10px 12px;border:1px solid {{ m.border }};border-radius:var(--r-2);background:{{ m.bubbleBg }};font-size:var(--text-xs);color:var(--text-body);line-height:1.7">{{ m.text }}</span>
+                        <sc-if value="{{ m.file }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--card);width:fit-content;font-size:10px;color:var(--text-strong)"><svg width="13" height="13" style="color:var(--text-muted)"><use href="#i-file"></use></svg>{{ m.file }}</span>
+                        </sc-if>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="background:var(--card);border:1px solid {{ dpDecBorder }};border-radius:var(--r-2);padding:15px;box-shadow:var(--shadow-sm);display:grid;gap:12px;align-content:start">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">القرار</span>
+                <div style="display:{{ dpNoPermDisplay }};align-items:flex-start;gap:9px;padding:11px;border:1px solid var(--warning);border-radius:var(--r-1);background:var(--warning-subtle)">
+                  <svg width="15" height="15" style="flex:none;color:var(--warning-text);margin-top:1px"><use href="#i-lock"></use></svg>
+                  <span style="font-size:var(--text-xs);color:var(--warning-text);line-height:1.7">القرار يحتاج صلاحية <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">disputes.resolve</span>. دورك الحالي «دعم» — يمكنك القراءة وإضافة ملاحظة فقط.</span>
+                </div>
+                <div style="display:grid;gap:8px">
+                  <sc-for list="{{ dpOptions }}" as="o" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ o.pick }}" disabled="{{ dpDisabled }}" style="text-align:start;padding:11px;border:1px solid {{ o.border }};border-radius:var(--r-1);background:{{ o.bg }};cursor:{{ dpCursor }};display:flex;align-items:flex-start;gap:9px">
+                      <span style="width:16px;height:16px;flex:none;margin-top:2px;border-radius:999px;border:2px solid {{ o.dotBorder }};display:grid;place-items:center"><span style="width:8px;height:8px;border-radius:999px;background:{{ o.dotBg }}"></span></span>
+                      <span style="display:grid;gap:3px;min-width:0">
+                        <span style="font-size:var(--text-xs);font-weight:700;color:var(--text-strong)">{{ o.label }}</span>
+                        <span style="font-size:10px;color:var(--text-muted);line-height:1.6">{{ o.hint }}</span>
+                      </span>
+                    </button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ dpIsPartial }}" hint-placeholder-val="{{ false }}">
+                  <label style="display:grid;gap:6px">
+                    <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">المبلغ المُعاد للمشتري</span>
+                    <span style="display:flex;align-items:stretch;border:1px solid {{ dpAmtBorder }};border-radius:var(--r-1);overflow:hidden;background:var(--card)">
+                      <input type="text" value="{{ dpAmount }}" onChange="{{ onDpAmount }}" disabled="{{ dpDisabled }}" dir="ltr" style="flex:1;min-width:0;height:var(--ctrl-h);padding:0 10px;border:0;background:transparent;color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-sm);outline:none" />
+                      <span style="display:flex;align-items:center;padding:0 10px;background:var(--sunken);color:var(--text-muted);font-size:var(--text-xs);border-inline-start:1px solid var(--border-default)">ر.س.</span>
+                    </span>
+                    <sc-if value="{{ dpAmtErr }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--danger-text)"><svg width="12" height="12" style="flex:none"><use href="#i-alert"></use></svg>{{ dpAmtErr }}</span></sc-if>
+                  </label>
+                </sc-if>
+                <div style="padding:12px;border:1px solid var(--money-border);border-radius:var(--r-1);background:var(--money-subtle);display:grid;gap:7px">
+                  <span style="font-size:10px;color:var(--text-muted);letter-spacing:.06em;font-family:var(--font-mono)">IMPACT PREVIEW</span>
+                  <sc-for list="{{ dpImpact }}" as="i" hint-placeholder-count="3">
+                    <span style="display:flex;justify-content:space-between;gap:10px;font-size:var(--text-xs);color:var(--text-body)"><span>{{ i.k }}</span><span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-weight:600;color:{{ i.color }}">{{ i.v }}</span></span>
+                  </sc-for>
+                  <span style="font-size:10px;color:var(--text-muted);line-height:1.7;padding-top:5px;border-block-start:1px solid var(--money-border)">{{ dpImpactNote }}</span>
+                </div>
+                <label style="display:grid;gap:6px">
+                  <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">سبب القرار — يظهر للطرفين</span>
+                  <textarea rows="3" value="{{ dpNote }}" onChange="{{ onDpNote }}" disabled="{{ dpDisabled }}" placeholder="اكتب سبباً واضحاً يفهمه الطرفان." style="padding:9px 11px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-ui);font-size:var(--text-xs);line-height:1.7;resize:vertical;width:100%"></textarea>
+                </label>
+                <button type="button" onClick="{{ dpResolve }}" disabled="{{ dpResolveDisabled }}" style="height:var(--ctrl-h);border:0;border-radius:var(--r-1);background:{{ dpResolveBg }};color:{{ dpResolveFg }};font-size:var(--text-sm);font-weight:700;cursor:{{ dpResolveCursor }}">أصدر القرار</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isAD05 }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:13px;min-width:0">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:16px;box-shadow:var(--shadow-sm);display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+            <span style="width:56px;height:56px;flex:none;border-radius:var(--r-2);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-store"></use></svg></span>
+            <div style="display:grid;gap:5px;min-width:0;flex:1">
+              <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">{{ vpName }}</span>
+                <span style="height:26px;padding:0 11px;border-radius:999px;background:{{ vpBadgeBg }};color:{{ vpBadgeFg }};font-size:var(--text-xs);font-weight:700;display:inline-flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:999px;background:{{ vpBadgeDot }}"></span>{{ vpBadge }}</span>
+              </span>
+              <span style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:var(--text-xs);color:var(--text-muted)">
+                <span>عملة التسوية <span style="color:var(--money);font-weight:700">{{ vpCurrency }}</span></span>
+                <span>{{ vpCountry }}</span>
+                <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">{{ vpId }}</span>
+              </span>
+            </div>
+            <div style="display:flex;gap:9px;flex-wrap:wrap">
+              <button type="button" onClick="{{ vpApprove }}" disabled="{{ vpActionsDisabled }}" style="height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:{{ vpApproveBg }};color:{{ vpApproveFg }};font-size:var(--text-sm);font-weight:700;cursor:{{ vpActionsCursor }};display:inline-flex;align-items:center;gap:7px"><svg width="16" height="16"><use href="#i-check"></use></svg>اعتمد المتجر</button>
+              <button type="button" onClick="{{ vpReject }}" disabled="{{ vpActionsDisabled }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-sm);font-weight:600;cursor:{{ vpActionsCursor }}" style-hover="background:var(--danger-subtle)">اطلب تعديلاً</button>
+              <button type="button" onClick="{{ vpSuspend }}" disabled="{{ vpActionsDisabled }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-sm);font-weight:600;cursor:{{ vpActionsCursor }}" style-hover="background:var(--danger-subtle)">علّق المتجر</button>
+            </div>
+          </div>
+
+          <div style="display:{{ vpNoPermDisplay }};align-items:center;gap:9px;padding:11px 14px;border:1px solid var(--warning);border-radius:var(--r-1);background:var(--warning-subtle)">
+            <svg width="16" height="16" style="flex:none;color:var(--warning-text)"><use href="#i-lock"></use></svg>
+            <span style="font-size:var(--text-sm);color:var(--warning-text);line-height:1.6">دورك «دعم» — تستطيع القراءة فقط. قرارات الاعتماد والتعليق تحتاج صلاحية <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">vendors.approve</span>.</span>
+          </div>
+
+          <div style="display:flex;gap:6px;flex-wrap:wrap;border-block-end:1px solid var(--border-default);padding-bottom:9px">
+            <sc-for list="{{ vpTabs }}" as="t" hint-placeholder-count="5">
+              <button type="button" onClick="{{ t.pick }}" style="height:34px;padding:0 13px;border:1px solid {{ t.border }};border-radius:var(--r-1);background:{{ t.bg }};color:{{ t.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ vpTabDocs }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+              <sc-for list="{{ vpDocs }}" as="d" hint-placeholder-count="4">
+                <div style="background:var(--card);border:1px solid {{ d.border }};border-radius:var(--r-2);padding:14px;box-shadow:var(--shadow-sm);display:grid;gap:11px">
+                  <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                    <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ d.title }}</span>
+                    <span style="height:22px;padding:0 9px;border-radius:999px;background:{{ d.badgeBg }};color:{{ d.badgeFg }};font-size:10px;font-weight:700;display:inline-flex;align-items:center">{{ d.badge }}</span>
+                    <span dir="ltr" style="unicode-bidi:isolate;margin-inline-start:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">{{ d.file }}</span>
+                  </div>
+                  <button type="button" onClick="{{ d.zoom }}" style="position:relative;aspect-ratio:16/9;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center;cursor:zoom-in;padding:0" style-hover="border-color:var(--brand)">
+                    <svg width="28" height="28"><use href="#i-file"></use></svg>
+                    <span style="position:absolute;bottom:8px;inset-inline-end:8px;width:28px;height:28px;border-radius:var(--r-1);background:var(--card);color:var(--text-strong);display:grid;place-items:center;box-shadow:var(--shadow-sm)"><svg width="15" height="15"><use href="#i-zoom-in"></use></svg></span>
+                  </button>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button type="button" onClick="{{ d.accept }}" disabled="{{ vpActionsDisabled }}" style="height:32px;padding:0 12px;border:1px solid var(--success);border-radius:var(--r-1);background:transparent;color:var(--success-text);font-size:var(--text-xs);font-weight:600;cursor:{{ vpActionsCursor }}" style-hover="background:var(--success-subtle)">اقبل</button>
+                    <button type="button" onClick="{{ d.reject }}" disabled="{{ vpActionsDisabled }}" style="height:32px;padding:0 12px;border:1px solid var(--danger);border-radius:var(--r-1);background:transparent;color:var(--danger-text);font-size:var(--text-xs);font-weight:600;cursor:{{ vpActionsCursor }}" style-hover="background:var(--danger-subtle)">ارفض بسبب</button>
+                  </div>
+                  <sc-if value="{{ d.reason }}" hint-placeholder-val="{{ false }}">
+                    <span style="display:flex;align-items:flex-start;gap:8px;padding:9px 11px;border:1px solid var(--danger);border-radius:var(--r-1);background:var(--danger-subtle);font-size:var(--text-xs);color:var(--danger-text);line-height:1.7"><svg width="14" height="14" style="flex:none;margin-top:2px"><use href="#i-alert"></use></svg>{{ d.reason }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ vpTabInfo }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:16px;box-shadow:var(--shadow-sm);display:grid;gap:10px">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">بيانات النشاط</span>
+                <sc-for list="{{ vpInfoRows }}" as="r" hint-placeholder-count="6">
+                  <span style="display:flex;justify-content:space-between;gap:12px;font-size:var(--text-xs);color:var(--text-body);padding-bottom:7px;border-block-end:1px solid var(--border-subtle)"><span style="color:var(--text-muted)">{{ r.k }}</span><span style="font-weight:600;color:var(--text-strong);text-align:end">{{ r.v }}</span></span>
+                </sc-for>
+              </div>
+              <div style="background:var(--card);border:1px solid var(--money-border);border-radius:var(--r-2);padding:16px;box-shadow:var(--shadow-sm);display:grid;gap:10px;align-content:start">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">الحساب البنكي</span>
+                <sc-for list="{{ vpBankRows }}" as="r" hint-placeholder-count="4">
+                  <span style="display:flex;justify-content:space-between;gap:12px;font-size:var(--text-xs);color:var(--text-body);padding-bottom:7px;border-block-end:1px solid var(--border-subtle)"><span style="color:var(--text-muted)">{{ r.k }}</span><span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-weight:600;color:var(--text-strong);text-align:end">{{ r.v }}</span></span>
+                </sc-for>
+                <span style="display:flex;align-items:center;gap:7px;font-size:var(--text-xs);color:var(--success-text)"><svg width="14" height="14"><use href="#i-check-circle"></use></svg>اسم صاحب الحساب يطابق السجل التجاري</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ vpTabOther }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:16px;box-shadow:var(--shadow-sm);display:grid;gap:11px">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-sm);color:var(--text-strong)">{{ vpOtherTitle }}</span>
+              <sc-for list="{{ vpOtherRows }}" as="r" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:11px;padding:10px;border:1px solid var(--border-subtle);border-radius:var(--r-1);background:var(--sunken);flex-wrap:wrap">
+                  <span style="width:28px;height:28px;flex:none;border-radius:var(--r-1);background:var(--card);color:var(--text-muted);display:grid;place-items:center"><svg width="14" height="14"><use href="{{ r.icon }}"></use></svg></span>
+                  <span style="font-size:var(--text-xs);color:var(--text-strong);min-width:0;flex:1">{{ r.text }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:{{ r.valueColor }};font-weight:600">{{ r.value }}</span>
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint)">{{ r.time }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ toastDisplay }};position:fixed;bottom:24px;inset-inline-start:24px;z-index:120;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-2);background:{{ toastBg }};color:{{ toastFg }};box-shadow:var(--shadow-lg);animation:bsToastIn .22s ease-out;max-width:560px">
+  <svg width="18" height="18" style="flex:none"><use href="{{ toastIcon }}"></use></svg>
+  <span style="font-size:var(--text-sm);font-weight:600;line-height:1.6">{{ toastMsg }}</span>
+  <button type="button" onClick="{{ closeToast }}" aria-label="إغلاق" style="margin-inline-start:8px;width:26px;height:26px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;opacity:.75"><svg width="15" height="15"><use href="#i-x"></use></svg></button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;defaultDirection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rtl&quot;,&quot;ltr&quot;],&quot;default&quot;:&quot;rtl&quot;,&quot;tsType&quot;:&quot;'rtl'|'ltr'&quot;},&quot;defaultDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;compact&quot;,&quot;comfortable&quot;],&quot;default&quot;:&quot;compact&quot;,&quot;tsType&quot;:&quot;'compact'|'comfortable'&quot;},&quot;defaultScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;AD-01&quot;,&quot;AD-02&quot;,&quot;AD-03&quot;,&quot;AD-04&quot;,&quot;AD-05&quot;,&quot;AD-06&quot;,&quot;AD-07&quot;,&quot;AD-12&quot;,&quot;AD-13&quot;,&quot;AD-14&quot;,&quot;AD-15&quot;,&quot;AD-21&quot;,&quot;AD-22&quot;],&quot;default&quot;:&quot;AD-03&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'AD-03', pstate: 'default', fit: 1, toast: null, globalQ: '',
+    role: 'super', currency: 'SAR'
+  };
+
+  componentDidMount() {
+    const r = this.rootEl;
+    if (r) {
+      if (this.props.defaultTheme === 'dark') r.setAttribute('data-theme', 'dark');
+      if (this.props.defaultDirection === 'ltr') { r.setAttribute('dir', 'ltr'); r.setAttribute('data-lang', 'en'); }
+      if (this.props.defaultDensity) r.setAttribute('data-density', this.props.defaultDensity);
+    }
+    if (this.props.defaultScreen) this.setState({ screen: this.props.defaultScreen });
+    try {
+      const hand = localStorage.getItem('basta.admin.screen');
+      if (hand) { localStorage.removeItem('basta.admin.screen'); this.setState({ screen: hand }); }
+    } catch (e) {}
+    this._fit = () => {
+      const w = (this.rootEl ? this.rootEl.clientWidth : window.innerWidth) - 36;
+      this.setState({ fit: Math.min(1, Math.max(0.3, w / 1440)) });
+    };
+    this._fit();
+    window.addEventListener('resize', this._fit);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this._fit); clearTimeout(this._toastT); }
+  set(k, v) { if (this.rootEl) this.rootEl.setAttribute(k, v); }
+  toast(msg, kind) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: { msg: msg, kind: kind || 'success' } });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), 4200);
+  }
+  go(screen) { this.setState({ screen: screen }); }
+  money(n, code) {
+    const dec = (code === 'KWD' || code === 'JOD' || code === 'OMR') ? 3 : 2;
+    const sym = { SAR: 'ر.س.', AED: 'د.إ.', KWD: 'د.ك.', JOD: 'د.أ.', EGP: 'ج.م.', USD: '$' }[code || 'SAR'];
+    return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + ' ' + sym;
+  }
+
+  opsA() {
+    const st = this.state, S = (o) => this.setState(o), out = {};
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const can = st.role === 'super';
+
+    ['AD-01', 'AD-02', 'AD-03', 'AD-04', 'AD-05'].forEach(c => { out['is' + c.replace('-', '')] = st.screen === c; });
+
+    /* AD-01 sign in */
+    const stage = st.ad01Stage || 'creds';
+    out.ad01Creds = stage === 'creds';
+    out.ad01Code = stage === 'code';
+    out.ad01Sub = stage === 'creds' ? 'خطوتان: بياناتك ثم رمز التحقّق.' : 'اكتب الرمز من تطبيق المصادقة.';
+    out.ad01Email = st.ad01Email === undefined ? 'reem@basta.sa' : st.ad01Email;
+    out.ad01Pw = st.ad01Pw || '';
+    out.onAd01Email = (e) => S({ ad01Email: e.target.value, ad01Err: false });
+    out.onAd01Pw = (e) => S({ ad01Pw: e.target.value, ad01Err: false });
+    out.ad01PwType = st.ad01PwShown ? 'text' : 'password';
+    out.ad01PwIcon = st.ad01PwShown ? '#i-eye-off' : '#i-eye';
+    out.toggleAd01Pw = () => S({ ad01PwShown: !st.ad01PwShown });
+    out.ad01ErrDisplay = st.ad01Err ? 'flex' : 'none';
+    out.ad01Continue = () => {
+      if ((st.ad01Pw || '') !== 'basta-2026') { S({ ad01Err: true }); return; }
+      S({ ad01Stage: 'code', ad01Err: false, ad01Otp: ['', '', '', '', '', ''], ad01CodeErr: false });
+    };
+    out.ad01Back = () => S({ ad01Stage: 'creds' });
+    if (!this.a1Els) this.a1Els = [];
+    const a1 = st.ad01Otp || ['', '', '', '', '', ''];
+    out.ad01Cells = a1.map((d, i) => ({
+      val: d,
+      border: st.ad01CodeErr ? 'var(--danger)' : (d ? 'var(--brand)' : 'var(--border-control)'),
+      bg: st.ad01CodeErr ? 'var(--danger-subtle)' : (d ? 'var(--brand-subtle)' : 'var(--card)'),
+      color: st.ad01CodeErr ? 'var(--danger-text)' : 'var(--text-strong)',
+      ref: (el) => { this.a1Els[i] = el; },
+      onInput: (e) => {
+        const v = (e.target.value || '').replace(/\D/g, '');
+        const arr = a1.slice();
+        if (v.length > 1) {
+          v.slice(0, 6).split('').forEach((ch, k) => { if (i + k < 6) arr[i + k] = ch; });
+          S({ ad01Otp: arr, ad01CodeErr: false });
+          const last = Math.min(5, i + v.length - 1);
+          if (this.a1Els[last]) this.a1Els[last].focus();
+          return;
+        }
+        arr[i] = v.slice(-1);
+        S({ ad01Otp: arr, ad01CodeErr: false });
+        if (v && i < 5 && this.a1Els[i + 1]) this.a1Els[i + 1].focus();
+      },
+      onKeyDown: (e) => { if (e.key === 'Backspace' && !a1[i] && i > 0 && this.a1Els[i - 1]) this.a1Els[i - 1].focus(); },
+      onPaste: (e) => {
+        const txt = ((e.clipboardData && e.clipboardData.getData('text')) || '').replace(/\D/g, '');
+        if (!txt) return;
+        e.preventDefault();
+        const arr = ['', '', '', '', '', ''];
+        txt.slice(0, 6).split('').forEach((ch, k) => { arr[k] = ch; });
+        S({ ad01Otp: arr, ad01CodeErr: false });
+        if (this.a1Els[5]) this.a1Els[5].focus();
+      }
+    }));
+    out.ad01CodeErrDisplay = st.ad01CodeErr ? 'flex' : 'none';
+    out.ad01Verify = () => {
+      const code = a1.join('');
+      if (code !== '204815') { S({ ad01CodeErr: true }); return; }
+      if (edge) { S({ screen: 'AD-02' }); this.toast('حساب جديد — فعّل التحقّق بخطوتين أولاً', 'warning'); return; }
+      S({ screen: 'AD-03' });
+      this.toast('أهلاً، ' + (st.role === 'super' ? 'ريم' : 'خالد'));
+    };
+
+    /* AD-02 mandatory 2FA */
+    const qr = [];
+    let seed = 20260914;
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const finder = (r < 3 && c < 3) || (r < 3 && c > 5) || (r > 5 && c < 3);
+        const ring = finder && (r % 3 === 1 && c % 3 === 1 ? true : (r === 0 || r === 2 || r === 6 || r === 8 || c === 0 || c === 2 || c === 6 || c === 8));
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        qr.push((finder ? ring : ((seed >> 16) % 100) > 52) ? '#1E1814' : 'transparent');
+      }
+    }
+    out.qrCells = qr;
+    out.copySecret = () => this.toast('نُسخ السر JBSW Y3DP EHPK 3PXP');
+    out.ad02Code = st.ad02Code || '';
+    out.onAd02Code = (e) => S({ ad02Code: e.target.value.replace(/\D/g, '').slice(0, 6), ad02Msg: '' });
+    out.ad02Border = st.ad02Msg ? 'var(--danger)' : 'var(--border-control)';
+    out.ad02MsgDisplay = st.ad02Msg ? 'flex' : 'none';
+    out.ad02Msg = st.ad02Msg || '';
+    out.ad02Confirm = () => {
+      if ((st.ad02Code || '').length < 6) { S({ ad02Msg: 'الرمز ستة أرقام.' }); return; }
+      if (st.ad02Code !== '204815') { S({ ad02Msg: 'الرمز لا يطابق التطبيق — جرّب الرمز التالي.' }); return; }
+      S({ screen: 'AD-03', ad02Msg: '' });
+      this.toast('فُعّل التحقّق بخطوتين — احفظ رموز الاسترجاع');
+    };
+
+    /* AD-03 dashboard */
+    const curDefs = [
+      { code: 'SAR', label: 'الريال', sales: 1284300.5, comm: 128430.05, fx: 9640.2, aov: 412.75, conv: 3.4, vendors: 148 },
+      { code: 'AED', label: 'الدرهم', sales: 486200.25, comm: 48620.03, fx: 3120.4, aov: 388.4, conv: 3.1, vendors: 62 },
+      { code: 'JOD', label: 'الدينار الأردني', sales: 94120.75, comm: 9412.08, fx: 780.5, aov: 96.125, conv: 2.8, vendors: 31 },
+      { code: 'EGP', label: 'الجنيه', sales: 1840200, comm: 184020, fx: 14200, aov: 1240.5, conv: 2.2, vendors: 44 }
+    ];
+    out.currencyTabs = curDefs.map(c => ({
+      label: c.label, code: c.code,
+      bg: st.currency === c.code ? 'var(--brand)' : 'var(--card)',
+      fg: st.currency === c.code ? 'var(--on-brand)' : 'var(--text-body)',
+      pick: () => S({ currency: c.code })
+    }));
+    const cur = curDefs.filter(c => c.code === st.currency)[0] || curDefs[0];
+    const z = empty;
+    out.metrics = [
+      { label: 'المبيعات', value: this.money(z ? 0 : cur.sales, cur.code), color: 'var(--money)', border: 'var(--money-border)', delta: z ? '—' : '+12.4%', sub: 'عن الشهر السابق' },
+      { label: 'عمولة المنصّة', value: this.money(z ? 0 : cur.comm, cur.code), color: 'var(--money)', border: 'var(--money-border)', delta: z ? '—' : '+12.4%', sub: '10% افتراضي' },
+      { label: 'دخل فرق الصرف', value: this.money(z ? 0 : cur.fx, cur.code), color: 'var(--money)', border: 'var(--money-border)', delta: z ? '—' : '+4.1%', sub: 'هامش 2%' },
+      { label: 'متوسط قيمة الطلب', value: this.money(z ? 0 : cur.aov, cur.code), color: 'var(--money)', border: 'var(--money-border)', delta: z ? '—' : '−1.8%', sub: 'عن الشهر السابق' },
+      { label: 'معدّل التحويل', value: (z ? 0 : cur.conv).toFixed(1) + '%', color: 'var(--text-strong)', border: 'var(--border-subtle)', delta: z ? '—' : '+0.3', sub: 'نقطة مئوية' },
+      { label: 'متاجر نشطة', value: String(z ? 0 : cur.vendors), color: 'var(--text-strong)', border: 'var(--border-subtle)', delta: z ? '—' : '+6', sub: 'هذا الشهر' }
+    ].map(m => Object.assign(m, { deltaColor: m.delta.indexOf('−') === 0 ? 'var(--danger-text)' : (m.delta === '—' ? 'var(--text-faint)' : 'var(--success-text)') }));
+    const qDefs = [
+      { label: 'متاجر تنتظر الاعتماد', sub: 'أقدم طلب ينتظر 3 أيام', count: 6, icon: '#i-store', screen: 'AD-04', warn: true },
+      { label: 'منتجات تنتظر المراجعة', sub: '23 جديد · 5 عُدّلت بعد النشر', count: 28, icon: '#i-package', screen: 'AD-07', warn: true },
+      { label: 'طلبات تحويل', sub: 'إجمالي 18,420.00 ر.س.', count: 4, icon: '#i-wallet', screen: 'AD-13', warn: false },
+      { label: 'نزاعات مفتوحة', sub: 'أقدم نزاع عمره يومان', count: 3, icon: '#i-scale', screen: 'AD-14', warn: true },
+      { label: 'طلبات فرعية تجاوزت مهلة القبول', sub: 'تُلغى تلقائياً بعد 48 ساعة', count: edge ? 31 : 2, icon: '#i-clock', screen: 'AD-12', warn: true }
+    ];
+    out.queues = qDefs.map(q => {
+      const n = empty ? 0 : q.count;
+      const hot = q.warn && n > 0;
+      return {
+        label: q.label, sub: empty ? 'لا شيء ينتظر' : q.sub, count: String(n),
+        border: hot ? 'var(--warning)' : 'var(--border-subtle)',
+        iconBg: hot ? 'var(--warning-subtle)' : 'var(--sunken)',
+        iconFg: hot ? 'var(--warning-text)' : 'var(--text-muted)',
+        countColor: n === 0 ? 'var(--text-faint)' : (hot ? 'var(--warning-text)' : 'var(--text-strong)'),
+        icon: q.icon,
+        go: () => this.go(q.screen)
+      };
+    });
+    out.auditFeed = empty ? [] : [
+      { text: 'اعتُمد متجر «بيت العطور»', actor: 'ريم السالم', time: 'قبل 12 د', icon: '#i-check-circle' },
+      { text: 'رُفض منتج «طقم مفارش قطن» — صورة بعلامة متجر آخر', actor: 'خالد النمر', time: 'قبل 40 د', icon: '#i-package' },
+      { text: 'صُرف تحويل 8,240.00 ر.س. لمتجر دار القطن', actor: 'ريم السالم', time: 'قبل ساعة', icon: '#i-wallet' },
+      { text: 'حُسم نزاع جزئياً لصالح المشتري — 92.50 ر.س.', actor: 'ريم السالم', time: 'قبل 3 س', icon: '#i-scale' },
+      { text: 'عُلّق متجر «حرف الشام» — شكاوى تجهيز متكرّرة', actor: 'ريم السالم', time: 'أمس', icon: '#i-alert' },
+      { text: 'أُضيف سعر صرف جديد USD→SAR 3.7503', actor: 'النظام', time: 'أمس', icon: '#i-chart' }
+    ];
+
+    /* AD-04 vendor queue */
+    const vqDefs = [
+      { id: 1, name: 'بيت العطور', owner: 'منى الحربي', country: 'السعودية', date: '11 سبتمبر', days: 3, docs: [1, 1, 1, 1] },
+      { id: 2, name: 'حرف الشام', owner: 'سامر خوري', country: 'الأردن', date: '12 سبتمبر', days: 2, docs: [1, 1, 0, 1] },
+      { id: 3, name: 'إلكترونيات الخليج', owner: 'عبدالله المري', country: 'الإمارات', date: '13 سبتمبر', days: 1, docs: [1, 1, 1, 0] },
+      { id: 4, name: 'نكهات القاهرة', owner: 'ياسمين فؤاد', country: 'مصر', date: '13 سبتمبر', days: 1, docs: [1, 0, 0, 1] },
+      { id: 5, name: 'مشغل الليوان', owner: 'هند العتيبي', country: 'السعودية', date: '14 سبتمبر', days: 0, docs: [1, 1, 1, 1] },
+      { id: 6, name: 'دار القطن', owner: 'نور الحاج', country: 'السعودية', date: '14 سبتمبر', days: 0, docs: [1, 1, 0, 2] }
+    ];
+    const vq = empty ? [] : vqDefs;
+    out.vqEmpty = vq.length === 0;
+    out.vqHasRows = vq.length > 0;
+    out.vqCountText = vq.length + ' طلب ينتظر';
+    const docShort = ['سجل', 'هوية', 'ضريبة', 'بنك'];
+    const docTitle = ['السجل التجاري', 'هوية صاحب النشاط', 'الشهادة الضريبية', 'إثبات الحساب البنكي'];
+    out.vqRows = vq.map(v => {
+      const late = v.days >= 2;
+      return {
+        name: v.name, owner: v.owner, country: v.country, date: v.date,
+        rowBg: late ? 'var(--danger-subtle)' : 'transparent',
+        wait: v.days === 0 ? 'اليوم' : v.days + ' أيام',
+        waitBg: late ? 'var(--danger-subtle)' : 'var(--neutral-subtle)',
+        waitFg: late ? 'var(--danger-text)' : 'var(--neutral-text)',
+        docs: v.docs.map((d, i) => ({
+          short: docShort[i], title: docTitle[i] + ' · ' + (d === 1 ? 'مُرفَق' : (d === 2 ? 'مرفوض' : 'ناقص')),
+          bg: d === 1 ? 'var(--success-subtle)' : (d === 2 ? 'var(--danger-subtle)' : 'var(--neutral-subtle)'),
+          fg: d === 1 ? 'var(--success-text)' : (d === 2 ? 'var(--danger-text)' : 'var(--text-faint)')
+        })),
+        review: () => { S({ vendorId: v.id, vpTab: 'docs' }); this.go('AD-05'); }
+      };
+    });
+
+    /* AD-05 vendor profile */
+    const vObj = vqDefs.filter(v => v.id === (st.vendorId || 1))[0] || vqDefs[0];
+    const decided = st.vpDecision;
+    out.vpName = vObj.name;
+    out.vpCountry = vObj.country;
+    out.vpCurrency = vObj.country === 'الأردن' ? 'الدينار الأردني' : (vObj.country === 'الإمارات' ? 'الدرهم الإماراتي' : (vObj.country === 'مصر' ? 'الجنيه المصري' : 'الريال السعودي'));
+    out.vpId = 'VND-' + String(1040 + vObj.id);
+    const badgeKey = decided || (edge ? 'suspended' : 'review');
+    const badges = {
+      review: ['قيد المراجعة', 'var(--warning-subtle)', 'var(--warning-text)', 'var(--warning)'],
+      approved: ['معتمد', 'var(--success-subtle)', 'var(--success-text)', 'var(--success)'],
+      rejected: ['طُلب تعديل', 'var(--danger-subtle)', 'var(--danger-text)', 'var(--danger)'],
+      suspended: ['معلَّق', 'var(--danger-subtle)', 'var(--danger-text)', 'var(--danger)']
+    };
+    out.vpBadge = badges[badgeKey][0];
+    out.vpBadgeBg = badges[badgeKey][1];
+    out.vpBadgeFg = badges[badgeKey][2];
+    out.vpBadgeDot = badges[badgeKey][3];
+    out.vpActionsDisabled = !can;
+    out.vpActionsCursor = can ? 'pointer' : 'not-allowed';
+    out.vpNoPermDisplay = can ? 'none' : 'flex';
+    out.vpApproveBg = can ? 'var(--brand)' : 'var(--sunken)';
+    out.vpApproveFg = can ? 'var(--on-brand)' : 'var(--text-faint)';
+    out.vpApprove = () => { if (!can) return; S({ vpDecision: 'approved' }); this.toast('اعتُمد متجر ' + vObj.name + ' — أُرسل إشعار للتاجر'); };
+    out.vpReject = () => { if (!can) return; S({ vpDecision: 'rejected' }); this.toast('طُلب تعديل — يُرسل السبب للتاجر', 'warning'); };
+    out.vpSuspend = () => { if (!can) return; S({ vpDecision: 'suspended' }); this.toast('عُلّق المتجر وأُخفيت منتجاته', 'warning'); };
+    const vpTabs = [['docs', 'المستندات'], ['info', 'البيانات والبنك'], ['products', 'المنتجات'], ['orders', 'الطلبات'], ['ledger', 'الحركات المالية']];
+    const vpTab = st.vpTab || 'docs';
+    out.vpTabs = vpTabs.map(t => ({
+      label: t[1],
+      bg: vpTab === t[0] ? 'var(--brand)' : 'transparent',
+      fg: vpTab === t[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: vpTab === t[0] ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ vpTab: t[0] })
+    }));
+    out.vpTabDocs = vpTab === 'docs';
+    out.vpTabInfo = vpTab === 'info';
+    out.vpTabOther = ['products', 'orders', 'ledger'].indexOf(vpTab) >= 0;
+    const rejectedDoc = st.vpDocReject || (vObj.docs[3] === 2 ? 3 : -1);
+    out.vpDocs = docTitle.map((t, i) => {
+      const state = vObj.docs[i];
+      const isRej = rejectedDoc === i;
+      const ok = state === 1 && !isRej;
+      return {
+        title: t,
+        file: ['cr-1042.pdf', 'id-front.jpg', 'tax-2026.pdf', 'bank-statement.jpg'][i],
+        badge: isRej ? 'مرفوض' : (state === 1 ? 'مُرفَق' : 'ناقص'),
+        badgeBg: isRej ? 'var(--danger-subtle)' : (ok ? 'var(--success-subtle)' : 'var(--neutral-subtle)'),
+        badgeFg: isRej ? 'var(--danger-text)' : (ok ? 'var(--success-text)' : 'var(--text-faint)'),
+        border: isRej ? 'var(--danger)' : 'var(--border-subtle)',
+        reason: isRej ? 'الصورة غير مقروءة — الآيبان مطموس. اطلب كشفاً واضحاً يُظهر الاسم والآيبان كاملاً.' : '',
+        zoom: () => this.toast('عارض المستند بالتكبير — ' + t),
+        accept: () => { if (!can) return; S({ vpDocReject: isRej ? -1 : rejectedDoc }); this.toast('قُبل ' + t); },
+        reject: () => { if (!can) return; S({ vpDocReject: i }); this.toast('رُفض ' + t + ' — يُطلب من التاجر رفعه من جديد', 'warning'); }
+      };
+    });
+    out.vpInfoRows = [
+      { k: 'الاسم التجاري', v: vObj.name },
+      { k: 'صاحب النشاط', v: vObj.owner },
+      { k: 'نوع النشاط', v: 'مؤسسة فردية' },
+      { k: 'رقم السجل', v: '1010' + (400 + vObj.id) + '82' },
+      { k: 'المدينة', v: vObj.country === 'الأردن' ? 'عمّان' : 'الرياض' },
+      { k: 'تاريخ التسجيل', v: vObj.date + ' 2026' }
+    ];
+    out.vpBankRows = [
+      { k: 'صاحب الحساب', v: 'مؤسسة ' + vObj.name },
+      { k: 'الآيبان', v: 'SA03 8000 0000 6080 1016 7519' },
+      { k: 'البنك', v: 'NCB · الأهلي السعودي' },
+      { k: 'SWIFT', v: 'NCBKSAJE' }
+    ];
+    const otherMap = {
+      products: {
+        title: 'منتجات المتجر — 42 منتجاً',
+        rows: [
+          { icon: '#i-package', text: 'قميص قطني مصري · 3 متغيّرات', value: '79.00 – 92.00', valueColor: 'var(--money)', time: 'منشور' },
+          { icon: '#i-package', text: 'بنطال كتان واسع', value: '149.00', valueColor: 'var(--money)', time: 'منشور' },
+          { icon: '#i-package', text: 'طقم مفارش قطن — كينج', value: '240.00', valueColor: 'var(--danger-text)', time: 'مرفوض' },
+          { icon: '#i-package', text: 'عباءة صوف مطرّزة', value: '640.00', valueColor: 'var(--warning-text)', time: 'قيد المراجعة' },
+          { icon: '#i-package', text: 'وشاح قطني مصبوغ', value: '58.00', valueColor: 'var(--money)', time: 'منشور' }
+        ]
+      },
+      orders: {
+        title: 'آخر الطلبات',
+        rows: [
+          { icon: '#i-truck', text: 'BST-26-004821-A · نورة العتيبي', value: '1,362.75', valueColor: 'var(--money)', time: 'بانتظار القبول' },
+          { icon: '#i-truck', text: 'BST-26-004822-A · سعد الدوسري', value: '640.00', valueColor: 'var(--money)', time: 'قيد التجهيز' },
+          { icon: '#i-truck', text: 'BST-26-004818-B · فهد الشمري', value: '268.00', valueColor: 'var(--money)', time: 'تم التسليم' },
+          { icon: '#i-truck', text: 'BST-26-004811-A · ليان الغامدي', value: '185.00', valueColor: 'var(--danger-text)', time: 'مرتجع' }
+        ]
+      },
+      ledger: {
+        title: 'الحركات المالية',
+        rows: [
+          { icon: '#i-wallet', text: 'تحويل مصروف', value: '−8,240.00', valueColor: 'var(--text-body)', time: '12 سبتمبر' },
+          { icon: '#i-wallet', text: 'عمولة منصّة على BST-26-004821-A', value: '−136.28', valueColor: 'var(--text-body)', time: '13 سبتمبر' },
+          { icon: '#i-wallet', text: 'بيع BST-26-004822-A', value: '+640.00', valueColor: 'var(--money)', time: '13 سبتمبر' },
+          { icon: '#i-wallet', text: 'ردّ مبلغ نزاع', value: '−92.50', valueColor: 'var(--danger-text)', time: '14 سبتمبر' },
+          { icon: '#i-wallet', text: 'الرصيد المتاح الآن', value: '3,180.25', valueColor: 'var(--money)', time: 'محدّث' }
+        ]
+      }
+    };
+    const other = otherMap[vpTab] || otherMap.products;
+    out.vpOtherTitle = other.title;
+    out.vpOtherRows = other.rows;
+
+    return out;
+  }
+
+  opsB() {
+    const st = this.state, S = (o) => this.setState(o), out = {};
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const can = st.role === 'super';
+    const M = (n, c) => this.money(n, c);
+
+    out.isAD07 = st.screen === 'AD-07';
+    out.isAD14 = st.screen === 'AD-14';
+    const tableScreens = ['AD-06', 'AD-12', 'AD-13', 'AD-15', 'AD-21', 'AD-22'];
+    out.isTable = tableScreens.indexOf(st.screen) >= 0;
+
+    /* AD-07 product review */
+    const prDefs = [
+      { id: 1, name: 'مكبّر صوت بلوتوث XL-900 مقاوم للماء', shop: 'إلكترونيات الخليج', cat: 'إلكترونيات › صوتيات', variants: 3, price: 349, hrs: 26, kind: 'new' },
+      { id: 2, name: 'قميص قطني مصري', shop: 'دار القطن', cat: 'أزياء › قمصان', variants: 9, price: 79, hrs: 20, kind: 'edit' },
+      { id: 3, name: 'عطر عود مركّز 12 مل', shop: 'بيت العطور', cat: 'الجمال › عطور', variants: 2, price: 420, hrs: 14, kind: 'new' },
+      { id: 4, name: 'سجادة صوف يدوية 120×180', shop: 'حرف الشام', cat: 'المنزل › سجاد', variants: 1, price: 1280, hrs: 9, kind: 'new' },
+      { id: 5, name: 'طقم مناشف قطن مصري', shop: 'دار القطن', cat: 'المنزل › حمّام', variants: 4, price: 185, hrs: 5, kind: 'edit' },
+      { id: 6, name: 'ساعة جدارية خشبية', shop: 'حرف الشام', cat: 'المنزل › ديكور', variants: 1, price: 220, hrs: 2, kind: 'new' }
+    ];
+    const prFilterKey = st.prFilter || 'all';
+    const prAll = empty ? [] : (st.prDone ? prDefs.filter(p => (st.prDone || []).indexOf(p.id) < 0) : prDefs);
+    const prShown = prAll.filter(p => prFilterKey === 'all' || p.kind === prFilterKey);
+    out.prFilters = [['all', 'الكل'], ['new', 'جديد'], ['edit', 'عُدّل بعد النشر']].map(f => ({
+      label: f[1],
+      count: String(f[0] === 'all' ? prAll.length : prAll.filter(p => p.kind === f[0]).length),
+      bg: prFilterKey === f[0] ? 'var(--brand)' : 'transparent',
+      fg: prFilterKey === f[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: prFilterKey === f[0] ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ prFilter: f[0] })
+    }));
+    const prActiveId = st.prActive || (prShown[0] && prShown[0].id);
+    const prActive = prShown.filter(p => p.id === prActiveId)[0] || prShown[0];
+    out.prQueueEmpty = prShown.length === 0;
+    out.prQueue = prShown.map(p => ({
+      name: p.name, shop: p.shop, cat: p.cat,
+      weight: prActive && p.id === prActive.id ? '700' : '500',
+      bg: prActive && p.id === prActive.id ? 'var(--brand-subtle)' : 'transparent',
+      kind: p.kind === 'new' ? 'جديد' : 'عُدّل بعد النشر',
+      kindBg: p.kind === 'new' ? 'var(--info-subtle)' : 'var(--warning-subtle)',
+      kindFg: p.kind === 'new' ? 'var(--info-text)' : 'var(--warning-text)',
+      wait: p.hrs >= 24 ? 'ينتظر ' + Math.floor(p.hrs / 24) + ' يوم' : 'ينتظر ' + p.hrs + ' ساعة',
+      waitColor: p.hrs >= 24 ? 'var(--danger-text)' : 'var(--text-muted)',
+      pick: () => S({ prActive: p.id })
+    }));
+    out.prHasActive = !!prActive;
+    out.prNoActive = !prActive;
+    if (prActive) {
+      out.prName = prActive.name;
+      out.prShop = prActive.shop;
+      out.prCat = prActive.cat;
+      out.prVariants = String(prActive.variants);
+      out.prPrice = M(prActive.price, 'SAR');
+      out.prKind = prActive.kind === 'new' ? 'جديد' : 'عُدّل بعد النشر';
+      out.prKindBg = prActive.kind === 'new' ? 'var(--info-subtle)' : 'var(--warning-subtle)';
+      out.prKindFg = prActive.kind === 'new' ? 'var(--info-text)' : 'var(--warning-text)';
+      out.prIsEdit = prActive.kind === 'edit';
+      out.prWait = prActive.hrs >= 24 ? 'ينتظر ' + Math.floor(prActive.hrs / 24) + ' يوم' : 'ينتظر ' + prActive.hrs + ' ساعة';
+      out.prWaitBg = prActive.hrs >= 24 ? 'var(--danger-subtle)' : 'var(--neutral-subtle)';
+      out.prWaitFg = prActive.hrs >= 24 ? 'var(--danger-text)' : 'var(--neutral-text)';
+      out.prDesc = prActive.kind === 'edit'
+        ? 'قميص من قطن مصري مغزول في الرياض، نسيج مسامي يناسب الصيف. يُغسل في الغسالة على 30 درجة، ولا يحتاج كياً بعد النشر المباشر.'
+        : 'مكبّر صوت محمول بمقاومة ماء IPX7، بطارية 18 ساعة، واتصال بلوتوث 5.3. يشمل كابل شحن وحقيبة حمل.';
+      out.prDiffs = [
+        { field: 'الوصف', before: 'يُغسل على 30 درجة.', after: 'يُغسل على 30 درجة، ولا يحتاج كياً بعد النشر المباشر.' },
+        { field: 'الصورة الرئيسية', before: 'shirt-main.jpg', after: 'shirt-main-v2.jpg — خلفية بيضاء' },
+        { field: 'السعر', before: 'لم يتغيّر — 79.00 ر.س.', after: 'لم يتغيّر (السعر لا يعيد المنتج للمراجعة)' }
+      ];
+      out.prImages = [
+        { border: 'var(--border-default)', flag: '', zoom: () => this.toast('عارض الصورة بالتكبير') },
+        { border: 'var(--border-default)', flag: '', zoom: () => this.toast('عارض الصورة بالتكبير') },
+        { border: edge ? 'var(--danger)' : 'var(--border-default)', flag: edge ? 'شعار متجر آخر' : '', zoom: () => this.toast('عارض الصورة بالتكبير') },
+        { border: 'var(--border-default)', flag: '', zoom: () => this.toast('عارض الصورة بالتكبير') },
+        { border: 'var(--border-default)', flag: '', zoom: () => this.toast('عارض الصورة بالتكبير') }
+      ];
+      out.prAttrs = prActive.kind === 'edit'
+        ? [{ k: 'المادة', v: 'قطن' }, { k: 'طول الكم', v: 'طويل' }, { k: 'المتغيّرات', v: '9 تركيبات' }, { k: 'نطاق السعر', v: '79.00 – 92.00 ر.س.' }]
+        : [{ k: 'مقاومة الماء', v: 'IPX7' }, { k: 'عمر البطارية', v: '18 ساعة' }, { k: 'المتغيّرات', v: '3 ألوان' }, { k: 'الضمان', v: 'سنتان' }];
+    }
+    out.prApprove = () => {
+      if (!prActive) return;
+      S({ prDone: (st.prDone || []).concat([prActive.id]), prActive: null });
+      this.toast('اعتُمد «' + prActive.name + '» وظهر في المتجر');
+    };
+    out.prOpenReject = () => {
+      if (!prActive) return;
+      S({ prDone: (st.prDone || []).concat([prActive.id]), prActive: null });
+      this.toast('رُفض «' + prActive.name + '» — أُرسل السبب للتاجر وبقي مسودة', 'warning');
+    };
+
+    /* AD-14 disputes */
+    const dpDefs = [
+      { id: 1, no: 'BST-26-004811-A', reason: 'المنتج مخالف للوصف', buyer: 'ليان الغامدي', shop: 'دار القطن', opened: '12 سبتمبر', days: 2, total: 185 },
+      { id: 2, no: 'BST-26-004802-B', reason: 'لم يصل الطلب', buyer: 'فهد الشمري', shop: 'بيت العطور', opened: '13 سبتمبر', days: 1, total: 420 },
+      { id: 3, no: 'BST-26-004795-A', reason: 'وصل تالفاً', buyer: 'مها القحطاني', shop: 'حرف الشام', opened: '14 سبتمبر', days: 0, total: 1280 }
+    ];
+    const dpAll = empty ? [] : dpDefs;
+    const dpId = st.dpActive || (dpAll[0] && dpAll[0].id);
+    const dp = dpAll.filter(d => d.id === dpId)[0] || dpAll[0] || { no: '—', reason: '—', buyer: '—', shop: '—', opened: '—', total: 0 };
+    out.dpCount = dpAll.length + ' نزاع';
+    out.dpList = dpAll.map(d => ({
+      no: d.no, reason: d.reason,
+      bg: d.id === dpId ? 'var(--brand-subtle)' : 'transparent',
+      age: d.days === 0 ? 'فُتح اليوم' : 'عمره ' + d.days + ' يوم',
+      ageColor: d.days >= 2 ? 'var(--danger-text)' : 'var(--text-muted)',
+      pick: () => S({ dpActive: d.id, dpChoice: null, dpAmount: '', dpNote: '' })
+    }));
+    out.dpNo = dp.no; out.dpReason = dp.reason; out.dpBuyer = dp.buyer; out.dpShop = dp.shop; out.dpOpened = dp.opened;
+    out.dpTotal = M(dp.total, 'SAR');
+    out.dpFacts = [
+      { k: 'حالة الشحنة', v: 'سُلّمت في 10 سبتمبر · SPL-88213394' },
+      { k: 'الرصيد المجمَّد', v: M(dp.total, 'SAR') + ' لدى المتجر' },
+      { k: 'نافذة الإرجاع', v: 'مفتوحة حتى 24 سبتمبر' }
+    ];
+    const roleStyle = {
+      buyer: { role: 'مشتري', align: 'flex-start', tagBg: 'var(--neutral-subtle)', tagFg: 'var(--neutral-text)', bubbleBg: 'var(--card)', border: 'var(--border-default)' },
+      shop: { role: 'متجر', align: 'flex-end', tagBg: 'var(--brand-subtle)', tagFg: 'var(--brand-text)', bubbleBg: 'var(--brand-subtle)', border: 'var(--brand)' },
+      admin: { role: 'إدارة', align: 'center', tagBg: 'var(--info-subtle)', tagFg: 'var(--info-text)', bubbleBg: 'var(--info-subtle)', border: 'var(--info)' }
+    };
+    out.dpThread = [
+      { r: 'buyer', text: 'الطقم وصل بلون مختلف تماماً عن الصورة، والقماش أرقّ من الوصف.', time: '12 سبتمبر · 11:20', file: 'IMG_3120.jpg' },
+      { r: 'shop', text: 'اللون في الصورة تحت إضاءة استوديو. مستعدون لاستبداله أو خصم 20%.', time: '12 سبتمبر · 15:40', file: '' },
+      { r: 'buyer', text: 'لا أريد استبدالاً، أريد إرجاعاً كاملاً.', time: '13 سبتمبر · 09:05', file: '' },
+      { r: 'admin', text: 'طلبنا من المتجر صور المنتج الأصلية للمقارنة.', time: '13 سبتمبر · 12:00', file: '' }
+    ].map(m => Object.assign({}, roleStyle[m.r], { text: m.text, time: m.time, file: m.file }));
+    const dpChoice = st.dpChoice || 'full';
+    const dpOpts = [
+      { k: 'full', label: 'لصالح المشتري كاملاً', hint: 'يُعاد كامل مبلغ الطلب الفرعي ويُخصم من رصيد المتجر.' },
+      { k: 'partial', label: 'لصالح المشتري جزئياً', hint: 'تحدّد مبلغاً يُعاد، والباقي يبقى للمتجر.' },
+      { k: 'shop', label: 'لصالح المتجر', hint: 'يُرفض الإرجاع ويُفكّ تجميد الرصيد.' }
+    ];
+    out.dpOptions = dpOpts.map(o => ({
+      label: o.label, hint: o.hint,
+      bg: dpChoice === o.k ? 'var(--brand-subtle)' : 'transparent',
+      border: dpChoice === o.k ? 'var(--brand)' : 'var(--border-control)',
+      dotBorder: dpChoice === o.k ? 'var(--brand)' : 'var(--border-control)',
+      dotBg: dpChoice === o.k ? 'var(--brand)' : 'transparent',
+      pick: () => { if (can) S({ dpChoice: o.k }); }
+    }));
+    out.dpIsPartial = dpChoice === 'partial';
+    out.dpAmount = st.dpAmount || '';
+    out.onDpAmount = (e) => S({ dpAmount: e.target.value.replace(/[^0-9.]/g, '') });
+    const partialAmt = Number(st.dpAmount || 0);
+    const partialBad = dpChoice === 'partial' && (!partialAmt || partialAmt > dp.total);
+    out.dpAmtBorder = partialBad ? 'var(--danger)' : 'var(--border-control)';
+    out.dpAmtErr = partialBad ? (partialAmt > dp.total ? 'المبلغ أكبر من قيمة الطلب الفرعي (' + M(dp.total, 'SAR') + ').' : 'اكتب مبلغاً أكبر من صفر.') : '';
+    const refund = dpChoice === 'full' ? dp.total : (dpChoice === 'partial' ? Math.min(partialAmt, dp.total) : 0);
+    const commission = refund * 0.1;
+    out.dpImpact = [
+      { k: 'يُعاد للمشتري', v: M(refund, 'SAR'), color: refund ? 'var(--danger-text)' : 'var(--text-faint)' },
+      { k: 'تُردّ عمولة المنصّة', v: M(commission, 'SAR'), color: commission ? 'var(--text-body)' : 'var(--text-faint)' },
+      { k: 'صافي أثر رصيد المتجر', v: '−' + M(refund - commission, 'SAR'), color: 'var(--danger-text)' }
+    ];
+    out.dpImpactNote = refund >= dp.total
+      ? 'يُخصم المبلغ كاملاً من رصيد المتجر؛ إن لم يكفِ الرصيد يصبح سالباً ويُوقف السحب.'
+      : (refund > 0 ? 'يُخصم المبلغ الجزئي ويُفكّ تجميد الباقي فوراً.' : 'يُفكّ تجميد الرصيد كاملاً ولا يُعاد شيء للمشتري.');
+    out.dpNote = st.dpNote || '';
+    out.onDpNote = (e) => S({ dpNote: e.target.value });
+    out.dpDisabled = !can;
+    out.dpCursor = can ? 'pointer' : 'not-allowed';
+    out.dpNoPermDisplay = can ? 'none' : 'flex';
+    out.dpDecBorder = can ? 'var(--border-subtle)' : 'var(--warning)';
+    const canResolve = can && !partialBad && (st.dpNote || '').trim().length > 0;
+    out.dpResolveDisabled = !canResolve;
+    out.dpResolveBg = canResolve ? 'var(--brand)' : 'var(--sunken)';
+    out.dpResolveFg = canResolve ? 'var(--on-brand)' : 'var(--text-faint)';
+    out.dpResolveCursor = canResolve ? 'pointer' : 'not-allowed';
+    out.dpResolve = () => {
+      if (!canResolve) { this.toast('اكتب سبب القرار قبل إصداره', 'warning'); return; }
+      this.toast('صدر القرار — أُعيد ' + M(refund, 'SAR') + ' وأُخطر الطرفان');
+    };
+
+    /* shared table screens */
+    const badge = (t, kind) => ({ isBadge: true, text: t, badgeBg: 'var(--' + kind + '-subtle)', badgeFg: 'var(--' + kind + '-text)' });
+    const plain = (t, o) => Object.assign({ isPlain: true, text: t, dir: 'rtl', font: 'var(--font-ui)', size: 'var(--text-sm)', weight: '500', color: 'var(--text-body)', justify: 'flex-start' }, o || {});
+    const mono = (t, o) => plain(t, Object.assign({ dir: 'ltr', font: 'var(--font-mono)', size: 'var(--text-xs)' }, o || {}));
+    const stack = (t, s, o) => Object.assign({ isStack: true, text: t, sub: s, subDir: 'rtl', subFont: 'var(--font-ui)', justify: 'flex-start' }, o || {});
+    const acts = (list) => ({ isActions: true, justify: 'flex-end', actions: list });
+    const btn = (label, go, kind) => ({
+      label: label, go: go,
+      disabled: kind === 'off',
+      border: kind === 'danger' ? '1px solid var(--danger)' : (kind === 'primary' ? '0' : '1px solid var(--border-control)'),
+      bg: kind === 'primary' ? 'var(--brand)' : 'transparent',
+      fg: kind === 'primary' ? 'var(--on-brand)' : (kind === 'danger' ? 'var(--danger-text)' : (kind === 'off' ? 'var(--text-faint)' : 'var(--text-strong)')),
+      cursor: kind === 'off' ? 'not-allowed' : 'pointer'
+    });
+
+    let cfg = null;
+    if (st.screen === 'AD-06') {
+      const rows = [
+        { name: 'دار القطن', owner: 'نور الحاج', status: ['معتمد', 'success'], cur: 'SAR', products: 42, sales: 128400, rating: 4.7, since: '2 يناير 2026' },
+        { name: 'إلكترونيات الخليج', owner: 'عبدالله المري', status: ['معتمد', 'success'], cur: 'AED', products: 180, sales: 486200, rating: 4.4, since: '14 مارس 2026' },
+        { name: 'بيت العطور', owner: 'منى الحربي', status: ['قيد المراجعة', 'warning'], cur: 'SAR', products: 0, sales: 0, rating: 0, since: '—' },
+        { name: 'حرف الشام', owner: 'سامر خوري', status: ['معلَّق', 'danger'], cur: 'JOD', products: 64, sales: 94120.75, rating: 3.9, since: '8 مايو 2026' },
+        { name: 'نكهات القاهرة', owner: 'ياسمين فؤاد', status: ['قيد المراجعة', 'warning'], cur: 'EGP', products: 0, sales: 0, rating: 0, since: '—' },
+        { name: 'مشغل الليوان', owner: 'هند العتيبي', status: ['معتمد', 'success'], cur: 'SAR', products: 28, sales: 62300, rating: 4.9, since: '1 يونيو 2026' }
+      ];
+      cfg = {
+        cols: 'minmax(0,1.3fr) 110px 86px 88px 132px 92px 116px 104px',
+        minWidth: '1080px',
+        head: ['SHOP', 'STATUS', 'CURRENCY', 'PRODUCTS', 'SALES', 'RATING', 'APPROVED', 'ACTION'],
+        searchHint: 'ابحث باسم المتجر أو صاحبه',
+        filters: [['all', 'الكل'], ['approved', 'معتمد'], ['review', 'قيد المراجعة'], ['suspended', 'معلَّق']],
+        filterFn: (r, k) => k === 'all' || (k === 'approved' && r.status[0] === 'معتمد') || (k === 'review' && r.status[0] === 'قيد المراجعة') || (k === 'suspended' && r.status[0] === 'معلَّق'),
+        match: (r, q) => r.name.indexOf(q) >= 0 || r.owner.indexOf(q) >= 0,
+        rows: rows,
+        emptyIcon: '#i-store', emptyTitle: 'لا متاجر بهذه التصفية', emptyBody: 'جرّب تصفية أخرى أو ابحث باسم آخر.',
+        cell: (r) => [
+          stack(r.name, r.owner, { icon: '#i-store' }),
+          badge(r.status[0], r.status[1]),
+          plain(r.cur, { font: 'var(--font-mono)', dir: 'ltr', size: 'var(--text-xs)' }),
+          mono(String(r.products), { justify: 'flex-end', color: 'var(--text-strong)' }),
+          mono(r.sales ? M(r.sales, r.cur) : '—', { justify: 'flex-end', color: r.sales ? 'var(--money)' : 'var(--text-faint)', weight: '600' }),
+          plain(r.rating ? String(r.rating) : '—', { font: 'var(--font-mono)', dir: 'ltr', color: r.rating ? 'var(--text-strong)' : 'var(--text-faint)' }),
+          plain(r.since, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          acts([btn('افتح', () => { S({ vpTab: 'docs' }); this.go('AD-05'); })])
+        ]
+      };
+    } else if (st.screen === 'AD-12') {
+      const rows = [
+        { no: 'BST-26-004821', buyer: 'نورة العتيبي', subs: 2, status: ['مختلط', 'warning'], total: 1362.75, cur: 'SAR', date: '13 سبتمبر', late: false },
+        { no: 'BST-26-004822', buyer: 'سعد الدوسري', subs: 1, status: ['قيد التجهيز', 'info'], total: 640, cur: 'SAR', date: '13 سبتمبر', late: false },
+        { no: 'BST-26-004823', buyer: 'مها القحطاني', subs: 3, status: ['تم الشحن', 'info'], total: 1840.5, cur: 'SAR', date: '13 سبتمبر', late: false },
+        { no: 'BST-26-004830', buyer: 'عبير الزهراني', subs: 1, status: ['تجاوز مهلة القبول', 'danger'], total: 268, cur: 'SAR', date: '12 سبتمبر', late: true },
+        { no: 'BST-26-004818', buyer: 'فهد الشمري', subs: 2, status: ['تم التسليم', 'success'], total: 512.25, cur: 'SAR', date: '11 سبتمبر', late: false },
+        { no: 'BST-26-004811', buyer: 'ليان الغامدي', subs: 1, status: ['نزاع مفتوح', 'danger'], total: 185, cur: 'SAR', date: '10 سبتمبر', late: false }
+      ];
+      cfg = {
+        cols: 'minmax(0,1.2fr) minmax(0,1fr) 92px 150px 128px 112px 150px',
+        minWidth: '1100px',
+        head: ['ORDER', 'CUSTOMER', 'SUB-ORDERS', 'STATUS', 'TOTAL', 'DATE', 'ACTION'],
+        searchHint: 'ابحث برقم الطلب أو العميل أو المتجر',
+        filters: [['all', 'الكل'], ['late', 'تجاوز المهلة'], ['dispute', 'نزاع'], ['done', 'مكتمل']],
+        filterFn: (r, k) => k === 'all' || (k === 'late' && r.late) || (k === 'dispute' && r.status[0] === 'نزاع مفتوح') || (k === 'done' && r.status[0] === 'تم التسليم'),
+        match: (r, q) => r.no.indexOf(q) >= 0 || r.buyer.indexOf(q) >= 0,
+        rows: rows,
+        note: edge ? '31 طلباً فرعياً تجاوز مهلة القبول (48 ساعة) — تُلغى تلقائياً ويُعاد المبلغ للمشترين.' : '',
+        noteKind: 'danger',
+        emptyIcon: '#i-truck', emptyTitle: 'لا طلبات بهذه التصفية', emptyBody: 'وسّع التصفية أو ابحث برقم آخر.',
+        cell: (r) => [
+          mono(r.no, { color: 'var(--text-strong)', size: 'var(--text-sm)' }),
+          plain(r.buyer, { color: 'var(--text-strong)', weight: '600' }),
+          mono(String(r.subs), { justify: 'center' }),
+          badge(r.status[0], r.status[1]),
+          mono(M(r.total, r.cur), { justify: 'flex-end', color: 'var(--money)', weight: '600' }),
+          plain(r.date, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          acts(r.late
+            ? [btn('افتح', () => this.toast('تفاصيل الطلب: مسار كل طلب فرعي وأحداث الدفع والحجوزات')), btn('ألغِ الطلب', () => { if (can) this.toast('أُلغي الطلب الفرعي وأُعيد المبلغ للمشتري', 'warning'); }, can ? 'danger' : 'off')]
+            : [btn('افتح', () => this.toast('تفاصيل الطلب: مسار كل طلب فرعي وأحداث الدفع والحجوزات'))])
+        ]
+      };
+    } else if (st.screen === 'AD-13') {
+      const rows = [
+        { shop: 'دار القطن', cur: 'SAR', amount: 8240, balance: 8240, ok: true, iban: 'SA03 …7519', date: '13 سبتمبر' },
+        { shop: 'إلكترونيات الخليج', cur: 'AED', amount: 21500, balance: 21500, ok: true, iban: 'AE07 …3391', date: '13 سبتمبر' },
+        { shop: 'مشغل الليوان', cur: 'SAR', amount: 3180.25, balance: 3180.25, ok: true, iban: 'SA44 …2087', date: '14 سبتمبر' },
+        { shop: 'حرف الشام', cur: 'JOD', amount: 1420.5, balance: 1380.5, ok: false, iban: 'JO94 …6612', date: '14 سبتمبر' }
+      ];
+      cfg = {
+        cols: 'minmax(0,1.1fr) 140px 190px 148px 112px 200px',
+        minWidth: '1080px',
+        head: ['SHOP', 'AMOUNT', 'LEDGER CHECK', 'BANK', 'REQUESTED', 'ACTION'],
+        searchHint: 'ابحث باسم المتجر',
+        filters: [['all', 'الكل'], ['ok', 'مطابق'], ['warn', 'يحتاج مراجعة']],
+        filterFn: (r, k) => k === 'all' || (k === 'ok' && r.ok) || (k === 'warn' && !r.ok),
+        match: (r, q) => r.shop.indexOf(q) >= 0,
+        rows: rows,
+        note: can ? '' : 'دورك «دعم» — الاعتماد وتسجيل التحويل يحتاجان صلاحية payouts.approve.',
+        noteKind: 'warning',
+        emptyIcon: '#i-wallet', emptyTitle: 'لا طلبات تحويل', emptyBody: 'تظهر الطلبات هنا عندما يطلب تاجر سحب رصيده المتاح.',
+        cell: (r) => [
+          stack(r.shop, 'عملة التسوية ' + r.cur, { icon: '#i-store' }),
+          mono(M(r.amount, r.cur), { justify: 'flex-end', color: 'var(--money)', weight: '700', size: 'var(--text-sm)' }),
+          r.ok ? badge('الرصيد مطابق للقيود', 'success') : badge('فرق ' + M(r.amount - r.balance, r.cur), 'danger'),
+          mono(r.iban, { color: 'var(--text-body)' }),
+          plain(r.date, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          acts([
+            btn('اعتمد', () => { if (can && r.ok) this.toast('اعتُمد تحويل ' + M(r.amount, r.cur) + ' لمتجر ' + r.shop); else if (!r.ok) this.toast('لا يمكن الاعتماد قبل تسوية الفرق في القيود', 'warning'); }, (can && r.ok) ? 'primary' : 'off'),
+            btn('سجّل التحويل', () => { if (can) this.toast('سُجّل التحويل — الرقم المرجعي إلزامي'); }, can ? 'normal' : 'off'),
+            btn('ارفض', () => { if (can) this.toast('رُفض الطلب — أُعيد المبلغ إلى رصيد المتجر فوراً', 'warning'); }, can ? 'danger' : 'off')
+          ])
+        ]
+      };
+    } else if (st.screen === 'AD-15') {
+      const rows = [
+        { no: 'RET-26-0091', shop: 'دار القطن', reason: 'مخالف للوصف', status: ['بانتظار ردّ المتجر', 'warning'], amount: 185, cur: 'SAR', age: 3, neg: false },
+        { no: 'RET-26-0090', shop: 'بيت العطور', reason: 'وصل تالفاً', status: ['قُبل — بانتظار الاستلام', 'info'], amount: 420, cur: 'SAR', age: 2, neg: false },
+        { no: 'RET-26-0088', shop: 'حرف الشام', reason: 'تغيّر الرأي', status: ['أُعيد المبلغ', 'success'], amount: 1280, cur: 'JOD', age: 6, neg: true },
+        { no: 'RET-26-0085', shop: 'إلكترونيات الخليج', reason: 'منتج مقلّد', status: ['رفضه المتجر', 'danger'], amount: 349, cur: 'AED', age: 8, neg: false }
+      ];
+      cfg = {
+        cols: '140px minmax(0,1fr) minmax(0,1fr) 180px 132px 100px 150px',
+        minWidth: '1120px',
+        head: ['RETURN', 'SHOP', 'REASON', 'STATUS', 'AMOUNT', 'AGE', 'ACTION'],
+        searchHint: 'ابحث برقم المرتجع أو المتجر',
+        filters: [['all', 'الكل'], ['stall', 'تأخّر المتجر'], ['refunded', 'أُعيد المبلغ']],
+        filterFn: (r, k) => k === 'all' || (k === 'stall' && r.age >= 3 && r.status[1] === 'warning') || (k === 'refunded' && r.status[1] === 'success'),
+        match: (r, q) => r.no.indexOf(q) >= 0 || r.shop.indexOf(q) >= 0,
+        rows: rows,
+        emptyIcon: '#i-return', emptyTitle: 'لا مرتجعات بهذه التصفية', emptyBody: 'جرّب تصفية أخرى.',
+        rowNote: (r) => r.neg ? { text: 'نتج عن هذا الإرجاع رصيد سالب لدى المتجر — السحب موقوف حتى يعود موجباً.', kind: 'danger' } : null,
+        cell: (r) => [
+          mono(r.no, { color: 'var(--text-strong)' }),
+          plain(r.shop, { color: 'var(--text-strong)', weight: '600' }),
+          plain(r.reason, { size: 'var(--text-xs)', color: 'var(--text-body)' }),
+          badge(r.status[0], r.status[1]),
+          mono(M(r.amount, r.cur), { justify: 'flex-end', color: 'var(--money)', weight: '600' }),
+          plain(r.age + ' أيام', { size: 'var(--text-xs)', color: r.age >= 3 ? 'var(--danger-text)' : 'var(--text-muted)' }),
+          acts(r.age >= 3 && r.status[1] === 'warning'
+            ? [btn('تدخّل الآن', () => { if (can) this.toast('تدخّلت الإدارة — أُعيد المبلغ للمشتري وأُخطر المتجر'); }, can ? 'primary' : 'off')]
+            : [btn('افتح', () => this.toast('تفاصيل المرتجع: المنتجات والسبب وأحداث الدفع'))])
+        ]
+      };
+    } else if (st.screen === 'AD-21') {
+      const rows = [
+        { name: 'نورة العتيبي', email: 'noura@example.com', phone: '+966 55 012 8844', orders: 24, since: '2 يناير 2026', status: ['نشط', 'success'] },
+        { name: 'فهد الشمري', email: 'fahad@example.com', phone: '+966 50 771 2290', orders: 8, since: '19 مارس 2026', status: ['نشط', 'success'] },
+        { name: 'ليان الغامدي', email: 'layan@example.com', phone: '+966 53 440 1188', orders: 3, since: '4 يوليو 2026', status: ['نزاع مفتوح', 'warning'] },
+        { name: 'سعد الدوسري', email: 'saad@example.com', phone: '+966 55 909 3312', orders: 41, since: '11 فبراير 2026', status: ['نشط', 'success'] },
+        { name: 'حساب مشبوه', email: 'bulk-returns@example.com', phone: '+20 100 220 9981', orders: 62, since: '1 سبتمبر 2026', status: ['موقوف', 'danger'] }
+      ];
+      cfg = {
+        cols: 'minmax(0,1.2fr) minmax(0,1.2fr) 96px 132px 132px 160px',
+        minWidth: '1060px',
+        head: ['CUSTOMER', 'CONTACT', 'ORDERS', 'SIGNED UP', 'STATUS', 'ACTION'],
+        searchHint: 'ابحث بالاسم أو البريد أو الجوال',
+        filters: [['all', 'الكل'], ['active', 'نشط'], ['suspended', 'موقوف']],
+        filterFn: (r, k) => k === 'all' || (k === 'active' && r.status[1] === 'success') || (k === 'suspended' && r.status[1] === 'danger'),
+        match: (r, q) => r.name.indexOf(q) >= 0 || r.email.indexOf(q) >= 0 || r.phone.indexOf(q) >= 0,
+        rows: rows,
+        emptyIcon: '#i-users', emptyTitle: 'لا عملاء بهذه التصفية', emptyBody: 'جرّب تصفية أخرى أو ابحث باسم آخر.',
+        cell: (r) => [
+          plain(r.name, { color: 'var(--text-strong)', weight: '600' }),
+          stack(r.email, r.phone, { subDir: 'ltr', subFont: 'var(--font-mono)' }),
+          mono(String(r.orders), { justify: 'center', color: 'var(--text-strong)' }),
+          plain(r.since, { size: 'var(--text-xs)', color: 'var(--text-muted)' }),
+          badge(r.status[0], r.status[1]),
+          acts([
+            btn('الملف', () => this.toast('ملف العميل: طلباته ونزاعاته وجلساته')),
+            btn(r.status[1] === 'danger' ? 'أعِد التفعيل' : 'أوقف', () => { if (can) this.toast(r.status[1] === 'danger' ? 'أُعيد تفعيل الحساب' : 'أُوقف الحساب — السبب إلزامي', 'warning'); }, can ? 'danger' : 'off')
+          ])
+        ]
+      };
+    } else {
+      const rows = [
+        { stars: 5, text: 'القماش ممتاز والمقاس مضبوط، وصلني قبل الموعد بيوم.', product: 'قميص قطني مصري', shop: 'دار القطن', verified: true, flagged: false },
+        { stars: 1, text: 'المنتج لم يصلني أصلاً، تواصلوا معي على 0555xxxxxx', product: 'عطر عود مركّز', shop: 'بيت العطور', verified: true, flagged: true },
+        { stars: 4, text: 'جودة جيدة مقابل السعر، لكن التغليف كان بسيطاً.', product: 'طقم مناشف قطن', shop: 'دار القطن', verified: true, flagged: false },
+        { stars: 5, text: 'أفضل متجر تعاملت معه، أنصح الجميع بزيارة موقعهم الخاص basta-shop.example', product: 'سجادة صوف يدوية', shop: 'حرف الشام', verified: false, flagged: true },
+        { stars: 3, text: 'الصوت جيد لكن البطارية أقل من المذكور.', product: 'مكبّر صوت XL-900', shop: 'إلكترونيات الخليج', verified: true, flagged: false }
+      ];
+      cfg = {
+        cols: '116px minmax(0,1.6fr) minmax(0,1fr) 128px 170px',
+        minWidth: '1060px',
+        head: ['RATING', 'REVIEW', 'PRODUCT', 'PURCHASE', 'ACTION'],
+        searchHint: 'ابحث بنص التقييم أو المنتج',
+        filters: [['all', 'الكل'], ['flagged', 'مُبلَّغ عنه'], ['verified', 'شراء موثّق']],
+        filterFn: (r, k) => k === 'all' || (k === 'flagged' && r.flagged) || (k === 'verified' && r.verified),
+        match: (r, q) => r.text.indexOf(q) >= 0 || r.product.indexOf(q) >= 0,
+        rows: rows,
+        emptyIcon: '#i-star', emptyTitle: 'لا تقييمات تنتظر', emptyBody: 'راجعت كل التقييمات المعلّقة.',
+        rowNote: (r) => r.flagged ? { text: 'يحتوي معلومات تواصل أو رابطاً خارجياً — يخالف شروط النشر.', kind: 'danger' } : null,
+        cell: (r) => [
+          { isStars: true, justify: 'flex-start', stars: [1, 2, 3, 4, 5].map(i => i <= r.stars ? '#i-star-fill' : '#i-star') },
+          plain(r.text, { size: 'var(--text-xs)', color: 'var(--text-body)' }),
+          stack(r.product, r.shop),
+          r.verified ? badge('شراء موثّق', 'success') : badge('بلا شراء', 'neutral'),
+          acts([
+            btn('انشر', () => { if (!r.flagged) this.toast('نُشر التقييم'); else this.toast('راجع المخالفة قبل النشر', 'warning'); }, r.flagged ? 'normal' : 'primary'),
+            btn('ارفض بسبب', () => this.toast('رُفض التقييم — أُرسل السبب للمشتري', 'warning'), 'danger')
+          ])
+        ]
+      };
+    }
+
+    if (cfg) {
+      const fk = st.tblFilter || 'all';
+      const q = (st.tblQuery || '').trim();
+      const all = empty ? [] : cfg.rows;
+      const shown = all.filter(r => cfg.filterFn(r, fk)).filter(r => !q || cfg.match(r, q));
+      out.tblCols = cfg.cols;
+      out.tblMinWidth = cfg.minWidth;
+      out.tblSearchHint = cfg.searchHint;
+      out.tblHead = cfg.head.map((h, i) => ({ label: h, align: i === cfg.head.length - 1 ? 'end' : 'start' }));
+      out.tblFilters = cfg.filters.map(f => ({
+        label: f[1],
+        count: String(f[0] === 'all' ? all.length : all.filter(r => cfg.filterFn(r, f[0])).length),
+        bg: fk === f[0] ? 'var(--brand)' : 'transparent',
+        fg: fk === f[0] ? 'var(--on-brand)' : 'var(--text-body)',
+        border: fk === f[0] ? 'var(--brand)' : 'var(--border-control)',
+        pick: () => S({ tblFilter: f[0] })
+      }));
+      out.tblQuery = st.tblQuery || '';
+      out.onTblQuery = (e) => S({ tblQuery: e.target.value });
+      out.tblClear = () => S({ tblFilter: 'all', tblQuery: '', pstate: empty ? 'default' : P });
+      out.tblEmpty = shown.length === 0;
+      out.tblHasRows = shown.length > 0;
+      out.tblEmptyIcon = cfg.emptyIcon;
+      out.tblEmptyTitle = empty ? 'لا بيانات بعد' : cfg.emptyTitle;
+      out.tblEmptyBody = empty ? 'تظهر البيانات هنا بمجرّد وجود نشاط على المنصّة.' : cfg.emptyBody;
+      const note = cfg.note;
+      out.tblNoteDisplay = note ? 'flex' : 'none';
+      out.tblNote = note || '';
+      const nk = cfg.noteKind || 'info';
+      out.tblNoteBorder = 'var(--' + nk + ')';
+      out.tblNoteBg = 'var(--' + nk + '-subtle)';
+      out.tblNoteColor = 'var(--' + nk + '-text)';
+      out.tblNoteIcon = nk === 'danger' ? '#i-alert' : (nk === 'warning' ? '#i-lock' : '#i-info');
+      out.tblRows = shown.map(r => {
+        const n = cfg.rowNote ? cfg.rowNote(r) : null;
+        return {
+          cells: cfg.cell(r),
+          rowBg: n ? 'var(--' + n.kind + '-subtle)' : 'transparent',
+          note: n ? n.text : '',
+          noteBorder: n ? 'var(--' + n.kind + ')' : 'transparent',
+          noteBg: 'var(--card)',
+          noteColor: n ? 'var(--' + n.kind + '-text)' : 'var(--text-body)',
+          noteIcon: '#i-alert'
+        };
+      });
+    }
+
+    return out;
+  }
+
+  renderVals() {
+    const st = this.state, S = (o) => this.setState(o);
+    const P = st.pstate;
+    const out = {};
+
+    out.rootRef = (el) => { this.rootEl = el; };
+    out.fit = st.fit;
+    out.screen = st.screen;
+    out.setLight = () => this.set('data-theme', 'light');
+    out.setDark = () => this.set('data-theme', 'dark');
+    out.setAr = () => { this.set('dir', 'rtl'); this.set('data-lang', 'ar'); };
+    out.setEn = () => { this.set('dir', 'ltr'); this.set('data-lang', 'en'); };
+    out.setCompact = () => this.set('data-density', 'compact');
+    out.setComfortable = () => this.set('data-density', 'comfortable');
+
+    const codes = ['AD-01', 'AD-02', 'AD-03', 'AD-04', 'AD-05', 'AD-06', 'AD-07', 'AD-12', 'AD-13', 'AD-14', 'AD-15', 'AD-21', 'AD-22'];
+    out.screenTabs = codes.map(c => ({
+      code: c,
+      bg: st.screen === c ? 'var(--brand)' : 'var(--card)',
+      fg: st.screen === c ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.screen === c ? 'var(--brand)' : 'var(--border-control)',
+      go: () => this.go(c)
+    }));
+    const pstates = [['default', 'طبيعي'], ['loading', 'تحميل'], ['empty', 'فارغ'], ['error', 'خطأ'], ['edge', 'الحدّ']];
+    out.stateTabs = pstates.map(p => ({
+      label: p[1],
+      bg: P === p[0] ? 'var(--brand)' : 'var(--card)',
+      fg: P === p[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: P === p[0] ? 'var(--brand)' : 'var(--border-control)',
+      go: () => S({ pstate: p[0] })
+    }));
+    out.loadingDisplay = P === 'loading' ? 'flex' : 'none';
+    out.errorDisplay = P === 'error' ? 'grid' : 'none';
+    out.contentDisplay = (P === 'loading' || P === 'error') ? 'none' : 'block';
+    out.retry = () => { S({ pstate: 'default' }); this.toast('أُعيد التحميل بنجاح'); };
+
+    const roles = [['super', 'مدير عام'], ['support', 'دعم — بلا صلاحيات مالية']];
+    out.roleTabs = roles.map(r => ({
+      label: r[1].split(' —')[0],
+      bg: st.role === r[0] ? 'var(--brand)' : 'var(--card)',
+      fg: st.role === r[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      pick: () => S({ role: r[0] })
+    }));
+    out.roleLabel = st.role === 'super' ? 'مدير عام — كل الصلاحيات' : 'دعم — بلا صلاحيات مالية';
+    out.adminName = st.role === 'super' ? 'ريم السالم' : 'خالد النمر';
+    out.adminInitial = st.role === 'super' ? 'ر' : 'خ';
+
+    const authScreens = ['AD-01', 'AD-02'];
+    const isAuth = authScreens.indexOf(st.screen) >= 0;
+    out.sidebarDisplay = isAuth ? 'none' : 'flex';
+    out.topbarDisplay = isAuth ? 'none' : 'flex';
+    out.shellCols = isAuth ? 'minmax(0,1fr)' : '228px minmax(0,1fr)';
+
+    const titles = {
+      'AD-01': 'دخول الإدارة', 'AD-02': 'تفعيل التحقّق بخطوتين', 'AD-03': 'لوحة المؤشرات',
+      'AD-04': 'طلبات اعتماد المتاجر', 'AD-05': 'ملف المتجر', 'AD-06': 'كل المتاجر',
+      'AD-07': 'مراجعة المنتجات', 'AD-12': 'الطلبات', 'AD-13': 'طلبات التحويل',
+      'AD-14': 'النزاعات', 'AD-15': 'المرتجعات والمبالغ المعادة', 'AD-21': 'العملاء', 'AD-22': 'تقييمات المنتجات'
+    };
+    out.pageTitle = titles[st.screen] || '';
+    out.globalQ = st.globalQ;
+    out.onGlobalQ = (e) => S({ globalQ: e.target.value });
+
+    const navDefs = [
+      { label: 'لوحة المؤشرات', icon: '#i-chart', screen: 'AD-03' },
+      { label: 'اعتماد المتاجر', icon: '#i-store', screen: 'AD-04', count: '6' },
+      { label: 'كل المتاجر', icon: '#i-store', screen: 'AD-06' },
+      { label: 'مراجعة المنتجات', icon: '#i-package', screen: 'AD-07', count: '23' },
+      { label: 'الطلبات', icon: '#i-truck', screen: 'AD-12' },
+      { label: 'طلبات التحويل', icon: '#i-wallet', screen: 'AD-13', count: '4' },
+      { label: 'النزاعات', icon: '#i-scale', screen: 'AD-14', count: '3' },
+      { label: 'المرتجعات', icon: '#i-return', screen: 'AD-15' },
+      { label: 'العملاء', icon: '#i-users', screen: 'AD-21' },
+      { label: 'التقييمات', icon: '#i-star', screen: 'AD-22', count: '9' },
+      { label: 'الكتالوج والنظام', icon: '#i-file', ext: 'AD-08' }
+    ];
+    out.navItems = navDefs.map(n => {
+      const here = n.screen === st.screen;
+      return {
+        label: n.label, icon: n.icon, count: P === 'empty' ? '' : (n.count || ''),
+        bg: here ? 'var(--brand)' : 'transparent',
+        fg: here ? '#FFFFFF' : 'rgba(255,255,255,.82)',
+        weight: here ? '700' : '500',
+        countBg: here ? 'rgba(255,255,255,.22)' : 'var(--danger)',
+        countFg: '#FFFFFF',
+        go: () => {
+          if (n.screen) this.go(n.screen);
+          else { try { localStorage.setItem('basta.adminsys.screen', n.ext); } catch (e) {} window.location.href = encodeURI('Basta Admin Catalog - System.dc.html'); }
+        }
+      };
+    });
+
+    Object.assign(out, this.opsA(), this.opsB());
+
+    out.toastMsg = st.toast ? st.toast.msg : '';
+    out.toastDisplay = st.toast ? 'flex' : 'none';
+    out.toastBg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-subtle)' : 'var(--inverse)';
+    out.toastFg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-text)' : 'var(--on-inverse)';
+    out.toastIcon = st.toast && st.toast.kind === 'warning' ? '#i-alert' : '#i-check-circle';
+    out.closeToast = () => S({ toast: null });
+
+    return out;
+  }
+}
+</script>
+</body>
+</html>

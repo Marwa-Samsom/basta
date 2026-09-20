@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Basta · Cart, checkout &amp; after purchase ST-13…ST-22 · ST-31</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--sunken);color:var(--text-body);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{color:var(--brand-hover)}
+button,input,select,textarea{font:inherit;color:inherit}
+:root{
+--font-head:'Almarai',system-ui,sans-serif;
+--font-ui:'IBM Plex Sans Arabic',system-ui,sans-serif;
+--font-mono:'IBM Plex Mono',ui-monospace,monospace;
+--page:#F8F3EC;--card:#FFFFFF;--raised:#FFFFFF;--sunken:#F0E8DD;--inverse:#28211C;--on-inverse:#FDFAF6;
+--text-strong:#1E1814;--text-body:#4A3F35;--text-muted:#6B5C4D;--text-faint:#7D6C5B;
+--border-subtle:#F0E8DD;--border-default:#E3D7C7;--border-control:#958470;
+--brand:#8C2F46;--brand-hover:#74243A;--brand-pressed:#5C1B2E;--on-brand:#FFFFFF;--brand-subtle:#FBF1F3;--brand-text:#74243A;
+--money:#0E6B66;--money-subtle:#E3F2F0;--money-border:#C4E5E1;
+--success:#2F7A3E;--warning:#9A4F0B;--danger:#C23A1A;--info:#2D5F8B;
+--success-subtle:#E3F1E6;--warning-subtle:#FBEBDD;--danger-subtle:#FBE3DD;--info-subtle:#E1EBF4;
+--success-text:#25622F;--warning-text:#7E4009;--danger-text:#A12E13;--info-text:#244C70;
+--neutral-subtle:#F0E8DD;--neutral-text:#4A3F35;
+--focus:#B05A70;
+--shadow-sm:0 1px 2px rgba(46,13,23,.07),0 1px 3px rgba(74,63,53,.07);
+--shadow-md:0 2px 4px rgba(74,63,53,.07),0 6px 14px rgba(74,63,53,.09);
+--shadow-lg:0 10px 28px rgba(74,63,53,.14);
+--shadow-overlay:0 18px 52px rgba(30,24,20,.26);
+--r-1:4px;--r-2:8px;--r-3:14px;
+--text-3xl:38px;--text-2xl:30px;--text-xl:24px;--text-lg:20px;--text-md:17px;--text-sm:13px;--text-xs:12px;--text-2xs:11px;
+--text-base:15px;--row-h:48px;--card-pad:20px;--ctrl-h:44px;--gap:16px;
+}
+[data-theme="dark"]{
+--page:#14100D;--card:#1E1814;--raised:#28211C;--sunken:#14100D;--inverse:#F0E8DD;--on-inverse:#1E1814;
+--text-strong:#FDFAF6;--text-body:#E3D7C7;--text-muted:#A89680;--text-faint:#958470;
+--border-subtle:#28211C;--border-default:#332B24;--border-control:#7D6C5B;
+--brand:#D08A9B;--brand-hover:#E6B6C1;--brand-pressed:#F4DDE2;--on-brand:#1E1814;--brand-subtle:#2E0D17;--brand-text:#D08A9B;
+--money:#5CC6B8;--money-subtle:#0F2624;--money-border:#08403D;
+--success:#6CC287;--warning:#E39A4B;--danger:#F07A66;--info:#7FB2E0;
+--success-subtle:#13261A;--warning-subtle:#2E1C0B;--danger-subtle:#331410;--info-subtle:#0F1E2C;
+--success-text:#6CC287;--warning-text:#E39A4B;--danger-text:#F07A66;--info-text:#7FB2E0;
+--neutral-subtle:#28211C;--neutral-text:#E3D7C7;
+--focus:#D08A9B;
+--shadow-sm:0 1px 2px rgba(0,0,0,.4);
+--shadow-md:0 2px 4px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.4);
+--shadow-lg:0 10px 28px rgba(0,0,0,.5);
+--shadow-overlay:0 18px 52px rgba(0,0,0,.6);
+}
+[data-density="compact"]{--text-base:13px;--row-h:32px;--card-pad:16px;--ctrl-h:36px;--gap:12px}
+[data-lang="ar"] [data-t="en"]{display:none}
+[data-lang="en"] [data-t="ar"]{display:none}
+[dir="rtl"] [data-mirror]{transform:scaleX(-1)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+[data-theme="light"] [data-seg="light"],[data-theme="dark"] [data-seg="dark"],[data-lang="ar"] [data-seg="ar"],[data-lang="en"] [data-seg="en"],[data-density="comfortable"] [data-seg="comfortable"],[data-density="compact"] [data-seg="compact"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+@keyframes bsSpin{to{transform:rotate(360deg)}}
+@keyframes bsShimmer{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+@keyframes bsToastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes bsFade{from{opacity:0}to{opacity:1}}
+@keyframes bsDrawerIn{from{transform:translateX(100%)}to{transform:none}}
+@keyframes bsFlash{0%{background:var(--money-subtle)}100%{background:transparent}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:1ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" dir="rtl" data-theme="light" data-lang="ar" data-density="comfortable" style="min-height:100vh;background:var(--sunken);color:var(--text-body);font-family:var(--font-ui)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M13 5l7 7-7 7"></path></symbol>
+<symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="M11 19l-7-7 7-7"></path></symbol>
+<symbol id="i-chev-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></symbol>
+<symbol id="i-chev-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M18.5 6l-1 14h-11L5.5 6"></path></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-9.5A4.5 4.5 0 0112 8a4.5 4.5 0 017 2.5c0 5.1-7 9.5-7 9.5z"></path></symbol>
+<symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2.2l2.4 11h9.6l2.3-8H6"></path><circle cx="9" cy="19" r="1.6"></circle><circle cx="17" cy="19" r="1.6"></circle></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L21.5 20H2.5z"></path><path d="M12 10v4.5"></path><path d="M12 17.5h.01"></path></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 8h.01"></path></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.4l2.8 2.8L16 9.6"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.4l3.4 2"></path></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a1 1 0 011-1h9"></path></symbol>
+<symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.5"></circle><path d="M21 16l-5-5-6 6"></path></symbol>
+<symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v11h16V9"></path><path d="M3 9l2-5h14l2 5z"></path></symbol>
+<symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"></path><path d="M3 8l9 5 9-5"></path><path d="M12 13v10"></path></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h10v9H3z"></path><path d="M13 10h4l4 3v3h-8z"></path><circle cx="7" cy="18" r="1.8"></circle><circle cx="17" cy="18" r="1.8"></circle></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"></path></symbol>
+<symbol id="i-return" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.3 5.7"></path><path d="M20 4v7h-7"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20a7.5 7.5 0 0115 0"></path></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></symbol>
+<symbol id="i-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M3 10.5h18"></path></symbol>
+<symbol id="i-cash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="2"></rect><circle cx="12" cy="12" r="2.4"></circle></symbol>
+<symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"></rect><path d="M16 12.5h3"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z"></path><path d="M9 12.2l2.2 2.2L15.5 10"></path></symbol>
+<symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-star-fill" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5l-8.2 8.2a4.5 4.5 0 01-6.4-6.4l8-8a3 3 0 014.3 4.3l-8 8a1.5 1.5 0 01-2.2-2.1L14 8"></path></symbol>
+<symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4L3 11l7 2.6L12.6 21z"></path><path d="M21 4l-8.4 17"></path></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"></path><path d="M7 8l5-5 5 5"></path><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path></symbol>
+<symbol id="i-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a9 9 0 109 9"></path></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"></rect><path d="M8 10.5V8a4 4 0 018 0v2.5"></path></symbol>
+</defs></svg>
+
+<header style="position:sticky;top:0;z-index:60;background:var(--card);border-block-end:1px solid var(--border-default);box-shadow:var(--shadow-sm)">
+  <div style="max-width:1600px;margin:0 auto;padding:9px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.08em">ST-13…22 · 31</span>
+    <div style="display:flex;gap:6px">
+      <a href="Basta Component Sheet.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">الورقة</a>
+      <a href="Basta Storefront Discovery.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">ST-01…12</a>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border-default)"></div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="light" onClick="{{ setLight }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 9px;height:26px;font-size:11px;cursor:pointer">فاتح</button>
+      <button type="button" data-seg="dark" onClick="{{ setDark }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 9px;height:26px;font-size:11px;cursor:pointer">داكن</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="ar" onClick="{{ setAr }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 9px;height:26px;font-size:11px;cursor:pointer">عربي</button>
+      <button type="button" data-seg="en" onClick="{{ setEn }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 9px;height:26px;font-size:11px;cursor:pointer">English</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="comfortable" onClick="{{ setComfortable }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 9px;height:26px;font-size:11px;cursor:pointer">مريحة</button>
+      <button type="button" data-seg="compact" onClick="{{ setCompact }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 9px;height:26px;font-size:11px;cursor:pointer">مضغوطة</button>
+    </div>
+    <nav style="display:flex;gap:3px;flex-wrap:wrap">
+      <sc-for list="{{ screenTabs }}" as="t" hint-placeholder-count="11">
+        <button type="button" onClick="{{ t.go }}" style="height:26px;padding:0 8px;border:1px solid {{ t.border }};border-radius:var(--r-1);background:{{ t.bg }};color:{{ t.fg }};font-family:var(--font-mono);font-size:10px;cursor:pointer">{{ t.code }}</button>
+      </sc-for>
+    </nav>
+    <div style="margin-inline-start:auto;display:flex;align-items:center;gap:5px">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">STATE</span>
+      <sc-for list="{{ stateTabs }}" as="p" hint-placeholder-count="5">
+        <button type="button" onClick="{{ p.go }}" style="height:26px;padding:0 8px;border:1px solid {{ p.border }};border-radius:var(--r-1);background:{{ p.bg }};color:{{ p.fg }};font-size:10px;cursor:pointer">{{ p.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+</header>
+
+<div style="padding:20px 16px 60px;display:grid;justify-items:center">
+  <div style="width:1440px;zoom:{{ fit }};background:var(--page);border:1px solid var(--border-default);border-radius:var(--r-3);box-shadow:var(--shadow-lg);overflow:hidden">
+
+    <div style="background:var(--card);border-block-end:1px solid var(--border-default);padding:12px 32px;display:flex;align-items:center;gap:16px">
+      <button type="button" onClick="{{ goDiscovery }}" style="border:0;background:transparent;padding:0;cursor:pointer;font-family:var(--font-head);font-weight:800;font-size:22px;color:var(--brand)">بسطة</button>
+      <span style="position:relative;display:flex;align-items:center;flex:1;max-width:520px">
+        <svg width="17" height="17" style="position:absolute;inset-inline-start:11px;color:var(--text-faint);pointer-events:none"><use href="#i-search"></use></svg>
+        <input type="text" value="{{ search }}" onChange="{{ onSearch }}" placeholder="ابحث في بسطة" style="height:var(--ctrl-h);width:100%;padding-inline:34px 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base)" />
+      </span>
+      <span style="display:flex;align-items:center;gap:8px;margin-inline-start:auto">
+        <button type="button" onClick="{{ cycleCurrency }}" style="height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-body);font-size:var(--text-sm);cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--sunken)">{{ currencyLabel }}</button>
+        <button type="button" onClick="{{ goOrders }}" style="height:var(--ctrl-h);padding:0 12px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-body);font-size:var(--text-sm);cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--sunken)"><svg width="17" height="17"><use href="#i-user"></use></svg>طلباتي</button>
+        <button type="button" onClick="{{ goCart }}" style="position:relative;height:var(--ctrl-h);padding:0 14px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px" style-hover="background:var(--brand-hover)">
+          <svg width="18" height="18"><use href="#i-cart"></use></svg>السلة
+          <span style="height:20px;min-width:20px;padding:0 6px;border-radius:999px;background:var(--on-brand);color:var(--brand);font-family:var(--font-mono);font-size:var(--text-2xs);font-weight:700;display:inline-flex;align-items:center;justify-content:center">{{ cartCount }}</span>
+        </button>
+      </span>
+    </div>
+
+    <div style="display:{{ loadingDisplay }};padding:32px;gap:16px;flex-direction:column">
+      <span style="height:28px;width:220px;border-radius:var(--r-1);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out infinite"></span>
+      <span style="height:150px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .12s infinite"></span>
+      <span style="height:150px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .24s infinite"></span>
+    </div>
+
+    <div style="display:{{ errorDisplay }};padding:80px 40px;place-items:center;text-align:center;gap:12px">
+      <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-alert"></use></svg></span>
+      <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong)">حدث خلل غير متوقّع ولم يكتمل طلبك</span>
+      <span style="font-size:var(--text-base);color:var(--text-muted);max-width:56ch;line-height:1.8">أعد المحاولة، وإن تكرّر أبلغنا بالرقم <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">req-8f3a2c</span>. سلتك محفوظة كاملة.</span>
+      <button type="button" onClick="{{ retry }}" style="margin-top:6px;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-return"></use></svg>أعد المحاولة</button>
+    </div>
+
+    <div style="display:{{ contentDisplay }};padding:24px 32px 48px">
+
+      <sc-if value="{{ isCart }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;gap:16px;min-width:0">
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+          <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong);margin:0">سلتك</h1>
+          <span style="font-size:var(--text-sm);color:var(--text-muted)">{{ cartSummaryLine }}</span>
+        </div>
+
+        <sc-if value="{{ cartMerged }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--info);border-radius:var(--r-2);background:var(--info-subtle)">
+            <svg width="18" height="18" style="flex:none;color:var(--info-text)"><use href="#i-info"></use></svg>
+            <span style="font-size:var(--text-sm);color:var(--info-text);line-height:1.7">أضفنا قطعتين من سلتك السابقة بعد تسجيل دخولك.</span>
+            <button type="button" onClick="{{ dismissMerge }}" aria-label="إغلاق" style="margin-inline-start:auto;width:30px;height:30px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:var(--info-text);display:grid;place-items:center;cursor:pointer"><svg width="15" height="15"><use href="#i-x"></use></svg></button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ cartEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:48px 28px;display:grid;gap:22px">
+            <div style="display:grid;justify-items:center;gap:10px;text-align:center">
+              <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-cart"></use></svg></span>
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong)">سلتك فارغة</span>
+              <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">تصفّح الأقسام أو أكمل من حيث توقّفت — القطع التي شاهدتها محفوظة أدناه.</span>
+              <button type="button" onClick="{{ goDiscovery }}" style="margin-top:4px;height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer">تصفّح المنتجات</button>
+            </div>
+            <div style="display:grid;gap:10px">
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">تصفّح الأقسام</span>
+              <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px">
+                <sc-for list="{{ emptyCats }}" as="c" hint-placeholder-count="6">
+                  <button type="button" onClick="{{ c.go }}" style="padding:14px 10px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:grid;justify-items:center;gap:7px" style-hover="border-color:var(--brand);background:var(--brand-subtle)">
+                    <svg width="20" height="20" style="color:var(--brand)"><use href="#i-package"></use></svg>
+                    <span style="font-size:var(--text-xs);color:var(--text-strong);font-weight:600;text-align:center">{{ c.label }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:grid;gap:10px">
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">شوهد مؤخراً</span>
+              <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+                <sc-for list="{{ recentCards }}" as="p" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ p.open }}" style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;cursor:pointer;text-align:start;padding:0" style-hover="box-shadow:var(--shadow-md)">
+                    <span style="display:block;aspect-ratio:1;background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-image"></use></svg></span>
+                    <span style="display:grid;gap:4px;padding:10px">
+                      <span style="font-size:var(--text-sm);color:var(--text-strong);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</span>
+                      <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--money)">{{ p.price }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ cartHasItems }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start">
+          <div style="display:grid;gap:14px;min-width:0">
+            <sc-for list="{{ cartGroups }}" as="g" hint-placeholder-count="2">
+              <div style="background:var(--card);border:1px solid {{ g.border }};border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+                <div style="padding:12px 16px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span style="width:30px;height:30px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-muted);display:grid;place-items:center"><svg width="15" height="15"><use href="#i-store"></use></svg></span>
+                  <button type="button" onClick="{{ g.openShop }}" style="border:0;background:transparent;padding:0;cursor:pointer;font-size:var(--text-base);font-weight:700;color:var(--text-strong)">{{ g.shop }}</button>
+                  <sc-if value="{{ g.verified }}" hint-placeholder-val="{{ true }}">
+                    <span style="display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;background:var(--success-subtle);color:var(--success-text);font-size:var(--text-2xs);font-weight:600"><svg width="12" height="12"><use href="#i-shield"></use></svg>موثّق</span>
+                  </sc-if>
+                  <span style="margin-inline-start:auto;font-size:var(--text-xs);color:var(--text-muted)">{{ g.deliveryText }}</span>
+                </div>
+
+                <sc-if value="{{ g.uncovered }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:12px 16px;border-block-end:1px solid var(--border-subtle);background:var(--warning-subtle);display:flex;align-items:flex-start;gap:10px">
+                    <svg width="17" height="17" style="flex:none;color:var(--warning-text);margin-top:2px"><use href="#i-alert"></use></svg>
+                    <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.7"><strong style="color:var(--warning-text)">لا يشحن هذا المتجر إلى منطقتك</strong> — أزل قطعه لتكمل بالباقي، أو غيّر مدينة التوصيل.</span>
+                    <button type="button" onClick="{{ g.removeAll }}" style="margin-inline-start:auto;flex:none;height:34px;padding:0 12px;border:1px solid var(--warning);border-radius:var(--r-1);background:var(--card);color:var(--warning-text);font-size:var(--text-xs);font-weight:600;cursor:pointer;white-space:nowrap">أزل قطع المتجر</button>
+                  </div>
+                </sc-if>
+
+                <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                  <div style="padding:14px 16px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:flex-start;gap:12px;background:{{ it.rowBg }}">
+                    <span style="width:64px;height:64px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-image"></use></svg></span>
+                    <div style="display:grid;gap:6px;min-width:0;flex:1">
+                      <button type="button" onClick="{{ it.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;text-align:start;font-size:var(--text-base);color:var(--text-strong);font-weight:600;line-height:1.5">{{ it.name }}</button>
+                      <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ it.variant }}</span>
+                      <sc-if value="{{ it.priceChanged }}" hint-placeholder-val="{{ false }}">
+                        <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--info);border-radius:var(--r-1);background:var(--info-subtle);width:fit-content">
+                          <svg width="13" height="13" style="flex:none;color:var(--info-text)"><use href="#i-info"></use></svg>
+                          <span style="font-size:var(--text-2xs);color:var(--info-text)">تغيّر السعر من <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);text-decoration:line-through">{{ it.oldPrice }}</span> إلى <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-weight:700">{{ it.unit }}</span> بعد إضافتها</span>
+                        </span>
+                      </sc-if>
+                      <sc-if value="{{ it.soldOut }}" hint-placeholder-val="{{ false }}">
+                        <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--danger);border-radius:var(--r-1);background:var(--danger-subtle);width:fit-content">
+                          <svg width="13" height="13" style="flex:none;color:var(--danger-text)"><use href="#i-alert"></use></svg>
+                          <span style="font-size:var(--text-2xs);color:var(--danger-text)">نفدت هذه القطعة بعد إضافتها — أزلها لتكمل الشراء</span>
+                        </span>
+                      </sc-if>
+                      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:2px">
+                        <span style="display:flex;align-items:center;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+                          <button type="button" onClick="{{ it.dec }}" aria-label="أنقص" style="width:34px;height:34px;border:0;background:var(--card);color:var(--text-strong);display:grid;place-items:center;cursor:{{ it.decCursor }};opacity:{{ it.decOpacity }}" style-hover="background:var(--sunken)"><svg width="14" height="14"><use href="#i-minus"></use></svg></button>
+                          <span dir="ltr" style="unicode-bidi:isolate;min-width:40px;text-align:center;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">{{ it.qty }}</span>
+                          <button type="button" onClick="{{ it.inc }}" aria-label="زد" style="width:34px;height:34px;border:0;border-inline-start:1px solid var(--border-default);background:var(--card);color:var(--text-strong);display:grid;place-items:center;cursor:{{ it.incCursor }};opacity:{{ it.incOpacity }}" style-hover="background:var(--sunken)"><svg width="14" height="14"><use href="#i-plus"></use></svg></button>
+                        </span>
+                        <span style="font-size:var(--text-xs);color:{{ it.stockColor }}">{{ it.stockNote }}</span>
+                        <button type="button" onClick="{{ it.wish }}" style="height:32px;padding:0 10px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-body);font-size:var(--text-xs);cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--sunken)"><svg width="14" height="14"><use href="#i-heart"></use></svg>إلى المفضّلة</button>
+                        <button type="button" onClick="{{ it.remove }}" style="height:32px;padding:0 10px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);font-size:var(--text-xs);cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--danger-subtle);color:var(--danger-text);border-color:var(--danger)"><svg width="14" height="14"><use href="#i-trash"></use></svg>أزل</button>
+                      </div>
+                    </div>
+                    <div style="display:grid;gap:3px;justify-items:end;flex:none">
+                      <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:600;color:var(--money)">{{ it.lineTotal }}</span>
+                      <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)">{{ it.unit }} × {{ it.qty }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+
+                <div style="padding:12px 16px;display:grid;gap:7px;background:var(--sunken)">
+                  <span style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                    <span style="font-size:var(--text-sm);color:var(--text-body)">مجموع قطع المتجر</span>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--money)">{{ g.subtotal }}</span>
+                  </span>
+                  <span style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                    <span style="font-size:var(--text-sm);color:var(--text-body)">شحن هذا المتجر</span>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:{{ g.shipColor }}">{{ g.shipping }}</span>
+                  </span>
+                  <sc-if value="{{ g.freeNote }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:var(--text-2xs);color:var(--money);line-height:1.6">{{ g.freeNote }}</span>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:10px">
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">كود الخصم</span>
+              <div style="display:flex;gap:9px;flex-wrap:wrap">
+                <input type="text" value="{{ couponVal }}" onChange="{{ onCoupon }}" dir="ltr" placeholder="BASTA10" style="height:var(--ctrl-h);flex:1;min-width:180px;padding:0 12px;border:1px solid {{ couponBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-base)" />
+                <button type="button" onClick="{{ applyCoupon }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">طبّق</button>
+              </div>
+              <sc-if value="{{ couponMsg }}" hint-placeholder-val="{{ false }}">
+                <span style="display:flex;align-items:center;gap:7px;font-size:var(--text-xs);color:{{ couponColor }}"><svg width="14" height="14" style="flex:none"><use href="{{ couponIcon }}"></use></svg>{{ couponMsg }}</span>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="position:sticky;top:20px;display:grid;gap:12px">
+            <div style="background:var(--card);border:1px solid var(--money-border);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:10px">
+              <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">ملخّص الطلب</span>
+              <sc-for list="{{ summaryRows }}" as="s" hint-placeholder-count="5">
+                <span style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-top:{{ s.padTop }};border-block-start:{{ s.border }}">
+                  <span style="font-size:{{ s.size }};color:{{ s.labelColor }};font-weight:{{ s.weight }}">{{ s.label }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:{{ s.size }};font-weight:{{ s.weight }};color:{{ s.valueColor }}">{{ s.value }}</span>
+                </span>
+              </sc-for>
+              <button type="button" onClick="{{ goCheckout }}" disabled="{{ checkoutBlocked }}" style="margin-top:4px;height:48px;border:0;border-radius:var(--r-1);background:{{ checkoutBg }};color:{{ checkoutFg }};font-size:var(--text-md);font-weight:700;cursor:{{ checkoutCursor }};display:inline-flex;align-items:center;justify-content:center;gap:8px">أكمل الشراء<svg width="17" height="17" data-mirror><use href="#i-next"></use></svg></button>
+              <span style="display:flex;align-items:flex-start;gap:7px;font-size:var(--text-2xs);color:{{ checkoutNoteColor }};line-height:1.6"><svg width="13" height="13" style="flex:none;margin-top:2px"><use href="#i-lock"></use></svg>{{ checkoutNote }}</span>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:14px;box-shadow:var(--shadow-sm);display:grid;gap:8px">
+              <span style="font-size:var(--text-xs);font-weight:700;color:var(--text-strong)">عملة العرض</span>
+              <div style="display:flex;gap:6px">
+                <sc-for list="{{ currencyChips }}" as="c" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ c.pick }}" style="flex:1;height:34px;border:1px solid {{ c.border }};border-radius:var(--r-1);background:{{ c.bg }};color:{{ c.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">{{ c.label }}</button>
+                </sc-for>
+              </div>
+              <span style="font-size:var(--text-2xs);color:var(--text-muted);line-height:1.6">{{ currencyNote }}</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isST15 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:14px;min-width:0">
+        <sc-if value="{{ coSoldOutGate }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--card);border:1px solid var(--danger);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:44px 28px;display:grid;justify-items:center;gap:12px;text-align:center;max-width:720px;margin:0 auto">
+            <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-alert"></use></svg></span>
+            <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);line-height:1.4">نفدت «قميص قطني مصري» قبل أن تُكمل الدفع</span>
+            <span style="font-size:var(--text-base);color:var(--text-muted);max-width:56ch;line-height:1.8">لم نأخذ أي مبلغ. أزل القطعة لتكمل بباقي سلتك، أو عُد إلى السلة لتراجعها كاملة.</span>
+            <span style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;justify-content:center">
+              <button type="button" onClick="{{ coRemoveSoldOut }}" style="height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer">أزلها وتابع</button>
+              <button type="button" onClick="{{ goCart }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">عُد إلى السلة</button>
+            </span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ coOpen }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;gap:14px;min-width:0">
+          <div style="position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:11px;padding:12px 16px;border:1px solid {{ resBorder }};border-radius:var(--r-2);background:{{ resBg }};box-shadow:var(--shadow-sm)">
+            <svg width="18" height="18" style="flex:none;color:{{ resColor }}"><use href="{{ resIcon }}"></use></svg>
+            <span style="font-size:var(--text-sm);color:{{ resColor }};font-weight:600;line-height:1.6">{{ resText }}</span>
+            <span dir="ltr" style="unicode-bidi:isolate;margin-inline-start:auto;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:{{ resColor }}">{{ resClock }}</span>
+            <sc-if value="{{ resExpired }}" hint-placeholder-val="{{ false }}">
+              <button type="button" onClick="{{ reReserve }}" style="flex:none;height:34px;padding:0 12px;border:1px solid {{ resColor }};border-radius:var(--r-1);background:var(--card);color:{{ resColor }};font-size:var(--text-xs);font-weight:700;cursor:pointer;white-space:nowrap">احجز من جديد</button>
+            </sc-if>
+          </div>
+
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start">
+            <div style="display:grid;gap:14px;min-width:0">
+              <sc-for list="{{ coSections }}" as="sec" hint-placeholder-count="5">
+                <div style="background:var(--card);border:1px solid {{ sec.border }};border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+                  <button type="button" onClick="{{ sec.toggle }}" style="width:100%;padding:14px 16px;border:0;border-block-end:{{ sec.headBorder }};background:transparent;cursor:pointer;display:flex;align-items:center;gap:11px;text-align:start">
+                    <span style="width:28px;height:28px;flex:none;border-radius:999px;background:{{ sec.numBg }};color:{{ sec.numFg }};display:grid;place-items:center;font-family:var(--font-mono);font-size:var(--text-xs);font-weight:700"><sc-if value="{{ sec.done }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15"><use href="#i-check"></use></svg></sc-if><sc-if value="{{ sec.notDone }}" hint-placeholder-val="{{ true }}">{{ sec.n }}</sc-if></span>
+                    <span style="display:grid;gap:2px;min-width:0;flex:1">
+                      <span style="font-size:var(--text-md);font-weight:700;color:var(--text-strong)">{{ sec.title }}</span>
+                      <sc-if value="{{ sec.summary }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size:var(--text-xs);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sec.summary }}</span>
+                      </sc-if>
+                    </span>
+                    <sc-if value="{{ sec.collapsed }}" hint-placeholder-val="{{ false }}">
+                      <span style="flex:none;height:30px;padding:0 11px;border:1px solid var(--border-control);border-radius:var(--r-1);color:var(--text-strong);font-size:var(--text-xs);font-weight:600;display:inline-flex;align-items:center">عدّل</span>
+                    </sc-if>
+                  </button>
+
+                  <div style="display:{{ sec.bodyDisplay }};padding:16px">
+                    <sc-if value="{{ sec.isContact }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:grid;gap:12px">
+                        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+                          <label style="display:grid;gap:6px">
+                            <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">البريد الإلكتروني</span>
+                            <input type="text" value="{{ coEmail }}" onChange="{{ onCoEmail }}" onBlur="{{ blurCoEmail }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ coEmailBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base);width:100%" />
+                            <sc-if value="{{ coEmailErr }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--danger-text)"><svg width="13" height="13" style="flex:none"><use href="#i-alert"></use></svg>{{ coEmailErr }}</span></sc-if>
+                          </label>
+                          <label style="display:grid;gap:6px">
+                            <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">رقم الجوال</span>
+                            <input type="text" value="{{ coPhone }}" onChange="{{ onCoPhone }}" onBlur="{{ blurCoPhone }}" dir="ltr" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ coPhoneBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-base);width:100%" />
+                            <sc-if value="{{ coPhoneErr }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--danger-text)"><svg width="13" height="13" style="flex:none"><use href="#i-alert"></use></svg>{{ coPhoneErr }}</span></sc-if>
+                          </label>
+                        </div>
+                        <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-xs);color:var(--text-muted)"><svg width="14" height="14" style="flex:none"><use href="#i-info"></use></svg>نرسل رقم الطلب وتحديثات الشحن إلى هذين.</span>
+                        <button type="button" onClick="{{ sec.next }}" style="width:fit-content;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">تابع إلى العنوان</button>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ sec.isAddress }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:grid;gap:12px">
+                        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+                          <sc-for list="{{ addresses }}" as="a" hint-placeholder-count="2">
+                            <button type="button" onClick="{{ a.pick }}" style="text-align:start;padding:13px;border:1px solid {{ a.border }};border-radius:var(--r-2);background:{{ a.bg }};cursor:pointer;display:grid;gap:5px">
+                              <span style="display:flex;align-items:center;gap:8px">
+                                <span style="width:15px;height:15px;flex:none;border-radius:999px;border:2px solid {{ a.dotBorder }};display:grid;place-items:center"><span style="width:7px;height:7px;border-radius:999px;background:{{ a.dotBg }}"></span></span>
+                                <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ a.label }}</span>
+                              </span>
+                              <span style="font-size:var(--text-xs);color:var(--text-body);line-height:1.7">{{ a.line }}</span>
+                              <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)">{{ a.phone }}</span>
+                            </button>
+                          </sc-for>
+                          <button type="button" onClick="{{ openNewAddr }}" style="padding:13px;border:1px dashed {{ newAddrBorder }};border-radius:var(--r-2);background:{{ newAddrBg }};cursor:pointer;display:grid;justify-items:center;align-content:center;gap:7px;color:var(--brand-text)">
+                            <svg width="20" height="20"><use href="#i-plus"></use></svg>
+                            <span style="font-size:var(--text-sm);font-weight:600">عنوان جديد</span>
+                          </button>
+                        </div>
+
+                        <div style="display:{{ newAddrDisplay }};gap:12px;flex-direction:column;padding:14px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--sunken)">
+                          <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">عنوان جديد</span>
+                          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+                            <sc-for list="{{ addrFields }}" as="f" hint-placeholder-count="9">
+                              <label style="display:grid;gap:5px">
+                                <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">{{ f.label }}<sc-if value="{{ f.required }}" hint-placeholder-val="{{ false }}"><span style="color:var(--danger-text)"> *</span></sc-if></span>
+                                <input type="text" value="{{ f.value }}" onChange="{{ f.onInput }}" onBlur="{{ f.onBlur }}" dir="{{ f.dir }}" style="height:38px;padding:0 10px;border:1px solid {{ f.border }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm);width:100%" />
+                                <sc-if value="{{ f.err }}" hint-placeholder-val="{{ false }}"><span style="font-size:var(--text-2xs);color:var(--danger-text)">{{ f.err }}</span></sc-if>
+                              </label>
+                            </sc-for>
+                          </div>
+                          <div style="display:grid;gap:7px">
+                            <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">حدّد الموقع على الخريطة</span>
+                            <div onMouseDown="{{ mapDown }}" onMouseMove="{{ mapMove }}" onMouseUp="{{ mapUp }}" onMouseLeave="{{ mapUp }}" style="position:relative;height:170px;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden;background:var(--card);cursor:crosshair">
+                              <span style="position:absolute;inset:0;background-image:linear-gradient(var(--border-subtle) 1px,transparent 1px),linear-gradient(90deg,var(--border-subtle) 1px,transparent 1px);background-size:30px 30px"></span>
+                              <span style="position:absolute;top:20%;inset-inline-start:10%;width:36%;height:24%;background:var(--border-default);border-radius:5px;opacity:.7"></span>
+                              <span style="position:absolute;top:58%;inset-inline-start:24%;width:50%;height:16%;background:var(--border-default);border-radius:5px;opacity:.55"></span>
+                              <span style="position:absolute;top:0;bottom:0;inset-inline-start:46%;width:7px;background:var(--sunken)"></span>
+                              <span style="position:absolute;top:{{ pinTop }};inset-inline-start:{{ pinLeft }};transform:translate(-50%,-100%);color:var(--brand);pointer-events:none"><svg width="30" height="30"><use href="#i-pin"></use></svg></span>
+                            </div>
+                            <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-2xs);color:var(--text-muted)">الإحداثيات<span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);color:var(--text-strong)">{{ latLng }}</span><span style="margin-inline-start:auto;display:inline-flex;align-items:center;gap:5px;color:var(--success-text)"><svg width="12" height="12"><use href="#i-check"></use></svg>الحقول متزامنة مع الدبّوس</span></span>
+                          </div>
+                          <div style="display:flex;gap:9px">
+                            <button type="button" onClick="{{ saveNewAddr }}" style="height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer">احفظ العنوان</button>
+                            <button type="button" onClick="{{ cancelNewAddr }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer">إلغاء</button>
+                          </div>
+                        </div>
+
+                        <button type="button" onClick="{{ sec.next }}" style="width:fit-content;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">تابع إلى الشحن</button>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ sec.isShipping }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:grid;gap:12px">
+                        <sc-for list="{{ shipCards }}" as="s2" hint-placeholder-count="2">
+                          <div style="border:1px solid {{ s2.border }};border-radius:var(--r-2);overflow:hidden">
+                            <div style="padding:11px 13px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px;background:var(--sunken)">
+                              <svg width="15" height="15" style="flex:none;color:var(--text-muted)"><use href="#i-store"></use></svg>
+                              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ s2.shop }}</span>
+                              <span style="margin-inline-start:auto;font-size:var(--text-2xs);color:var(--text-muted)">{{ s2.itemsText }}</span>
+                            </div>
+                            <sc-if value="{{ s2.uncovered }}" hint-placeholder-val="{{ false }}">
+                              <div style="padding:11px 13px;background:var(--warning-subtle);display:flex;align-items:flex-start;gap:9px">
+                                <svg width="15" height="15" style="flex:none;color:var(--warning-text);margin-top:2px"><use href="#i-alert"></use></svg>
+                                <span style="font-size:var(--text-xs);color:var(--text-body);line-height:1.7">لا يشحن هذا المتجر إلى {{ coCity }} — أزل قطعه من السلة لتكمل بالباقي.</span>
+                              </div>
+                            </sc-if>
+                            <div style="display:{{ s2.methodsDisplay }};padding:11px 13px;gap:9px;flex-direction:column">
+                              <sc-for list="{{ s2.methods }}" as="m" hint-placeholder-count="2">
+                                <button type="button" onClick="{{ m.pick }}" style="text-align:start;padding:10px 12px;border:1px solid {{ m.border }};border-radius:var(--r-1);background:{{ m.bg }};cursor:pointer;display:flex;align-items:center;gap:10px">
+                                  <span style="width:15px;height:15px;flex:none;border-radius:999px;border:2px solid {{ m.dotBorder }};display:grid;place-items:center"><span style="width:7px;height:7px;border-radius:999px;background:{{ m.dotBg }}"></span></span>
+                                  <span style="display:grid;gap:2px;min-width:0;flex:1">
+                                    <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600">{{ m.label }}</span>
+                                    <span style="font-size:var(--text-2xs);color:var(--text-muted)">{{ m.days }}</span>
+                                  </span>
+                                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--money);flex:none">{{ m.cost }}</span>
+                                </button>
+                              </sc-for>
+                            </div>
+                          </div>
+                        </sc-for>
+                        <button type="button" onClick="{{ sec.next }}" style="width:fit-content;height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">تابع إلى الدفع</button>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ sec.isPayment }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:grid;gap:12px">
+                        <sc-for list="{{ payMethods }}" as="pm" hint-placeholder-count="3">
+                          <button type="button" onClick="{{ pm.pick }}" style="text-align:start;padding:12px;border:1px solid {{ pm.border }};border-radius:var(--r-2);background:{{ pm.bg }};cursor:{{ pm.cursor }};display:flex;align-items:center;gap:11px">
+                            <span style="width:15px;height:15px;flex:none;border-radius:999px;border:2px solid {{ pm.dotBorder }};display:grid;place-items:center"><span style="width:7px;height:7px;border-radius:999px;background:{{ pm.dotBg }}"></span></span>
+                            <svg width="19" height="19" style="flex:none;color:{{ pm.iconColor }}"><use href="{{ pm.icon }}"></use></svg>
+                            <span style="display:grid;gap:2px;min-width:0;flex:1">
+                              <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600">{{ pm.label }}</span>
+                              <span style="font-size:var(--text-2xs);color:{{ pm.noteColor }}">{{ pm.note }}</span>
+                            </span>
+                          </button>
+                        </sc-for>
+                        <div style="display:{{ cardFieldsDisplay }};gap:10px;flex-direction:column;padding:14px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--sunken)">
+                          <label style="display:grid;gap:5px">
+                            <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">رقم البطاقة</span>
+                            <input type="text" value="{{ cardNo }}" onChange="{{ onCardNo }}" dir="ltr" placeholder="0000 0000 0000 0000" style="height:var(--ctrl-h);padding:0 12px;border:1px solid {{ cardNoBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-base);width:100%" />
+                            <sc-if value="{{ cardNoErr }}" hint-placeholder-val="{{ false }}"><span style="font-size:var(--text-2xs);color:var(--danger-text)">{{ cardNoErr }}</span></sc-if>
+                          </label>
+                          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+                            <label style="display:grid;gap:5px">
+                              <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">تاريخ الانتهاء</span>
+                              <input type="text" value="{{ cardExp }}" onChange="{{ onCardExp }}" dir="ltr" placeholder="MM/YY" style="height:38px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-sm);width:100%" />
+                            </label>
+                            <label style="display:grid;gap:5px">
+                              <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">CVV</span>
+                              <input type="text" value="{{ cardCvv }}" onChange="{{ onCardCvv }}" dir="ltr" placeholder="000" style="height:38px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-sm);width:100%" />
+                            </label>
+                            <label style="display:grid;gap:5px">
+                              <span style="font-size:var(--text-xs);font-weight:600;color:var(--text-strong)">اسم صاحب البطاقة</span>
+                              <input type="text" value="{{ cardName }}" onChange="{{ onCardName }}" style="height:38px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm);width:100%" />
+                            </label>
+                          </div>
+                          <span style="display:flex;align-items:center;gap:7px;font-size:var(--text-2xs);color:var(--text-muted)"><svg width="13" height="13" style="flex:none"><use href="#i-lock"></use></svg>تُعالَج البطاقة عند بوّابة الدفع ولا نحفظ بياناتها.</span>
+                        </div>
+                        <div style="display:{{ codNoteDisplay }};align-items:flex-start;gap:9px;padding:11px 13px;border:1px solid var(--info);border-radius:var(--r-1);background:var(--info-subtle)">
+                          <svg width="15" height="15" style="flex:none;color:var(--info-text);margin-top:2px"><use href="#i-info"></use></svg>
+                          <span style="font-size:var(--text-xs);color:var(--info-text);line-height:1.7">الدفع عند الاستلام متاح من دار القطن فقط. قطع إلكترو بيت ستُدفع بالبطاقة في عملية منفصلة.</span>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ sec.isReview }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:grid;gap:12px">
+                        <span style="font-size:var(--text-base);color:var(--text-strong);font-weight:600">{{ reviewHeadline }}</span>
+                        <sc-for list="{{ reviewCards }}" as="rc" hint-placeholder-count="2">
+                          <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);overflow:hidden">
+                            <div style="padding:11px 13px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px;background:var(--sunken)">
+                              <span style="width:24px;height:24px;flex:none;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center;font-family:var(--font-mono);font-size:var(--text-2xs);font-weight:700">{{ rc.n }}</span>
+                              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ rc.shop }}</span>
+                              <span style="margin-inline-start:auto;font-size:var(--text-2xs);color:var(--text-muted)">{{ rc.eta }}</span>
+                            </div>
+                            <div style="padding:11px 13px;display:grid;gap:7px">
+                              <sc-for list="{{ rc.items }}" as="ri" hint-placeholder-count="2">
+                                <span style="display:flex;align-items:center;gap:9px">
+                                  <span style="width:28px;height:28px;flex:none;border-radius:var(--r-1);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="14" height="14"><use href="#i-image"></use></svg></span>
+                                  <span style="font-size:var(--text-xs);color:var(--text-body);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ri.name }}</span>
+                                  <span dir="ltr" style="unicode-bidi:isolate;margin-inline-start:auto;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">× {{ ri.qty }}</span>
+                                </span>
+                              </sc-for>
+                            </div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="position:sticky;top:76px;display:grid;gap:12px">
+              <div style="background:var(--card);border:1px solid var(--money-border);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:10px">
+                <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">ملخّص الدفع</span>
+                <sc-for list="{{ coSummary }}" as="s3" hint-placeholder-count="5">
+                  <span style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-top:{{ s3.padTop }};border-block-start:{{ s3.border }}">
+                    <span style="font-size:{{ s3.size }};color:{{ s3.labelColor }};font-weight:{{ s3.weight }}">{{ s3.label }}</span>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:{{ s3.size }};font-weight:{{ s3.weight }};color:{{ s3.valueColor }}">{{ s3.value }}</span>
+                  </span>
+                </sc-for>
+                <button type="button" onClick="{{ payNow }}" disabled="{{ payDisabled }}" style="margin-top:4px;height:52px;border:0;border-radius:var(--r-1);background:{{ payBg }};color:{{ payFg }};font-size:var(--text-md);font-weight:700;cursor:{{ payCursor }};display:inline-flex;align-items:center;justify-content:center;gap:9px">
+                  <sc-if value="{{ paying }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" style="animation:bsSpin .9s linear infinite"><use href="#i-spinner"></use></svg></sc-if>
+                  {{ payLabel }}
+                </button>
+                <span style="display:flex;align-items:flex-start;gap:7px;font-size:var(--text-2xs);color:var(--text-muted);line-height:1.6"><svg width="13" height="13" style="flex:none;margin-top:2px"><use href="#i-lock"></use></svg>يُحصَّل المبلغ بالريال السعودي. {{ payNote }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isST16 }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width:720px;margin:0 auto;display:grid;gap:16px">
+        <div style="background:var(--card);border:1px solid var(--danger);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:36px 28px;display:grid;justify-items:center;gap:12px;text-align:center">
+          <span style="width:56px;height:56px;border-radius:var(--r-2);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="28" height="28"><use href="#i-alert"></use></svg></span>
+          <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);line-height:1.4">تعذّر الدفع: رفض البنك العملية</span>
+          <span style="font-size:var(--text-base);color:var(--text-body);max-width:56ch;line-height:1.8">لم يُخصم أي مبلغ من بطاقتك. جرّب بطاقة أخرى أو الدفع عند الاستلام، وسلتك محفوظة كاملة كما هي.</span>
+          <span style="display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 12px;border-radius:999px;background:var(--success-subtle);color:var(--success-text);font-size:var(--text-xs);font-weight:600"><svg width="14" height="14"><use href="#i-check-circle"></use></svg>لم نأخذ أي مبلغ</span>
+          <span style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;justify-content:center">
+            <button type="button" onClick="{{ retryPay }}" style="height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px" style-hover="background:var(--brand-hover)"><svg width="16" height="16"><use href="#i-return"></use></svg>أعد المحاولة</button>
+            <button type="button" onClick="{{ changePayMethod }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">غيّر طريقة الدفع</button>
+            <button type="button" onClick="{{ goCart }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);font-size:var(--text-base);cursor:pointer" style-hover="background:var(--sunken);color:var(--text-strong)">عُد إلى السلة</button>
+          </span>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);display:grid;gap:9px">
+          <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">أسباب شائعة للرفض</span>
+          <sc-for list="{{ failReasons }}" as="f" hint-placeholder-count="3">
+            <span style="display:flex;align-items:flex-start;gap:9px;font-size:var(--text-sm);color:var(--text-body);line-height:1.7"><svg width="15" height="15" style="flex:none;color:var(--text-muted);margin-top:3px"><use href="#i-info"></use></svg>{{ f }}</span>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isST17 }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width:900px;margin:0 auto;display:grid;gap:16px">
+        <div style="background:var(--card);border:1px solid var(--success);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:32px 28px;display:grid;justify-items:center;gap:12px;text-align:center">
+          <span style="width:56px;height:56px;border-radius:var(--r-2);background:var(--success-subtle);color:var(--success-text);display:grid;place-items:center"><svg width="28" height="28"><use href="#i-check-circle"></use></svg></span>
+          <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong)">استلمنا طلبك</span>
+          <span style="font-size:var(--text-base);color:var(--text-muted);max-width:60ch;line-height:1.8">أرسلنا تفاصيل الطلب إلى <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">{{ coEmail }}</span>. يصلك إشعار عند قبول كل متجر لقطعه.</span>
+          <span style="display:flex;align-items:center;gap:10px;margin-top:4px;padding:11px 14px;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--sunken)">
+            <span style="font-size:var(--text-sm);color:var(--text-body)">رقم الطلب</span>
+            <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--text-strong)">BST-26-004821</span>
+            <button type="button" onClick="{{ copyOrderNo }}" aria-label="انسخ" style="width:32px;height:32px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--border-default)"><svg width="16" height="16"><use href="#i-copy"></use></svg></button>
+          </span>
+        </div>
+
+        <div style="display:grid;gap:12px">
+          <sc-for list="{{ confirmSubs }}" as="c" hint-placeholder-count="3">
+            <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+              <div style="padding:12px 16px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="width:28px;height:28px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-muted);display:grid;place-items:center"><svg width="14" height="14"><use href="#i-store"></use></svg></span>
+                <span style="font-size:var(--text-base);font-weight:700;color:var(--text-strong)">{{ c.shop }}</span>
+                <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">{{ c.no }}</span>
+                <span style="margin-inline-start:auto;height:24px;padding:0 10px;border-radius:999px;background:var(--warning-subtle);color:var(--warning-text);font-size:var(--text-2xs);font-weight:600;display:inline-flex;align-items:center;gap:6px"><svg width="12" height="12"><use href="#i-clock"></use></svg>{{ c.status }}</span>
+              </div>
+              <div style="padding:12px 16px;display:grid;gap:9px">
+                <sc-for list="{{ c.items }}" as="ci" hint-placeholder-count="2">
+                  <span style="display:flex;align-items:center;gap:10px">
+                    <span style="width:34px;height:34px;flex:none;border-radius:var(--r-1);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="16" height="16"><use href="#i-image"></use></svg></span>
+                    <span style="display:grid;gap:2px;min-width:0;flex:1">
+                      <span style="font-size:var(--text-sm);color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ci.name }}</span>
+                      <span style="font-size:var(--text-2xs);color:var(--text-muted)">{{ ci.variant }}</span>
+                    </span>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);flex:none">× {{ ci.qty }}</span>
+                    <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--money);flex:none">{{ ci.total }}</span>
+                  </span>
+                </sc-for>
+                <span style="display:flex;align-items:center;gap:9px;padding-top:9px;border-block-start:1px solid var(--border-subtle);font-size:var(--text-xs);color:var(--text-muted)">
+                  <svg width="14" height="14" style="flex:none"><use href="#i-truck"></use></svg>التوصيل المتوقّع {{ c.eta }}
+                  <button type="button" onClick="{{ c.track }}" style="margin-inline-start:auto;height:30px;padding:0 11px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-xs);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">تابع الطلب</button>
+                </span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:{{ guestPwDisplay }};background:var(--card);border:1px solid var(--info);border-radius:var(--r-2);padding:var(--card-pad);box-shadow:var(--shadow-sm);gap:12px;flex-direction:column">
+          <span style="font-size:var(--text-md);font-weight:700;color:var(--text-strong)">أنشئ حساباً لتتابع طلباتك</span>
+          <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.7">اخترْ كلمة مرور الآن ونربط هذا الطلب بحسابك — أو تابعه لاحقاً برقم الطلب وبريدك من صفحة التتبّع.</span>
+          <div style="display:flex;gap:9px;flex-wrap:wrap">
+            <input type="password" value="{{ guestPw }}" onChange="{{ onGuestPw }}" dir="ltr" placeholder="كلمة مرور جديدة" style="height:var(--ctrl-h);flex:1;min-width:200px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-base)" />
+            <button type="button" onClick="{{ createAccount }}" style="height:var(--ctrl-h);padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">أنشئ الحساب</button>
+            <button type="button" onClick="{{ skipAccount }}" style="height:var(--ctrl-h);padding:0 14px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);font-size:var(--text-base);cursor:pointer" style-hover="background:var(--sunken);color:var(--text-strong)">لاحقاً</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+          <button type="button" onClick="{{ goOrders }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">طلباتي</button>
+          <button type="button" onClick="{{ goDiscovery }}" style="height:var(--ctrl-h);padding:0 16px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);font-size:var(--text-base);cursor:pointer" style-hover="background:var(--sunken);color:var(--text-strong)">تابع التسوّق</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <div id="rest2"></div>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ miniDisplay }};position:fixed;inset:0;z-index:100;background:rgba(30,24,20,.5);animation:bsFade .2s ease-out" onClick="{{ closeMini }}">
+  <div onClick="{{ stopClick }}" style="position:absolute;inset-block:0;inset-inline-end:0;width:min(400px,100%);background:var(--raised);box-shadow:var(--shadow-overlay);display:flex;flex-direction:column;animation:bsDrawerIn .24s ease-out">
+    <div style="padding:16px 20px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none">
+      <span style="display:flex;align-items:center;gap:9px">
+        <span style="width:26px;height:26px;border-radius:999px;background:var(--success-subtle);color:var(--success-text);display:grid;place-items:center"><svg width="15" height="15"><use href="#i-check"></use></svg></span>
+        <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">أُضيف إلى سلتك</span>
+      </span>
+      <button type="button" onClick="{{ closeMini }}" aria-label="إغلاق" style="width:34px;height:34px;display:grid;place-items:center;border:0;background:transparent;color:var(--text-muted);cursor:pointer;border-radius:var(--r-1)" style-hover="background:var(--sunken)"><svg width="18" height="18"><use href="#i-x"></use></svg></button>
+    </div>
+    <div style="padding:16px 20px;display:grid;gap:14px;flex:1;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--sunken)">
+        <span style="width:54px;height:54px;flex:none;border-radius:var(--r-1);background:var(--card);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="22" height="22"><use href="#i-image"></use></svg></span>
+        <span style="display:grid;gap:3px;min-width:0">
+          <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600;line-height:1.5">قميص قطني مصري</span>
+          <span style="font-size:var(--text-2xs);color:var(--text-muted)">أحمر · M · الكمية 1</span>
+          <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--money)">{{ miniUnit }}</span>
+        </span>
+      </div>
+      <span style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px;border:1px solid var(--money-border);border-radius:var(--r-1);background:var(--money-subtle)">
+        <span style="font-size:var(--text-sm);color:var(--text-body)">{{ miniCountText }}</span>
+        <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ miniTotal }}</span>
+      </span>
+    </div>
+    <div style="padding:16px 20px;border-block-start:1px solid var(--border-subtle);display:grid;gap:9px;flex:none">
+      <button type="button" onClick="{{ miniCheckout }}" style="height:48px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer" style-hover="background:var(--brand-hover)">أكمل الشراء</button>
+      <button type="button" onClick="{{ miniViewCart }}" style="height:44px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">اعرض السلة</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ toastDisplay }};position:fixed;bottom:24px;inset-inline-start:24px;z-index:110;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-2);background:{{ toastBg }};color:{{ toastFg }};box-shadow:var(--shadow-lg);animation:bsToastIn .22s ease-out;max-width:560px">
+  <svg width="18" height="18" style="flex:none"><use href="{{ toastIcon }}"></use></svg>
+  <span style="font-size:var(--text-sm);font-weight:600;line-height:1.6">{{ toastMsg }}</span>
+  <sc-if value="{{ toastUndo }}" hint-placeholder-val="{{ false }}">
+    <button type="button" onClick="{{ undoRemove }}" style="margin-inline-start:8px;height:30px;padding:0 11px;flex:none;border:1px solid currentColor;border-radius:var(--r-1);background:transparent;color:inherit;font-size:var(--text-xs);font-weight:700;cursor:pointer">تراجع</button>
+  </sc-if>
+  <button type="button" onClick="{{ closeToast }}" aria-label="إغلاق" style="margin-inline-start:8px;width:26px;height:26px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;opacity:.75"><svg width="15" height="15"><use href="#i-x"></use></svg></button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;defaultDirection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rtl&quot;,&quot;ltr&quot;],&quot;default&quot;:&quot;rtl&quot;,&quot;tsType&quot;:&quot;'rtl'|'ltr'&quot;},&quot;defaultDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;comfortable&quot;,&quot;compact&quot;],&quot;default&quot;:&quot;comfortable&quot;,&quot;tsType&quot;:&quot;'comfortable'|'compact'&quot;},&quot;defaultScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ST-13&quot;,&quot;ST-15&quot;,&quot;ST-16&quot;,&quot;ST-17&quot;,&quot;ST-18&quot;,&quot;ST-19&quot;,&quot;ST-20&quot;,&quot;ST-21&quot;,&quot;ST-22&quot;,&quot;ST-31&quot;],&quot;default&quot;:&quot;ST-13&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'ST-13', pstate: 'default', fit: 1, toast: null,
+    search: '', currency: 'SAR', cartCount: 3,
+    qty: {}, removed: {}, lastRemoved: null, merged: true,
+    coupon: '', couponState: null,
+    miniOpen: false,
+    coStep: 1, coEmail: 'noura@example.com', coPhone: '+966 55 012 8844', coErrs: {},
+    addrSel: 1, newAddrOpen: false, addr: {}, addrErrs: {},
+    pinX: 62, pinY: 34,
+    shipSel: {}, payMethod: 'card', card: {}, cardErr: false,
+    resSecs: 872, resState: 'live', paying: false,
+    soldOutGate: false, guestPwDone: false, guestPw: ''
+  };
+
+  componentDidMount() {
+    const r = this.rootEl;
+    if (r) {
+      if (this.props.defaultTheme === 'dark') r.setAttribute('data-theme', 'dark');
+      if (this.props.defaultDirection === 'ltr') { r.setAttribute('dir', 'ltr'); r.setAttribute('data-lang', 'en'); }
+      if (this.props.defaultDensity) r.setAttribute('data-density', this.props.defaultDensity);
+    }
+    if (this.props.defaultScreen) this.setState({ screen: this.props.defaultScreen });
+    try {
+      const hand = localStorage.getItem('basta.purchase.screen');
+      if (hand) { localStorage.removeItem('basta.purchase.screen'); this.setState({ screen: hand }); }
+    } catch (e) {}
+    this._fit = () => {
+      const w = (this.rootEl ? this.rootEl.clientWidth : window.innerWidth) - 40;
+      this.setState({ fit: Math.min(1, Math.max(0.3, w / 1440)) });
+    };
+    this._fit();
+    window.addEventListener('resize', this._fit);
+    this._tick = setInterval(() => this.setState(s => {
+      if (s.screen !== 'ST-15' || s.resState !== 'live') return { tickN: (s.tickN || 0) + 1 };
+      const next = s.resSecs - 1;
+      if (next <= 0) return { resSecs: 0, resState: 'expired', tickN: (s.tickN || 0) + 1 };
+      return { resSecs: next, tickN: (s.tickN || 0) + 1 };
+    }), 1000);
+    this._esc = (e) => { if (e.key === 'Escape' && this.state.miniOpen) this.setState({ miniOpen: false }); };
+    window.addEventListener('keydown', this._esc);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._fit);
+    window.removeEventListener('keydown', this._esc);
+    clearInterval(this._tick); clearTimeout(this._toastT);
+  }
+  set(k, v) { if (this.rootEl) this.rootEl.setAttribute(k, v); }
+  toast(msg, kind, undo) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: { msg: msg, kind: kind || 'success', undo: !!undo } });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), undo ? 6000 : 4200);
+  }
+  go(screen) { this.setState({ screen: screen }); }
+  fx() { return { SAR: { label: 'ر.س.', dec: 2, rate: 1 }, AED: { label: 'د.إ.', dec: 2, rate: 0.98 }, JOD: { label: 'د.أ.', dec: 3, rate: 0.189 } }; }
+  money(n) {
+    const f = this.fx()[this.state.currency];
+    const v = n * f.rate;
+    return v.toLocaleString('en-US', { minimumFractionDigits: f.dec, maximumFractionDigits: f.dec }) + ' ' + f.label;
+  }
+  cartData() {
+    return [
+      {
+        shop: 'دار القطن', verified: true, shipFlat: 25, freeOver: 300, days: '2 – 4 أيام عمل', uncovered: false,
+        items: [
+          { id: 1, name: 'قميص قطني مصري', variant: 'أحمر · M', unit: 79, qty: 2, stock: 14, oldPrice: 99 },
+          { id: 2, name: 'وشاح قطني مصبوغ يدوياً', variant: 'أزرق', unit: 58, qty: 1, stock: 3 }
+        ]
+      },
+      {
+        shop: 'إلكترو بيت', verified: true, shipFlat: 30, freeOver: 0, days: '3 – 5 أيام عمل', uncovered: false,
+        items: [
+          { id: 3, name: 'مكبّر صوت بلوتوث XL-900', variant: 'أسود', unit: 249, qty: 1, stock: 0 }
+        ]
+      },
+      {
+        shop: 'حِرف دمشق', verified: false, shipFlat: 45, freeOver: 0, days: '5 – 9 أيام عمل', uncovered: true,
+        items: [
+          { id: 4, name: 'صندوق خشب مرصّع بالصدف', variant: 'وسط', unit: 320, qty: 1, stock: 6 }
+        ]
+      }
+    ];
+  }
+
+  mmss(sec) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  checkout() {
+    const st = this.state, S = (o) => this.setState(o), out = {};
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+
+    out.isST15 = st.screen === 'ST-15';
+    out.isST16 = st.screen === 'ST-16';
+    out.isST17 = st.screen === 'ST-17';
+    const gate = st.soldOutGate || (edge && st.screen === 'ST-15');
+    out.coSoldOutGate = gate;
+    out.coOpen = !gate;
+    out.coRemoveSoldOut = () => { S({ soldOutGate: false, pstate: edge ? 'default' : P }); this.toast('أُزيلت القطعة النافدة — تابع الدفع'); };
+
+    /* reservation countdown */
+    const expired = st.resState === 'expired';
+    const reserving = st.resState === 'reserving';
+    const low = st.resSecs <= 120 && !expired;
+    out.resExpired = expired;
+    out.resClock = expired ? '0:00' : (reserving ? '—' : this.mmss(st.resSecs));
+    out.resText = expired ? 'انتهى الحجز — قطعك لم تُحجز بعد. احجز من جديد لتتابع الدفع.'
+      : (reserving ? 'نحجز قطعك من جديد…' : 'حجزنا قطعك · يُثبَّت السعر والمخزون حتى انتهاء المؤقّت');
+    out.resBg = expired ? 'var(--danger-subtle)' : (low ? 'var(--warning-subtle)' : 'var(--money-subtle)');
+    out.resBorder = expired ? 'var(--danger)' : (low ? 'var(--warning)' : 'var(--money-border)');
+    out.resColor = expired ? 'var(--danger-text)' : (low ? 'var(--warning-text)' : 'var(--money)');
+    out.resIcon = expired ? '#i-alert' : (reserving ? '#i-spinner' : '#i-lock');
+    out.reReserve = () => {
+      S({ resState: 'reserving' });
+      setTimeout(() => { this.setState({ resState: 'live', resSecs: 900 }); this.toast('أُعيد الحجز — لديك 15 دقيقة'); }, 1200);
+    };
+
+    /* sections */
+    const emailOk = /.+@.+\..+/.test(st.coEmail);
+    const phoneOk = st.coPhone.replace(/\D/g, '').length >= 11;
+    out.coEmail = st.coEmail;
+    out.coPhone = st.coPhone;
+    out.onCoEmail = (e) => S({ coEmail: e.target.value, coErrs: Object.assign({}, st.coErrs, { email: '' }) });
+    out.onCoPhone = (e) => S({ coPhone: e.target.value, coErrs: Object.assign({}, st.coErrs, { phone: '' }) });
+    out.blurCoEmail = () => S({ coErrs: Object.assign({}, st.coErrs, { email: emailOk ? '' : 'البريد غير صحيح — اكتبه بالشكل name@example.com' }) });
+    out.blurCoPhone = () => S({ coErrs: Object.assign({}, st.coErrs, { phone: phoneOk ? '' : 'رقم الجوال غير مكتمل — مثال +966 55 012 8844' }) });
+    out.coEmailErr = st.coErrs.email || '';
+    out.coPhoneErr = st.coErrs.phone || '';
+    out.coEmailBorder = out.coEmailErr ? 'var(--danger)' : 'var(--border-control)';
+    out.coPhoneBorder = out.coPhoneErr ? 'var(--danger)' : 'var(--border-control)';
+
+    const addrDefs = [
+      { id: 1, label: 'المنزل', line: 'الرياض · حي النرجس · شارع أنس بن مالك · مبنى 24 · الدور 3', phone: '+966 55 012 8844', city: 'الرياض' },
+      { id: 2, label: 'العمل', line: 'الرياض · حي الملقا · طريق الملك فهد · برج العنود · الدور 12', phone: '+966 55 012 8844', city: 'الرياض' }
+    ];
+    const curAddr = addrDefs.filter(a => a.id === st.addrSel)[0] || addrDefs[0];
+    out.coCity = curAddr.city;
+    out.addresses = addrDefs.map(a => ({
+      label: a.label, line: a.line, phone: a.phone,
+      bg: st.addrSel === a.id && !st.newAddrOpen ? 'var(--brand-subtle)' : 'var(--card)',
+      border: st.addrSel === a.id && !st.newAddrOpen ? 'var(--brand)' : 'var(--border-default)',
+      dotBorder: st.addrSel === a.id && !st.newAddrOpen ? 'var(--brand)' : 'var(--border-control)',
+      dotBg: st.addrSel === a.id && !st.newAddrOpen ? 'var(--brand)' : 'transparent',
+      pick: () => { S({ addrSel: a.id, newAddrOpen: false }); this.toast('حُدّث الشحن حسب ' + a.label); }
+    }));
+    out.newAddrDisplay = st.newAddrOpen ? 'flex' : 'none';
+    out.newAddrBg = st.newAddrOpen ? 'var(--brand-subtle)' : 'transparent';
+    out.newAddrBorder = st.newAddrOpen ? 'var(--brand)' : 'var(--border-control)';
+    out.openNewAddr = () => S({ newAddrOpen: true });
+    out.cancelNewAddr = () => S({ newAddrOpen: false, addrErrs: {} });
+    const addrFieldDefs = [
+      { k: 'country', label: 'البلد', req: true, def: 'السعودية', dir: 'rtl' },
+      { k: 'region', label: 'المنطقة', req: true, def: 'منطقة الرياض', dir: 'rtl' },
+      { k: 'city', label: 'المدينة', req: true, def: 'الرياض', dir: 'rtl' },
+      { k: 'district', label: 'الحي', req: true, def: '', dir: 'rtl' },
+      { k: 'street', label: 'الشارع', req: true, def: '', dir: 'rtl' },
+      { k: 'building', label: 'المبنى', req: true, def: '', dir: 'ltr' },
+      { k: 'floor', label: 'الدور', req: false, def: '', dir: 'ltr' },
+      { k: 'landmark', label: 'علامة مميّزة', req: false, def: '', dir: 'rtl' },
+      { k: 'name', label: 'اسم المستلم', req: true, def: 'نورة العتيبي', dir: 'rtl' }
+    ];
+    out.addrFields = addrFieldDefs.map(f => {
+      const v = st.addr[f.k] !== undefined ? st.addr[f.k] : f.def;
+      const err = st.addrErrs[f.k] || '';
+      return {
+        label: f.label, required: f.req, value: v, dir: f.dir, err: err,
+        border: err ? 'var(--danger)' : 'var(--border-control)',
+        onInput: (e) => S({ addr: Object.assign({}, st.addr, { [f.k]: e.target.value }), addrErrs: Object.assign({}, st.addrErrs, { [f.k]: '' }) }),
+        onBlur: () => { if (f.req && !String(v).trim()) S({ addrErrs: Object.assign({}, st.addrErrs, { [f.k]: 'هذا الحقل إلزامي.' }) }); }
+      };
+    });
+    out.saveNewAddr = () => {
+      const errs = {};
+      addrFieldDefs.forEach(f => {
+        const v = st.addr[f.k] !== undefined ? st.addr[f.k] : f.def;
+        if (f.req && !String(v).trim()) errs[f.k] = 'هذا الحقل إلزامي.';
+      });
+      if (Object.keys(errs).length) { S({ addrErrs: errs }); this.toast('أكمل الحقول الإلزامية في العنوان', 'warning'); return; }
+      S({ newAddrOpen: false, addrErrs: {} });
+      this.toast('حُفظ العنوان الجديد وحُدّث الشحن');
+    };
+    const setPin = (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      const rtl = !this.rootEl || this.rootEl.getAttribute('dir') !== 'ltr';
+      let x = rtl ? (r.right - e.clientX) / r.width : (e.clientX - r.left) / r.width;
+      let y = (e.clientY - r.top) / r.height;
+      S({ pinX: Math.max(4, Math.min(96, x * 100)), pinY: Math.max(12, Math.min(96, y * 100)) });
+    };
+    out.mapDown = (e) => { this._drag = true; setPin(e); };
+    out.mapMove = (e) => { if (this._drag) setPin(e); };
+    out.mapUp = () => { this._drag = false; };
+    out.pinTop = st.pinY + '%';
+    out.pinLeft = st.pinX + '%';
+    out.latLng = (24.9 - st.pinY * 0.006).toFixed(5) + ', ' + (46.55 + st.pinX * 0.006).toFixed(5);
+
+    const shopDefs = [
+      { k: 'qutn', shop: 'دار القطن', items: 3, uncovered: false, methods: [{ k: 'std', label: 'شحن عادي', days: '2 – 4 أيام عمل', cost: 25 }, { k: 'exp', label: 'شحن سريع', days: 'يوم عمل واحد', cost: 45 }] },
+      { k: 'electro', shop: 'إلكترو بيت', items: 1, uncovered: false, methods: [{ k: 'std', label: 'شحن عادي', days: '3 – 5 أيام عمل', cost: 30 }] },
+      { k: 'damascus', shop: 'حِرف دمشق', items: 1, uncovered: true, methods: [] }
+    ];
+    let shipSum = 0;
+    out.shipCards = shopDefs.map(s2 => {
+      const sel = st.shipSel[s2.k] || 'std';
+      if (!s2.uncovered) {
+        const m = s2.methods.filter(x => x.k === sel)[0] || s2.methods[0];
+        shipSum += m ? m.cost : 0;
+      }
+      return {
+        shop: s2.shop, itemsText: s2.items + ' قطع', uncovered: s2.uncovered,
+        border: s2.uncovered ? 'var(--warning)' : 'var(--border-subtle)',
+        methodsDisplay: s2.uncovered ? 'none' : 'flex',
+        methods: s2.methods.map(m => ({
+          label: m.label, days: m.days, cost: this.money(m.cost),
+          bg: sel === m.k ? 'var(--brand-subtle)' : 'var(--card)',
+          border: sel === m.k ? 'var(--brand)' : 'var(--border-default)',
+          dotBorder: sel === m.k ? 'var(--brand)' : 'var(--border-control)',
+          dotBg: sel === m.k ? 'var(--brand)' : 'transparent',
+          pick: () => { S({ shipSel: Object.assign({}, st.shipSel, { [s2.k]: m.k }) }); this.toast('حُدّث الشحن — أُعيد حساب الإجمالي'); }
+        }))
+      };
+    });
+
+    const payDefs = [
+      { k: 'card', label: 'بطاقة مدى أو فيزا', note: 'تُعالَج عند بوّابة الدفع', icon: '#i-card', enabled: true },
+      { k: 'cod', label: 'الدفع عند الاستلام', note: 'متاح من دار القطن فقط · رسوم 15.00 ر.س.', icon: '#i-cash', enabled: true },
+      { k: 'wallet', label: 'محفظة رقمية', note: 'Apple Pay أو STC Pay', icon: '#i-wallet', enabled: true }
+    ];
+    out.payMethods = payDefs.map(pm => ({
+      label: pm.label, note: pm.note, icon: pm.icon,
+      bg: st.payMethod === pm.k ? 'var(--brand-subtle)' : 'var(--card)',
+      border: st.payMethod === pm.k ? 'var(--brand)' : 'var(--border-default)',
+      dotBorder: st.payMethod === pm.k ? 'var(--brand)' : 'var(--border-control)',
+      dotBg: st.payMethod === pm.k ? 'var(--brand)' : 'transparent',
+      iconColor: st.payMethod === pm.k ? 'var(--brand-text)' : 'var(--text-muted)',
+      noteColor: 'var(--text-muted)',
+      cursor: 'pointer',
+      pick: () => S({ payMethod: pm.k })
+    }));
+    out.cardFieldsDisplay = st.payMethod === 'card' ? 'flex' : 'none';
+    out.codNoteDisplay = st.payMethod === 'cod' ? 'flex' : 'none';
+    const cardNo = st.card.no || '';
+    out.cardNo = cardNo;
+    out.onCardNo = (e) => S({ card: Object.assign({}, st.card, { no: e.target.value.replace(/[^0-9 ]/g, '') }) });
+    const cardDigits = cardNo.replace(/\D/g, '');
+    out.cardNoErr = cardNo && cardDigits.length < 16 ? 'رقم البطاقة 16 رقماً — الحالي ' + cardDigits.length + '.' : '';
+    out.cardNoBorder = out.cardNoErr ? 'var(--danger)' : 'var(--border-control)';
+    out.cardExp = st.card.exp || '';
+    out.onCardExp = (e) => S({ card: Object.assign({}, st.card, { exp: e.target.value }) });
+    out.cardCvv = st.card.cvv || '';
+    out.onCardCvv = (e) => S({ card: Object.assign({}, st.card, { cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }) });
+    out.cardName = st.card.name || '';
+    out.onCardName = (e) => S({ card: Object.assign({}, st.card, { name: e.target.value }) });
+
+    const secDefs = [
+      { n: 1, title: 'بيانات التواصل', kind: 'contact', summary: st.coEmail + ' · ' + st.coPhone },
+      { n: 2, title: 'عنوان التوصيل', kind: 'address', summary: curAddr.label + ' — ' + curAddr.line },
+      { n: 3, title: 'الشحن لكل متجر', kind: 'shipping', summary: 'شحن ' + this.money(shipSum) + ' من ثلاثة متاجر' },
+      { n: 4, title: 'الدفع', kind: 'payment', summary: (payDefs.filter(p => p.k === st.payMethod)[0] || payDefs[0]).label },
+      { n: 5, title: 'المراجعة', kind: 'review', summary: '' }
+    ];
+    out.coSections = secDefs.map(s2 => {
+      const open = st.coStep === s2.n;
+      const done = st.coStep > s2.n;
+      return {
+        n: String(s2.n), title: s2.title,
+        summary: done ? s2.summary : '',
+        done: done, notDone: !done, collapsed: done,
+        border: open ? 'var(--brand)' : 'var(--border-subtle)',
+        headBorder: open ? '1px solid var(--border-subtle)' : '0',
+        numBg: done ? 'var(--brand)' : (open ? 'var(--brand-subtle)' : 'var(--sunken)'),
+        numFg: done ? 'var(--on-brand)' : (open ? 'var(--brand-text)' : 'var(--text-faint)'),
+        bodyDisplay: open ? 'block' : 'none',
+        isContact: s2.kind === 'contact', isAddress: s2.kind === 'address',
+        isShipping: s2.kind === 'shipping', isPayment: s2.kind === 'payment', isReview: s2.kind === 'review',
+        toggle: () => S({ coStep: s2.n }),
+        next: () => {
+          if (s2.kind === 'contact') {
+            if (!emailOk || !phoneOk) {
+              S({ coErrs: { email: emailOk ? '' : 'البريد غير صحيح — اكتبه بالشكل name@example.com', phone: phoneOk ? '' : 'رقم الجوال غير مكتمل — مثال +966 55 012 8844' } });
+              this.toast('أكمل بيانات التواصل', 'warning');
+              return;
+            }
+          }
+          S({ coStep: s2.n + 1 });
+        }
+      };
+    });
+    out.reviewHeadline = 'يصلك طلبك في ثلاث شِحنات من ثلاثة متاجر.';
+    out.reviewCards = [
+      { n: '1', shop: 'دار القطن', eta: 'يصل 17 – 19 سبتمبر', items: [{ name: 'قميص قطني مصري — أحمر · M', qty: '2' }, { name: 'وشاح قطني مصبوغ يدوياً', qty: '1' }] },
+      { n: '2', shop: 'إلكترو بيت', eta: 'يصل 18 – 20 سبتمبر', items: [{ name: 'مكبّر صوت بلوتوث XL-900', qty: '1' }] },
+      { n: '3', shop: 'حِرف دمشق', eta: 'لا يشحن إلى الرياض', items: [{ name: 'صندوق خشب مرصّع بالصدف', qty: '1' }] }
+    ];
+
+    const goods = 79 * 2 + 58 + 249;
+    const cod = st.payMethod === 'cod' ? 15 : 0;
+    const tax = Math.round((goods) * 0.15 * 100) / 100;
+    const total = goods + shipSum + tax + cod;
+    out.coSummary = [
+      { label: 'قيمة المنتجات', value: this.money(goods), size: 'var(--text-sm)', weight: '400', labelColor: 'var(--text-body)', valueColor: 'var(--text-strong)', padTop: '0', border: 'none' },
+      { label: 'الشحن', value: this.money(shipSum), size: 'var(--text-sm)', weight: '400', labelColor: 'var(--text-body)', valueColor: 'var(--text-strong)', padTop: '0', border: 'none' },
+      { label: 'ضريبة القيمة المضافة 15%', value: this.money(tax), size: 'var(--text-sm)', weight: '400', labelColor: 'var(--text-body)', valueColor: 'var(--text-strong)', padTop: '0', border: 'none' },
+      { label: 'رسوم الدفع عند الاستلام', value: cod ? this.money(cod) : '—', size: 'var(--text-sm)', weight: '400', labelColor: 'var(--text-body)', valueColor: cod ? 'var(--text-strong)' : 'var(--text-muted)', padTop: '0', border: 'none' },
+      { label: 'الإجمالي', value: this.money(total), size: 'var(--text-md)', weight: '700', labelColor: 'var(--text-strong)', valueColor: 'var(--money)', padTop: '10px', border: '1px solid var(--money-border)' }
+    ];
+    out.paying = st.paying;
+    const payReady = !expired && !reserving && !st.paying;
+    out.payDisabled = !payReady;
+    out.payBg = payReady ? 'var(--brand)' : 'var(--sunken)';
+    out.payFg = payReady ? 'var(--on-brand)' : 'var(--text-faint)';
+    out.payCursor = payReady ? 'pointer' : 'not-allowed';
+    out.payLabel = st.paying ? 'نعالج الدفع…' : (expired ? 'انتهى الحجز' : 'ادفع ' + this.money(total));
+    out.payNote = expired ? 'احجز من جديد قبل الدفع.' : 'لن نخصم شيئاً قبل تأكيد البوّابة.';
+    out.payNow = () => {
+      if (!payReady) return;
+      S({ paying: true });
+      setTimeout(() => {
+        const fail = st.payMethod === 'card' && (st.card.no || '').replace(/\D/g, '').slice(0, 4) === '4000';
+        this.setState({ paying: false, screen: fail ? 'ST-16' : 'ST-17' });
+        if (!fail) this.toast('اكتمل الدفع — استلمنا طلبك');
+      }, 1600);
+    };
+
+    /* ST-16 */
+    out.retryPay = () => { S({ screen: 'ST-15', coStep: 4, resState: 'live', resSecs: 900 }); this.toast('أعد المحاولة — سلتك كما هي'); };
+    out.changePayMethod = () => { S({ screen: 'ST-15', coStep: 4, payMethod: 'cod' }); this.toast('اختر طريقة دفع أخرى'); };
+    out.failReasons = [
+      'رصيد غير كافٍ أو حدّ شرائي يومي على البطاقة.',
+      'البطاقة غير مُفعّلة للشراء عبر الإنترنت — فعّلها من تطبيق بنكك.',
+      'بيانات البطاقة غير مطابقة: تحقّق من الرقم وتاريخ الانتهاء وCVV.'
+    ];
+
+    /* ST-17 */
+    out.copyOrderNo = () => this.toast('نُسخ رقم الطلب BST-26-004821');
+    out.confirmSubs = [
+      { shop: 'دار القطن', no: 'BST-26-004821-A', status: 'بانتظار قبول المتجر', eta: '17 – 19 سبتمبر', items: [{ name: 'قميص قطني مصري', variant: 'أحمر · M', qty: '2', total: this.money(158) }, { name: 'وشاح قطني مصبوغ يدوياً', variant: 'أزرق', qty: '1', total: this.money(58) }] },
+      { shop: 'إلكترو بيت', no: 'BST-26-004821-B', status: 'بانتظار قبول المتجر', eta: '18 – 20 سبتمبر', items: [{ name: 'مكبّر صوت بلوتوث XL-900', variant: 'أسود', qty: '1', total: this.money(249) }] }
+    ].map(c => Object.assign({}, c, { track: () => S({ screen: 'ST-19' }) }));
+    out.guestPwDisplay = st.guestPwDone ? 'none' : 'flex';
+    out.guestPw = st.guestPw;
+    out.onGuestPw = (e) => S({ guestPw: e.target.value });
+    out.createAccount = () => {
+      if (st.guestPw.length < 8) { this.toast('كلمة المرور 8 أحرف على الأقل', 'warning'); return; }
+      S({ guestPwDone: true });
+      this.toast('أُنشئ حسابك ورُبط الطلب به');
+    };
+    out.skipAccount = () => S({ guestPwDone: true });
+
+    return out;
+  }
+
+  renderVals() {
+    const st = this.state, S = (o) => this.setState(o);
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const out = this.checkout();
+
+    out.rootRef = (el) => { this.rootEl = el; };
+    out.fit = st.fit;
+    out.setLight = () => this.set('data-theme', 'light');
+    out.setDark = () => this.set('data-theme', 'dark');
+    out.setAr = () => { this.set('dir', 'rtl'); this.set('data-lang', 'ar'); };
+    out.setEn = () => { this.set('dir', 'ltr'); this.set('data-lang', 'en'); };
+    out.setCompact = () => this.set('data-density', 'compact');
+    out.setComfortable = () => this.set('data-density', 'comfortable');
+    out.stopClick = (e) => e.stopPropagation();
+
+    const codes = ['ST-13', 'ST-14', 'ST-15', 'ST-16', 'ST-17', 'ST-18', 'ST-19', 'ST-20', 'ST-21', 'ST-22', 'ST-31'];
+    out.screenTabs = codes.map(c => ({
+      code: c,
+      bg: st.screen === c ? 'var(--brand)' : 'var(--card)',
+      fg: st.screen === c ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.screen === c ? 'var(--brand)' : 'var(--border-control)',
+      go: () => { if (c === 'ST-14') S({ screen: 'ST-13', pstate: 'empty' }); else this.go(c); }
+    }));
+    const pstates = [['default', 'طبيعي'], ['loading', 'تحميل'], ['empty', 'فارغ'], ['error', 'خطأ'], ['edge', 'الحدّ']];
+    out.stateTabs = pstates.map(p => ({
+      label: p[1],
+      bg: P === p[0] ? 'var(--brand)' : 'var(--card)',
+      fg: P === p[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: P === p[0] ? 'var(--brand)' : 'var(--border-control)',
+      go: () => S({ pstate: p[0] })
+    }));
+    out.loadingDisplay = P === 'loading' ? 'flex' : 'none';
+    out.errorDisplay = P === 'error' ? 'grid' : 'none';
+    out.contentDisplay = (P === 'loading' || P === 'error') ? 'none' : 'block';
+    out.retry = () => { S({ pstate: 'default' }); this.toast('أُعيد التحميل — سلتك كما كانت'); };
+
+    out.search = st.search;
+    out.onSearch = (e) => S({ search: e.target.value });
+    const fxMap = this.fx();
+    out.currencyLabel = st.currency + ' · ' + fxMap[st.currency].label;
+    const curKeys = Object.keys(fxMap);
+    out.cycleCurrency = () => S({ currency: curKeys[(curKeys.indexOf(st.currency) + 1) % curKeys.length] });
+    out.currencyChips = curKeys.map(k => ({
+      label: k,
+      bg: st.currency === k ? 'var(--brand)' : 'transparent',
+      fg: st.currency === k ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.currency === k ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ currency: k })
+    }));
+    out.currencyNote = st.currency === 'SAR' ? 'يُحصَّل المبلغ بالريال السعودي.' : 'العرض تقريبي — يُحصَّل المبلغ بالريال السعودي بسعر يوم الدفع.';
+    out.goDiscovery = () => { window.location.href = encodeURI('Basta Storefront Discovery.dc.html'); };
+    out.goOrders = () => this.go('ST-18');
+    out.goCart = () => this.go('ST-13');
+
+    /* ---------- ST-13 / ST-14 cart ---------- */
+    out.isCart = st.screen === 'ST-13';
+    const groupsRaw = this.cartData();
+    let itemCount = 0, goods = 0, shipTotal = 0, blockers = 0;
+    const groups = [];
+    groupsRaw.forEach((g, gi) => {
+      const items = g.items.filter(it => !st.removed[it.id]);
+      if (!items.length) return;
+      let sub = 0;
+      const mapped = items.map(it => {
+        const q = st.qty[it.id] !== undefined ? st.qty[it.id] : it.qty;
+        const soldOut = it.stock === 0 || (edge && it.id === 2);
+        const stockLeft = edge && it.id === 2 ? 0 : it.stock;
+        sub += it.unit * q;
+        itemCount += q;
+        if (soldOut) blockers++;
+        return {
+          name: it.name, variant: it.variant, qty: String(q),
+          unit: this.money(it.unit), oldPrice: it.oldPrice ? this.money(it.oldPrice) : '',
+          lineTotal: this.money(it.unit * q),
+          priceChanged: !!it.oldPrice, soldOut: soldOut,
+          rowBg: soldOut ? 'var(--danger-subtle)' : 'transparent',
+          stockNote: soldOut ? 'نفدت الكمية' : (stockLeft <= 3 ? 'بقي ' + stockLeft + ' فقط' : 'متوفّر'),
+          stockColor: soldOut ? 'var(--danger-text)' : (stockLeft <= 3 ? 'var(--warning-text)' : 'var(--text-muted)'),
+          decCursor: q <= 1 ? 'not-allowed' : 'pointer',
+          decOpacity: q <= 1 ? 0.4 : 1,
+          incCursor: (soldOut || q >= stockLeft) ? 'not-allowed' : 'pointer',
+          incOpacity: (soldOut || q >= stockLeft) ? 0.4 : 1,
+          dec: () => { if (q > 1) { S({ qty: Object.assign({}, st.qty, { [it.id]: q - 1 }) }); this.toast('حُدّثت الكمية — أُعيد حساب المجموع والشحن'); } },
+          inc: () => {
+            if (soldOut) { this.toast('نفدت هذه القطعة — أزلها لتكمل الشراء', 'warning'); return; }
+            if (q >= stockLeft) { this.toast('لا يتوفّر أكثر من ' + stockLeft + ' من هذه القطعة', 'warning'); return; }
+            S({ qty: Object.assign({}, st.qty, { [it.id]: q + 1 }) });
+            this.toast('حُدّثت الكمية — أُعيد حساب المجموع والشحن');
+          },
+          wish: () => { S({ removed: Object.assign({}, st.removed, { [it.id]: true }), lastRemoved: it.id }); this.toast('نُقلت إلى المفضّلة', 'success', true); },
+          remove: () => { S({ removed: Object.assign({}, st.removed, { [it.id]: true }), lastRemoved: it.id }); this.toast('أُزيلت «' + it.name + '» من سلتك', 'success', true); },
+          open: () => out.goDiscovery()
+        };
+      });
+      const uncovered = g.uncovered;
+      if (uncovered) blockers++;
+      const ship = uncovered ? 0 : (g.freeOver && sub >= g.freeOver ? 0 : g.shipFlat);
+      if (!uncovered) { goods += sub; shipTotal += ship; }
+      groups.push({
+        shop: g.shop, verified: g.verified, deliveryText: 'التوصيل ' + g.days,
+        border: uncovered ? 'var(--warning)' : 'var(--border-subtle)',
+        uncovered: uncovered,
+        items: mapped,
+        subtotal: this.money(sub),
+        shipping: ship === 0 ? (uncovered ? '—' : 'مجاني') : this.money(ship),
+        shipColor: ship === 0 ? 'var(--money)' : 'var(--money)',
+        freeNote: (!uncovered && g.freeOver && sub < g.freeOver) ? 'أضف ' + this.money(g.freeOver - sub) + ' ليصبح شحن هذا المتجر مجانياً.' : '',
+        openShop: () => out.goDiscovery(),
+        removeAll: () => {
+          const r = Object.assign({}, st.removed);
+          g.items.forEach(it => { r[it.id] = true; });
+          S({ removed: r });
+          this.toast('أُزيلت قطع ' + g.shop + ' — تابع بالباقي');
+        }
+      });
+    });
+    out.cartGroups = empty ? [] : groups;
+    out.cartEmpty = empty || groups.length === 0;
+    out.cartHasItems = !out.cartEmpty;
+    out.cartCount = String(empty ? 0 : itemCount);
+    out.cartSummaryLine = empty || !groups.length ? 'لا قطع' : itemCount + ' قطعة من ' + groups.length + ' متاجر';
+    out.cartMerged = st.merged && !empty && groups.length > 0;
+    out.dismissMerge = () => S({ merged: false });
+    out.emptyCats = ['إلكترونيات', 'أزياء', 'الجمال والعناية', 'المنزل والمطبخ', 'بقالة', 'حِرف يدوية'].map(c => ({ label: c, go: () => out.goDiscovery() }));
+    out.recentCards = [
+      { name: 'قميص قطني مصري', price: this.money(79) },
+      { name: 'بنطال كتان واسع', price: this.money(149) },
+      { name: 'مكبّر صوت بلوتوث XL-900', price: this.money(249) },
+      { name: 'زيت أرغان مغربي', price: this.money(64) }
+    ].map(p => ({ name: p.name, price: p.price, open: () => out.goDiscovery() }));
+
+    out.couponVal = st.coupon;
+    out.onCoupon = (e) => S({ coupon: e.target.value.toUpperCase(), couponState: null });
+    const discount = st.couponState === 'ok' ? Math.round(goods * 0.1 * 100) / 100 : 0;
+    out.applyCoupon = () => {
+      const c = st.coupon.trim();
+      if (!c) { S({ couponState: 'empty' }); return; }
+      if (c === 'BASTA10') { S({ couponState: 'ok' }); this.toast('طُبّق الخصم 10%'); return; }
+      if (c === 'EXPIRED') { S({ couponState: 'expired' }); return; }
+      S({ couponState: 'bad' });
+    };
+    const couponMsgs = {
+      ok: ['طُبّق الكود — خصم 10% على قيمة المنتجات.', 'var(--success-text)', '#i-check-circle'],
+      bad: ['هذا الكود غير موجود. تحقّق من الحروف وأعد المحاولة.', 'var(--danger-text)', '#i-alert'],
+      expired: ['انتهت صلاحية هذا الكود في 31 أغسطس 2026.', 'var(--danger-text)', '#i-alert'],
+      empty: ['اكتب كود الخصم أولاً.', 'var(--danger-text)', '#i-alert']
+    };
+    const cm = couponMsgs[st.couponState];
+    out.couponMsg = cm ? cm[0] : '';
+    out.couponColor = cm ? cm[1] : 'var(--text-muted)';
+    out.couponIcon = cm ? cm[2] : '#i-info';
+    out.couponBorder = (st.couponState === 'bad' || st.couponState === 'expired' || st.couponState === 'empty') ? 'var(--danger)' : 'var(--border-control)';
+
+    const tax = Math.round((goods - discount) * 0.15 * 100) / 100;
+    const total = goods - discount + shipTotal + tax;
+    out.summaryRows = [
+      { label: 'قيمة المنتجات', value: this.money(goods), size: 'var(--text-sm)', weight: '400', labelColor: 'var(--text-body)', valueColor: 'var(--text-strong)', padTop: '0', border: 'none' },
+      { label: 'الشحن (كل المتاجر)', value: shipTotal === 0 ? 'مجاني' : this.money(shipTotal), size: 'var(--text-sm)', weight: '400', labelColor: 'var(--text-body)', valueColor: 'var(--text-strong)', padTop: '0', border: 'none' },
+      { label: 'الخصم', value: discount ? '− ' + this.money(discount) : '—', size: 'var(--text-sm)', weight: '400', labelColor: 'var(--text-body)', valueColor: discount ? 'var(--success-text)' : 'var(--text-muted)', padTop: '0', border: 'none' },
+      { label: 'ضريبة القيمة المضافة 15%', value: this.money(tax), size: 'var(--text-sm)', weight: '400', labelColor: 'var(--text-body)', valueColor: 'var(--text-strong)', padTop: '0', border: 'none' },
+      { label: 'الإجمالي', value: this.money(total), size: 'var(--text-md)', weight: '700', labelColor: 'var(--text-strong)', valueColor: 'var(--money)', padTop: '10px', border: '1px solid var(--money-border)' }
+    ];
+    out.checkoutBlocked = blockers > 0;
+    out.checkoutBg = blockers ? 'var(--sunken)' : 'var(--brand)';
+    out.checkoutFg = blockers ? 'var(--text-faint)' : 'var(--on-brand)';
+    out.checkoutCursor = blockers ? 'not-allowed' : 'pointer';
+    out.checkoutNote = blockers
+      ? 'أزل القطع النافدة وقطع المتاجر التي لا تشحن إلى منطقتك لتكمل الشراء.'
+      : 'يُثبَّت السعر ويُحجز المخزون عند إكمال الشراء.';
+    out.checkoutNoteColor = blockers ? 'var(--danger-text)' : 'var(--text-muted)';
+    out.goCheckout = () => { if (!blockers) this.go('ST-15'); };
+    out.undoRemove = () => {
+      if (!st.lastRemoved) return;
+      const r = Object.assign({}, st.removed);
+      delete r[st.lastRemoved];
+      S({ removed: r, lastRemoved: null, toast: null });
+      this.toast('أُعيدت القطعة إلى سلتك');
+    };
+
+    out.miniDisplay = st.miniOpen ? 'block' : 'none';
+    out.closeMini = () => S({ miniOpen: false });
+    out.miniUnit = this.money(79);
+    out.miniCountText = itemCount + ' قطعة في سلتك';
+    out.miniTotal = this.money(total);
+    out.miniCheckout = () => { S({ miniOpen: false }); this.go('ST-15'); };
+    out.miniViewCart = () => { S({ miniOpen: false }); this.go('ST-13'); };
+
+    out.toastMsg = st.toast ? st.toast.msg : '';
+    out.toastDisplay = st.toast ? 'flex' : 'none';
+    out.toastUndo = st.toast ? st.toast.undo : false;
+    out.toastBg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-subtle)' : 'var(--inverse)';
+    out.toastFg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-text)' : 'var(--on-inverse)';
+    out.toastIcon = st.toast && st.toast.kind === 'warning' ? '#i-alert' : '#i-check-circle';
+    out.closeToast = () => S({ toast: null });
+
+    return out;
+  }
+}
+</script>
+</body>
+</html>

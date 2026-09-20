@@ -948,6 +948,91 @@ Native mobile apps · real-time live chat · loyalty points and referrals · AI 
 **The order is deliberate:** components first, then the Vendor Dashboard (Phase 06 is next in development), then the Storefront, then Admin.
 In each batch: paste §0, then the prompt below, then the named screen specs from §8.
 
+### 13.1 · Status and continuing after Batch 0
+
+**Batch 0 is done** (14 September 2026): `Basta Component Sheet.dc.html` — interactive sheet with the burgundy/beige tokens, theme / RTL-LTR / density toggles, the 47 components with their states, and the §9 status badges.
+**Batch 1 is done** (15 September 2026): `Basta Batch 1 — Vendor Onboarding.dc.html` — VD-01 to VD-05, plus component 30 (image crop dialog) added to the sheet. Links to later-batch screens (SH-01, VD-07, VD-19) are placeholder toasts until those screens exist.
+
+**Block 2 is done** (14 September 2026): the §4.2 components, numbered 13–29 in the same sheet — status timeline, blocker list, message thread, variant matrix editor, image uploader, category tree, rich-text editor, three-balance card, currency/language switcher, 6-digit code, two-factor setup, date-range picker, map picker, side drawer, filter sheet, sticky add-to-cart bar, state switcher.
+**Still deferred:** mobile 400 frames — closed by the 3M and 6M passes below.
+**Rule from here:** the component sheet is the only source of UI parts. Batch prompts below that mention mobile 400 produce desktop frames only until the mobile passes.
+
+**All 86 screens are done (20 September 2026).** Ten files exported from Claude Design into `docs/02-design/screens/`: the component sheet (30 components), `Batch 1 - Vendor Onboarding` (VD-01…05), `Batch 2 - Vendor Products` (VD-06…11), `Vendor Orders & Money` (VD-12…21), `Storefront Discovery` (ST-01…12, ST-29, SH-05), `Storefront Purchase` (ST-13…22, ST-31), `Account & Shared` (ST-23…28, ST-30, SH-01…04, SH-06…08), `Admin Operations` (AD-01…07, AD-12…15, AD-21, AD-22), `Admin Catalog - System` (AD-08…11, AD-16…20, AD-23…26), and `Mobile 400`. They open straight in a browser; `support.js` must stay beside them. Everything below is the record of how they were produced.
+
+**Delivery mode changed by the project owner (16 September 2026): no batch gates.** After the remainder of Batch 2, the rest of the screens are produced as one continuous package — the designer does not stop for approval between sections, makes its own call on anything ambiguous and records it in a "Decisions I made" list, and only pauses on a usage limit (then resumes from the same point). The batch list below stays as the **order of work and the source of each section's focus**, not as approval checkpoints.
+
+**Step 1 — component sheet, block 2** (paste once):
+```
+Continue in this project. Batch 0 ("Basta Component Sheet.dc.html") is approved. Add a second block to
+the same sheet with the §4.2 components the screens depend on — same tokens, same toolbar (theme /
+direction / density), same seven-state convention, all live in both themes. Do not redesign block 1.
+- Status timeline: sub-order and payout variants, progressing from the right in RTL
+- Variant matrix editor: choose up to 3 axes, rows generate live; per-row SKU, price, compare-at,
+  stock, threshold, active; duplicate-combination and taken-SKU errors in the row; column bulk-fill
+- Multi-image uploader: drag to reorder, main-image marker, link to variant, per-image rejection reason
+- Blocker list: all submit blockers shown together, each linking to its field
+- Three-balance card (pending / available / withdrawn) and the negative-balance banner
+- 6-digit code input: auto-advance, paste fills all, expiry countdown, resend cooldown, locked state
+- Two-factor setup block: QR code, copyable text secret, confirm field
+- Draggable category tree: drop indicators, invalid-drop reason, inline rename, 4-level limit
+- Message thread: buyer / shop / admin role styling, attachments, composer
+- Map location picker: neutral map, draggable pin, address fields sync — no provider logos
+- Display-currency and language switcher
+- Rich-text editor with variable chips and live preview
+- Date-range picker · side detail drawer · filter bottom sheet · sticky add-to-cart bar
+- Prototype state switcher: Default / Loading / Empty / Error / Edge
+When done, list what you added and stop.
+```
+
+**Step 2 — master continuation prompt** (paste once, after block 2 is approved):
+```
+First fix one mismatch in block 2: the 6-digit code locks after 5 wrong attempts (§8 SH-03, SRS C-01),
+not 3. Update component 22 and keep everything else.
+
+From now on the component sheet (blocks 1 and 2) is the only source of UI parts: build every screen
+from those components and the §2 tokens — no new colors, spacing or one-off components. If a screen
+needs a part that is missing, add it to the sheet first and tell me.
+
+Design the remaining screens from §8 of DESIGN-BRIEF.md, one file per batch, in this order:
+  1  VD-01–VD-05   vendor onboarding
+  2  VD-06–VD-11   vendor products & inventory
+  3  VD-12–VD-21   vendor orders & money
+  3M mobile 400 for VD-01–VD-21 (Phase 06 cannot close until every vendor screen works at 400px)
+  4  ST-01–ST-12, ST-29, SH-05   storefront discovery
+  5  ST-13–ST-22, ST-31          cart, checkout & after purchase
+  6  ST-23–ST-28, ST-30, SH-01–SH-04, SH-06–SH-08   account & shared
+  6M mobile 400 for all storefront and shared screens
+  7  AD-01–AD-07, AD-12–AD-15, AD-21, AD-22   admin operations (+ mobile 400 for AD-07 and AD-13)
+  8  AD-08–AD-11, AD-16–AD-20, AD-23–AD-26   admin catalog, money, marketing & system
+  9  full review
+Use each batch's prompt in §13 for its focus.
+
+For every batch:
+- Desktop 1440 frames (mobile only in the M passes above).
+- A real interactive prototype per §5: links between this batch's screens and earlier batches, live
+  controls and calculations, and the state switcher showing Loading / Empty / Error plus each
+  screen's edge states listed in §8.
+- Arabic RTL and light theme by default; the theme and direction toggles keep working.
+- Sample data from §10, real copy from §3.5, status labels from §9, glossary from §3.6.
+- §0 rules: teal for money only, allowed actions only, outlined destructive buttons, Latin digits with
+  each currency's decimals, isolated LTR runs, visible focus.
+- When the batch is done, stop and report: files created · screens covered (by code) · which §5.2
+  flows click through end to end · anything deferred and why. Wait for "continue" before the next batch.
+
+Start with Batch 1.
+```
+
+**Step 3 — between batches:** review the batch, then paste `Approved. Continue with the next batch.` — or list fixes first: `Fix these before continuing: …`.
+
+**Mobile pass prompt** (used for 3M and 6M):
+```
+Mobile pass: add 400px frames for the screens named, following §6 and each screen's "Mobile" line in
+§8 — storefront bottom tab bar and full-screen search; dashboard sidebar as a drawer and tables as
+stacked cards with the two most important columns; sticky bottom bars (add to cart, cart total, pay);
+filters in a bottom sheet. 44px touch targets, no horizontal scroll. Same interactions as desktop.
+Report what was covered and stop.
+```
+
 ### Batch 0 — Foundations
 ```
 Design Basta's interactive component sheet: every component in §4 with its seven states, in light and

@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Basta · Mobile 400 — vendor · storefront · shared · admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--sunken);color:var(--text-body);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{color:var(--brand-hover)}
+button,input,select,textarea{font:inherit;color:inherit}
+:root{
+--font-head:'Almarai',system-ui,sans-serif;
+--font-ui:'IBM Plex Sans Arabic',system-ui,sans-serif;
+--font-mono:'IBM Plex Mono',ui-monospace,monospace;
+--page:#F8F3EC;--card:#FFFFFF;--raised:#FFFFFF;--sunken:#F0E8DD;--inverse:#28211C;--on-inverse:#FDFAF6;
+--text-strong:#1E1814;--text-body:#4A3F35;--text-muted:#6B5C4D;--text-faint:#7D6C5B;
+--border-subtle:#F0E8DD;--border-default:#E3D7C7;--border-control:#958470;
+--brand:#8C2F46;--brand-hover:#74243A;--brand-pressed:#5C1B2E;--on-brand:#FFFFFF;--brand-subtle:#FBF1F3;--brand-text:#74243A;
+--money:#0E6B66;--money-subtle:#E3F2F0;--money-border:#C4E5E1;
+--success:#2F7A3E;--warning:#9A4F0B;--danger:#C23A1A;--info:#2D5F8B;
+--success-subtle:#E3F1E6;--warning-subtle:#FBEBDD;--danger-subtle:#FBE3DD;--info-subtle:#E1EBF4;
+--success-text:#25622F;--warning-text:#7E4009;--danger-text:#A12E13;--info-text:#244C70;
+--neutral-subtle:#F0E8DD;--neutral-text:#4A3F35;
+--focus:#B05A70;
+--shadow-sm:0 1px 2px rgba(46,13,23,.07),0 1px 3px rgba(74,63,53,.07);
+--shadow-md:0 2px 4px rgba(74,63,53,.07),0 6px 14px rgba(74,63,53,.09);
+--shadow-lg:0 10px 28px rgba(74,63,53,.14);
+--shadow-overlay:0 18px 52px rgba(30,24,20,.26);
+--r-1:4px;--r-2:8px;--r-3:14px;
+--text-3xl:38px;--text-2xl:30px;--text-xl:24px;--text-lg:20px;--text-md:17px;--text-sm:13px;--text-xs:12px;--text-2xs:11px;
+--text-base:15px;--row-h:48px;--card-pad:16px;--ctrl-h:48px;--gap:14px;
+}
+[data-theme="dark"]{
+--page:#14100D;--card:#1E1814;--raised:#28211C;--sunken:#14100D;--inverse:#F0E8DD;--on-inverse:#1E1814;
+--text-strong:#FDFAF6;--text-body:#E3D7C7;--text-muted:#A89680;--text-faint:#958470;
+--border-subtle:#28211C;--border-default:#332B24;--border-control:#7D6C5B;
+--brand:#D08A9B;--brand-hover:#E6B6C1;--brand-pressed:#F4DDE2;--on-brand:#1E1814;--brand-subtle:#2E0D17;--brand-text:#D08A9B;
+--money:#5CC6B8;--money-subtle:#0F2624;--money-border:#08403D;
+--success:#6CC287;--warning:#E39A4B;--danger:#F07A66;--info:#7FB2E0;
+--success-subtle:#13261A;--warning-subtle:#2E1C0B;--danger-subtle:#331410;--info-subtle:#0F1E2C;
+--success-text:#6CC287;--warning-text:#E39A4B;--danger-text:#F07A66;--info-text:#7FB2E0;
+--neutral-subtle:#28211C;--neutral-text:#E3D7C7;
+--focus:#D08A9B;
+--shadow-sm:0 1px 2px rgba(0,0,0,.4);
+--shadow-md:0 2px 4px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.4);
+--shadow-lg:0 10px 28px rgba(0,0,0,.5);
+--shadow-overlay:0 18px 52px rgba(0,0,0,.6);
+}
+[data-lang="ar"] [data-t="en"]{display:none}
+[data-lang="en"] [data-t="ar"]{display:none}
+[dir="rtl"] [data-mirror]{transform:scaleX(-1)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+[data-theme="light"] [data-seg="light"],[data-theme="dark"] [data-seg="dark"],[data-lang="ar"] [data-seg="ar"],[data-lang="en"] [data-seg="en"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+@keyframes bsSpin{to{transform:rotate(360deg)}}
+@keyframes bsShimmer{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+@keyframes bsSheetUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes bsFade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:1ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" dir="rtl" data-theme="light" data-lang="ar" style="min-height:100vh;background:var(--sunken);color:var(--text-body);font-family:var(--font-ui)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="M11 19l-7-7 7-7"></path></symbol>
+<symbol id="i-chev-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></symbol>
+<symbol id="i-chev-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L21.5 20H2.5z"></path><path d="M12 10v4.5"></path><path d="M12 17.5h.01"></path></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 8h.01"></path></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.4l2.8 2.8L16 9.6"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.4l3.4 2"></path></symbol>
+<symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.5"></circle><path d="M21 16l-5-5-6 6"></path></symbol>
+<symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v11h16V9"></path><path d="M3 9l2-5h14l2 5z"></path></symbol>
+<symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"></path><path d="M3 8l9 5 9-5"></path><path d="M12 13v10"></path></symbol>
+<symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2.2l2.2 11h10.2l2.2-8H6"></path><circle cx="9" cy="19.5" r="1.4"></circle><circle cx="17" cy="19.5" r="1.4"></circle></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18"></path><path d="M6 12h12"></path><path d="M10 19h4"></path></symbol>
+<symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"></rect><path d="M16 12.5h3"></path></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"></path><path d="M10 20V4"></path><path d="M16 20v-7"></path><path d="M22 20H2"></path></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h10v9H3z"></path><path d="M13 10h4l4 3v3h-8z"></path><circle cx="7" cy="18" r="1.8"></circle><circle cx="17" cy="18" r="1.8"></circle></symbol>
+<symbol id="i-boxes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="7" rx="1.5"></rect><rect x="13" y="4" width="8" height="7" rx="1.5"></rect><rect x="8" y="13" width="8" height="7" rx="1.5"></rect></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></symbol>
+<symbol id="i-star-fill" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-9.5A4.5 4.5 0 0112 8a4.5 4.5 0 017 2.5c0 5.1-7 9.5-7 9.5z"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"></path><path d="M6 8h12"></path><path d="M6 8l-3 6h6z"></path><path d="M18 8l-3 6h6z"></path></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-6.5 10-6.5S22 12 22 12s-4 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+<symbol id="i-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a9 9 0 109 9"></path></symbol>
+</defs></svg>
+
+<header style="position:sticky;top:0;z-index:60;background:var(--card);border-block-end:1px solid var(--border-default);box-shadow:var(--shadow-sm)">
+  <div style="max-width:1600px;margin:0 auto;padding:9px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-family:var(--font-head);font-weight:800;font-size:19px;color:var(--brand)">بسطة</span>
+    <span style="height:22px;padding:0 9px;border-radius:var(--r-1);background:var(--inverse);color:var(--on-inverse);font-family:var(--font-mono);font-size:10px;display:inline-flex;align-items:center;letter-spacing:.06em">MOBILE 400</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <a href="Basta Component Sheet.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">الورقة</a>
+      <a href="Basta Storefront Discovery.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">سطح المكتب</a>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border-default)"></div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="light" onClick="{{ setLight }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">فاتح</button>
+      <button type="button" data-seg="dark" onClick="{{ setDark }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">داكن</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="ar" onClick="{{ setAr }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 10px;height:28px;font-size:12px;cursor:pointer">عربي</button>
+      <button type="button" data-seg="en" onClick="{{ setEn }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 10px;height:28px;font-size:12px;cursor:pointer">English</button>
+    </div>
+    <div style="margin-inline-start:auto;display:flex;align-items:center;gap:6px">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">STATE</span>
+      <div style="display:flex;gap:4px">
+        <sc-for list="{{ stateTabs }}" as="p" hint-placeholder-count="5">
+          <button type="button" onClick="{{ p.go }}" style="height:28px;padding:0 9px;border:1px solid {{ p.border }};border-radius:var(--r-1);background:{{ p.bg }};color:{{ p.fg }};font-size:11px;cursor:pointer">{{ p.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  <div style="max-width:1600px;margin:0 auto;padding:0 20px 8px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+    <sc-for list="{{ groupTabs }}" as="g" hint-placeholder-count="4">
+      <button type="button" onClick="{{ g.go }}" style="height:26px;padding:0 11px;border:1px solid {{ g.border }};border-radius:999px;background:{{ g.bg }};color:{{ g.fg }};font-size:11px;font-weight:700;cursor:pointer">{{ g.label }}</button>
+    </sc-for>
+    <span style="width:1px;height:18px;background:var(--border-default);margin:0 4px"></span>
+    <sc-for list="{{ screenTabs }}" as="t" hint-placeholder-count="8">
+      <button type="button" onClick="{{ t.go }}" style="height:26px;padding:0 9px;border:1px solid {{ t.border }};border-radius:var(--r-1);background:{{ t.bg }};color:{{ t.fg }};font-family:var(--font-mono);font-size:11px;cursor:pointer">{{ t.code }}</button>
+    </sc-for>
+  </div>
+</header>
+
+<div style="padding:22px 16px 60px;display:grid;justify-items:center;gap:12px">
+  <span style="font-size:var(--text-xs);color:var(--text-muted);text-align:center;max-width:70ch;line-height:1.8">{{ frameNote }}</span>
+
+  <div style="width:400px;border:1px solid var(--border-default);border-radius:var(--r-3);background:var(--page);box-shadow:var(--shadow-lg);overflow:hidden;position:relative;min-height:780px;display:flex;flex-direction:column">
+
+    <div style="height:28px;background:var(--card);border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;padding:0 14px;gap:8px;flex:none">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">9:41</span>
+      <span style="margin-inline-start:auto;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">{{ screen }}</span>
+    </div>
+
+    <div style="background:var(--card);border-block-end:1px solid var(--border-default);padding:10px 14px;display:flex;align-items:center;gap:10px;flex:none">
+      <sc-if value="{{ showBack }}" hint-placeholder-val="{{ false }}">
+        <button type="button" onClick="{{ goBack }}" aria-label="رجوع" style="width:44px;height:44px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:var(--text-strong);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)"><svg width="20" height="20" data-mirror><use href="#i-back"></use></svg></button>
+      </sc-if>
+      <sc-if value="{{ showBrand }}" hint-placeholder-val="{{ true }}">
+        <span style="font-family:var(--font-head);font-weight:800;font-size:18px;color:var(--brand)">بسطة</span>
+      </sc-if>
+      <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ barTitle }}</span>
+      <span style="margin-inline-start:auto;display:flex;gap:6px;flex:none">
+        <sc-for list="{{ barActions }}" as="a" hint-placeholder-count="2">
+          <button type="button" onClick="{{ a.go }}" aria-label="{{ a.label }}" style="position:relative;width:44px;height:44px;border:0;border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)">
+            <svg width="20" height="20"><use href="{{ a.icon }}"></use></svg>
+            <sc-if value="{{ a.badge }}" hint-placeholder-val="{{ false }}">
+              <span style="position:absolute;top:5px;inset-inline-end:5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-family:var(--font-mono);font-size:9px;display:grid;place-items:center">{{ a.badge }}</span>
+            </sc-if>
+          </button>
+        </sc-for>
+      </span>
+    </div>
+
+    <div style="display:{{ loadingDisplay }};padding:16px;gap:12px;flex-direction:column;flex:1">
+      <span style="height:20px;width:60%;border-radius:var(--r-1);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out infinite"></span>
+      <span style="height:120px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .12s infinite"></span>
+      <span style="height:120px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .24s infinite"></span>
+      <span style="height:120px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .36s infinite"></span>
+    </div>
+
+    <div style="display:{{ errorDisplay }};padding:48px 20px;place-items:center;text-align:center;gap:11px;flex:1;align-content:center">
+      <span style="width:48px;height:48px;border-radius:var(--r-2);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-alert"></use></svg></span>
+      <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-md);color:var(--text-strong);line-height:1.5">حدث خلل غير متوقّع ولم يكتمل طلبك</span>
+      <span style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.8">أعد المحاولة، وإن تكرّر أبلغنا بالرقم <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">req-8f3a2c</span>.</span>
+      <button type="button" onClick="{{ retry }}" style="height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer">أعد المحاولة</button>
+    </div>
+
+    <div style="display:{{ contentDisplay }};flex:1;overflow-y:auto;padding:14px 14px {{ contentPadBottom }}">
+      <sc-if value="{{ mEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:44px 12px;display:grid;justify-items:center;gap:11px;text-align:center">
+          <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="26" height="26"><use href="{{ mEmptyIcon }}"></use></svg></span>
+          <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-md);color:var(--text-strong);line-height:1.5">{{ mEmptyTitle }}</span>
+          <span style="font-size:var(--text-sm);color:var(--text-muted);line-height:1.8">{{ mEmptyBody }}</span>
+          <button type="button" onClick="{{ mEmptyGo }}" style="margin-top:4px;height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer">{{ mEmptyCta }}</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ mCards }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;gap:11px">
+
+        <sc-if value="{{ mBanner }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:12px;border:1px solid {{ mBannerBorder }};border-radius:var(--r-2);background:{{ mBannerBg }};display:flex;align-items:flex-start;gap:10px">
+            <svg width="18" height="18" style="flex:none;color:{{ mBannerColor }};margin-top:2px"><use href="{{ mBannerIcon }}"></use></svg>
+            <span style="display:grid;gap:3px;min-width:0">
+              <span style="font-size:var(--text-sm);font-weight:700;color:{{ mBannerColor }};line-height:1.5">{{ mBannerTitle }}</span>
+              <span style="font-size:var(--text-xs);color:var(--text-body);line-height:1.7">{{ mBanner }}</span>
+            </span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mHero }}" hint-placeholder-val="{{ false }}">
+          <div style="border-radius:var(--r-2);overflow:hidden;border:1px solid var(--border-default)">
+            <div style="background:var(--brand);color:var(--on-brand);padding:20px 16px;display:grid;gap:9px">
+              <span style="font-family:var(--font-mono);font-size:10px;opacity:.8;letter-spacing:.06em">موسم الصيف</span>
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);line-height:1.4">قطن يتنفّس، مصنوع في الرياض</span>
+              <span style="font-size:var(--text-sm);line-height:1.7;opacity:.92">قمصان وبنطلونات كتان من تجّار موثّقين.</span>
+              <button type="button" onClick="{{ mHeroGo }}" style="margin-top:4px;height:48px;border:0;border-radius:var(--r-1);background:var(--card);color:var(--brand-text);font-size:var(--text-base);font-weight:700;cursor:pointer;width:fit-content;padding:0 18px">تسوّق الأزياء</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mChips }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
+            <sc-for list="{{ mChipList }}" as="c" hint-placeholder-count="4">
+              <button type="button" onClick="{{ c.pick }}" style="height:44px;padding:0 14px;flex:none;border:1px solid {{ c.border }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px">{{ c.label }}<span style="font-family:var(--font-mono);font-size:10px;opacity:.75">{{ c.count }}</span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mStats }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:10px">
+            <sc-for list="{{ mStatList }}" as="s" hint-placeholder-count="4">
+              <button type="button" onClick="{{ s.go }}" style="text-align:start;padding:14px;border:1px solid {{ s.border }};border-radius:var(--r-2);background:var(--card);box-shadow:var(--shadow-sm);cursor:pointer;display:flex;align-items:center;gap:12px;min-height:72px">
+                <span style="width:40px;height:40px;flex:none;border-radius:var(--r-1);background:{{ s.iconBg }};color:{{ s.iconFg }};display:grid;place-items:center"><svg width="20" height="20"><use href="{{ s.icon }}"></use></svg></span>
+                <span style="display:grid;gap:3px;min-width:0;flex:1">
+                  <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ s.label }}</span>
+                  <span dir="{{ s.dir }}" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:{{ s.color }};line-height:1.2">{{ s.value }}</span>
+                  <sc-if value="{{ s.sub }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:10px;color:{{ s.subColor }};line-height:1.6">{{ s.sub }}</span>
+                  </sc-if>
+                </span>
+                <svg width="18" height="18" data-mirror style="flex:none;color:var(--text-muted)"><use href="#i-chev-end"></use></svg>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mGrid }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px">
+            <sc-for list="{{ mGridItems }}" as="p" hint-placeholder-count="6">
+              <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm);display:grid;align-content:start">
+                <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;position:relative;display:block">
+                  <span style="display:grid;place-items:center;aspect-ratio:4/5;background:var(--sunken);color:var(--text-faint)"><svg width="26" height="26"><use href="#i-image"></use></svg></span>
+                  <sc-if value="{{ p.badge }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;top:8px;inset-inline-start:8px;height:22px;padding:0 9px;border-radius:999px;background:{{ p.badgeBg }};color:{{ p.badgeFg }};font-size:10px;font-weight:700;display:inline-flex;align-items:center">{{ p.badge }}</span>
+                  </sc-if>
+                </button>
+                <div style="padding:10px;display:grid;gap:6px">
+                  <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;text-align:start;cursor:pointer;font-size:var(--text-sm);color:var(--text-strong);line-height:1.5;min-height:2.8em">{{ p.name }}</button>
+                  <span style="font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.shop }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ p.price }}</span>
+                  <button type="button" onClick="{{ p.add }}" style="height:44px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:700;cursor:pointer">أضف</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mGallery }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:9px">
+            <div style="aspect-ratio:1;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--sunken);display:grid;place-items:center;color:var(--text-faint)"><svg width="40" height="40"><use href="#i-image"></use></svg></div>
+            <div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:3px">
+              <sc-for list="{{ mThumbs }}" as="t" hint-placeholder-count="5">
+                <span style="width:56px;height:56px;flex:none;border:1.5px solid {{ t.border }};border-radius:var(--r-1);background:var(--sunken);display:grid;place-items:center;color:var(--text-faint)"><svg width="18" height="18"><use href="#i-image"></use></svg></span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mProduct }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:11px">
+            <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong);line-height:1.45">{{ mProductName }}</span>
+            <button type="button" onClick="{{ mOpenShop }}" style="display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;padding:0;cursor:pointer;width:fit-content;min-height:44px">
+              <svg width="17" height="17" style="color:var(--text-muted)"><use href="#i-store"></use></svg>
+              <span style="font-size:var(--text-sm);color:var(--brand-text);font-weight:600">دار القطن</span>
+              <span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--text-xs);color:var(--text-body)"><svg width="14" height="14" style="color:var(--warning)"><use href="#i-star-fill"></use></svg><span style="font-family:var(--font-mono)">4.7</span></span>
+            </button>
+            <span style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+              <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;color:var(--money)">{{ mPrice }}</span>
+              <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);color:var(--text-faint);text-decoration:line-through">92.00 ر.س.</span>
+              <span style="height:24px;padding:0 10px;border-radius:999px;background:var(--success-subtle);color:var(--success-text);font-size:10px;font-weight:700;display:inline-flex;align-items:center">وفّر 14%</span>
+            </span>
+            <div style="display:grid;gap:9px">
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">اللون والمقاس</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <sc-for list="{{ mVariants }}" as="v" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ v.pick }}" style="min-height:48px;padding:0 16px;border:1px solid {{ v.border }};border-radius:var(--r-1);background:{{ v.bg }};color:{{ v.fg }};font-size:var(--text-sm);font-weight:600;cursor:{{ v.cursor }};display:inline-flex;align-items:center;gap:7px">{{ v.label }}<sc-if value="{{ v.out }}" hint-placeholder-val="{{ false }}"><span style="font-size:10px;color:var(--text-faint)">نفد</span></sc-if></button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">الكمية</span>
+              <span style="display:flex;align-items:center;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+                <button type="button" onClick="{{ mQtyDown }}" aria-label="أنقص" style="width:48px;height:48px;border:0;background:var(--card);color:var(--text-strong);display:grid;place-items:center;cursor:pointer"><svg width="18" height="18"><use href="#i-minus"></use></svg></button>
+                <span dir="ltr" style="unicode-bidi:isolate;min-width:48px;text-align:center;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--text-strong)">{{ mQty }}</span>
+                <button type="button" onClick="{{ mQtyUp }}" aria-label="زد" style="width:48px;height:48px;border:0;background:var(--card);color:var(--text-strong);display:grid;place-items:center;cursor:pointer"><svg width="18" height="18"><use href="#i-plus"></use></svg></button>
+              </span>
+              <span style="font-size:var(--text-xs);color:{{ mStockColor }};font-weight:600">{{ mStockNote }}</span>
+            </div>
+            <div style="padding:12px;border:1px solid var(--border-subtle);border-radius:var(--r-1);background:var(--sunken);display:grid;gap:8px">
+              <span style="display:flex;align-items:flex-start;gap:8px;font-size:var(--text-xs);color:var(--text-body);line-height:1.7"><svg width="15" height="15" style="flex:none;color:var(--text-muted);margin-top:2px"><use href="#i-truck"></use></svg>يشحن من الرياض خلال يوم عمل · التوصيل 2 إلى 4 أيام</span>
+              <span style="display:flex;align-items:flex-start;gap:8px;font-size:var(--text-xs);color:var(--text-body);line-height:1.7"><svg width="15" height="15" style="flex:none;color:var(--text-muted);margin-top:2px"><use href="#i-check-circle"></use></svg>إرجاع مجاني خلال 14 يوماً</span>
+            </div>
+            <p style="margin:0;font-size:var(--text-sm);color:var(--text-body);line-height:1.9">قميص من قطن مصري مغزول في الرياض، نسيج مسامي يناسب الصيف. يُغسل في الغسالة على 30 درجة.</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mList }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:10px">
+            <sc-for list="{{ mListItems }}" as="r" hint-placeholder-count="5">
+              <div style="border:1px solid {{ r.border }};border-radius:var(--r-2);background:var(--card);box-shadow:var(--shadow-sm);overflow:hidden">
+                <button type="button" onClick="{{ r.go }}" style="width:100%;padding:13px;border:0;background:transparent;cursor:pointer;text-align:start;display:grid;gap:9px">
+                  <span style="display:flex;align-items:flex-start;gap:11px">
+                    <sc-if value="{{ r.thumb }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:46px;height:46px;flex:none;border-radius:var(--r-1);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="20" height="20"><use href="{{ r.thumbIcon }}"></use></svg></span>
+                    </sc-if>
+                    <span style="display:grid;gap:4px;min-width:0;flex:1">
+                      <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong);line-height:1.5">{{ r.title }}</span>
+                      <span dir="{{ r.subDir }}" style="unicode-bidi:isolate;font-family:{{ r.subFont }};font-size:var(--text-xs);color:var(--text-muted);line-height:1.6">{{ r.sub }}</span>
+                    </span>
+                    <sc-if value="{{ r.amount }}" hint-placeholder-val="{{ false }}">
+                      <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--money);flex:none">{{ r.amount }}</span>
+                    </sc-if>
+                  </span>
+                  <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <sc-if value="{{ r.badge }}" hint-placeholder-val="{{ false }}">
+                      <span style="height:24px;padding:0 10px;border-radius:999px;background:{{ r.badgeBg }};color:{{ r.badgeFg }};font-size:10px;font-weight:700;display:inline-flex;align-items:center">{{ r.badge }}</span>
+                    </sc-if>
+                    <sc-if value="{{ r.meta }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-family:var(--font-mono);font-size:10px;color:{{ r.metaColor }}">{{ r.meta }}</span>
+                    </sc-if>
+                  </span>
+                </button>
+                <sc-if value="{{ r.note }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:flex;align-items:flex-start;gap:8px;margin:0 13px 11px;padding:9px 11px;border:1px solid {{ r.noteBorder }};border-radius:var(--r-1);background:{{ r.noteBg }};font-size:var(--text-xs);color:{{ r.noteColor }};line-height:1.7"><svg width="14" height="14" style="flex:none;margin-top:2px"><use href="#i-alert"></use></svg>{{ r.note }}</span>
+                </sc-if>
+                <sc-if value="{{ r.actions }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:8px;padding:0 13px 13px;flex-wrap:wrap">
+                    <sc-for list="{{ r.actionList }}" as="a" hint-placeholder-count="2">
+                      <button type="button" onClick="{{ a.go }}" style="flex:1;min-width:120px;height:48px;border:{{ a.border }};border-radius:var(--r-1);background:{{ a.bg }};color:{{ a.fg }};font-size:var(--text-sm);font-weight:700;cursor:pointer">{{ a.label }}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mTimeline }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);padding:14px;box-shadow:var(--shadow-sm);display:grid;gap:2px">
+            <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong);margin-bottom:8px">مسار الطلب</span>
+            <sc-for list="{{ mSteps }}" as="s" hint-placeholder-count="5">
+              <div style="display:flex;align-items:flex-start;gap:12px">
+                <span style="display:grid;justify-items:center;gap:2px;flex:none">
+                  <span style="width:30px;height:30px;border-radius:999px;background:{{ s.bg }};color:{{ s.fg }};border:2px solid {{ s.bd }};display:grid;place-items:center"><svg width="15" height="15"><use href="{{ s.icon }}"></use></svg></span>
+                  <sc-if value="{{ s.hasLine }}" hint-placeholder-val="{{ true }}">
+                    <span style="width:2px;height:26px;background:{{ s.line }};border-radius:2px"></span>
+                  </sc-if>
+                </span>
+                <span style="display:grid;gap:2px;min-width:0;flex:1;padding-bottom:10px">
+                  <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">{{ s.label }}</span>
+                  <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">{{ s.date }}</span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mForm }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:14px">
+            <sc-for list="{{ mFields }}" as="f" hint-placeholder-count="3">
+              <label style="display:grid;gap:7px">
+                <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ f.label }}</span>
+                <input type="{{ f.type }}" value="{{ f.value }}" onChange="{{ f.onChange }}" dir="{{ f.dir }}" placeholder="{{ f.placeholder }}" style="height:52px;padding:0 14px;border:1px solid {{ f.border }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:{{ f.font }};font-size:var(--text-base);width:100%" />
+                <sc-if value="{{ f.hint }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:var(--text-xs);color:{{ f.hintColor }};line-height:1.7">{{ f.hint }}</span>
+                </sc-if>
+              </label>
+            </sc-for>
+            <sc-if value="{{ mOtp }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;gap:12px">
+                <div dir="ltr" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px">
+                  <sc-for list="{{ mOtpCells }}" as="d" hint-placeholder-count="6">
+                    <input type="text" inputMode="numeric" maxLength="6" value="{{ d.val }}" onChange="{{ d.onInput }}" onKeyDown="{{ d.onKeyDown }}" onPaste="{{ d.onPaste }}" ref="{{ d.ref }}" style="height:56px;text-align:center;border:1.5px solid {{ d.border }};border-radius:var(--r-1);background:{{ d.bg }};color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;min-width:0" />
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                  <span style="display:inline-flex;align-items:center;gap:7px;font-size:var(--text-sm);color:var(--text-muted)"><svg width="15" height="15"><use href="#i-clock"></use></svg>ينتهي بعد <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-weight:700">09:41</span></span>
+                  <button type="button" onClick="{{ mResend }}" style="margin-inline-start:auto;height:48px;padding:0 14px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-sm);font-weight:600;cursor:pointer">أعد الإرسال</button>
+                </div>
+              </div>
+            </sc-if>
+            <button type="button" onClick="{{ mFormGo }}" style="height:52px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer">{{ mFormCta }}</button>
+            <sc-if value="{{ mFormAlt }}" hint-placeholder-val="{{ false }}">
+              <button type="button" onClick="{{ mFormAltGo }}" style="height:48px;border:0;background:transparent;color:var(--brand);font-size:var(--text-sm);font-weight:700;cursor:pointer;text-decoration:underline">{{ mFormAlt }}</button>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mMenu }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:9px">
+            <div style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);box-shadow:var(--shadow-sm)">
+              <span style="width:48px;height:48px;flex:none;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center;font-size:var(--text-lg);font-weight:800">ن</span>
+              <span style="display:grid;gap:3px;min-width:0">
+                <span style="font-size:var(--text-md);font-weight:700;color:var(--text-strong)">نورة العتيبي</span>
+                <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)">noura@example.com</span>
+              </span>
+            </div>
+            <sc-for list="{{ mMenuItems }}" as="m" hint-placeholder-count="7">
+              <button type="button" onClick="{{ m.go }}" style="min-height:56px;padding:0 14px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:flex;align-items:center;gap:12px;text-align:start" style-hover="background:var(--sunken)">
+                <span style="width:36px;height:36px;flex:none;border-radius:var(--r-1);background:var(--sunken);color:var(--text-muted);display:grid;place-items:center"><svg width="18" height="18"><use href="{{ m.icon }}"></use></svg></span>
+                <span style="flex:1;min-width:0;font-size:var(--text-base);color:var(--text-strong);font-weight:600">{{ m.label }}</span>
+                <sc-if value="{{ m.badge }}" hint-placeholder-val="{{ false }}">
+                  <span style="height:22px;min-width:22px;padding:0 7px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-family:var(--font-mono);font-size:10px;display:grid;place-items:center;flex:none">{{ m.badge }}</span>
+                </sc-if>
+                <svg width="18" height="18" data-mirror style="flex:none;color:var(--text-muted)"><use href="#i-chev-end"></use></svg>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mSummary }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid var(--money-border);border-radius:var(--r-2);background:var(--money-subtle);padding:14px;display:grid;gap:9px">
+            <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ mSummaryTitle }}</span>
+            <sc-for list="{{ mSummaryRows }}" as="r" hint-placeholder-count="4">
+              <span style="display:flex;justify-content:space-between;gap:12px;font-size:var(--text-sm);color:var(--text-body);padding-bottom:7px;border-block-end:1px solid var(--money-border)">
+                <span>{{ r.k }}</span>
+                <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-weight:{{ r.weight }};color:{{ r.color }}">{{ r.v }}</span>
+              </span>
+            </sc-for>
+            <sc-if value="{{ mSummaryNote }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7">{{ mSummaryNote }}</span>
+            </sc-if>
+          </div>
+        </sc-if>
+
+      </div>
+      </sc-if>
+    </div>
+
+    <div style="display:{{ tabbarDisplay }};position:absolute;inset-inline:0;bottom:0;background:var(--card);border-block-start:1px solid var(--border-default);padding:6px 8px;box-shadow:0 -2px 8px rgba(74,63,53,.06)">
+      <div style="display:grid;grid-template-columns:repeat({{ tabCount }},minmax(0,1fr));gap:4px">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+          <button type="button" onClick="{{ t.go }}" style="height:56px;border:0;border-radius:var(--r-1);background:transparent;color:{{ t.color }};display:grid;place-items:center;gap:3px;cursor:pointer;padding:0">
+            <span style="position:relative;display:grid;place-items:center">
+              <svg width="21" height="21"><use href="{{ t.icon }}"></use></svg>
+              <sc-if value="{{ t.badge }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:-4px;inset-inline-end:-8px;min-width:15px;height:15px;padding:0 4px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-family:var(--font-mono);font-size:9px;display:grid;place-items:center">{{ t.badge }}</span>
+              </sc-if>
+            </span>
+            <span style="font-size:10px;font-weight:{{ t.weight }}">{{ t.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:{{ sheetDisplay }};position:absolute;inset:0;z-index:50;align-items:flex-end;background:rgba(30,24,20,.5);animation:bsFade .2s ease-out" onClick="{{ closeSheet }}">
+      <div onClick="{{ stopClick }}" style="width:100%;max-height:82%;background:var(--raised);border-start-start-radius:var(--r-3);border-start-end-radius:var(--r-3);box-shadow:var(--shadow-overlay);display:flex;flex-direction:column;animation:bsSheetUp .24s ease-out">
+        <div style="padding:10px 0 0;display:grid;place-items:center;flex:none"><span style="width:40px;height:4px;border-radius:999px;background:var(--border-default)"></span></div>
+        <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;border-block-end:1px solid var(--border-subtle);flex:none">
+          <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">{{ sheetTitle }}</span>
+          <button type="button" onClick="{{ sheetClear }}" style="margin-inline-start:auto;height:36px;padding:0 10px;border:0;border-radius:var(--r-1);background:transparent;color:var(--brand-text);font-size:var(--text-xs);font-weight:700;cursor:pointer">{{ sheetClearLabel }}</button>
+          <button type="button" onClick="{{ closeSheet }}" aria-label="إغلاق" style="width:44px;height:44px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer"><svg width="20" height="20"><use href="#i-x"></use></svg></button>
+        </div>
+        <div style="padding:14px 16px;overflow-y:auto;flex:1;display:grid;gap:16px;align-content:start">
+          <sc-for list="{{ sheetGroups }}" as="g" hint-placeholder-count="2">
+            <div style="display:grid;gap:9px">
+              <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ g.title }}</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <sc-for list="{{ g.options }}" as="o" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ o.toggle }}" style="min-height:48px;padding:0 14px;border:1px solid {{ o.border }};border-radius:var(--r-1);background:{{ o.bg }};color:{{ o.fg }};font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px">{{ o.label }}<span style="font-family:var(--font-mono);font-size:10px;opacity:.75">{{ o.count }}</span></button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding:12px 16px;border-block-start:1px solid var(--border-subtle);flex:none">
+          <button type="button" onClick="{{ sheetApply }}" style="width:100%;height:52px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer">{{ sheetApplyLabel }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:{{ stickyDisplay }};position:absolute;inset-inline:0;bottom:{{ stickyBottom }};background:var(--card);border-block-start:1px solid var(--border-default);box-shadow:0 -3px 12px rgba(74,63,53,.10);padding:10px 14px;align-items:center;gap:12px">
+      <span style="display:grid;gap:2px;min-width:0">
+        <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ stickyPrice }}</span>
+        <span style="font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ stickyNote }}</span>
+      </span>
+      <button type="button" onClick="{{ stickyGo }}" style="margin-inline-start:auto;flex:none;height:48px;padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap" style-hover="background:var(--brand-hover)"><svg width="18" height="18" style="flex:none"><use href="{{ stickyIcon }}"></use></svg>{{ stickyLabel }}</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ toastDisplay }};position:fixed;bottom:24px;inset-inline-start:24px;z-index:120;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-2);background:{{ toastBg }};color:{{ toastFg }};box-shadow:var(--shadow-lg);max-width:420px">
+  <svg width="18" height="18" style="flex:none"><use href="{{ toastIcon }}"></use></svg>
+  <span style="font-size:var(--text-sm);font-weight:600;line-height:1.6">{{ toastMsg }}</span>
+  <button type="button" onClick="{{ closeToast }}" aria-label="إغلاق" style="margin-inline-start:8px;width:26px;height:26px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;opacity:.75"><svg width="15" height="15"><use href="#i-x"></use></svg></button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;defaultDirection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rtl&quot;,&quot;ltr&quot;],&quot;default&quot;:&quot;rtl&quot;,&quot;tsType&quot;:&quot;'rtl'|'ltr'&quot;},&quot;defaultScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;VD-06&quot;,&quot;VD-07&quot;,&quot;VD-08&quot;,&quot;VD-11&quot;,&quot;VD-12&quot;,&quot;VD-13&quot;,&quot;VD-17&quot;,&quot;ST-01&quot;,&quot;ST-05&quot;,&quot;ST-10&quot;,&quot;ST-13&quot;,&quot;ST-15&quot;,&quot;ST-19&quot;,&quot;SH-01&quot;,&quot;SH-03&quot;,&quot;ST-25&quot;,&quot;AD-07&quot;,&quot;AD-13&quot;],&quot;default&quot;:&quot;VD-06&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { group: 'vendor', screen: 'VD-06', pstate: 'default', toast: null, sheet: false, qty: 1, variant: 'أحمر · M' };
+
+  componentDidMount() {
+    const r = this.rootEl;
+    if (r) {
+      if (this.props.defaultTheme === 'dark') r.setAttribute('data-theme', 'dark');
+      if (this.props.defaultDirection === 'ltr') { r.setAttribute('dir', 'ltr'); r.setAttribute('data-lang', 'en'); }
+    }
+    if (this.props.defaultScreen) this.setState({ screen: this.props.defaultScreen });
+  }
+  componentWillUnmount() { clearTimeout(this._toastT); }
+  set(k, v) { if (this.rootEl) this.rootEl.setAttribute(k, v); }
+  toast(msg, kind) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: { msg: msg, kind: kind || 'success' } });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), 3600);
+  }
+  go(screen) { this.setState({ screen: screen, sheet: false }); }
+  money(n, code) {
+    const dec = (code === 'KWD' || code === 'JOD' || code === 'OMR') ? 3 : 2;
+    const sym = { SAR: 'ر.س.', AED: 'د.إ.', JOD: 'د.أ.' }[code || 'SAR'];
+    return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + ' ' + sym;
+  }
+
+  groups() {
+    return {
+      vendor: { label: 'التاجر', screens: ['VD-06', 'VD-07', 'VD-08', 'VD-11', 'VD-12', 'VD-13', 'VD-17'] },
+      shop: { label: 'المتجر', screens: ['ST-01', 'ST-05', 'ST-10', 'ST-13', 'ST-15', 'ST-19'] },
+      shared: { label: 'مشترك', screens: ['SH-01', 'SH-03', 'ST-25'] },
+      admin: { label: 'الإدارة', screens: ['AD-07', 'AD-13'] }
+    };
+  }
+
+  body() {
+    const st = this.state, S = (o) => this.setState(o), out = {};
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const sc = st.screen;
+    const M = (n, c) => this.money(n, c);
+
+    out.mCards = !empty;
+    out.mEmpty = empty;
+    const emptyMap = {
+      'VD-06': ['#i-chart', 'لا بيانات بعد', 'تظهر مؤشراتك بعد أول منتج وأول طلب.', 'أضف أول منتج', () => this.go('VD-08')],
+      'VD-07': ['#i-package', 'لا منتجات بعد', 'ابدأ بمنتج واحد لتفهم الشكل.', 'أضف منتجاً', () => this.go('VD-08')],
+      'VD-08': ['#i-package', 'منتج جديد', 'املأ الأساسيات ثم أضف الصور والمتغيّرات.', 'ابدأ', () => S({ pstate: 'default' })],
+      'VD-11': ['#i-boxes', 'لا مخزون بعد', 'أضف منتجاً بمتغيّراته ليظهر مخزونه هنا.', 'أضف منتجاً', () => this.go('VD-08')],
+      'VD-12': ['#i-truck', 'لا طلبات بعد', 'تصلك الطلبات هنا فور شراء أحدهم من متجرك.', 'راجع منتجاتك', () => this.go('VD-07')],
+      'VD-13': ['#i-truck', 'لا تفاصيل', 'اختر طلباً من القائمة.', 'عُد للطلبات', () => this.go('VD-12')],
+      'VD-17': ['#i-wallet', 'لا حركات مالية', 'تظهر أرباحك بعد أول عملية بيع مكتملة.', 'راجع منتجاتك', () => this.go('VD-07')],
+      'ST-01': ['#i-store', 'لا منتجات لعرضها', 'نضيف متاجر جديدة كل أسبوع.', 'حدّث', () => S({ pstate: 'default' })],
+      'ST-05': ['#i-search', 'لا نتائج', 'جرّب كلمة أقصر أو أزل بعض التصفية.', 'أزل التصفية', () => { S({ sheetPicked: [], pstate: 'default' }); }],
+      'ST-10': ['#i-image', 'المنتج غير متاح', 'ربما حُذف أو أوقف المتجر بيعه.', 'تصفّح البدائل', () => this.go('ST-05')],
+      'ST-13': ['#i-cart', 'سلتك فارغة', 'أضف منتجات من المتجر لتظهر هنا.', 'تصفّح المتجر', () => this.go('ST-01')],
+      'ST-15': ['#i-cart', 'لا شيء للدفع', 'أضف منتجاً إلى سلتك أولاً.', 'عُد للسلة', () => this.go('ST-13')],
+      'ST-19': ['#i-package', 'لا طلبات بعد', 'طلباتك تظهر هنا بعد أول عملية شراء.', 'تصفّح المتجر', () => this.go('ST-01')],
+      'SH-01': ['#i-user', 'الدخول', 'اكتب بريدك وكلمة مرورك.', 'ابدأ', () => S({ pstate: 'default' })],
+      'SH-03': ['#i-check-circle', 'لا رمز', 'اطلب رمزاً جديداً.', 'أعد الإرسال', () => S({ pstate: 'default' })],
+      'ST-25': ['#i-user', 'لا حساب', 'ادخل لعرض حسابك.', 'ادخل', () => this.go('SH-01')],
+      'AD-07': ['#i-package', 'انتهى الطابور', 'لا منتجات تنتظر المراجعة الآن.', 'حدّث', () => S({ pstate: 'default' })],
+      'AD-13': ['#i-wallet', 'لا طلبات تحويل', 'تظهر الطلبات عند طلب تاجر سحب رصيده.', 'حدّث', () => S({ pstate: 'default' })]
+    };
+    const em = emptyMap[sc] || emptyMap['VD-06'];
+    out.mEmptyIcon = em[0]; out.mEmptyTitle = em[1]; out.mEmptyBody = em[2]; out.mEmptyCta = em[3]; out.mEmptyGo = em[4];
+
+    out.mBanner = ''; out.mHero = false; out.mChips = false; out.mStats = false; out.mGrid = false;
+    out.mGallery = false; out.mProduct = false; out.mList = false; out.mTimeline = false;
+    out.mForm = false; out.mMenu = false; out.mSummary = false; out.mOtp = false;
+    out.mChipList = []; out.mStatList = []; out.mGridItems = []; out.mThumbs = []; out.mVariants = [];
+    out.mListItems = []; out.mSteps = []; out.mFields = []; out.mMenuItems = []; out.mSummaryRows = []; out.mOtpCells = [];
+
+    const badge = (t, kind) => ({ badge: t, badgeBg: 'var(--' + kind + '-subtle)', badgeFg: 'var(--' + kind + '-text)' });
+    const row = (o) => Object.assign({
+      title: '', sub: '', subDir: 'rtl', subFont: 'var(--font-ui)', amount: '', badge: '', badgeBg: '', badgeFg: '',
+      meta: '', metaColor: 'var(--text-muted)', thumb: false, thumbIcon: '#i-image', border: 'var(--border-subtle)',
+      note: '', noteBorder: 'var(--danger)', noteBg: 'var(--danger-subtle)', noteColor: 'var(--danger-text)',
+      actions: false, actionList: [], go: () => {}
+    }, o);
+    const abtn = (label, go, kind) => ({
+      label: label, go: go,
+      border: kind === 'primary' ? '0' : (kind === 'danger' ? '1px solid var(--danger)' : '1px solid var(--border-control)'),
+      bg: kind === 'primary' ? 'var(--brand)' : 'transparent',
+      fg: kind === 'primary' ? 'var(--on-brand)' : (kind === 'danger' ? 'var(--danger-text)' : 'var(--text-strong)')
+    });
+
+    if (sc === 'VD-06') {
+      out.mStats = true;
+      if (edge) { out.mBanner = 'السبب: شكاوى متكرّرة على مدّة التجهيز. راسل الدعم لرفع التعليق.'; out.mBannerTitle = 'متجرك معلَّق مؤقتاً'; out.mBannerBorder = 'var(--danger)'; out.mBannerBg = 'var(--danger-subtle)'; out.mBannerColor = 'var(--danger-text)'; out.mBannerIcon = '#i-alert'; }
+      out.mStatList = [
+        { label: 'مبيعات هذا الأسبوع', value: M(8420), dir: 'ltr', color: 'var(--money)', border: 'var(--money-border)', iconBg: 'var(--money-subtle)', iconFg: 'var(--money)', icon: '#i-wallet', sub: '+26.2% عن الأسبوع السابق', subColor: 'var(--success-text)', go: () => this.toast('التقارير على الهاتف: ملخّص فقط') },
+        { label: 'بانتظار القبول', value: edge ? '47' : '12', dir: 'ltr', color: 'var(--text-strong)', border: edge ? 'var(--danger)' : 'var(--border-subtle)', iconBg: edge ? 'var(--danger-subtle)' : 'var(--warning-subtle)', iconFg: edge ? 'var(--danger-text)' : 'var(--warning-text)', icon: '#i-clock', sub: edge ? 'الأقرب يسقط بعد ساعة' : 'الأقرب يسقط بعد 5 ساعات', subColor: edge ? 'var(--danger-text)' : 'var(--warning-text)', go: () => this.go('VD-12') },
+        { label: 'مخزون منخفض', value: '4', dir: 'ltr', color: 'var(--text-strong)', border: 'var(--border-subtle)', iconBg: 'var(--sunken)', iconFg: 'var(--text-muted)', icon: '#i-boxes', sub: '3 قارب النفاد · 1 نفد', subColor: 'var(--text-muted)', go: () => this.go('VD-11') },
+        { label: 'المتاح للسحب', value: M(3180.25), dir: 'ltr', color: 'var(--money)', border: 'var(--money-border)', iconBg: 'var(--money-subtle)', iconFg: 'var(--money)', icon: '#i-wallet', sub: 'قيد التحرير 1,240.00 ر.س.', subColor: 'var(--text-muted)', go: () => this.go('VD-17') }
+      ];
+    } else if (sc === 'VD-07') {
+      out.mChips = true;
+      out.mList = true;
+      const tabs = [['الكل', 8], ['منشور', 3], ['مسودة', 1], ['مراجعة', 1], ['مرفوض', 2]];
+      const pick = st.vdTab || 'الكل';
+      out.mChipList = tabs.map(t => ({
+        label: t[0], count: String(t[1]),
+        bg: pick === t[0] ? 'var(--brand)' : 'var(--card)',
+        fg: pick === t[0] ? 'var(--on-brand)' : 'var(--text-body)',
+        border: pick === t[0] ? 'var(--brand)' : 'var(--border-control)',
+        pick: () => S({ vdTab: t[0] })
+      }));
+      const prods = [
+        { n: 'قميص قطني مصري', s: '3 متغيّرات · 79.00 – 92.00 ر.س.', b: ['منشور', 'success'], stock: 'متاح 24', t: 'منشور' },
+        { n: 'بنطال كتان واسع', s: 'PT04-LIN · 149.00 ر.س.', b: ['منشور', 'success'], stock: 'متاح 6', t: 'منشور' },
+        { n: 'طقم مفارش قطن — كينج', s: 'BD12-KNG · 240.00 ر.س.', b: ['مرفوض', 'danger'], stock: 'نفد', t: 'مرفوض', note: 'الصورة الرئيسية تحتوي شعار متجر آخر. ارفع صورة بلا علامات مائية.' },
+        { n: 'عباءة صوف مطرّزة', s: '2 متغيّرات · 640.00 ر.س.', b: ['قيد المراجعة', 'warning'], stock: 'متاح 11', t: 'مراجعة' },
+        { n: 'قميص كتان بأكمام قصيرة', s: 'SH09-LIN · 92.00 ر.س.', b: ['مسودة', 'neutral'], stock: 'متاح 3', t: 'مسودة' }
+      ].filter(p => pick === 'الكل' || p.t === pick);
+      out.mListItems = prods.map(p => row(Object.assign({
+        title: p.n, sub: p.s, subDir: 'rtl', thumb: true, meta: p.stock,
+        border: p.b[1] === 'danger' ? 'var(--danger)' : 'var(--border-subtle)',
+        note: p.note || '',
+        go: () => this.go('VD-08')
+      }, badge(p.b[0], p.b[1]))));
+    } else if (sc === 'VD-08') {
+      out.mBannerTitle = '3 عوائق تمنع الإرسال';
+      out.mBanner = 'صورة مرفوضة · خصيصة «طول الكم» ناقصة · صف مصفوفة برمز مكرّر. كلها معروضة أدناه.';
+      out.mBannerBorder = 'var(--danger)'; out.mBannerBg = 'var(--danger-subtle)'; out.mBannerColor = 'var(--danger-text)'; out.mBannerIcon = '#i-alert';
+      out.mGallery = true;
+      out.mThumbs = [{ border: 'var(--brand)' }, { border: 'var(--border-default)' }, { border: 'var(--danger)' }, { border: 'var(--border-default)' }];
+      out.mForm = true;
+      out.mFields = [
+        { label: 'الاسم بالعربية', type: 'text', value: st.p8Name === undefined ? 'قميص قطني مصري' : st.p8Name, onChange: (e) => S({ p8Name: e.target.value }), dir: 'rtl', font: 'var(--font-ui)', border: 'var(--border-control)', placeholder: '', hint: '', hintColor: 'var(--text-muted)' },
+        { label: 'السعر', type: 'text', value: st.p8Price === undefined ? '79.00' : st.p8Price, onChange: (e) => S({ p8Price: e.target.value.replace(/[^0-9.]/g, '') }), dir: 'ltr', font: 'var(--font-mono)', border: 'var(--border-control)', placeholder: '79.00', hint: 'بالريال السعودي — منزلتان عشريتان.', hintColor: 'var(--text-muted)' },
+        { label: 'طول الكم', type: 'text', value: st.p8Sleeve || '', onChange: (e) => S({ p8Sleeve: e.target.value }), dir: 'rtl', font: 'var(--font-ui)', border: (st.p8Sleeve || '') ? 'var(--border-control)' : 'var(--danger)', placeholder: 'قصير أو طويل', hint: (st.p8Sleeve || '') ? '' : 'خصيصة إلزامية في تصنيف «قمصان».', hintColor: 'var(--danger-text)' }
+      ];
+      out.mFormCta = 'احفظ كمسودة';
+      out.mFormGo = () => this.toast('حُفظت المسودة');
+      out.mFormAlt = 'عاين في المتجر';
+      out.mFormAltGo = () => this.go('ST-10');
+    } else if (sc === 'VD-11') {
+      out.mChips = true;
+      out.mList = true;
+      const f = st.invF || 'الكل';
+      out.mChipList = [['الكل', 7], ['منخفض', 3], ['نفد', 1]].map(t => ({
+        label: t[0], count: String(t[1]),
+        bg: f === t[0] ? 'var(--brand)' : 'var(--card)',
+        fg: f === t[0] ? 'var(--on-brand)' : 'var(--text-body)',
+        border: f === t[0] ? 'var(--brand)' : 'var(--border-control)',
+        pick: () => S({ invF: t[0] })
+      }));
+      const inv = [
+        { n: 'قميص قطني مصري', v: 'أحمر · M', sku: 'SH01-RED-M', on: 14, res: 3, th: 3 },
+        { n: 'قميص قطني مصري', v: 'أحمر · L', sku: 'SH01-RED-L', on: 6, res: 4, th: 3 },
+        { n: 'قميص قطني مصري', v: 'أزرق · M', sku: 'SH01-BLU-M', on: 2, res: 0, th: 3 },
+        { n: 'طقم مفارش قطن', v: 'بلا خيارات', sku: 'BD12-KNG', on: 0, res: 0, th: 2 }
+      ].map(r => Object.assign({}, r, { avail: Math.max(0, r.on - r.res) }))
+        .filter(r => f === 'الكل' || (f === 'منخفض' && r.avail > 0 && r.avail <= r.th) || (f === 'نفد' && r.avail === 0));
+      out.mListItems = inv.map(r => row(Object.assign({
+        title: r.n + ' — ' + r.v,
+        sub: r.sku + ' · الموجود ' + r.on + ' · المحجوز ' + r.res,
+        subDir: 'ltr', subFont: 'var(--font-mono)',
+        amount: 'متاح ' + r.avail,
+        border: r.avail === 0 ? 'var(--danger)' : 'var(--border-subtle)',
+        meta: 'الحد ' + r.th,
+        actions: true,
+        actionList: [abtn('عدّل المخزون', () => this.toast('ورقة تعديل المخزون — جرد أو حركة'), 'primary'), abtn('الحركات', () => this.toast('سجلّ حركات ' + r.sku))],
+        go: () => {}
+      }, badge(r.avail === 0 ? 'نفد' : (r.avail <= r.th ? 'منخفض' : 'متاح'), r.avail === 0 ? 'danger' : (r.avail <= r.th ? 'warning' : 'success')))));
+    } else if (sc === 'VD-12') {
+      out.mChips = true;
+      out.mList = true;
+      const f = st.ordF || 'الكل';
+      out.mChipList = [['الكل', 6], ['بانتظار القبول', 2], ['قيد التجهيز', 1], ['تم الشحن', 2]].map(t => ({
+        label: t[0], count: String(t[1]),
+        bg: f === t[0] ? 'var(--brand)' : 'var(--card)',
+        fg: f === t[0] ? 'var(--on-brand)' : 'var(--text-body)',
+        border: f === t[0] ? 'var(--brand)' : 'var(--border-control)',
+        pick: () => S({ ordF: t[0] })
+      }));
+      const ords = [
+        { no: 'BST-26-004821-A', who: 'نورة العتيبي', amt: 1362.75, s: ['بانتظار القبول', 'warning'], left: edge ? 'يسقط بعد ساعة' : 'يسقط بعد 5 ساعات', urgent: true },
+        { no: 'BST-26-004830-B', who: 'عبير الزهراني', amt: 268, s: ['بانتظار القبول', 'warning'], left: 'يسقط بعد 11 ساعة', urgent: false },
+        { no: 'BST-26-004822-A', who: 'سعد الدوسري', amt: 640, s: ['قيد التجهيز', 'info'], left: 'اشحن قبل 16 سبتمبر', urgent: false },
+        { no: 'BST-26-004823-C', who: 'مها القحطاني', amt: 450, s: ['تم الشحن', 'info'], left: 'SPL-88213394', urgent: false },
+        { no: 'BST-26-004818-B', who: 'فهد الشمري', amt: 268, s: ['تم التسليم', 'success'], left: 'سُلّم 11 سبتمبر', urgent: false }
+      ].filter(o => f === 'الكل' || o.s[0] === f);
+      out.mListItems = ords.map(o => row(Object.assign({
+        title: o.who, sub: o.no, subDir: 'ltr', subFont: 'var(--font-mono)',
+        amount: M(o.amt),
+        border: o.urgent ? 'var(--danger)' : 'var(--border-subtle)',
+        meta: o.left, metaColor: o.urgent ? 'var(--danger-text)' : 'var(--text-muted)',
+        actions: o.s[0] === 'بانتظار القبول',
+        actionList: [abtn('اقبل', () => this.toast('قُبل الطلب ' + o.no), 'primary'), abtn('ارفض', () => this.toast('يلزم سبب الرفض', 'warning'), 'danger')],
+        go: () => this.go('VD-13')
+      }, badge(o.s[0], o.s[1]))));
+    } else if (sc === 'VD-13') {
+      out.mTimeline = true;
+      const step = 2;
+      const defs = [['بانتظار قبول المتجر', '13 سبت · 15:42'], ['قيد التجهيز', '13 سبت · 16:10'], ['تم الشحن', '—'], ['قيد التوصيل', '—'], ['تم التسليم', '—']];
+      out.mSteps = defs.map((d, i) => {
+        const pos = i + 1, done = pos < step, active = pos === step;
+        return {
+          label: d[0], date: d[1], hasLine: i < defs.length - 1,
+          bg: done ? 'var(--brand)' : (active ? 'var(--brand-subtle)' : 'var(--card)'),
+          fg: done ? 'var(--on-brand)' : (active ? 'var(--brand-text)' : 'var(--text-faint)'),
+          bd: (done || active) ? 'var(--brand)' : 'var(--border-default)',
+          icon: done ? '#i-check' : (active ? '#i-clock' : '#i-minus'),
+          line: pos < step ? 'var(--brand)' : 'var(--border-default)'
+        };
+      });
+      out.mList = true;
+      out.mListItems = [
+        row({ title: 'قميص قطن — أحمر · M', sub: 'TS01-RED-M × 2', subDir: 'ltr', subFont: 'var(--font-mono)', amount: M(158), thumb: true }),
+        row({ title: 'عباءة صوف — أسود · L', sub: 'AB07-BLK-L × 1', subDir: 'ltr', subFont: 'var(--font-mono)', amount: M(1002), thumb: true })
+      ];
+      out.mSummary = true;
+      out.mSummaryTitle = 'الإجمالي';
+      out.mSummaryRows = [
+        { k: 'المنتجات', v: M(1160), weight: '500', color: 'var(--text-body)' },
+        { k: 'الشحن', v: M(25), weight: '500', color: 'var(--text-body)' },
+        { k: 'ضريبة القيمة المضافة 15%', v: M(177.75), weight: '500', color: 'var(--text-body)' },
+        { k: 'الإجمالي', v: M(1362.75), weight: '700', color: 'var(--money)' }
+      ];
+      out.mSummaryNote = 'يُحرَّر رصيدك بعد 14 يوماً من التسليم.';
+    } else if (sc === 'VD-17') {
+      out.mStats = true;
+      out.mStatList = [
+        { label: 'قيد التحرير', value: M(1240), dir: 'ltr', color: 'var(--text-body)', border: 'var(--border-subtle)', iconBg: 'var(--sunken)', iconFg: 'var(--text-muted)', icon: '#i-clock', sub: 'يُحرَّر بعد 72 ساعة من التسليم', subColor: 'var(--text-muted)', go: () => {} },
+        { label: 'متاح للسحب', value: edge ? '−' + M(312.5) : M(3180.25), dir: 'ltr', color: edge ? 'var(--danger-text)' : 'var(--money)', border: edge ? 'var(--danger)' : 'var(--money-border)', iconBg: edge ? 'var(--danger-subtle)' : 'var(--money-subtle)', iconFg: edge ? 'var(--danger-text)' : 'var(--money)', icon: '#i-wallet', sub: edge ? 'السحب موقوف حتى يعود الرصيد موجباً' : 'الحد الأدنى 100 ر.س.', subColor: edge ? 'var(--danger-text)' : 'var(--text-muted)', go: () => { if (!edge) this.toast('طُلب سحب 3,180.25 ر.س.'); else this.toast('لا يمكن السحب برصيد سالب', 'warning'); } },
+        { label: 'مسحوب', value: M(18640), dir: 'ltr', color: 'var(--text-body)', border: 'var(--border-subtle)', iconBg: 'var(--sunken)', iconFg: 'var(--text-muted)', icon: '#i-check-circle', sub: 'آخر تحويل 8 سبتمبر', subColor: 'var(--text-muted)', go: () => {} }
+      ];
+      if (edge) { out.mBannerTitle = 'رصيدك سالب — −312.50 ر.س.'; out.mBanner = 'ثلاث عمليات ردّ بعد آخر تحويل. تُخصم تلقائياً من أرباحك القادمة.'; out.mBannerBorder = 'var(--danger)'; out.mBannerBg = 'var(--danger-subtle)'; out.mBannerColor = 'var(--danger-text)'; out.mBannerIcon = '#i-alert'; }
+    } else if (sc === 'ST-01') {
+      out.mHero = true;
+      out.mHeroGo = () => this.go('ST-05');
+      out.mChips = true;
+      out.mChipList = [['أزياء', 412], ['إلكترونيات', 238], ['المنزل', 156], ['الجمال', 94]].map(t => ({
+        label: t[0], count: String(t[1]),
+        bg: 'var(--card)', fg: 'var(--text-body)', border: 'var(--border-control)',
+        pick: () => this.go('ST-05')
+      }));
+      out.mGrid = true;
+      out.mGridItems = [
+        { name: 'قميص قطني مصري', shop: 'دار القطن', price: M(79), badge: 'وفّر 14%', badgeBg: 'var(--success-subtle)', badgeFg: 'var(--success-text)' },
+        { name: 'مكبّر صوت XL-900', shop: 'إلكترونيات الخليج', price: M(349), badge: '', badgeBg: '', badgeFg: '' },
+        { name: 'عطر عود مركّز 12 مل', shop: 'بيت العطور', price: M(420), badge: '', badgeBg: '', badgeFg: '' },
+        { name: 'وشاح قطني مصبوغ', shop: 'دار القطن', price: M(58), badge: 'بقي 3', badgeBg: 'var(--warning-subtle)', badgeFg: 'var(--warning-text)' }
+      ].map(p => Object.assign({}, p, { open: () => this.go('ST-10'), add: () => this.toast('أُضيف «' + p.name + '» إلى السلة') }));
+    } else if (sc === 'ST-05') {
+      out.mChips = true;
+      const picked = st.sheetPicked || [];
+      out.mChipList = [{ label: 'تصفية', count: String(picked.length), bg: picked.length ? 'var(--brand)' : 'var(--card)', fg: picked.length ? 'var(--on-brand)' : 'var(--text-body)', border: picked.length ? 'var(--brand)' : 'var(--border-control)', pick: () => S({ sheet: true }) }]
+        .concat([['الأحدث', 0], ['الأقل سعراً', 0], ['الأعلى تقييماً', 0]].map(t => ({
+          label: t[0], count: '',
+          bg: (st.sortBy || 'الأحدث') === t[0] ? 'var(--brand-subtle)' : 'var(--card)',
+          fg: (st.sortBy || 'الأحدث') === t[0] ? 'var(--brand-text)' : 'var(--text-body)',
+          border: (st.sortBy || 'الأحدث') === t[0] ? 'var(--brand)' : 'var(--border-control)',
+          pick: () => S({ sortBy: t[0] })
+        })));
+      out.mGrid = true;
+      const items = [
+        { name: 'قميص قطني مصري بأكمام طويلة', shop: 'دار القطن', price: 79 },
+        { name: 'قميص كتان بأكمام قصيرة', shop: 'دار القطن', price: 92 },
+        { name: 'بنطال كتان واسع', shop: 'دار القطن', price: 149 },
+        { name: 'وشاح قطني مصبوغ يدوياً', shop: 'دار القطن', price: 58 },
+        { name: 'طقم مناشف قطن مصري', shop: 'دار القطن', price: 185 },
+        { name: 'عباءة صوف مطرّزة', shop: 'مشغل الليوان', price: 640 }
+      ];
+      const sorted = (st.sortBy === 'الأقل سعراً') ? items.slice().sort((a, b) => a.price - b.price) : items;
+      out.mGridItems = sorted.map(p => ({
+        name: p.name, shop: p.shop, price: M(p.price), badge: '', badgeBg: '', badgeFg: '',
+        open: () => this.go('ST-10'), add: () => this.toast('أُضيف «' + p.name + '» إلى السلة')
+      }));
+    } else if (sc === 'ST-10') {
+      out.mGallery = true;
+      out.mThumbs = [{ border: 'var(--brand)' }, { border: 'var(--border-default)' }, { border: 'var(--border-default)' }, { border: 'var(--border-default)' }];
+      out.mProduct = true;
+      out.mProductName = 'قميص قطني مصري بأكمام طويلة';
+      out.mPrice = M(79);
+      out.mOpenShop = () => this.toast('صفحة المتجر ST-11');
+      const vars = [['أحمر · M', false], ['أحمر · L', false], ['أزرق · M', false], ['أسود · XL', true]];
+      out.mVariants = vars.map(v => ({
+        label: v[0], out: v[1],
+        bg: st.variant === v[0] ? 'var(--brand-subtle)' : 'transparent',
+        fg: v[1] ? 'var(--text-faint)' : (st.variant === v[0] ? 'var(--brand-text)' : 'var(--text-body)'),
+        border: v[1] ? 'var(--border-default)' : (st.variant === v[0] ? 'var(--brand)' : 'var(--border-control)'),
+        cursor: v[1] ? 'not-allowed' : 'pointer',
+        pick: () => { if (v[1]) { this.toast('هذا المقاس نفد', 'warning'); return; } S({ variant: v[0] }); }
+      }));
+      out.mQty = String(st.qty);
+      out.mQtyUp = () => { if (st.qty >= 3) { this.toast('بقي 3 فقط من هذا المقاس', 'warning'); return; } S({ qty: st.qty + 1 }); };
+      out.mQtyDown = () => S({ qty: Math.max(1, st.qty - 1) });
+      out.mStockNote = st.qty >= 3 ? 'بلغت الحد المتاح' : 'بقي 3 فقط';
+      out.mStockColor = st.qty >= 3 ? 'var(--danger-text)' : 'var(--warning-text)';
+    } else if (sc === 'ST-13') {
+      out.mList = true;
+      out.mListItems = [
+        row({ title: 'دار القطن', sub: 'يشحن من الرياض · 25.00 ر.س. شحن', badge: 'متجر 1', badgeBg: 'var(--brand-subtle)', badgeFg: 'var(--brand-text)', thumb: true, thumbIcon: '#i-store' }),
+        row({ title: 'قميص قطني مصري — أحمر · M', sub: '× 2 · 79.00 ر.س. للقطعة', subDir: 'rtl', amount: M(158), thumb: true, actions: true, actionList: [abtn('زد', () => this.toast('صار 3 قطع')), abtn('أزل', () => this.toast('أُزيل من السلة', 'warning'), 'danger')] }),
+        row({ title: 'عباءة صوف — أسود · L', sub: '× 1 · 1,002.00 ر.س.', amount: M(1002), thumb: true, note: edge ? 'بقي 1 فقط — قلّلنا الكمية تلقائياً.' : '', actions: true, actionList: [abtn('زد', () => this.toast('بقي 1 فقط', 'warning')), abtn('أزل', () => this.toast('أُزيل من السلة', 'warning'), 'danger')] }),
+        row({ title: 'إلكترونيات الخليج', sub: 'يشحن من دبي · شحن مجاني', badge: 'متجر 2', badgeBg: 'var(--brand-subtle)', badgeFg: 'var(--brand-text)', thumb: true, thumbIcon: '#i-store' }),
+        row({ title: 'مكبّر صوت XL-900', sub: '× 1 · 349.00 ر.س.', amount: M(349), thumb: true, actions: true, actionList: [abtn('زد', () => this.toast('صار 2')), abtn('أزل', () => this.toast('أُزيل من السلة', 'warning'), 'danger')] })
+      ];
+      out.mSummary = true;
+      out.mSummaryTitle = 'الإجمالي';
+      out.mSummaryRows = [
+        { k: 'المنتجات', v: M(1509), weight: '500', color: 'var(--text-body)' },
+        { k: 'الشحن — متجران', v: M(25), weight: '500', color: 'var(--text-body)' },
+        { k: 'ضريبة القيمة المضافة 15%', v: M(230.1), weight: '500', color: 'var(--text-body)' },
+        { k: 'الإجمالي', v: M(1764.1), weight: '700', color: 'var(--money)' }
+      ];
+      out.mSummaryNote = 'كل متجر يشحن شحنته على حدة، فقد تصلك الطرود في أيام مختلفة.';
+    } else if (sc === 'ST-15') {
+      out.mForm = true;
+      out.mFields = [
+        { label: 'الاسم الكامل', type: 'text', value: st.coName === undefined ? 'نورة العتيبي' : st.coName, onChange: (e) => S({ coName: e.target.value }), dir: 'rtl', font: 'var(--font-ui)', border: 'var(--border-control)', placeholder: '', hint: '', hintColor: '' },
+        { label: 'رقم الجوال', type: 'text', value: st.coPhone === undefined ? '+966 55 012 8844' : st.coPhone, onChange: (e) => S({ coPhone: e.target.value }), dir: 'ltr', font: 'var(--font-mono)', border: 'var(--border-control)', placeholder: '', hint: 'نرسل تحديثات الشحنة على هذا الرقم.', hintColor: 'var(--text-muted)' },
+        { label: 'العنوان', type: 'text', value: st.coAddr === undefined ? 'الرياض · النرجس · شارع أنس بن مالك' : st.coAddr, onChange: (e) => S({ coAddr: e.target.value }), dir: 'rtl', font: 'var(--font-ui)', border: 'var(--border-control)', placeholder: '', hint: '', hintColor: '' }
+      ];
+      out.mFormCta = 'اختر طريقة الدفع';
+      out.mFormGo = () => this.toast('البطاقة · Apple Pay · تحويل بنكي');
+      out.mSummary = true;
+      out.mSummaryTitle = 'ملخّص الدفع';
+      out.mSummaryRows = [
+        { k: 'المنتجات', v: M(1160), weight: '500', color: 'var(--text-body)' },
+        { k: 'الشحن', v: M(25), weight: '500', color: 'var(--text-body)' },
+        { k: 'ضريبة القيمة المضافة 15%', v: M(177.75), weight: '500', color: 'var(--text-body)' },
+        { k: 'الإجمالي', v: M(1362.75), weight: '700', color: 'var(--money)' }
+      ];
+      out.mSummaryNote = 'يُحصَّل المبلغ بالريال السعودي.';
+    } else if (sc === 'ST-19') {
+      out.mBannerTitle = 'طلبك في الطريق';
+      out.mBanner = 'شحنة دار القطن غادرت المستودع · التوصيل المتوقّع 16 سبتمبر.';
+      out.mBannerBorder = 'var(--info)'; out.mBannerBg = 'var(--info-subtle)'; out.mBannerColor = 'var(--info-text)'; out.mBannerIcon = '#i-truck';
+      out.mTimeline = true;
+      const defs = [['تم الطلب', '13 سبت · 15:40'], ['قبله المتجر', '13 سبت · 16:10'], ['تم الشحن', '14 سبت · 09:05'], ['قيد التوصيل', '—'], ['تم التسليم', '—']];
+      out.mSteps = defs.map((d, i) => {
+        const pos = i + 1, step = 3, done = pos < step, active = pos === step;
+        return {
+          label: d[0], date: d[1], hasLine: i < defs.length - 1,
+          bg: done ? 'var(--brand)' : (active ? 'var(--brand-subtle)' : 'var(--card)'),
+          fg: done ? 'var(--on-brand)' : (active ? 'var(--brand-text)' : 'var(--text-faint)'),
+          bd: (done || active) ? 'var(--brand)' : 'var(--border-default)',
+          icon: done ? '#i-check' : (active ? '#i-truck' : '#i-minus'),
+          line: pos < step ? 'var(--brand)' : 'var(--border-default)'
+        };
+      });
+      out.mList = true;
+      out.mListItems = [
+        row({ title: 'دار القطن', sub: 'SPL-88213394', subDir: 'ltr', subFont: 'var(--font-mono)', thumb: true, thumbIcon: '#i-store', badge: 'تم الشحن', badgeBg: 'var(--info-subtle)', badgeFg: 'var(--info-text)', actions: true, actionList: [abtn('تتبّع الشحنة', () => this.toast('صفحة التتبّع ST-20'), 'primary'), abtn('راسل المتجر', () => this.toast('محادثة المتجر ST-28'))] }),
+        row({ title: 'إلكترونيات الخليج', sub: 'بانتظار الشحن', thumb: true, thumbIcon: '#i-store', badge: 'قيد التجهيز', badgeBg: 'var(--warning-subtle)', badgeFg: 'var(--warning-text)' })
+      ];
+      out.mSummary = true;
+      out.mSummaryTitle = 'الإجمالي المدفوع';
+      out.mSummaryRows = [{ k: 'الإجمالي', v: M(1362.75), weight: '700', color: 'var(--money)' }];
+      out.mSummaryNote = 'نافذة الإرجاع مفتوحة حتى 30 سبتمبر.';
+    } else if (sc === 'SH-01') {
+      out.mForm = true;
+      out.mFields = [
+        { label: 'البريد الإلكتروني', type: 'text', value: st.inEmail === undefined ? 'noura@example.com' : st.inEmail, onChange: (e) => S({ inEmail: e.target.value, inErr: false }), dir: 'ltr', font: 'var(--font-ui)', border: st.inErr ? 'var(--danger)' : 'var(--border-control)', placeholder: '', hint: '', hintColor: '' },
+        { label: 'كلمة المرور', type: 'password', value: st.inPw || '', onChange: (e) => S({ inPw: e.target.value, inErr: false }), dir: 'ltr', font: 'var(--font-ui)', border: st.inErr ? 'var(--danger)' : 'var(--border-control)', placeholder: '', hint: st.inErr ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة' : 'للتجربة: basta-2026', hintColor: st.inErr ? 'var(--danger-text)' : 'var(--text-muted)' }
+      ];
+      out.mFormCta = 'ادخل';
+      out.mFormGo = () => {
+        if ((st.inPw || '') === 'basta-2026') { this.go('SH-03'); this.toast('أرسلنا رمز التحقّق'); }
+        else S({ inErr: true });
+      };
+      out.mFormAlt = 'أنشئ حساباً جديداً';
+      out.mFormAltGo = () => this.toast('إنشاء الحساب SH-02');
+    } else if (sc === 'SH-03') {
+      out.mBannerTitle = 'أرسلنا رمزاً من ست خانات';
+      out.mBanner = 'إلى +966 50 •••• 567 — يصل خلال دقيقة.';
+      out.mBannerBorder = 'var(--info)'; out.mBannerBg = 'var(--info-subtle)'; out.mBannerColor = 'var(--info-text)'; out.mBannerIcon = '#i-info';
+      out.mForm = true;
+      out.mOtp = true;
+      if (!this.otpEls) this.otpEls = [];
+      const otp = st.otp || ['', '', '', '', '', ''];
+      out.mOtpCells = otp.map((d, i) => ({
+        val: d,
+        border: st.otpErr ? 'var(--danger)' : (d ? 'var(--brand)' : 'var(--border-control)'),
+        bg: st.otpErr ? 'var(--danger-subtle)' : (d ? 'var(--brand-subtle)' : 'var(--card)'),
+        ref: (el) => { this.otpEls[i] = el; },
+        onInput: (e) => {
+          const v = (e.target.value || '').replace(/\D/g, '');
+          const arr = otp.slice();
+          if (v.length > 1) {
+            v.slice(0, 6).split('').forEach((ch, k) => { if (i + k < 6) arr[i + k] = ch; });
+            S({ otp: arr, otpErr: false });
+            const last = Math.min(5, i + v.length - 1);
+            if (this.otpEls[last]) this.otpEls[last].focus();
+            return;
+          }
+          arr[i] = v.slice(-1);
+          S({ otp: arr, otpErr: false });
+          if (v && i < 5 && this.otpEls[i + 1]) this.otpEls[i + 1].focus();
+        },
+        onKeyDown: (e) => { if (e.key === 'Backspace' && !otp[i] && i > 0 && this.otpEls[i - 1]) this.otpEls[i - 1].focus(); },
+        onPaste: (e) => {
+          const txt = ((e.clipboardData && e.clipboardData.getData('text')) || '').replace(/\D/g, '');
+          if (!txt) return;
+          e.preventDefault();
+          const arr = ['', '', '', '', '', ''];
+          txt.slice(0, 6).split('').forEach((ch, k) => { arr[k] = ch; });
+          S({ otp: arr, otpErr: false });
+          if (this.otpEls[5]) this.otpEls[5].focus();
+          this.toast('لُصق الرمز');
+        }
+      }));
+      out.mResend = () => { S({ otp: ['', '', '', '', '', ''], otpErr: false }); this.toast('أُرسل رمز جديد'); };
+      out.mFormCta = 'تحقّق';
+      out.mFormGo = () => {
+        const code = (st.otp || []).join('');
+        if (code === '482913') { this.go('ST-25'); this.toast('تم التحقّق'); }
+        else S({ otpErr: true });
+      };
+      out.mFormAlt = 'الرمز الصحيح للتجربة 482913';
+      out.mFormAltGo = () => S({ otp: ['4', '8', '2', '9', '1', '3'], otpErr: false });
+    } else if (sc === 'ST-25') {
+      out.mMenu = true;
+      out.mMenuItems = [
+        { label: 'طلباتي', icon: '#i-package', badge: '', go: () => this.go('ST-19') },
+        { label: 'قائمة الرغبات', icon: '#i-heart', badge: '6', go: () => this.toast('قائمة الرغبات ST-23') },
+        { label: 'العناوين', icon: '#i-store', badge: '', go: () => this.toast('العناوين ST-26') },
+        { label: 'الإشعارات', icon: '#i-info', badge: '4', go: () => this.toast('الإشعارات ST-27') },
+        { label: 'رسائلي', icon: '#i-user', badge: '2', go: () => this.toast('الرسائل ST-28') },
+        { label: 'الأمان والجلسات', icon: '#i-check-circle', badge: '', go: () => this.toast('الأمان ST-25') },
+        { label: 'اللغة وعملة العرض', icon: '#i-chart', badge: '', go: () => this.toast('العربية · ر.س.') }
+      ];
+    } else if (sc === 'AD-07') {
+      out.mChips = true;
+      const f = st.adF || 'الكل';
+      out.mChipList = [['الكل', 6], ['جديد', 4], ['عُدّل بعد النشر', 2]].map(t => ({
+        label: t[0], count: String(t[1]),
+        bg: f === t[0] ? 'var(--brand)' : 'var(--card)',
+        fg: f === t[0] ? 'var(--on-brand)' : 'var(--text-body)',
+        border: f === t[0] ? 'var(--brand)' : 'var(--border-control)',
+        pick: () => S({ adF: t[0] })
+      }));
+      out.mList = true;
+      const items = [
+        { n: 'مكبّر صوت بلوتوث XL-900', s: 'إلكترونيات الخليج · صوتيات', k: 'جديد', w: 'ينتظر يوم', late: true },
+        { n: 'قميص قطني مصري', s: 'دار القطن · قمصان', k: 'عُدّل بعد النشر', w: 'ينتظر 20 ساعة', late: false },
+        { n: 'عطر عود مركّز 12 مل', s: 'بيت العطور · عطور', k: 'جديد', w: 'ينتظر 14 ساعة', late: false },
+        { n: 'سجادة صوف يدوية', s: 'حرف الشام · سجاد', k: 'جديد', w: 'ينتظر 9 ساعات', late: false }
+      ].filter(i => f === 'الكل' || i.k === f);
+      out.mListItems = items.map(i => row(Object.assign({
+        title: i.n, sub: i.s, thumb: true,
+        border: i.late ? 'var(--danger)' : 'var(--border-subtle)',
+        meta: i.w, metaColor: i.late ? 'var(--danger-text)' : 'var(--text-muted)',
+        actions: true,
+        actionList: [abtn('اعتمد وانشر', () => this.toast('اعتُمد «' + i.n + '»'), 'primary'), abtn('ارفض بسبب', () => this.toast('رُفض — أُرسل السبب للتاجر', 'warning'), 'danger')],
+        go: () => this.toast('تفاصيل المنتج بالصور والخصائص')
+      }, badge(i.k, i.k === 'جديد' ? 'info' : 'warning'))));
+    } else if (sc === 'AD-13') {
+      out.mList = true;
+      const items = [
+        { shop: 'دار القطن', amt: 8240, cur: 'SAR', ok: true, iban: 'SA03 …7519' },
+        { shop: 'إلكترونيات الخليج', amt: 21500, cur: 'AED', ok: true, iban: 'AE07 …3391' },
+        { shop: 'مشغل الليوان', amt: 3180.25, cur: 'SAR', ok: true, iban: 'SA44 …2087' },
+        { shop: 'حرف الشام', amt: 1420.5, cur: 'JOD', ok: false, iban: 'JO94 …6612' }
+      ];
+      out.mListItems = items.map(i => row(Object.assign({
+        title: i.shop, sub: i.iban, subDir: 'ltr', subFont: 'var(--font-mono)',
+        amount: M(i.amt, i.cur), thumb: true, thumbIcon: '#i-store',
+        border: i.ok ? 'var(--border-subtle)' : 'var(--danger)',
+        note: i.ok ? '' : 'فرق 40.000 د.أ. بين الرصيد والقيود — لا يمكن الاعتماد قبل التسوية.',
+        actions: true,
+        actionList: i.ok
+          ? [abtn('اعتمد', () => this.toast('اعتُمد تحويل ' + M(i.amt, i.cur)), 'primary'), abtn('ارفض', () => this.toast('رُفض — يُعاد المبلغ للرصيد فوراً', 'warning'), 'danger')]
+          : [abtn('راجع القيود', () => this.toast('فتح كشف القيود للمقارنة'))],
+        go: () => {}
+      }, badge(i.ok ? 'الرصيد مطابق' : 'يحتاج مراجعة', i.ok ? 'success' : 'danger'))));
+    }
+
+    return out;
+  }
+
+  renderVals() {
+    const st = this.state, S = (o) => this.setState(o);
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const out = {};
+
+    out.rootRef = (el) => { this.rootEl = el; };
+    out.screen = st.screen;
+    out.setLight = () => this.set('data-theme', 'light');
+    out.setDark = () => this.set('data-theme', 'dark');
+    out.setAr = () => { this.set('dir', 'rtl'); this.set('data-lang', 'ar'); };
+    out.setEn = () => { this.set('dir', 'ltr'); this.set('data-lang', 'en'); };
+
+    const groups = this.groups();
+    out.groupTabs = Object.keys(groups).map(k => ({
+      label: groups[k].label,
+      bg: st.group === k ? 'var(--brand)' : 'var(--card)',
+      fg: st.group === k ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.group === k ? 'var(--brand)' : 'var(--border-control)',
+      go: () => S({ group: k, screen: groups[k].screens[0], sheet: false })
+    }));
+    out.screenTabs = groups[st.group].screens.map(c => ({
+      code: c,
+      bg: st.screen === c ? 'var(--brand)' : 'var(--card)',
+      fg: st.screen === c ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.screen === c ? 'var(--brand)' : 'var(--border-control)',
+      go: () => this.go(c)
+    }));
+    const pstates = [['default', 'طبيعي'], ['loading', 'تحميل'], ['empty', 'فارغ'], ['error', 'خطأ'], ['edge', 'الحدّ']];
+    out.stateTabs = pstates.map(p => ({
+      label: p[1],
+      bg: P === p[0] ? 'var(--brand)' : 'var(--card)',
+      fg: P === p[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: P === p[0] ? 'var(--brand)' : 'var(--border-control)',
+      go: () => S({ pstate: p[0] })
+    }));
+    out.loadingDisplay = P === 'loading' ? 'flex' : 'none';
+    out.errorDisplay = P === 'error' ? 'grid' : 'none';
+    out.contentDisplay = (P === 'loading' || P === 'error') ? 'none' : 'block';
+    out.retry = () => { S({ pstate: 'default' }); this.toast('أُعيد التحميل'); };
+
+    out.frameNote = 'إطار 400 بكسل — نفس المكوّنات والرموز، بكثافة اللمس: كل هدف 48 بكسل على الأقل، والجداول تصبح بطاقات، والتصفية ورقة سفلية.';
+
+    const notes = {
+      'VD-06': 'لوحة التاجر: البطاقات عمود واحد، والجداول بطاقات.',
+      'VD-07': 'المنتجات: بطاقة لكل منتج بدل صف جدول، والتصفية في ورقة سفلية.',
+      'VD-08': 'تحرير المنتج: أقسام مطوية، ومصفوفة المتغيّرات بطاقة لكل تركيبة.',
+      'VD-11': 'المخزون: بطاقة لكل متغيّر، والتعديل في ورقة سفلية.',
+      'VD-12': 'الطلبات: بطاقة لكل طلب مع مهلة القبول ظاهرة.',
+      'VD-13': 'تفاصيل الطلب: المسار عمودي على الهاتف.',
+      'VD-17': 'المحفظة: الأرصدة الثلاثة فوق بعضها.',
+      'ST-01': 'الرئيسية: لافتة واحدة وشبكة منتجات بعمودين.',
+      'ST-05': 'نتائج البحث: التصفية زر يفتح ورقة سفلية.',
+      'ST-10': 'صفحة المنتج: شريط الإضافة ثابت أسفل الشاشة.',
+      'ST-13': 'السلة: مجموعة لكل متجر، والإجمالي ثابت أسفل.',
+      'ST-15': 'الدفع: خطوات رأسية وزر واحد أسفل الشاشة.',
+      'ST-19': 'تفاصيل الطلب: طلب فرعي لكل متجر ببطاقة.',
+      'SH-01': 'الدخول: حقول بارتفاع 48 وزر بعرض كامل.',
+      'SH-03': 'رمز التحقّق: ست خانات كبيرة تتسع للإبهام.',
+      'ST-25': 'الحساب: قائمة أقسام، كل قسم يفتح صفحته.',
+      'AD-07': 'مراجعة المنتجات على الهاتف — المراجعون يعملون من جوالهم.',
+      'AD-13': 'طلبات التحويل على الهاتف مع تحقّق القيود.'
+    };
+    out.frameNote = notes[st.screen] ? 'إطار 400 بكسل · ' + notes[st.screen] + ' كل هدف لمس 48 بكسل على الأقل.' : out.frameNote;
+
+    const titles = {
+      'VD-06': 'لوحة التاجر', 'VD-07': 'المنتجات', 'VD-08': 'قميص قطني مصري', 'VD-11': 'المخزون',
+      'VD-12': 'الطلبات', 'VD-13': 'BST-26-004821-A', 'VD-17': 'المحفظة',
+      'ST-01': '', 'ST-05': 'نتائج البحث', 'ST-10': 'قميص قطني مصري', 'ST-13': 'السلة', 'ST-15': 'الدفع', 'ST-19': 'طلبي',
+      'SH-01': 'الدخول', 'SH-03': 'رمز التحقّق', 'ST-25': 'حسابي',
+      'AD-07': 'مراجعة المنتجات', 'AD-13': 'طلبات التحويل'
+    };
+    out.barTitle = titles[st.screen] || '';
+    const backScreens = ['VD-08', 'VD-13', 'ST-10', 'ST-15', 'ST-19', 'SH-03'];
+    out.showBack = backScreens.indexOf(st.screen) >= 0;
+    out.showBrand = st.screen === 'ST-01';
+    out.goBack = () => {
+      const map = { 'VD-08': 'VD-07', 'VD-13': 'VD-12', 'ST-10': 'ST-05', 'ST-15': 'ST-13', 'ST-19': 'ST-25', 'SH-03': 'SH-01' };
+      this.go(map[st.screen] || 'VD-06');
+    };
+    const shopBar = [{ icon: '#i-search', label: 'بحث', go: () => this.go('ST-05'), badge: '' }, { icon: '#i-cart', label: 'السلة', go: () => this.go('ST-13'), badge: empty ? '' : '2' }];
+    const barMap = {
+      'ST-01': shopBar, 'ST-05': shopBar, 'ST-10': shopBar, 'ST-13': [], 'ST-15': [], 'ST-19': [],
+      'VD-06': [{ icon: '#i-search', label: 'بحث', go: () => this.toast('بحث المتجر'), badge: '' }],
+      'VD-07': [{ icon: '#i-filter', label: 'تصفية', go: () => S({ sheet: true }), badge: '' }],
+      'VD-11': [{ icon: '#i-filter', label: 'تصفية', go: () => S({ sheet: true }), badge: '' }],
+      'VD-12': [{ icon: '#i-filter', label: 'تصفية', go: () => S({ sheet: true }), badge: '' }],
+      'AD-07': [{ icon: '#i-filter', label: 'تصفية', go: () => S({ sheet: true }), badge: '' }],
+      'AD-13': [], 'ST-25': [], 'SH-01': [], 'SH-03': [], 'VD-08': [], 'VD-17': [], 'VD-13': []
+    };
+    out.barActions = barMap[st.screen] || [];
+
+    /* bottom tab bar */
+    const tabSets = {
+      vendor: [
+        { label: 'الرئيسية', icon: '#i-chart', screen: 'VD-06' },
+        { label: 'المنتجات', icon: '#i-package', screen: 'VD-07' },
+        { label: 'الطلبات', icon: '#i-truck', screen: 'VD-12', badge: '12' },
+        { label: 'المخزون', icon: '#i-boxes', screen: 'VD-11' },
+        { label: 'المحفظة', icon: '#i-wallet', screen: 'VD-17' }
+      ],
+      shop: [
+        { label: 'الرئيسية', icon: '#i-store', screen: 'ST-01' },
+        { label: 'البحث', icon: '#i-search', screen: 'ST-05' },
+        { label: 'السلة', icon: '#i-cart', screen: 'ST-13', badge: '2' },
+        { label: 'حسابي', icon: '#i-user', screen: 'ST-25' }
+      ],
+      shared: [
+        { label: 'الدخول', icon: '#i-user', screen: 'SH-01' },
+        { label: 'الرمز', icon: '#i-check-circle', screen: 'SH-03' },
+        { label: 'حسابي', icon: '#i-user', screen: 'ST-25' }
+      ],
+      admin: [
+        { label: 'المنتجات', icon: '#i-package', screen: 'AD-07', badge: '6' },
+        { label: 'التحويلات', icon: '#i-wallet', screen: 'AD-13', badge: '4' }
+      ]
+    };
+    const tabs = tabSets[st.group] || [];
+    const noTabs = ['VD-08', 'VD-13', 'ST-10', 'ST-15', 'ST-19', 'SH-03'];
+    const showTabs = tabs.length > 0 && noTabs.indexOf(st.screen) < 0;
+    out.tabbarDisplay = showTabs ? 'block' : 'none';
+    out.tabCount = String(Math.max(1, tabs.length));
+    out.tabs = tabs.map(t => ({
+      label: t.label, icon: t.icon,
+      badge: empty ? '' : (t.badge || ''),
+      color: st.screen === t.screen ? 'var(--brand)' : 'var(--text-muted)',
+      weight: st.screen === t.screen ? '700' : '500',
+      go: () => this.go(t.screen)
+    }));
+
+    /* sticky bar */
+    const stickyMap = {
+      'ST-10': { price: this.money(79), note: st.variant + ' · بقي 3 فقط', label: 'أضف إلى السلة', icon: '#i-cart', go: () => { this.toast('أُضيف إلى السلة'); this.go('ST-13'); } },
+      'ST-13': { price: this.money(1362.75), note: 'شامل الشحن والضريبة · متجران', label: 'أكمل الطلب', icon: '#i-chev-end', go: () => this.go('ST-15') },
+      'ST-15': { price: this.money(1362.75), note: 'يُحصَّل بالريال السعودي', label: 'ادفع الآن', icon: '#i-check', go: () => { this.toast('تم الدفع — شكراً لك'); this.go('ST-19'); } },
+      'VD-08': { price: this.money(79), note: '9 متغيّرات · 3 عوائق', label: 'أرسل للمراجعة', icon: '#i-check', go: () => this.toast('3 عوائق تمنع الإرسال — راجعها أعلاه', 'warning') }
+    };
+    const sticky = stickyMap[st.screen];
+    out.stickyDisplay = (sticky && !empty) ? 'flex' : 'none';
+    out.stickyBottom = showTabs ? '68px' : '0';
+    out.stickyPrice = sticky ? sticky.price : '';
+    out.stickyNote = sticky ? sticky.note : '';
+    out.stickyLabel = sticky ? sticky.label : '';
+    out.stickyIcon = sticky ? sticky.icon : '#i-cart';
+    out.stickyGo = sticky ? sticky.go : (() => {});
+    let pad = '14px';
+    if (showTabs) pad = '82px';
+    if (sticky && !empty) pad = showTabs ? '150px' : '84px';
+    out.contentPadBottom = pad;
+
+    /* filter sheet */
+    out.sheetDisplay = st.sheet ? 'flex' : 'none';
+    out.closeSheet = () => S({ sheet: false });
+    out.stopClick = (e) => e.stopPropagation();
+    const sheetMap = {
+      'VD-07': { title: 'تصفية المنتجات', groups: [{ title: 'الحالة', options: [['منشور', 3], ['مسودة', 1], ['قيد المراجعة', 1], ['مرفوض', 2]] }] },
+      'VD-11': { title: 'تصفية المخزون', groups: [{ title: 'المستوى', options: [['الكل', 7], ['منخفض', 3], ['نفد', 1]] }] },
+      'VD-12': { title: 'تصفية الطلبات', groups: [{ title: 'الحالة', options: [['بانتظار القبول', 12], ['قيد التجهيز', 8], ['تم الشحن', 24], ['مرتجع', 3]] }] },
+      'AD-07': { title: 'تصفية الطابور', groups: [{ title: 'النوع', options: [['جديد', 4], ['عُدّل بعد النشر', 2]] }] },
+      'ST-05': { title: 'تصفية النتائج', groups: [{ title: 'القسم', options: [['أزياء', 42], ['المنزل', 18], ['إلكترونيات', 9]] }, { title: 'التقييم', options: [['4 نجوم فأكثر', 31], ['3 فأكثر', 48]] }] }
+    };
+    const sheetCfg = sheetMap[st.screen] || { title: 'تصفية', groups: [] };
+    const picked = st.sheetPicked || [];
+    out.sheetTitle = sheetCfg.title;
+    out.sheetClearLabel = picked.length ? 'امسح الكل' : '';
+    out.sheetClear = () => S({ sheetPicked: [] });
+    out.sheetGroups = sheetCfg.groups.map(g => ({
+      title: g.title,
+      options: g.options.map(o => {
+        const on = picked.indexOf(o[0]) >= 0;
+        return {
+          label: o[0], count: String(o[1]),
+          bg: on ? 'var(--brand-subtle)' : 'transparent',
+          fg: on ? 'var(--brand-text)' : 'var(--text-body)',
+          border: on ? 'var(--brand)' : 'var(--border-control)',
+          toggle: () => S({ sheetPicked: on ? picked.filter(x => x !== o[0]) : picked.concat([o[0]]) })
+        };
+      })
+    }));
+    out.sheetApplyLabel = picked.length ? 'اعرض النتائج · ' + picked.length + ' تصفية' : 'اعرض كل النتائج';
+    out.sheetApply = () => { S({ sheet: false }); this.toast(picked.length ? 'طُبّقت ' + picked.length + ' تصفية' : 'أُزيلت التصفية'); };
+
+    Object.assign(out, this.body());
+
+    out.toastMsg = st.toast ? st.toast.msg : '';
+    out.toastDisplay = st.toast ? 'flex' : 'none';
+    out.toastBg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-subtle)' : 'var(--inverse)';
+    out.toastFg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-text)' : 'var(--on-inverse)';
+    out.toastIcon = st.toast && st.toast.kind === 'warning' ? '#i-alert' : '#i-check-circle';
+    out.closeToast = () => S({ toast: null });
+
+    return out;
+  }
+}
+</script>
+</body>
+</html>

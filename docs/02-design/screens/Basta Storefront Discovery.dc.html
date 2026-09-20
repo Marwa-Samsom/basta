@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Basta · Storefront discovery ST-01…ST-12 · ST-29 · SH-05</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--sunken);color:var(--text-body);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{color:var(--brand-hover)}
+button,input,select,textarea{font:inherit;color:inherit}
+:root{
+--font-head:'Almarai',system-ui,sans-serif;
+--font-ui:'IBM Plex Sans Arabic',system-ui,sans-serif;
+--font-mono:'IBM Plex Mono',ui-monospace,monospace;
+--page:#F8F3EC;--card:#FFFFFF;--raised:#FFFFFF;--sunken:#F0E8DD;--inverse:#28211C;--on-inverse:#FDFAF6;
+--text-strong:#1E1814;--text-body:#4A3F35;--text-muted:#6B5C4D;--text-faint:#7D6C5B;
+--border-subtle:#F0E8DD;--border-default:#E3D7C7;--border-control:#958470;
+--brand:#8C2F46;--brand-hover:#74243A;--brand-pressed:#5C1B2E;--on-brand:#FFFFFF;--brand-subtle:#FBF1F3;--brand-text:#74243A;
+--money:#0E6B66;--money-subtle:#E3F2F0;--money-border:#C4E5E1;
+--success:#2F7A3E;--warning:#9A4F0B;--danger:#C23A1A;--info:#2D5F8B;
+--success-subtle:#E3F1E6;--warning-subtle:#FBEBDD;--danger-subtle:#FBE3DD;--info-subtle:#E1EBF4;
+--success-text:#25622F;--warning-text:#7E4009;--danger-text:#A12E13;--info-text:#244C70;
+--neutral-subtle:#F0E8DD;--neutral-text:#4A3F35;
+--focus:#B05A70;
+--shadow-sm:0 1px 2px rgba(46,13,23,.07),0 1px 3px rgba(74,63,53,.07);
+--shadow-md:0 2px 4px rgba(74,63,53,.07),0 6px 14px rgba(74,63,53,.09);
+--shadow-lg:0 10px 28px rgba(74,63,53,.14);
+--shadow-overlay:0 18px 52px rgba(30,24,20,.26);
+--r-1:4px;--r-2:8px;--r-3:14px;
+--text-3xl:38px;--text-2xl:30px;--text-xl:24px;--text-lg:20px;--text-md:17px;--text-sm:13px;--text-xs:12px;--text-2xs:11px;
+--text-base:15px;--row-h:48px;--card-pad:20px;--ctrl-h:40px;--gap:16px;
+}
+[data-theme="dark"]{
+--page:#14100D;--card:#1E1814;--raised:#28211C;--sunken:#14100D;--inverse:#F0E8DD;--on-inverse:#1E1814;
+--text-strong:#FDFAF6;--text-body:#E3D7C7;--text-muted:#A89680;--text-faint:#958470;
+--border-subtle:#28211C;--border-default:#332B24;--border-control:#7D6C5B;
+--brand:#D08A9B;--brand-hover:#E6B6C1;--brand-pressed:#F4DDE2;--on-brand:#1E1814;--brand-subtle:#2E0D17;--brand-text:#D08A9B;
+--money:#5CC6B8;--money-subtle:#0F2624;--money-border:#08403D;
+--success:#6CC287;--warning:#E39A4B;--danger:#F07A66;--info:#7FB2E0;
+--success-subtle:#13261A;--warning-subtle:#2E1C0B;--danger-subtle:#331410;--info-subtle:#0F1E2C;
+--success-text:#6CC287;--warning-text:#E39A4B;--danger-text:#F07A66;--info-text:#7FB2E0;
+--neutral-subtle:#28211C;--neutral-text:#E3D7C7;
+--focus:#D08A9B;
+--shadow-sm:0 1px 2px rgba(0,0,0,.4);
+--shadow-md:0 2px 4px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.4);
+--shadow-lg:0 10px 28px rgba(0,0,0,.5);
+--shadow-overlay:0 18px 52px rgba(0,0,0,.6);
+}
+[data-density="compact"]{--text-base:13px;--row-h:32px;--card-pad:16px;--ctrl-h:32px;--gap:12px}
+[data-lang="ar"] [data-t="en"]{display:none}
+[data-lang="en"] [data-t="ar"]{display:none}
+[dir="rtl"] [data-mirror]{transform:scaleX(-1)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+[data-theme="light"] [data-seg="light"],[data-theme="dark"] [data-seg="dark"],[data-lang="ar"] [data-seg="ar"],[data-lang="en"] [data-seg="en"],[data-density="comfortable"] [data-seg="comfortable"],[data-density="compact"] [data-seg="compact"]{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+@keyframes bsSpin{to{transform:rotate(360deg)}}
+@keyframes bsShimmer{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+@keyframes bsToastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes bsFade{from{opacity:0}to{opacity:1}}
+@keyframes bsDrawerIn{from{transform:translateX(100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:1ms !important;transition-duration:1ms !important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" dir="rtl" data-theme="light" data-lang="ar" data-density="comfortable" style="min-height:100vh;background:var(--sunken);color:var(--text-body);font-family:var(--font-ui)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M13 5l7 7-7 7"></path></symbol>
+<symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="M11 19l-7-7 7-7"></path></symbol>
+<symbol id="i-chev-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></symbol>
+<symbol id="i-chev-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L21.5 20H2.5z"></path><path d="M12 10v4.5"></path><path d="M12 17.5h.01"></path></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 8h.01"></path></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.4l2.8 2.8L16 9.6"></path></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.4l3.4 2"></path></symbol>
+<symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.5"></circle><path d="M21 16l-5-5-6 6"></path></symbol>
+<symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v11h16V9"></path><path d="M3 9l2-5h14l2 5z"></path></symbol>
+<symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"></path><path d="M3 8l9 5 9-5"></path><path d="M12 13v10"></path></symbol>
+<symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.2 11h10.3L20 7H6"></path><circle cx="9" cy="19" r="1.6"></circle><circle cx="17" cy="19" r="1.6"></circle></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.5-7-9.5A4.5 4.5 0 0112 8a4.5 4.5 0 017 2.5C19 15.5 12 20 12 20z"></path></symbol>
+<symbol id="i-heart-fill" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.5-7-9.5A4.5 4.5 0 0112 8a4.5 4.5 0 017 2.5C19 15.5 12 20 12 20z"></path></symbol>
+<symbol id="i-star-fill" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6l2.75 5.6 6.15.9-4.45 4.35 1.05 6.15L12 17.7l-5.5 2.9 1.05-6.15L3.1 10.1l6.15-.9z"></path></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18"></path><path d="M6 12h12"></path><path d="M10 19h4"></path></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h10v9H3z"></path><path d="M13 10h4l4 3v3h-8z"></path><circle cx="7" cy="18" r="1.8"></circle><circle cx="17" cy="18" r="1.8"></circle></symbol>
+<symbol id="i-return" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.3 5.7"></path><path d="M20 4v7h-7"></path></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z"></path><path d="M9 12.2l2.2 2.2L15.5 10"></path></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"></path></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 21a7.5 7.5 0 0115 0"></path></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3.5 9.5h17"></path><path d="M3.5 14.5h17"></path><path d="M12 3c2.5 3 2.5 15 0 18"></path><path d="M12 3c-2.5 3-2.5 15 0 18"></path></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></symbol>
+<symbol id="i-boxes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="7" rx="1.5"></rect><rect x="13" y="4" width="8" height="7" rx="1.5"></rect><rect x="8" y="13" width="8" height="7" rx="1.5"></rect></symbol>
+<symbol id="i-zoom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path><path d="M11 8.5v5"></path><path d="M8.5 11h5"></path></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 10-12 0c0 5-2 6-2 6h16s-2-1-2-6z"></path><path d="M13.7 20a2 2 0 01-3.4 0"></path></symbol>
+<symbol id="i-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a9 9 0 109 9"></path></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"></path><path d="M6 8h12"></path><path d="M6 8l-3 6h6z"></path><path d="M18 8l-3 6h6z"></path></symbol>
+</defs></svg>
+
+<header style="position:sticky;top:0;z-index:60;background:var(--card);border-block-end:1px solid var(--border-default);box-shadow:var(--shadow-sm)">
+  <div style="max-width:1600px;margin:0 auto;padding:9px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.08em">ST-01…12 · 29 · SH-05</span>
+    <div style="display:flex;gap:6px">
+      <a href="Basta Component Sheet.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">الورقة</a>
+      <a href="Basta Batch 1 - Vendor Onboarding.dc.html" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;padding:5px 9px;border:1px solid var(--border-default);border-radius:var(--r-1)" style-hover="background:var(--brand-subtle);color:var(--brand-text)">لوحة التاجر</a>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border-default)"></div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="light" onClick="{{ setLight }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 9px;height:26px;font-size:11px;cursor:pointer">فاتح</button>
+      <button type="button" data-seg="dark" onClick="{{ setDark }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 9px;height:26px;font-size:11px;cursor:pointer">داكن</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="ar" onClick="{{ setAr }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 9px;height:26px;font-size:11px;cursor:pointer">عربي</button>
+      <button type="button" data-seg="en" onClick="{{ setEn }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 9px;height:26px;font-size:11px;cursor:pointer">English</button>
+    </div>
+    <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+      <button type="button" data-seg="comfortable" onClick="{{ setComfortable }}" style="background:var(--card);color:var(--text-body);border:0;padding:0 9px;height:26px;font-size:11px;cursor:pointer">مريحة</button>
+      <button type="button" data-seg="compact" onClick="{{ setCompact }}" style="background:var(--card);color:var(--text-body);border:0;border-inline-start:1px solid var(--border-control);padding:0 9px;height:26px;font-size:11px;cursor:pointer">مضغوطة</button>
+    </div>
+    <nav style="display:flex;gap:3px;flex-wrap:wrap">
+      <sc-for list="{{ screenTabs }}" as="t" hint-placeholder-count="14">
+        <button type="button" onClick="{{ t.go }}" style="height:26px;padding:0 8px;border:1px solid {{ t.border }};border-radius:var(--r-1);background:{{ t.bg }};color:{{ t.fg }};font-family:var(--font-mono);font-size:10px;cursor:pointer">{{ t.code }}</button>
+      </sc-for>
+    </nav>
+    <div style="margin-inline-start:auto;display:flex;align-items:center;gap:5px">
+      <span style="font-family:var(--font-mono);font-size:10px;color:var(--text-faint);letter-spacing:.06em">STATE</span>
+      <div style="display:flex;gap:3px;flex-wrap:wrap">
+        <sc-for list="{{ stateTabs }}" as="p" hint-placeholder-count="5">
+          <button type="button" onClick="{{ p.go }}" style="height:26px;padding:0 8px;border:1px solid {{ p.border }};border-radius:var(--r-1);background:{{ p.bg }};color:{{ p.fg }};font-size:10px;cursor:pointer">{{ p.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div style="padding:20px 16px {{ pagePadBottom }};display:grid;justify-items:center">
+  <div style="width:1440px;zoom:{{ fit }};background:var(--page);border:1px solid var(--border-default);border-radius:var(--r-3);box-shadow:var(--shadow-lg);overflow:hidden">
+
+    <div style="background:var(--card);border-block-end:1px solid var(--border-default)">
+      <div style="padding:12px 32px;display:flex;align-items:center;gap:18px">
+        <button type="button" onClick="{{ goHome }}" style="border:0;background:transparent;padding:0;cursor:pointer;display:flex;align-items:baseline;gap:7px">
+          <span style="font-family:var(--font-head);font-weight:800;font-size:26px;color:var(--brand)">بسطة</span>
+        </button>
+        <div style="flex:1;min-width:0;position:relative">
+          <span style="display:flex;align-items:center;position:relative">
+            <svg width="18" height="18" style="position:absolute;inset-inline-start:12px;color:var(--text-faint);pointer-events:none"><use href="#i-search"></use></svg>
+            <input type="text" value="{{ searchVal }}" onChange="{{ onSearch }}" onFocus="{{ openSuggest }}" onKeyDown="{{ searchKey }}" placeholder="ابحث عن منتج أو متجر" style="width:100%;height:46px;padding-inline:38px 96px;border:1.5px solid {{ searchBorder }};border-radius:var(--r-2);background:var(--card);color:var(--text-strong);font-size:var(--text-base)" />
+            <button type="button" onClick="{{ runSearch }}" style="position:absolute;inset-inline-end:5px;height:36px;padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">ابحث</button>
+          </span>
+          <div style="display:{{ suggestDisplay }};position:absolute;top:100%;inset-inline:0;z-index:70;margin-top:6px;background:var(--raised);border:1px solid var(--border-default);border-radius:var(--r-2);box-shadow:var(--shadow-lg);overflow:hidden;max-height:420px;overflow-y:auto">
+            <sc-for list="{{ suggestGroups }}" as="g" hint-placeholder-count="3">
+              <div style="border-block-end:1px solid var(--border-subtle)">
+                <div style="padding:8px 14px;background:var(--sunken)">
+                  <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:.06em">{{ g.label }}</span>
+                </div>
+                <sc-for list="{{ g.items }}" as="s" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ s.pick }}" style="width:100%;padding:9px 14px;border:0;background:{{ s.bg }};cursor:pointer;text-align:start;display:flex;align-items:center;gap:11px" style-hover="background:var(--sunken)">
+                    <span style="width:34px;height:34px;flex:none;border-radius:var(--r-1);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="16" height="16"><use href="{{ s.icon }}"></use></svg></span>
+                    <span style="display:grid;gap:2px;min-width:0;flex:1">
+                      <span style="font-size:var(--text-sm);color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="background:var(--brand-subtle);color:var(--brand-text);font-weight:700">{{ s.hit }}</span>{{ s.rest }}</span>
+                      <sc-if value="{{ s.meta }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size:var(--text-2xs);color:var(--text-muted)">{{ s.meta }}</span>
+                      </sc-if>
+                    </span>
+                    <sc-if value="{{ s.price }}" hint-placeholder-val="{{ false }}">
+                      <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--money);flex:none">{{ s.price }}</span>
+                    </sc-if>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-for>
+            <div style="padding:9px 14px;display:flex;align-items:center;gap:10px;background:var(--sunken)">
+              <span style="font-size:var(--text-2xs);color:var(--text-muted)">Enter يفتح النتائج · Esc يغلق · الأسهم تتنقّل</span>
+              <button type="button" onClick="{{ closeSuggest }}" style="margin-inline-start:auto;height:26px;padding:0 9px;border:0;border-radius:var(--r-1);background:transparent;color:var(--text-muted);font-size:var(--text-2xs);cursor:pointer" style-hover="background:var(--card)">أغلق</button>
+            </div>
+          </div>
+        </div>
+        <button type="button" onClick="{{ changeLocation }}" style="border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;padding:0 11px;height:40px;cursor:pointer;display:flex;align-items:center;gap:8px" style-hover="background:var(--sunken)">
+          <svg width="17" height="17" style="flex:none;color:var(--text-muted)"><use href="#i-pin"></use></svg>
+          <span style="display:grid;gap:1px;text-align:start">
+            <span style="font-size:var(--text-2xs);color:var(--text-faint)">التوصيل إلى</span>
+            <span style="font-size:var(--text-xs);color:var(--text-strong);font-weight:600">{{ cityVal }}</span>
+          </span>
+        </button>
+        <button type="button" onClick="{{ toggleCurrency }}" style="border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;padding:0 11px;height:40px;cursor:pointer;display:flex;align-items:center;gap:7px" style-hover="background:var(--sunken)">
+          <svg width="16" height="16" style="flex:none;color:var(--text-muted)"><use href="#i-globe"></use></svg>
+          <span style="font-size:var(--text-xs);color:var(--text-strong);font-weight:600">{{ currencyCode }}</span>
+        </button>
+        <button type="button" onClick="{{ goAccount }}" aria-label="حسابي" style="width:40px;height:40px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)"><svg width="19" height="19"><use href="#i-user"></use></svg></button>
+        <button type="button" onClick="{{ goCart }}" aria-label="السلة" style="position:relative;width:40px;height:40px;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken)">
+          <svg width="19" height="19"><use href="#i-cart"></use></svg>
+          <span style="position:absolute;top:-6px;inset-inline-end:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-family:var(--font-mono);font-size:10px;display:grid;place-items:center">{{ cartCount }}</span>
+        </button>
+      </div>
+      <div style="padding:0 32px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <button type="button" onClick="{{ goCategories }}" style="height:32px;padding:0 12px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="background:var(--sunken)"><svg width="15" height="15"><use href="#i-boxes"></use></svg>كل الأقسام</button>
+        <sc-for list="{{ topCats }}" as="c" hint-placeholder-count="6">
+          <button type="button" onClick="{{ c.go }}" style="height:32px;padding:0 12px;border:0;border-radius:var(--r-1);background:{{ c.bg }};color:{{ c.fg }};font-size:var(--text-sm);cursor:pointer" style-hover="background:var(--brand-subtle);color:var(--brand-text)">{{ c.label }}</button>
+        </sc-for>
+        <button type="button" onClick="{{ goSell }}" style="margin-inline-start:auto;height:32px;padding:0 12px;border:0;border-radius:var(--r-1);background:var(--brand-subtle);color:var(--brand-text);font-size:var(--text-sm);font-weight:600;cursor:pointer" style-hover="background:var(--brand);color:var(--on-brand)">بِع على بسطة</button>
+      </div>
+    </div>
+
+    <div style="display:{{ loadingDisplay }};padding:28px 32px;gap:16px;flex-direction:column">
+      <span style="height:280px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out infinite"></span>
+      <span style="height:90px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .15s infinite"></span>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+        <span style="height:300px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .3s infinite"></span>
+        <span style="height:300px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .38s infinite"></span>
+        <span style="height:300px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .46s infinite"></span>
+        <span style="height:300px;border-radius:var(--r-2);background:var(--sunken);animation:bsShimmer 1.4s ease-in-out .54s infinite"></span>
+      </div>
+    </div>
+
+    <div style="display:{{ errorDisplay }};padding:90px 40px;place-items:center;text-align:center;gap:12px">
+      <span style="width:52px;height:52px;border-radius:var(--r-2);background:var(--danger-subtle);color:var(--danger-text);display:grid;place-items:center"><svg width="26" height="26"><use href="#i-alert"></use></svg></span>
+      <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong)">حدث خلل غير متوقّع</span>
+      <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">لم نستطع تحميل هذه الصفحة. أعد المحاولة، وإن تكرّر أبلغنا بالرقم <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono)">req-8f3a2c</span>.</span>
+      <button type="button" onClick="{{ retry }}" style="margin-top:6px;height:44px;padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px" style-hover="background:var(--brand-hover)"><svg width="17" height="17"><use href="#i-return"></use></svg>أعد المحاولة</button>
+    </div>
+
+    <div style="display:{{ contentDisplay }}">
+      <sc-if value="{{ isST01 }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;gap:28px;padding:20px 32px 36px">
+        <div style="position:relative;border-radius:var(--r-3);overflow:hidden;border:1px solid var(--border-default);background:var(--sunken)">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 42%;min-height:300px">
+            <div style="padding:40px;display:grid;align-content:center;gap:14px;background:var(--brand);color:var(--on-brand)">
+              <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:.14em;opacity:.85">{{ heroKicker }}</span>
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-3xl);line-height:1.25">{{ heroTitle }}</span>
+              <span style="font-size:var(--text-md);line-height:1.8;opacity:.92;max-width:44ch">{{ heroBody }}</span>
+              <button type="button" onClick="{{ heroCta }}" style="width:fit-content;margin-top:6px;height:46px;padding:0 22px;border:0;border-radius:var(--r-1);background:var(--card);color:var(--brand-text);font-size:var(--text-base);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:9px" style-hover="background:var(--brand-subtle)">{{ heroCtaLabel }}<svg width="17" height="17" data-mirror><use href="#i-next"></use></svg></button>
+            </div>
+            <div style="display:grid;place-items:center;color:var(--text-faint);background:var(--sunken)"><svg width="46" height="46"><use href="#i-image"></use></svg></div>
+          </div>
+          <div style="position:absolute;bottom:14px;inset-inline-start:40px;display:flex;gap:7px">
+            <sc-for list="{{ heroDots }}" as="d" hint-placeholder-count="3">
+              <button type="button" onClick="{{ d.pick }}" aria-label="شريحة" style="width:{{ d.w }};height:8px;border:0;border-radius:999px;background:{{ d.bg }};cursor:pointer;padding:0;transition:width .2s ease-out"></button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:grid;gap:12px">
+          <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">تصفّح الأقسام</span>
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">
+            <sc-for list="{{ catStrip }}" as="c" hint-placeholder-count="6">
+              <button type="button" onClick="{{ c.go }}" style="padding:18px 12px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:grid;justify-items:center;gap:9px;box-shadow:var(--shadow-sm)" style-hover="box-shadow:var(--shadow-md);border-color:var(--brand)">
+                <span style="width:44px;height:44px;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center"><svg width="21" height="21"><use href="{{ c.icon }}"></use></svg></span>
+                <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600;text-align:center">{{ c.label }}</span>
+                <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)">{{ c.count }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-for list="{{ homeSections }}" as="s" hint-placeholder-count="3">
+          <div style="display:grid;gap:12px">
+            <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">{{ s.title }}</span>
+              <sc-if value="{{ s.note }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:var(--text-sm);color:var(--text-muted)">{{ s.note }}</span>
+              </sc-if>
+              <sc-if value="{{ s.hasTabs }}" hint-placeholder-val="{{ false }}">
+                <span style="display:flex;gap:6px;margin-inline-start:auto;flex-wrap:wrap">
+                  <sc-for list="{{ s.tabs }}" as="t" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ t.pick }}" style="height:30px;padding:0 12px;border:1px solid {{ t.border }};border-radius:999px;background:{{ t.bg }};color:{{ t.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">{{ t.label }}</button>
+                  </sc-for>
+                </span>
+              </sc-if>
+              <sc-if value="{{ s.linkLabel }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ s.link }}" style="margin-inline-start:auto;height:30px;padding:0 11px;border:0;border-radius:var(--r-1);background:transparent;color:var(--brand-text);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--brand-subtle)">{{ s.linkLabel }}<svg width="14" height="14" data-mirror><use href="#i-chev-end"></use></svg></button>
+              </sc-if>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat({{ s.cols }},minmax(0,1fr));gap:16px">
+              <sc-for list="{{ s.cards }}" as="p" hint-placeholder-count="4">
+                <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm);display:grid;align-content:start" style-hover="box-shadow:var(--shadow-md)">
+                  <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;position:relative;display:block">
+                    <span style="display:grid;place-items:center;aspect-ratio:4/5;background:var(--sunken);color:var(--text-faint)"><svg width="30" height="30"><use href="{{ p.icon }}"></use></svg></span>
+                    <sc-if value="{{ p.badge }}" hint-placeholder-val="{{ false }}">
+                      <span style="position:absolute;top:10px;inset-inline-start:10px;height:24px;padding:0 10px;border-radius:999px;background:{{ p.badgeBg }};color:{{ p.badgeFg }};font-size:var(--text-2xs);font-weight:700;display:inline-flex;align-items:center">{{ p.badge }}</span>
+                    </sc-if>
+                  </button>
+                  <div style="padding:12px;display:grid;gap:7px">
+                    <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;text-align:start;font-size:var(--text-sm);color:var(--text-strong);line-height:1.5;min-height:2.8em;display:block">{{ p.name }}</button>
+                    <sc-if value="{{ p.shop }}" hint-placeholder-val="{{ false }}">
+                      <button type="button" onClick="{{ p.openShop }}" style="border:0;background:transparent;padding:0;cursor:pointer;text-align:start;font-size:var(--text-2xs);color:var(--text-muted);display:inline-flex;align-items:center;gap:5px" style-hover="color:var(--brand-text)"><svg width="12" height="12" style="flex:none"><use href="#i-store"></use></svg>{{ p.shop }}</button>
+                    </sc-if>
+                    <sc-if value="{{ p.rating }}" hint-placeholder-val="{{ false }}">
+                      <span style="display:inline-flex;align-items:center;gap:5px;font-size:var(--text-2xs);color:var(--text-body)"><svg width="13" height="13" style="color:var(--warning);flex:none"><use href="#i-star-fill"></use></svg><span style="font-family:var(--font-mono);font-weight:600">{{ p.rating }}</span><span style="color:var(--text-muted)">({{ p.reviews }})</span></span>
+                    </sc-if>
+                    <span style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+                      <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ p.price }}</span>
+                      <sc-if value="{{ p.compare }}" hint-placeholder-val="{{ false }}">
+                        <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);text-decoration:line-through">{{ p.compare }}</span>
+                      </sc-if>
+                    </span>
+                    <sc-if value="{{ p.stockNote }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-size:var(--text-2xs);color:{{ p.stockColor }};font-weight:600">{{ p.stockNote }}</span>
+                    </sc-if>
+                    <div style="display:flex;gap:7px;padding-top:2px">
+                      <button type="button" onClick="{{ p.add }}" style="flex:1;min-width:0;height:36px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px" style-hover="background:var(--brand-hover)" style-active="background:var(--brand-pressed)"><svg width="15" height="15"><use href="#i-cart"></use></svg>أضف</button>
+                      <button type="button" onClick="{{ p.wish }}" aria-label="المفضّلة" style="width:36px;height:36px;flex:none;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:{{ p.wishColor }};display:grid;place-items:center;cursor:pointer" style-hover="background:var(--brand-subtle);border-color:var(--brand)"><svg width="16" height="16"><use href="{{ p.wishIcon }}"></use></svg></button>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px">
+          <sc-for list="{{ shopCards }}" as="s" hint-placeholder-count="4">
+            <button type="button" onClick="{{ s.open }}" style="padding:16px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm);text-align:start" style-hover="box-shadow:var(--shadow-md);border-color:var(--brand)">
+              <span style="width:48px;height:48px;flex:none;border-radius:var(--r-2);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="22" height="22"><use href="#i-store"></use></svg></span>
+              <span style="display:grid;gap:4px;min-width:0">
+                <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.name }}</span>
+                  <sc-if value="{{ s.verified }}" hint-placeholder-val="{{ true }}">
+                    <svg width="14" height="14" style="color:var(--success-text);flex:none"><use href="#i-shield"></use></svg>
+                  </sc-if>
+                </span>
+                <span style="display:inline-flex;align-items:center;gap:5px;font-size:var(--text-2xs);color:var(--text-body)"><svg width="12" height="12" style="color:var(--warning);flex:none"><use href="#i-star-fill"></use></svg><span style="font-family:var(--font-mono);font-weight:600">{{ s.rating }}</span><span style="color:var(--text-muted)">· {{ s.city }}</span></span>
+              </span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:18px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card)">
+          <span style="display:flex;align-items:center;gap:11px">
+            <span style="width:40px;height:40px;flex:none;border-radius:999px;background:var(--success-subtle);color:var(--success-text);display:grid;place-items:center"><svg width="19" height="19"><use href="#i-shield"></use></svg></span>
+            <span style="display:grid;gap:2px"><span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">تجّار موثّقون</span><span style="font-size:var(--text-2xs);color:var(--text-muted)">نراجع سجل كل متجر قبل النشر</span></span>
+          </span>
+          <span style="display:flex;align-items:center;gap:11px">
+            <span style="width:40px;height:40px;flex:none;border-radius:999px;background:var(--info-subtle);color:var(--info-text);display:grid;place-items:center"><svg width="19" height="19"><use href="#i-return"></use></svg></span>
+            <span style="display:grid;gap:2px"><span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">إرجاع خلال 14 يوماً</span><span style="font-size:var(--text-2xs);color:var(--text-muted)">على المنتجات غير المستخدمة</span></span>
+          </span>
+          <span style="display:flex;align-items:center;gap:11px">
+            <span style="width:40px;height:40px;flex:none;border-radius:999px;background:var(--money-subtle);color:var(--money);display:grid;place-items:center"><svg width="19" height="19"><use href="#i-truck"></use></svg></span>
+            <span style="display:grid;gap:2px"><span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">دفع آمن أو عند الاستلام</span><span style="font-size:var(--text-2xs);color:var(--text-muted)">مدى · فيزا · ماستركارد · نقداً</span></span>
+          </span>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isST02 }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:22px 32px 36px;display:grid;gap:16px;max-width:1100px">
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+          <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong);margin:0">كل الأقسام</h1>
+          <span style="font-size:var(--text-sm);color:var(--text-muted)">حتى أربعة مستويات — اضغط القسم ليتوسّع</span>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);overflow:hidden">
+          <sc-for list="{{ catTree }}" as="n" hint-placeholder-count="10">
+            <div style="border-block-end:1px solid var(--border-subtle)">
+              <button type="button" onClick="{{ n.act }}" style="width:100%;padding:0 16px;height:{{ n.h }};border:0;background:{{ n.bg }};cursor:pointer;text-align:start;display:flex;align-items:center;gap:11px" style-hover="background:var(--sunken)">
+                <span style="width:{{ n.indent }};flex:none"></span>
+                <sc-if value="{{ n.hasIcon }}" hint-placeholder-val="{{ false }}">
+                  <span style="width:36px;height:36px;flex:none;border-radius:var(--r-1);background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center"><svg width="18" height="18"><use href="{{ n.icon }}"></use></svg></span>
+                </sc-if>
+                <span style="flex:1;min-width:0;font-size:{{ n.size }};font-weight:{{ n.weight }};color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.name }}</span>
+                <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);flex:none">{{ n.count }}</span>
+                <sc-if value="{{ n.expandable }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:grid;place-items:center;color:var(--text-muted);flex:none;transform:{{ n.rotate }};transition:transform .18s ease-out"><svg width="16" height="16"><use href="#i-chev-down"></use></svg></span>
+                </sc-if>
+                <sc-if value="{{ n.isLeaf }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:grid;place-items:center;color:var(--brand);flex:none"><svg width="15" height="15" data-mirror><use href="#i-chev-end"></use></svg></span>
+                </sc-if>
+              </button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:20px 32px 36px;display:grid;gap:14px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);color:var(--text-muted)">
+          <button type="button" onClick="{{ goHome }}" style="border:0;background:transparent;padding:0;cursor:pointer;color:var(--brand);font-size:var(--text-xs)">الرئيسية</button>
+          <svg width="12" height="12" data-mirror style="flex:none"><use href="#i-chev-end"></use></svg>
+          <sc-if value="{{ isST03 }}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{ goCategories }}" style="border:0;background:transparent;padding:0;cursor:pointer;color:var(--brand);font-size:var(--text-xs)">أزياء</button>
+            <svg width="12" height="12" data-mirror style="flex:none"><use href="#i-chev-end"></use></svg>
+            <span style="color:var(--text-strong);font-weight:600">قمصان</span>
+          </sc-if>
+          <sc-if value="{{ isSearchScreen }}" hint-placeholder-val="{{ false }}">
+            <span style="color:var(--text-strong);font-weight:600">نتائج البحث</span>
+          </sc-if>
+        </div>
+
+        <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+          <div style="display:grid;gap:5px;min-width:0">
+            <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong);margin:0">{{ listTitle }}</h1>
+            <span style="font-size:var(--text-sm);color:var(--text-muted)">{{ listCountText }}</span>
+          </div>
+          <sc-if value="{{ hasCorrection }}" hint-placeholder-val="{{ false }}">
+            <span style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--info);border-radius:var(--r-1);background:var(--info-subtle);flex-wrap:wrap">
+              <svg width="15" height="15" style="flex:none;color:var(--info-text)"><use href="#i-info"></use></svg>
+              <span style="font-size:var(--text-sm);color:var(--info-text)">نعرض نتائج «موبايل» بدلاً من «موبيل»</span>
+              <button type="button" onClick="{{ keepOriginal }}" style="border:0;background:transparent;padding:0;cursor:pointer;color:var(--info-text);font-size:var(--text-sm);font-weight:700;text-decoration:underline">ابحث عن «موبيل» كما كتبتها</button>
+            </span>
+          </sc-if>
+          <div style="margin-inline-start:auto;display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+            <sc-if value="{{ isSearchScreen }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;border:1px solid var(--border-control);border-radius:var(--r-1);overflow:hidden">
+                <button type="button" onClick="{{ tabProducts }}" style="height:var(--ctrl-h);padding:0 14px;border:0;background:{{ tabPBg }};color:{{ tabPFg }};font-size:var(--text-sm);font-weight:600;cursor:pointer">منتجات <span style="font-family:var(--font-mono)">{{ resCount }}</span></button>
+                <button type="button" onClick="{{ tabShops }}" style="height:var(--ctrl-h);padding:0 14px;border:0;border-inline-start:1px solid var(--border-control);background:{{ tabSBg }};color:{{ tabSFg }};font-size:var(--text-sm);font-weight:600;cursor:pointer">متاجر <span style="font-family:var(--font-mono)">4</span></button>
+              </div>
+            </sc-if>
+            <div style="position:relative">
+              <button type="button" onClick="{{ toggleSort }}" style="height:var(--ctrl-h);padding:0 13px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-size:var(--text-sm);cursor:pointer;display:inline-flex;align-items:center;gap:9px" style-hover="background:var(--sunken)">
+                <span style="color:var(--text-muted);font-size:var(--text-xs)">الترتيب</span>{{ sortLabel }}<svg width="15" height="15" style="flex:none;color:var(--text-muted)"><use href="#i-chev-down"></use></svg>
+              </button>
+              <div style="display:{{ sortMenu }};position:absolute;top:100%;inset-inline-end:0;z-index:30;margin-top:4px;min-width:200px;background:var(--raised);border:1px solid var(--border-default);border-radius:var(--r-1);box-shadow:var(--shadow-lg);overflow:hidden">
+                <sc-for list="{{ sortOptions }}" as="s" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ s.pick }}" style="width:100%;height:38px;padding:0 13px;border:0;background:{{ s.bg }};color:{{ s.fg }};font-size:var(--text-sm);text-align:start;cursor:pointer;display:flex;align-items:center;gap:8px" style-hover="background:var(--sunken)">
+                    <sc-if value="{{ s.on }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" style="flex:none;color:var(--brand)"><use href="#i-check"></use></svg></sc-if>{{ s.label }}
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <sc-if value="{{ showSubcats }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ subcats }}" as="c" hint-placeholder-count="5">
+              <button type="button" onClick="{{ c.pick }}" style="height:34px;padding:0 13px;border:1px solid {{ c.border }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px">{{ c.label }}<span style="font-family:var(--font-mono);font-size:var(--text-2xs);opacity:.75">{{ c.count }}</span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasChips }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border:1px solid var(--brand);border-radius:var(--r-1);background:var(--brand-subtle)">
+            <span style="font-size:var(--text-xs);color:var(--brand-text);font-weight:700">التصفية المطبّقة</span>
+            <sc-for list="{{ appliedChips }}" as="c" hint-placeholder-count="3">
+              <button type="button" onClick="{{ c.remove }}" style="height:28px;padding:0 10px;border:1px solid var(--brand);border-radius:999px;background:var(--card);color:var(--brand-text);font-size:var(--text-xs);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--brand);color:var(--on-brand)">{{ c.label }}<svg width="12" height="12"><use href="#i-x"></use></svg></button>
+            </sc-for>
+            <button type="button" onClick="{{ clearFilters }}" style="margin-inline-start:auto;height:28px;padding:0 10px;border:0;border-radius:var(--r-1);background:transparent;color:var(--brand-text);font-size:var(--text-xs);font-weight:700;cursor:pointer;text-decoration:underline">أزل الكل</button>
+          </div>
+        </sc-if>
+
+        <div style="display:grid;grid-template-columns:256px minmax(0,1fr);gap:20px;align-items:start">
+          <div style="display:grid;gap:14px;position:sticky;top:16px">
+            <sc-for list="{{ filterGroups }}" as="g" hint-placeholder-count="4">
+              <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:14px;box-shadow:var(--shadow-sm);display:grid;gap:10px">
+                <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ g.title }}</span>
+                <sc-if value="{{ g.isPrice }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;gap:10px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <input type="text" value="{{ priceMin }}" onChange="{{ onPriceMin }}" dir="ltr" style="flex:1;min-width:0;height:34px;padding:0 9px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-xs)" />
+                      <span style="color:var(--text-faint);flex:none">—</span>
+                      <input type="text" value="{{ priceMax }}" onChange="{{ onPriceMax }}" dir="ltr" style="flex:1;min-width:0;height:34px;padding:0 9px;border:1px solid var(--border-control);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-mono);font-size:var(--text-xs)" />
+                    </div>
+                    <input type="range" min="0" max="1000" step="10" value="{{ priceMax }}" onChange="{{ onPriceRange }}" style="width:100%;accent-color:var(--brand)" />
+                    <span style="font-size:var(--text-2xs);color:var(--text-muted)">{{ priceNote }}</span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ g.isSwatch }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:9px;flex-wrap:wrap">
+                    <sc-for list="{{ g.options }}" as="o" hint-placeholder-count="4">
+                      <button type="button" onClick="{{ o.toggle }}" aria-label="{{ o.label }}" style="width:34px;height:34px;border:2px solid {{ o.border }};border-radius:999px;background:{{ o.swatch }};cursor:pointer;display:grid;place-items:center;position:relative" title="{{ o.label }} · {{ o.count }}">
+                        <sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" style="color:{{ o.checkColor }}"><use href="#i-check"></use></svg></sc-if>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ g.isChips }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:7px;flex-wrap:wrap">
+                    <sc-for list="{{ g.options }}" as="o" hint-placeholder-count="4">
+                      <button type="button" onClick="{{ o.toggle }}" style="height:32px;padding:0 11px;border:1px solid {{ o.border }};border-radius:var(--r-1);background:{{ o.bg }};color:{{ o.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">{{ o.label }}<span style="font-family:var(--font-mono);font-size:9px;opacity:.7">{{ o.count }}</span></button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ g.isList }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;gap:7px">
+                    <sc-for list="{{ g.options }}" as="o" hint-placeholder-count="4">
+                      <button type="button" onClick="{{ o.toggle }}" style="border:0;background:transparent;padding:0;cursor:pointer;display:flex;align-items:center;gap:9px;text-align:start">
+                        <span style="width:17px;height:17px;flex:none;border:2px solid {{ o.border }};border-radius:var(--r-1);background:{{ o.boxBg }};display:grid;place-items:center;color:var(--on-brand)"><svg width="11" height="11" style="opacity:{{ o.opacity }}"><use href="#i-check"></use></svg></span>
+                        <span style="flex:1;min-width:0;font-size:var(--text-sm);color:var(--text-body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ o.label }}</span>
+                        <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);flex:none">{{ o.count }}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;gap:16px;min-width:0">
+            <sc-if value="{{ showShopResults }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+                <sc-for list="{{ shopResults }}" as="s" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ s.open }}" style="padding:16px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:flex;align-items:center;gap:13px;box-shadow:var(--shadow-sm);text-align:start" style-hover="box-shadow:var(--shadow-md);border-color:var(--brand)">
+                    <span style="width:52px;height:52px;flex:none;border-radius:var(--r-2);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-store"></use></svg></span>
+                    <span style="display:grid;gap:4px;min-width:0;flex:1">
+                      <span style="display:flex;align-items:center;gap:7px"><span style="font-size:var(--text-base);font-weight:700;color:var(--text-strong)">{{ s.name }}</span><svg width="14" height="14" style="color:var(--success-text);flex:none"><use href="#i-shield"></use></svg></span>
+                      <span style="display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--text-body)"><svg width="13" height="13" style="color:var(--warning);flex:none"><use href="#i-star-fill"></use></svg><span style="font-family:var(--font-mono);font-weight:600">{{ s.rating }}</span><span style="color:var(--text-muted)">· {{ s.products }} منتجاً · {{ s.city }}</span></span>
+                    </span>
+                    <svg width="16" height="16" data-mirror style="flex:none;color:var(--text-muted)"><use href="#i-chev-end"></use></svg>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ showGrid }}" hint-placeholder-val="{{ true }}">
+              <sc-if value="{{ gridEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm);padding:48px 24px;display:grid;justify-items:center;gap:11px;text-align:center">
+                  <span style="width:50px;height:50px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-filter"></use></svg></span>
+                  <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">{{ gridEmptyTitle }}</span>
+                  <span style="font-size:var(--text-base);color:var(--text-muted);max-width:52ch;line-height:1.8">{{ gridEmptyBody }}</span>
+                  <span style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;justify-content:center">
+                    <sc-if value="{{ hasChips }}" hint-placeholder-val="{{ false }}">
+                      <button type="button" onClick="{{ removeLastFilter }}" style="height:42px;padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer">أزل آخر تصفية: {{ lastFilterLabel }}</button>
+                    </sc-if>
+                    <button type="button" onClick="{{ goCategories }}" style="height:42px;padding:0 16px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">تصفّح الأقسام</button>
+                  </span>
+                </div>
+              </sc-if>
+              <sc-if value="{{ gridHasItems }}" hint-placeholder-val="{{ true }}">
+                <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+                  <sc-for list="{{ gridCards }}" as="p" hint-placeholder-count="8">
+                    <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm);display:grid;align-content:start" style-hover="box-shadow:var(--shadow-md)">
+                      <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;position:relative;display:block">
+                        <span style="display:grid;place-items:center;aspect-ratio:4/5;background:var(--sunken);color:var(--text-faint)"><svg width="30" height="30"><use href="{{ p.icon }}"></use></svg></span>
+                        <sc-if value="{{ p.badge }}" hint-placeholder-val="{{ false }}">
+                          <span style="position:absolute;top:10px;inset-inline-start:10px;height:24px;padding:0 10px;border-radius:999px;background:{{ p.badgeBg }};color:{{ p.badgeFg }};font-size:var(--text-2xs);font-weight:700;display:inline-flex;align-items:center">{{ p.badge }}</span>
+                        </sc-if>
+                      </button>
+                      <div style="padding:12px;display:grid;gap:7px">
+                        <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;text-align:start;font-size:var(--text-sm);color:var(--text-strong);line-height:1.5;min-height:2.8em;display:block">{{ p.name }}</button>
+                        <button type="button" onClick="{{ p.openShop }}" style="border:0;background:transparent;padding:0;cursor:pointer;text-align:start;font-size:var(--text-2xs);color:var(--text-muted);display:inline-flex;align-items:center;gap:5px" style-hover="color:var(--brand-text)"><svg width="12" height="12" style="flex:none"><use href="#i-store"></use></svg>{{ p.shop }}</button>
+                        <span style="display:inline-flex;align-items:center;gap:5px;font-size:var(--text-2xs);color:var(--text-body)"><svg width="13" height="13" style="color:var(--warning);flex:none"><use href="#i-star-fill"></use></svg><span style="font-family:var(--font-mono);font-weight:600">{{ p.rating }}</span><span style="color:var(--text-muted)">({{ p.reviews }})</span></span>
+                        <span style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+                          <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ p.price }}</span>
+                          <sc-if value="{{ p.compare }}" hint-placeholder-val="{{ false }}">
+                            <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-faint);text-decoration:line-through">{{ p.compare }}</span>
+                          </sc-if>
+                        </span>
+                        <sc-if value="{{ p.stockNote }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-size:var(--text-2xs);color:{{ p.stockColor }};font-weight:600">{{ p.stockNote }}</span>
+                        </sc-if>
+                        <div style="display:flex;gap:7px;padding-top:2px">
+                          <button type="button" onClick="{{ p.add }}" style="flex:1;min-width:0;height:36px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px" style-hover="background:var(--brand-hover)"><svg width="15" height="15"><use href="#i-cart"></use></svg>أضف</button>
+                          <button type="button" onClick="{{ p.wish }}" aria-label="المفضّلة" style="width:36px;height:36px;flex:none;border:1px solid var(--border-default);border-radius:var(--r-1);background:transparent;color:{{ p.wishColor }};display:grid;place-items:center;cursor:pointer" style-hover="background:var(--brand-subtle);border-color:var(--brand)"><svg width="16" height="16"><use href="{{ p.wishIcon }}"></use></svg></button>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <sc-for list="{{ skeletons }}" as="k" hint-placeholder-count="0">
+                    <span style="border-radius:var(--r-2);background:var(--sunken);min-height:340px;animation:bsShimmer 1.4s ease-in-out infinite"></span>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding-top:6px">
+                  <button type="button" onClick="{{ loadMore }}" disabled="{{ loadMoreDisabled }}" style="height:44px;padding:0 20px;border:1px solid {{ loadMoreBorder }};border-radius:var(--r-1);background:{{ loadMoreBg }};color:{{ loadMoreFg }};font-size:var(--text-base);font-weight:600;cursor:{{ loadMoreCursor }};display:inline-flex;align-items:center;gap:9px">
+                    <sc-if value="{{ loadingMore }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" style="animation:bsSpin .9s linear infinite"><use href="#i-spinner"></use></svg></sc-if>{{ loadMoreLabel }}
+                  </button>
+                  <span style="font-size:var(--text-xs);color:var(--text-muted)">{{ shownText }}</span>
+                </div>
+              </sc-if>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isST05 }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:22px 32px 40px;display:grid;gap:22px;max-width:1120px">
+        <div style="display:grid;gap:14px;padding:26px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);box-shadow:var(--shadow-sm)">
+          <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong);line-height:1.4">لا نتائج لـ «سماعه بلوتوث زرقا»</span>
+          <span style="font-size:var(--text-base);color:var(--text-body);line-height:1.8">جرّب كلمات أقل أو تحقّق من الإملاء. هذه بدائل قريبة من بحثك.</span>
+          <button type="button" onClick="{{ didYouMean }}" style="width:fit-content;height:44px;padding:0 18px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:9px" style-hover="background:var(--brand-hover)"><svg width="17" height="17"><use href="#i-search"></use></svg>هل تعني: سماعة بلوتوث زرقاء؟</button>
+        </div>
+        <div style="display:grid;gap:12px">
+          <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">بدائل قريبة</span>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+            <sc-for list="{{ altCards }}" as="p" hint-placeholder-count="4">
+              <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm)">
+                <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;display:block;width:100%">
+                  <span style="display:grid;place-items:center;aspect-ratio:4/5;background:var(--sunken);color:var(--text-faint)"><svg width="28" height="28"><use href="#i-image"></use></svg></span>
+                </button>
+                <div style="padding:12px;display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);color:var(--text-strong);line-height:1.5">{{ p.name }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ p.price }}</span>
+                  <button type="button" onClick="{{ p.add }}" style="height:34px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;margin-top:2px" style-hover="background:var(--brand-hover)">أضف إلى السلة</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:grid;gap:12px">
+          <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">الأقسام الأكثر تصفّحاً</span>
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">
+            <sc-for list="{{ catStrip }}" as="c" hint-placeholder-count="6">
+              <button type="button" onClick="{{ c.go }}" style="padding:16px 12px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:grid;justify-items:center;gap:8px;box-shadow:var(--shadow-sm)" style-hover="border-color:var(--brand);box-shadow:var(--shadow-md)">
+                <span style="width:40px;height:40px;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center"><svg width="19" height="19"><use href="{{ c.icon }}"></use></svg></span>
+                <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600;text-align:center">{{ c.label }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isSH05 }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:70px 32px 80px;display:grid;justify-items:center;gap:18px;text-align:center">
+        <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:64px;font-weight:600;color:var(--brand);line-height:1">404</span>
+        <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong)">لم نجد هذه الصفحة</span>
+        <span style="font-size:var(--text-base);color:var(--text-muted);max-width:54ch;line-height:1.8">قد يكون الرابط قديماً أو المنتج أُزيل. ابحث عمّا تريد أو ابدأ من الأقسام.</span>
+        <span style="display:flex;align-items:center;position:relative;width:min(520px,100%);margin-top:4px">
+          <svg width="18" height="18" style="position:absolute;inset-inline-start:12px;color:var(--text-faint);pointer-events:none"><use href="#i-search"></use></svg>
+          <input type="text" value="{{ searchVal }}" onChange="{{ onSearch }}" onKeyDown="{{ searchKey }}" placeholder="ابحث عن منتج أو متجر" style="width:100%;height:46px;padding-inline:38px 96px;border:1.5px solid var(--border-control);border-radius:var(--r-2);background:var(--card);color:var(--text-strong);font-size:var(--text-base)" />
+          <button type="button" onClick="{{ runSearch }}" style="position:absolute;inset-inline-end:5px;height:36px;padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">ابحث</button>
+        </span>
+        <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;width:100%;max-width:900px;margin-top:8px">
+          <sc-for list="{{ catStrip }}" as="c" hint-placeholder-count="6">
+            <button type="button" onClick="{{ c.go }}" style="padding:14px 10px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:grid;justify-items:center;gap:7px" style-hover="border-color:var(--brand)">
+              <span style="width:36px;height:36px;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center"><svg width="17" height="17"><use href="{{ c.icon }}"></use></svg></span>
+              <span style="font-size:var(--text-xs);color:var(--text-strong);font-weight:600;text-align:center">{{ c.label }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <button type="button" onClick="{{ goHome }}" style="margin-top:6px;height:44px;padding:0 20px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:9px" style-hover="background:var(--sunken)"><svg width="17" height="17" data-mirror><use href="#i-back"></use></svg>عُد إلى الرئيسية</button>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isPdp }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:20px 32px 40px;display:grid;gap:26px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--text-xs);color:var(--text-muted)">
+          <button type="button" onClick="{{ goHome }}" style="border:0;background:transparent;padding:0;cursor:pointer;color:var(--brand);font-size:var(--text-xs)">الرئيسية</button>
+          <svg width="12" height="12" data-mirror style="flex:none"><use href="#i-chev-end"></use></svg>
+          <button type="button" onClick="{{ goList }}" style="border:0;background:transparent;padding:0;cursor:pointer;color:var(--brand);font-size:var(--text-xs)">{{ pdpCat }}</button>
+          <svg width="12" height="12" data-mirror style="flex:none"><use href="#i-chev-end"></use></svg>
+          <span style="color:var(--text-strong);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:44ch">{{ pdpName }}</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:28px;align-items:start">
+          <div style="display:grid;grid-template-columns:84px minmax(0,1fr);gap:12px;align-items:start">
+            <div style="display:grid;gap:9px">
+              <sc-for list="{{ pdpThumbs }}" as="t" hint-placeholder-count="4">
+                <button type="button" onClick="{{ t.pick }}" aria-label="صورة" style="aspect-ratio:1;border:2px solid {{ t.border }};border-radius:var(--r-1);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center;cursor:pointer"><svg width="20" height="20"><use href="#i-image"></use></svg></button>
+              </sc-for>
+            </div>
+            <div style="position:relative;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--sunken);aspect-ratio:4/5;display:grid;place-items:center;color:var(--text-faint);overflow:hidden">
+              <svg width="54" height="54"><use href="#i-image"></use></svg>
+              <button type="button" onClick="{{ pdpZoom }}" aria-label="تكبير" style="position:absolute;bottom:12px;inset-inline-end:12px;width:40px;height:40px;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--card);color:var(--text-strong);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow-sm)" style-hover="background:var(--sunken)"><svg width="19" height="19"><use href="#i-zoom"></use></svg></button>
+              <sc-if value="{{ pdpSoldOut }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:14px;inset-inline-start:14px;height:30px;padding:0 13px;border-radius:999px;background:var(--inverse);color:var(--on-inverse);font-size:var(--text-sm);font-weight:700;display:inline-flex;align-items:center">نفد من المخزون</span>
+              </sc-if>
+              <span dir="ltr" style="unicode-bidi:isolate;position:absolute;bottom:12px;inset-inline-start:12px;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted)">{{ pdpImgLabel }}</span>
+            </div>
+          </div>
+
+          <div style="display:grid;gap:16px">
+            <div style="display:grid;gap:9px">
+              <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);line-height:1.4;color:var(--text-strong);margin:0">{{ pdpName }}</h1>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <button type="button" onClick="{{ pdpOpenShop }}" style="border:0;background:transparent;padding:0;cursor:pointer;display:inline-flex;align-items:center;gap:7px" style-hover="color:var(--brand-text)">
+                  <svg width="15" height="15" style="flex:none;color:var(--text-muted)"><use href="#i-store"></use></svg>
+                  <span style="font-size:var(--text-sm);color:var(--brand);font-weight:600">{{ pdpShop }}</span>
+                  <svg width="14" height="14" style="flex:none;color:var(--success-text)"><use href="#i-shield"></use></svg>
+                </button>
+                <span style="display:inline-flex;align-items:center;gap:6px;font-size:var(--text-sm);color:var(--text-body)">
+                  <span style="display:inline-flex;gap:1px">
+                    <sc-for list="{{ pdpStars }}" as="s" hint-placeholder-count="5">
+                      <svg width="15" height="15" style="color:{{ s.color }}"><use href="{{ s.icon }}"></use></svg>
+                    </sc-for>
+                  </span>
+                  <span style="font-family:var(--font-mono);font-weight:600">{{ pdpRating }}</span>
+                  <button type="button" onClick="{{ pdpToReviews }}" style="border:0;background:transparent;padding:0;cursor:pointer;color:var(--brand);font-size:var(--text-sm)">({{ pdpReviews }} تقييماً)</button>
+                </span>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:14px;border:1px solid var(--money-border);border-radius:var(--r-2);background:var(--money-subtle)">
+              <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;color:var(--money)">{{ pdpPrice }}</span>
+              <sc-if value="{{ pdpCompare }}" hint-placeholder-val="{{ false }}">
+                <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);color:var(--text-faint);text-decoration:line-through">{{ pdpCompare }}</span>
+                <span style="height:26px;padding:0 11px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-size:var(--text-xs);font-weight:700;display:inline-flex;align-items:center">{{ pdpDiscount }}</span>
+              </sc-if>
+              <span style="margin-inline-start:auto;font-size:var(--text-2xs);color:var(--text-muted)">{{ pdpCurrencyNote }}</span>
+            </div>
+
+            <div style="display:grid;gap:9px">
+              <span style="display:flex;align-items:baseline;gap:9px"><span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">اللون</span><span style="font-size:var(--text-sm);color:var(--text-muted)">{{ pdpColorLabel }}</span></span>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <sc-for list="{{ pdpColors }}" as="c" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ c.pick }}" disabled="{{ c.disabled }}" aria-label="{{ c.label }}" title="{{ c.title }}" style="width:44px;height:44px;border:2.5px solid {{ c.border }};border-radius:999px;background:{{ c.swatch }};cursor:{{ c.cursor }};display:grid;place-items:center;opacity:{{ c.opacity }};position:relative">
+                    <sc-if value="{{ c.on }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" style="color:{{ c.checkColor }}"><use href="#i-check"></use></svg></sc-if>
+                    <sc-if value="{{ c.disabled }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset-inline:2px;height:2px;background:var(--danger);transform:rotate(-45deg)"></span></sc-if>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:grid;gap:9px">
+              <span style="display:flex;align-items:baseline;gap:9px"><span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">المقاس</span><span style="font-size:var(--text-sm);color:var(--text-muted)">{{ pdpSizeLabel }}</span></span>
+              <div style="display:flex;gap:9px;flex-wrap:wrap">
+                <sc-for list="{{ pdpSizes }}" as="s" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ s.pick }}" disabled="{{ s.disabled }}" title="{{ s.title }}" style="min-width:52px;height:44px;padding:0 14px;border:1.5px solid {{ s.border }};border-radius:var(--r-1);background:{{ s.bg }};color:{{ s.fg }};font-size:var(--text-base);font-weight:600;cursor:{{ s.cursor }};position:relative;opacity:{{ s.opacity }}">
+                    {{ s.label }}
+                    <sc-if value="{{ s.disabled }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset-inline:6px;top:50%;height:1.5px;background:var(--text-faint)"></span></sc-if>
+                  </button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ pdpComboNote }}" hint-placeholder-val="{{ false }}">
+                <span style="display:flex;align-items:center;gap:7px;font-size:var(--text-xs);color:var(--warning-text)"><svg width="14" height="14" style="flex:none"><use href="#i-info"></use></svg>{{ pdpComboNote }}</span>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid {{ pdpStockBorder }};border-radius:var(--r-1);background:{{ pdpStockBg }}">
+              <span style="width:9px;height:9px;border-radius:999px;background:{{ pdpStockDot }};flex:none"></span>
+              <span style="font-size:var(--text-sm);font-weight:600;color:{{ pdpStockColor }}">{{ pdpStockText }}</span>
+            </div>
+
+            <sc-if value="{{ pdpSoldOut }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;gap:11px">
+                <button type="button" onClick="{{ pdpNotify }}" style="height:52px;border:{{ notifyBorder }};border-radius:var(--r-1);background:{{ notifyBg }};color:{{ notifyFg }};font-size:var(--text-md);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px" style-hover="background:var(--brand-subtle)"><svg width="18" height="18"><use href="{{ notifyIcon }}"></use></svg>{{ notifyLabel }}</button>
+                <span style="height:52px;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--sunken);color:var(--text-faint);font-size:var(--text-md);font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:9px"><svg width="18" height="18"><use href="#i-cart"></use></svg>نفد من المخزون</span>
+                <span style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.7">{{ pdpOtherVariants }}</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ pdpInStock }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;gap:11px">
+                <div style="display:flex;gap:11px;align-items:stretch">
+                  <div style="display:flex;align-items:center;border:1.5px solid var(--border-control);border-radius:var(--r-1);background:var(--card);overflow:hidden;flex:none">
+                    <button type="button" onClick="{{ qtyMinus }}" aria-label="أنقص" style="width:44px;height:52px;border:0;background:transparent;color:var(--text-strong);cursor:pointer;display:grid;place-items:center" style-hover="background:var(--sunken)"><svg width="17" height="17"><use href="#i-minus"></use></svg></button>
+                    <span dir="ltr" style="unicode-bidi:isolate;min-width:48px;text-align:center;font-family:var(--font-mono);font-size:var(--text-md);font-weight:600;color:var(--text-strong)">{{ pdpQty }}</span>
+                    <button type="button" onClick="{{ qtyPlus }}" aria-label="أضف" style="width:44px;height:52px;border:0;background:transparent;color:var(--text-strong);cursor:pointer;display:grid;place-items:center" style-hover="background:var(--sunken)"><svg width="17" height="17"><use href="#i-plus"></use></svg></button>
+                  </div>
+                  <button type="button" onClick="{{ pdpAdd }}" style="flex:1;min-width:0;height:52px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-md);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:10px" style-hover="background:var(--brand-hover)" style-active="background:var(--brand-pressed)"><svg width="19" height="19"><use href="#i-cart"></use></svg>أضف إلى السلة</button>
+                  <button type="button" onClick="{{ pdpWish }}" aria-label="المفضّلة" style="width:52px;height:52px;flex:none;border:1.5px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:{{ pdpWishColor }};display:grid;place-items:center;cursor:pointer" style-hover="background:var(--brand-subtle);border-color:var(--brand)"><svg width="20" height="20"><use href="{{ pdpWishIcon }}"></use></svg></button>
+                  <button type="button" onClick="{{ pdpCompareAdd }}" aria-label="قارن" style="width:52px;height:52px;flex:none;border:1.5px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--sunken);color:var(--text-strong)"><svg width="20" height="20"><use href="#i-scale"></use></svg></button>
+                </div>
+                <sc-if value="{{ qtyHint }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:flex;align-items:center;gap:7px;font-size:var(--text-xs);color:var(--warning-text)"><svg width="14" height="14" style="flex:none"><use href="#i-info"></use></svg>{{ qtyHint }}</span>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <div style="display:grid;gap:10px;padding:14px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card)">
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <svg width="17" height="17" style="flex:none;color:var(--text-muted);margin-top:2px"><use href="#i-truck"></use></svg>
+                <div style="display:grid;gap:3px;min-width:0;flex:1">
+                  <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.7">{{ pdpShipText }}</span>
+                  <button type="button" onClick="{{ changeLocation }}" style="border:0;background:transparent;padding:0;cursor:pointer;color:var(--brand);font-size:var(--text-xs);width:fit-content">غيّر الموقع</button>
+                </div>
+              </div>
+              <sc-if value="{{ pdpNoShip }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border:1px solid var(--warning);border-radius:var(--r-1);background:var(--warning-subtle)">
+                  <svg width="15" height="15" style="flex:none;color:var(--warning-text);margin-top:2px"><use href="#i-alert"></use></svg>
+                  <span style="font-size:var(--text-xs);color:var(--text-body);line-height:1.7">هذا المتجر لا يشحن إلى {{ cityVal }}. يمكنك الإضافة إلى السلة، لكن لن تستطيع إتمام الشراء لهذا المتجر قبل تغيير الموقع.</span>
+                </div>
+              </sc-if>
+              <div style="display:flex;align-items:flex-start;gap:10px;padding-top:10px;border-block-start:1px solid var(--border-subtle)">
+                <svg width="17" height="17" style="flex:none;color:var(--text-muted);margin-top:2px"><use href="#i-return"></use></svg>
+                <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.7">إرجاع مجاني خلال 14 يوماً على المنتجات غير المستخدمة بعلّامتها الأصلية.</span>
+              </div>
+            </div>
+
+            <button type="button" onClick="{{ openAsk }}" style="height:44px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px" style-hover="background:var(--sunken)"><svg width="17" height="17"><use href="#i-msg"></use></svg>اسأل المتجر عن هذا المنتج</button>
+          </div>
+        </div>
+
+        <div style="display:grid;gap:14px">
+          <div style="display:flex;gap:4px;border-block-end:1px solid var(--border-default);flex-wrap:wrap">
+            <sc-for list="{{ pdpTabs }}" as="t" hint-placeholder-count="4">
+              <button type="button" onClick="{{ t.pick }}" style="height:44px;padding:0 16px;border:0;border-block-end:3px solid {{ t.underline }};background:transparent;color:{{ t.fg }};font-size:var(--text-base);font-weight:{{ t.weight }};cursor:pointer">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ tabIsDesc }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;gap:12px;max-width:80ch">
+              <span style="font-size:var(--text-base);color:var(--text-body);line-height:1.9">{{ pdpDesc }}</span>
+              <ul style="margin:0;padding-inline-start:20px;display:grid;gap:7px">
+                <sc-for list="{{ pdpBullets }}" as="b" hint-placeholder-count="3">
+                  <li style="font-size:var(--text-base);color:var(--text-body);line-height:1.8">{{ b }}</li>
+                </sc-for>
+              </ul>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ tabIsSpecs }}" hint-placeholder-val="{{ false }}">
+            <div style="max-width:780px;border:1px solid var(--border-subtle);border-radius:var(--r-2);overflow:hidden;background:var(--card)">
+              <sc-for list="{{ pdpSpecs }}" as="s" hint-placeholder-count="5">
+                <div style="display:grid;grid-template-columns:200px minmax(0,1fr);gap:14px;padding:12px 16px;border-block-end:1px solid var(--border-subtle);background:{{ s.bg }}">
+                  <span style="font-size:var(--text-sm);color:var(--text-muted)">{{ s.k }}</span>
+                  <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600">{{ s.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ tabIsReviews }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;grid-template-columns:280px minmax(0,1fr);gap:22px;align-items:start">
+              <div style="display:grid;gap:11px;padding:16px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card)">
+                <span style="display:flex;align-items:baseline;gap:9px">
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;color:var(--text-strong)">{{ pdpRating }}</span>
+                  <span style="font-size:var(--text-sm);color:var(--text-muted)">من 5 · {{ pdpReviews }} تقييماً</span>
+                </span>
+                <sc-for list="{{ ratingBars }}" as="r" hint-placeholder-count="5">
+                  <span style="display:flex;align-items:center;gap:9px">
+                    <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);min-width:14px">{{ r.star }}</span>
+                    <svg width="12" height="12" style="color:var(--warning);flex:none"><use href="#i-star-fill"></use></svg>
+                    <span style="flex:1;height:7px;border-radius:999px;background:var(--sunken);overflow:hidden"><span style="display:block;height:100%;width:{{ r.w }};background:var(--warning)"></span></span>
+                    <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-muted);min-width:30px;text-align:end">{{ r.n }}</span>
+                  </span>
+                </sc-for>
+              </div>
+              <div style="display:grid;gap:12px">
+                <sc-if value="{{ noReviews }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:36px 20px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);display:grid;justify-items:center;gap:9px;text-align:center">
+                    <span style="font-size:var(--text-base);font-weight:700;color:var(--text-strong)">لا تقييمات بعد</span>
+                    <span style="font-size:var(--text-sm);color:var(--text-muted);max-width:44ch;line-height:1.8">كن أول من يقيّم هذا المنتج بعد استلامه.</span>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ reviews }}" as="r" hint-placeholder-count="3">
+                  <div style="padding:14px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);display:grid;gap:8px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <span style="width:32px;height:32px;flex:none;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center;font-size:var(--text-xs);font-weight:700">{{ r.initial }}</span>
+                      <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">{{ r.name }}</span>
+                      <sc-if value="{{ r.verified }}" hint-placeholder-val="{{ true }}">
+                        <span style="height:22px;padding:0 9px;border-radius:999px;background:var(--success-subtle);color:var(--success-text);font-size:var(--text-2xs);font-weight:600;display:inline-flex;align-items:center;gap:5px"><svg width="12" height="12"><use href="#i-check-circle"></use></svg>شراء موثّق</span>
+                      </sc-if>
+                      <span style="display:inline-flex;gap:1px;margin-inline-start:auto">
+                        <sc-for list="{{ r.stars }}" as="s" hint-placeholder-count="5">
+                          <svg width="13" height="13" style="color:{{ s.color }}"><use href="{{ s.icon }}"></use></svg>
+                        </sc-for>
+                      </span>
+                      <span style="font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)">{{ r.date }}</span>
+                    </div>
+                    <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">{{ r.text }}</span>
+                    <span style="font-size:var(--text-2xs);color:var(--text-muted)">{{ r.variant }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ tabIsQna }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;gap:12px;max-width:820px">
+              <sc-for list="{{ qna }}" as="q" hint-placeholder-count="2">
+                <div style="padding:14px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);display:grid;gap:9px">
+                  <span style="display:flex;align-items:flex-start;gap:9px">
+                    <span style="width:24px;height:24px;flex:none;border-radius:999px;background:var(--neutral-subtle);color:var(--neutral-text);display:grid;place-items:center;font-size:var(--text-2xs);font-weight:700">س</span>
+                    <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600;line-height:1.7">{{ q.q }}</span>
+                  </span>
+                  <span style="display:flex;align-items:flex-start;gap:9px">
+                    <span style="width:24px;height:24px;flex:none;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center;font-size:var(--text-2xs);font-weight:700">ج</span>
+                    <span style="display:grid;gap:3px;min-width:0">
+                      <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">{{ q.a }}</span>
+                      <span style="font-size:var(--text-2xs);color:var(--text-muted)">{{ q.meta }}</span>
+                    </span>
+                  </span>
+                </div>
+              </sc-for>
+              <button type="button" onClick="{{ openAsk }}" style="width:fit-content;height:42px;padding:0 16px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:9px" style-hover="background:var(--sunken)"><svg width="16" height="16"><use href="#i-msg"></use></svg>اسأل المتجر سؤالاً جديداً</button>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="display:grid;gap:12px">
+          <div style="display:flex;align-items:baseline;gap:12px">
+            <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">{{ pdpMoreTitle }}</span>
+            <button type="button" onClick="{{ pdpOpenShop }}" style="margin-inline-start:auto;height:30px;padding:0 11px;border:0;border-radius:var(--r-1);background:transparent;color:var(--brand-text);font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="background:var(--brand-subtle)">كل منتجات المتجر<svg width="14" height="14" data-mirror><use href="#i-chev-end"></use></svg></button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+            <sc-for list="{{ pdpRelated }}" as="p" hint-placeholder-count="4">
+              <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm)">
+                <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;display:block;width:100%">
+                  <span style="display:grid;place-items:center;aspect-ratio:4/5;background:var(--sunken);color:var(--text-faint)"><svg width="28" height="28"><use href="#i-image"></use></svg></span>
+                </button>
+                <div style="padding:12px;display:grid;gap:6px">
+                  <span style="font-size:var(--text-sm);color:var(--text-strong);line-height:1.5;min-height:2.8em">{{ p.name }}</span>
+                  <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ p.price }}</span>
+                  <button type="button" onClick="{{ p.add }}" style="height:34px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;margin-top:2px" style-hover="background:var(--brand-hover)">أضف</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isST10 }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:22px 32px 40px;display:grid;gap:16px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong);margin:0">قارن المنتجات</h1>
+          <span style="font-size:var(--text-sm);color:var(--text-muted)">{{ cmpCountText }}</span>
+          <button type="button" onClick="{{ toggleDiff }}" style="margin-inline-start:auto;height:36px;padding:0 13px;border:1px solid {{ diffBorder }};border-radius:var(--r-1);background:{{ diffBg }};color:{{ diffFg }};font-size:var(--text-sm);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+            <span style="width:36px;height:20px;border-radius:999px;background:{{ diffSwBg }};position:relative;flex:none"><span style="position:absolute;top:2px;inset-inline-start:{{ diffSwX }};width:16px;height:16px;border-radius:999px;background:#FFFFFF;transition:inset-inline-start .16s ease-out"></span></span>
+            أبرِز الفروق
+          </button>
+        </div>
+        <sc-if value="{{ cmpEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);padding:52px 24px;display:grid;justify-items:center;gap:10px;text-align:center;box-shadow:var(--shadow-sm)">
+            <span style="width:50px;height:50px;border-radius:var(--r-2);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="24" height="24"><use href="#i-scale"></use></svg></span>
+            <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">لا منتجات للمقارنة</span>
+            <span style="font-size:var(--text-base);color:var(--text-muted);max-width:50ch;line-height:1.8">أضف حتى أربعة منتجات من القسم نفسه من زرّ المقارنة في صفحة المنتج.</span>
+            <button type="button" onClick="{{ goList }}" style="margin-top:6px;height:42px;padding:0 16px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer">تصفّح القسم</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ cmpHasItems }}" hint-placeholder-val="{{ true }}">
+        <div style="overflow-x:auto;background:var(--card);border:1px solid var(--border-subtle);border-radius:var(--r-2);box-shadow:var(--shadow-sm)">
+          <div style="min-width:900px">
+            <div style="display:grid;grid-template-columns:{{ cmpGrid }};gap:0">
+              <span style="padding:14px 16px;border-block-end:1px solid var(--border-default);font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint);letter-spacing:.06em">PRODUCT</span>
+              <sc-for list="{{ cmpCols }}" as="c" hint-placeholder-count="3">
+                <span style="padding:14px 16px;border-block-end:1px solid var(--border-default);border-inline-start:1px solid var(--border-subtle);display:grid;gap:9px">
+                  <span style="display:flex;align-items:flex-start;gap:9px">
+                    <span style="width:56px;height:70px;flex:none;border-radius:var(--r-1);background:var(--sunken);color:var(--text-faint);display:grid;place-items:center"><svg width="22" height="22"><use href="#i-image"></use></svg></span>
+                    <button type="button" onClick="{{ c.remove }}" aria-label="أزل" style="margin-inline-start:auto;width:28px;height:28px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--danger-subtle);color:var(--danger-text)"><svg width="15" height="15"><use href="#i-x"></use></svg></button>
+                  </span>
+                  <button type="button" onClick="{{ c.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;text-align:start;font-size:var(--text-sm);color:var(--text-strong);font-weight:600;line-height:1.5">{{ c.name }}</button>
+                </span>
+              </sc-for>
+            </div>
+            <sc-for list="{{ cmpRows }}" as="r" hint-placeholder-count="7">
+              <div style="display:grid;grid-template-columns:{{ cmpGrid }};gap:0;background:{{ r.rowBg }}">
+                <span style="padding:12px 16px;border-block-end:1px solid var(--border-subtle);font-size:var(--text-sm);color:var(--text-muted);display:flex;align-items:center;gap:8px">
+                  {{ r.label }}
+                  <sc-if value="{{ r.differs }}" hint-placeholder-val="{{ false }}">
+                    <span style="height:19px;padding:0 7px;border-radius:999px;background:var(--warning-subtle);color:var(--warning-text);font-size:9px;font-weight:700;display:inline-flex;align-items:center">مختلف</span>
+                  </sc-if>
+                </span>
+                <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="3">
+                  <span style="padding:12px 16px;border-block-end:1px solid var(--border-subtle);border-inline-start:1px solid var(--border-subtle);font-size:var(--text-sm);color:{{ c.color }};font-weight:{{ c.weight }};font-family:{{ c.font }};display:flex;align-items:center" dir="{{ c.dir }}">{{ c.v }}</span>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isShop }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid">
+        <div style="height:220px;background:var(--sunken);display:grid;place-items:center;color:var(--text-faint);border-block-end:1px solid var(--border-default)">
+          <span style="font-family:var(--font-mono);font-size:var(--text-xs)">cover-{{ shopSlug }}.jpg · 1600 × 500</span>
+        </div>
+        <div style="padding:0 32px 36px;display:grid;gap:22px">
+          <div style="display:flex;align-items:flex-start;gap:18px;margin-top:-56px;flex-wrap:wrap">
+            <span style="width:112px;height:112px;flex:none;border-radius:var(--r-3);background:var(--card);border:1px solid var(--border-default);box-shadow:var(--shadow-md);display:grid;place-items:center;color:var(--text-faint)"><svg width="44" height="44"><use href="#i-store"></use></svg></span>
+            <div style="display:grid;gap:9px;min-width:0;flex:1;padding-top:62px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <h1 style="font-family:var(--font-head);font-weight:800;font-size:var(--text-2xl);color:var(--text-strong);margin:0">{{ shopName }}</h1>
+                <sc-if value="{{ shopVerified }}" hint-placeholder-val="{{ true }}">
+                  <span style="height:28px;padding:0 12px;border-radius:999px;background:var(--success-subtle);color:var(--success-text);font-size:var(--text-sm);font-weight:600;display:inline-flex;align-items:center;gap:7px"><svg width="15" height="15"><use href="#i-shield"></use></svg>موثّق</span>
+                </sc-if>
+                <sc-if value="{{ shopSuspended }}" hint-placeholder-val="{{ false }}">
+                  <span style="height:28px;padding:0 12px;border-radius:999px;background:var(--neutral-subtle);color:var(--text-muted);font-size:var(--text-sm);font-weight:600;display:inline-flex;align-items:center;gap:7px"><svg width="15" height="15"><use href="#i-clock"></use></svg>لا يستقبل طلبات حالياً</span>
+                </sc-if>
+              </div>
+              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                <span style="display:inline-flex;align-items:center;gap:6px;font-size:var(--text-sm);color:var(--text-body)"><svg width="15" height="15" style="color:var(--warning);flex:none"><use href="#i-star-fill"></use></svg><span style="font-family:var(--font-mono);font-weight:600">4.7</span><span style="color:var(--text-muted)">(312 تقييماً)</span></span>
+                <span style="font-size:var(--text-sm);color:var(--text-muted)">على بسطة منذ 2026</span>
+                <span style="font-size:var(--text-sm);color:var(--text-muted)">الرياض</span>
+                <span style="font-size:var(--text-sm);color:var(--text-muted)">{{ shopProductCount }}</span>
+              </div>
+            </div>
+            <button type="button" onClick="{{ msgShop }}" disabled="{{ shopSuspended }}" style="flex:none;margin-top:62px;height:44px;padding:0 18px;border:0;border-radius:var(--r-1);background:{{ msgBg }};color:{{ msgFg }};font-size:var(--text-base);font-weight:600;cursor:{{ msgCursor }};display:inline-flex;align-items:center;gap:9px"><svg width="17" height="17"><use href="#i-msg"></use></svg>راسل المتجر</button>
+          </div>
+
+          <sc-if value="{{ shopSuspended }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:22px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);display:grid;gap:11px;justify-items:center;text-align:center">
+              <span style="width:48px;height:48px;border-radius:999px;background:var(--sunken);color:var(--text-muted);display:grid;place-items:center"><svg width="23" height="23"><use href="#i-clock"></use></svg></span>
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">هذا المتجر لا يستقبل طلبات حالياً</span>
+              <span style="font-size:var(--text-base);color:var(--text-muted);max-width:56ch;line-height:1.8">يمكنك تصفّح متاجر أخرى تبيع منتجات مشابهة. طلباتك السابقة من هذا المتجر تُكمَل كما هي.</span>
+            </div>
+            <div style="display:grid;gap:12px">
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">متاجر مشابهة</span>
+              <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px">
+                <sc-for list="{{ shopCards }}" as="s" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ s.open }}" style="padding:16px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);cursor:pointer;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm);text-align:start" style-hover="border-color:var(--brand);box-shadow:var(--shadow-md)">
+                    <span style="width:44px;height:44px;flex:none;border-radius:var(--r-2);background:var(--sunken);border:1px solid var(--border-default);color:var(--text-faint);display:grid;place-items:center"><svg width="21" height="21"><use href="#i-store"></use></svg></span>
+                    <span style="display:grid;gap:3px;min-width:0">
+                      <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.name }}</span>
+                      <span style="display:inline-flex;align-items:center;gap:5px;font-size:var(--text-2xs);color:var(--text-body)"><svg width="12" height="12" style="color:var(--warning);flex:none"><use href="#i-star-fill"></use></svg><span style="font-family:var(--font-mono)">{{ s.rating }}</span><span style="color:var(--text-muted)">· {{ s.city }}</span></span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ shopActive }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+              <div style="padding:15px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);display:grid;gap:6px">
+                <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">عن المتجر</span>
+                <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">قطن مصري مغزول في الرياض. نصنع قمصاناً وبنطلونات كتان لموسم الصيف، ونشحن من مستودعنا داخل المملكة.</span>
+              </div>
+              <div style="padding:15px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);display:grid;gap:6px">
+                <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);font-weight:700;color:var(--text-strong)"><svg width="15" height="15" style="flex:none;color:var(--text-muted)"><use href="#i-truck"></use></svg>سياسة الشحن</span>
+                <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">الشحن داخل الرياض في يوم عمل، وبقية المملكة في 2 إلى 4 أيام عمل.</span>
+              </div>
+              <div style="padding:15px;border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);display:grid;gap:6px">
+                <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm);font-weight:700;color:var(--text-strong)"><svg width="15" height="15" style="flex:none;color:var(--text-muted)"><use href="#i-return"></use></svg>سياسة الإرجاع</span>
+                <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">إرجاع مجاني خلال 14 يوماً على المنتجات غير المستخدمة بعلّامتها الأصلية.</span>
+              </div>
+            </div>
+
+            <div style="display:grid;gap:12px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">منتجات المتجر</span>
+                <div style="margin-inline-start:auto;display:flex;gap:7px;flex-wrap:wrap">
+                  <sc-for list="{{ shopFilters }}" as="f" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ f.pick }}" style="height:32px;padding:0 12px;border:1px solid {{ f.border }};border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font-size:var(--text-xs);font-weight:600;cursor:pointer">{{ f.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+                <sc-for list="{{ shopProducts }}" as="p" hint-placeholder-count="4">
+                  <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm)">
+                    <button type="button" onClick="{{ p.open }}" style="border:0;background:transparent;padding:0;cursor:pointer;display:block;width:100%;position:relative">
+                      <span style="display:grid;place-items:center;aspect-ratio:4/5;background:var(--sunken);color:var(--text-faint)"><svg width="28" height="28"><use href="#i-image"></use></svg></span>
+                      <sc-if value="{{ p.badge }}" hint-placeholder-val="{{ false }}">
+                        <span style="position:absolute;top:10px;inset-inline-start:10px;height:24px;padding:0 10px;border-radius:999px;background:{{ p.badgeBg }};color:{{ p.badgeFg }};font-size:var(--text-2xs);font-weight:700;display:inline-flex;align-items:center">{{ p.badge }}</span>
+                      </sc-if>
+                    </button>
+                    <div style="padding:12px;display:grid;gap:6px">
+                      <span style="font-size:var(--text-sm);color:var(--text-strong);line-height:1.5;min-height:2.8em">{{ p.name }}</span>
+                      <span dir="ltr" style="unicode-bidi:isolate;font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--money)">{{ p.price }}</span>
+                      <button type="button" onClick="{{ p.add }}" style="height:34px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer;margin-top:2px" style-hover="background:var(--brand-hover)">أضف</button>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isST29 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid">
+        <div style="padding:46px 32px;background:var(--brand);color:var(--on-brand);display:grid;gap:16px;justify-items:start">
+          <span style="font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:.14em;opacity:.85">بِع على بسطة</span>
+          <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-3xl);line-height:1.25;max-width:26ch">بِع لمشترين في الخليج والشام ومصر</span>
+          <span style="font-size:var(--text-md);line-height:1.9;max-width:60ch;opacity:.94">سعّر بعملتك، واقبض بعملتك. عمولة على كل عملية بيع فقط — بلا اشتراك شهري ولا رسوم إدراج.</span>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">
+            <button type="button" onClick="{{ goRegister }}" style="height:50px;padding:0 24px;border:0;border-radius:var(--r-1);background:var(--card);color:var(--brand-text);font-size:var(--text-md);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:9px" style-hover="background:var(--brand-subtle)">سجّل متجرك<svg width="18" height="18" data-mirror><use href="#i-next"></use></svg></button>
+            <button type="button" onClick="{{ scrollFaq }}" style="height:50px;padding:0 20px;border:1.5px solid rgba(255,255,255,.5);border-radius:var(--r-1);background:transparent;color:var(--on-brand);font-size:var(--text-md);font-weight:600;cursor:pointer">الأسئلة الشائعة</button>
+          </div>
+        </div>
+        <div style="padding:34px 32px;display:grid;gap:30px">
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+            <div style="padding:20px;border:1px solid var(--money-border);border-radius:var(--r-2);background:var(--money-subtle);display:grid;gap:9px">
+              <span style="width:44px;height:44px;border-radius:999px;background:var(--card);color:var(--money);display:grid;place-items:center"><svg width="21" height="21"><use href="#i-boxes"></use></svg></span>
+              <span style="font-size:var(--text-md);font-weight:700;color:var(--text-strong)">عمولة على البيع فقط</span>
+              <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">لا اشتراك شهري ولا رسوم إدراج. تُحسب العمولة من قيمة المنتجات بعد الخصم.</span>
+            </div>
+            <div style="padding:20px;border:1px solid var(--money-border);border-radius:var(--r-2);background:var(--money-subtle);display:grid;gap:9px">
+              <span style="width:44px;height:44px;border-radius:999px;background:var(--card);color:var(--money);display:grid;place-items:center"><svg width="21" height="21"><use href="#i-globe"></use></svg></span>
+              <span style="font-size:var(--text-md);font-weight:700;color:var(--text-strong)">سعّر واقبض بعملتك</span>
+              <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">يرى المشتري السعر بعملة العرض عنده، وتبقى أسعارك وأرباحك بعملة تسويتك.</span>
+            </div>
+            <div style="padding:20px;border:1px solid var(--money-border);border-radius:var(--r-2);background:var(--money-subtle);display:grid;gap:9px">
+              <span style="width:44px;height:44px;border-radius:999px;background:var(--card);color:var(--money);display:grid;place-items:center"><svg width="21" height="21"><use href="#i-clock"></use></svg></span>
+              <span style="font-size:var(--text-md);font-weight:700;color:var(--text-strong)">تحرير الأرباح بعد 14 يوماً</span>
+              <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">تُحرَّر أرباح كل طلب بعد 14 يوماً من التسليم، ثم تطلب تحويلها إلى حسابك البنكي.</span>
+            </div>
+          </div>
+
+          <div style="display:grid;gap:14px">
+            <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong)">أربع خطوات وتبدأ</span>
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px">
+              <sc-for list="{{ sellSteps }}" as="s" hint-placeholder-count="4">
+                <div style="padding:18px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);display:grid;gap:8px;box-shadow:var(--shadow-sm)">
+                  <span style="width:34px;height:34px;border-radius:999px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700">{{ s.n }}</span>
+                  <span style="font-size:var(--text-base);font-weight:700;color:var(--text-strong)">{{ s.title }}</span>
+                  <span style="font-size:var(--text-sm);color:var(--text-body);line-height:1.8">{{ s.body }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div id="faq" style="display:grid;gap:12px;max-width:820px">
+            <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-xl);color:var(--text-strong)">الأسئلة الشائعة</span>
+            <div style="border:1px solid var(--border-subtle);border-radius:var(--r-2);background:var(--card);overflow:hidden;box-shadow:var(--shadow-sm)">
+              <sc-for list="{{ faqs }}" as="f" hint-placeholder-count="5">
+                <div style="border-block-end:1px solid var(--border-subtle)">
+                  <button type="button" onClick="{{ f.toggle }}" style="width:100%;padding:15px 16px;border:0;background:{{ f.bg }};cursor:pointer;text-align:start;display:flex;align-items:center;gap:12px" style-hover="background:var(--sunken)">
+                    <span style="flex:1;min-width:0;font-size:var(--text-base);font-weight:600;color:var(--text-strong);line-height:1.6">{{ f.q }}</span>
+                    <span style="display:grid;place-items:center;color:var(--text-muted);flex:none;transform:{{ f.rotate }};transition:transform .18s ease-out"><svg width="17" height="17"><use href="#i-chev-down"></use></svg></span>
+                  </button>
+                  <sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:0 16px 15px">
+                      <span style="font-size:var(--text-base);color:var(--text-body);line-height:1.9">{{ f.a }}</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="padding:26px;border:1px solid var(--border-default);border-radius:var(--r-2);background:var(--card);display:flex;align-items:center;gap:18px;flex-wrap:wrap;box-shadow:var(--shadow-sm)">
+            <span style="display:grid;gap:5px;min-width:0">
+              <span style="font-family:var(--font-head);font-weight:800;font-size:var(--text-lg);color:var(--text-strong)">جاهز تبيع؟ التسجيل عشر دقائق</span>
+              <span style="font-size:var(--text-sm);color:var(--text-muted)">تحتاج سجلاً تجارياً سارياً وهوية وشهادة ضريبية وحساباً بنكياً باسم النشاط.</span>
+            </span>
+            <button type="button" onClick="{{ goRegister }}" style="margin-inline-start:auto;flex:none;height:50px;padding:0 24px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-md);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:9px" style-hover="background:var(--brand-hover)">سجّل متجرك<svg width="18" height="18" data-mirror><use href="#i-next"></use></svg></button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <div style="background:var(--inverse);color:var(--on-inverse);padding:28px 32px;display:grid;gap:16px">
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">
+          <div style="display:grid;gap:8px;align-content:start">
+            <span style="font-family:var(--font-head);font-weight:800;font-size:22px">بسطة</span>
+            <span style="font-size:var(--text-sm);opacity:.8;line-height:1.8">سوق يجمع تجّار الخليج والشام ومصر في مكان واحد.</span>
+          </div>
+          <sc-for list="{{ footerCols }}" as="col" hint-placeholder-count="3">
+            <div style="display:grid;gap:8px;align-content:start">
+              <span style="font-size:var(--text-sm);font-weight:700">{{ col.title }}</span>
+              <sc-for list="{{ col.links }}" as="l" hint-placeholder-count="4">
+                <button type="button" onClick="{{ l.go }}" style="border:0;background:transparent;padding:0;text-align:start;color:inherit;opacity:.8;font-size:var(--text-sm);cursor:pointer;width:fit-content" style-hover="opacity:1;text-decoration:underline">{{ l.label }}</button>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding-top:14px;border-block-start:1px solid rgba(253,250,246,.16);display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <span style="font-size:var(--text-2xs);opacity:.7">© 2026 بسطة. جميع الحقوق محفوظة.</span>
+          <span style="margin-inline-start:auto;display:flex;gap:7px;flex-wrap:wrap">
+            <span style="height:26px;padding:0 10px;border:1px solid rgba(253,250,246,.24);border-radius:var(--r-1);font-family:var(--font-mono);font-size:var(--text-2xs);display:inline-flex;align-items:center">مدى</span>
+            <span style="height:26px;padding:0 10px;border:1px solid rgba(253,250,246,.24);border-radius:var(--r-1);font-family:var(--font-mono);font-size:var(--text-2xs);display:inline-flex;align-items:center">VISA</span>
+            <span style="height:26px;padding:0 10px;border:1px solid rgba(253,250,246,.24);border-radius:var(--r-1);font-family:var(--font-mono);font-size:var(--text-2xs);display:inline-flex;align-items:center">Mastercard</span>
+            <span style="height:26px;padding:0 10px;border:1px solid rgba(253,250,246,.24);border-radius:var(--r-1);font-size:var(--text-2xs);display:inline-flex;align-items:center">الدفع عند الاستلام</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ askDisplay }};position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;padding:24px;background:rgba(30,24,20,.55);animation:bsFade .2s ease-out" onClick="{{ closeAsk }}">
+  <div onClick="{{ stopClick }}" style="background:var(--raised);border-radius:var(--r-3);box-shadow:var(--shadow-overlay);width:100%;max-width:540px;max-height:min(86vh,620px);display:flex;flex-direction:column">
+    <div style="padding:17px 20px;border-block-end:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none">
+      <span style="font-family:var(--font-head);font-weight:700;font-size:var(--text-md);color:var(--text-strong)">اسأل المتجر</span>
+      <button type="button" onClick="{{ closeAsk }}" aria-label="إغلاق" style="width:34px;height:34px;display:grid;place-items:center;border:0;background:transparent;color:var(--text-muted);cursor:pointer;border-radius:var(--r-1)" style-hover="background:var(--sunken)"><svg width="18" height="18"><use href="#i-x"></use></svg></button>
+    </div>
+    <div style="padding:18px 20px;display:grid;gap:14px;overflow-y:auto;flex:1;min-height:0">
+      <div style="display:flex;align-items:center;gap:11px;padding:11px;border:1px solid var(--border-subtle);border-radius:var(--r-1);background:var(--sunken)">
+        <span style="width:44px;height:52px;flex:none;border-radius:var(--r-1);background:var(--card);color:var(--text-faint);display:grid;place-items:center"><svg width="19" height="19"><use href="#i-image"></use></svg></span>
+        <span style="display:grid;gap:3px;min-width:0">
+          <span style="font-size:var(--text-sm);color:var(--text-strong);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ pdpName }}</span>
+          <span style="font-size:var(--text-2xs);color:var(--text-muted)">{{ askVariant }}</span>
+        </span>
+        <span style="margin-inline-start:auto;flex:none;height:22px;padding:0 9px;border-radius:999px;background:var(--brand-subtle);color:var(--brand-text);font-size:var(--text-2xs);font-weight:600;display:inline-flex;align-items:center">مُرفق تلقائياً</span>
+      </div>
+      <sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:13px;border:1px solid var(--info);border-radius:var(--r-1);background:var(--info-subtle);display:grid;gap:9px">
+          <span style="display:flex;align-items:flex-start;gap:9px">
+            <svg width="16" height="16" style="flex:none;color:var(--info-text);margin-top:2px"><use href="#i-info"></use></svg>
+            <span style="font-size:var(--text-sm);color:var(--info-text);line-height:1.7">تحتاج إلى الدخول أولاً حتى يصل ردّ المتجر إلى رسائلك.</span>
+          </span>
+          <button type="button" onClick="{{ askSignIn }}" style="width:fit-content;height:38px;padding:0 15px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-sm);font-weight:600;cursor:pointer" style-hover="background:var(--brand-hover)">ادخل إلى حسابك</button>
+        </div>
+      </sc-if>
+      <label style="display:grid;gap:7px">
+        <span style="font-size:var(--text-sm);font-weight:600;color:var(--text-strong)">سؤالك</span>
+        <textarea rows="4" value="{{ askText }}" onChange="{{ onAskText }}" placeholder="مثال: هل القطن مصري أصلي؟ وهل يتوفّر مقاس XL خلال الأسبوع؟" style="padding:11px 13px;border:1px solid {{ askBorder }};border-radius:var(--r-1);background:var(--card);color:var(--text-strong);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.8;resize:vertical;width:100%"></textarea>
+        <span style="display:flex;align-items:center;gap:9px">
+          <span style="font-size:var(--text-xs);color:{{ askMsgColor }}">{{ askMsg }}</span>
+          <span dir="ltr" style="unicode-bidi:isolate;margin-inline-start:auto;font-family:var(--font-mono);font-size:var(--text-2xs);color:{{ askCountColor }}">{{ askCount }} / 500</span>
+        </span>
+      </label>
+      <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-xs);color:var(--text-muted)"><svg width="14" height="14" style="flex:none"><use href="#i-msg"></use></svg>يردّ المتجر عادةً في رسائلك خلال يوم عمل.</span>
+    </div>
+    <div style="padding:14px 20px;border-block-start:1px solid var(--border-subtle);display:flex;gap:10px;justify-content:flex-end;flex:none">
+      <button type="button" onClick="{{ closeAsk }}" style="height:var(--ctrl-h);padding:0 15px;border:1px solid var(--border-control);border-radius:var(--r-1);background:transparent;color:var(--text-strong);font-size:var(--text-base);font-weight:600;cursor:pointer" style-hover="background:var(--sunken)">إلغاء</button>
+      <button type="button" onClick="{{ sendAsk }}" disabled="{{ askDisabled }}" style="height:var(--ctrl-h);padding:0 18px;border:0;border-radius:var(--r-1);background:{{ askBg }};color:{{ askFg }};font-size:var(--text-base);font-weight:600;cursor:{{ askCursor }};display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16"><use href="#i-msg"></use></svg>أرسل السؤال</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:{{ cmpBarDisplay }};position:fixed;bottom:0;inset-inline:0;z-index:85;background:var(--card);border-block-start:1px solid var(--border-default);box-shadow:var(--shadow-overlay);padding:12px 24px;align-items:center;gap:14px;flex-wrap:nowrap">
+  <span style="display:flex;align-items:center;gap:9px;flex:none">
+    <span style="width:34px;height:34px;flex:none;border-radius:var(--r-1);background:var(--brand-subtle);color:var(--brand-text);display:grid;place-items:center"><svg width="17" height="17"><use href="#i-scale"></use></svg></span>
+    <span style="display:grid;gap:2px">
+      <span style="font-size:var(--text-sm);font-weight:700;color:var(--text-strong)">{{ cmpBarText }}</span>
+      <span style="font-size:var(--text-2xs);color:var(--text-muted)">حتى أربعة منتجات من القسم نفسه</span>
+    </span>
+  </span>
+  <span style="display:flex;gap:7px;flex-wrap:nowrap;flex:1;min-width:0;overflow-x:auto;padding-bottom:2px">
+    <sc-for list="{{ cmpBarItems }}" as="c" hint-placeholder-count="3">
+      <span style="height:32px;padding:0 10px;flex:none;border:1px solid var(--border-default);border-radius:var(--r-1);background:var(--sunken);display:inline-flex;align-items:center;gap:7px;max-width:220px">
+        <span style="font-size:var(--text-xs);color:var(--text-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.name }}</span>
+        <button type="button" onClick="{{ c.remove }}" aria-label="أزل" style="width:20px;height:20px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:var(--text-muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--danger-subtle);color:var(--danger-text)"><svg width="12" height="12"><use href="#i-x"></use></svg></button>
+      </span>
+    </sc-for>
+  </span>
+  <button type="button" onClick="{{ openCompare }}" style="flex:none;height:44px;padding:0 20px;border:0;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--text-base);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap" style-hover="background:var(--brand-hover)">قارن الآن<svg width="16" height="16" data-mirror><use href="#i-next"></use></svg></button>
+</div>
+
+<div style="display:{{ toastDisplay }};position:fixed;bottom:24px;inset-inline-start:24px;z-index:110;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r-2);background:{{ toastBg }};color:{{ toastFg }};box-shadow:var(--shadow-lg);animation:bsToastIn .22s ease-out;max-width:560px">
+  <svg width="18" height="18" style="flex:none"><use href="{{ toastIcon }}"></use></svg>
+  <span style="font-size:var(--text-sm);font-weight:600;line-height:1.6">{{ toastMsg }}</span>
+  <button type="button" onClick="{{ closeToast }}" aria-label="إغلاق" style="margin-inline-start:8px;width:26px;height:26px;flex:none;border:0;border-radius:var(--r-1);background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;opacity:.75"><svg width="15" height="15"><use href="#i-x"></use></svg></button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;defaultDirection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rtl&quot;,&quot;ltr&quot;],&quot;default&quot;:&quot;rtl&quot;,&quot;tsType&quot;:&quot;'rtl'|'ltr'&quot;},&quot;defaultDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;comfortable&quot;,&quot;compact&quot;],&quot;default&quot;:&quot;comfortable&quot;,&quot;tsType&quot;:&quot;'comfortable'|'compact'&quot;},&quot;defaultScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ST-01&quot;,&quot;ST-02&quot;,&quot;ST-03&quot;,&quot;ST-04&quot;,&quot;ST-05&quot;,&quot;ST-07&quot;,&quot;ST-08&quot;,&quot;ST-10&quot;,&quot;ST-11&quot;,&quot;ST-12&quot;,&quot;ST-29&quot;,&quot;SH-05&quot;],&quot;default&quot;:&quot;ST-01&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'ST-01', pstate: 'default', fit: 1, toast: null,
+    search: '', suggestOpen: false, city: 'الرياض', currency: 'SAR',
+    cart: 2, wish: {}, hero: 0, newTab: 'إلكترونيات',
+    catOpen: { 1: true }, listFilters: {}, listSort: 'relevance', listPage: 1,
+    searchTab: 'products', pdpColor: 'أحمر', pdpSize: 'M', pdpQty: 1, pdpTab: 'desc', pdpImg: 0,
+    notify: false, askOpen: false, askText: '', compare: [1, 2, 3], compareDiff: true, faqOpen: 1
+  };
+
+  componentDidMount() {
+    const r = this.rootEl;
+    if (r) {
+      if (this.props.defaultTheme === 'dark') r.setAttribute('data-theme', 'dark');
+      if (this.props.defaultDirection === 'ltr') { r.setAttribute('dir', 'ltr'); r.setAttribute('data-lang', 'en'); }
+      if (this.props.defaultDensity) r.setAttribute('data-density', this.props.defaultDensity);
+    }
+    if (this.props.defaultScreen) this.setState({ screen: this.props.defaultScreen });
+    try {
+      const hand = localStorage.getItem('basta.discovery.screen');
+      if (hand) { localStorage.removeItem('basta.discovery.screen'); this.setState({ screen: hand }); }
+    } catch (e) {}
+    this._fit = () => {
+      const w = (this.rootEl ? this.rootEl.clientWidth : window.innerWidth) - 40;
+      this.setState({ fit: Math.min(1, Math.max(0.3, w / 1440)) });
+    };
+    this._fit();
+    window.addEventListener('resize', this._fit);
+    this._hero = setInterval(() => this.setState(s => ({ hero: (s.hero + 1) % 3 })), 6000);
+    this._esc = (e) => {
+      if (e.key !== 'Escape') return;
+      if (this.state.suggestOpen || this.state.askOpen) this.setState({ suggestOpen: false, askOpen: false });
+    };
+    window.addEventListener('keydown', this._esc);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._fit);
+    window.removeEventListener('keydown', this._esc);
+    clearInterval(this._hero); clearTimeout(this._toastT);
+  }
+  set(k, v) { if (this.rootEl) this.rootEl.setAttribute(k, v); }
+  toast(msg, kind) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: { msg: msg, kind: kind || 'success' } });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), 4200);
+  }
+  go(screen) { this.setState({ screen: screen, suggestOpen: false }); }
+  fx() { return { SAR: { r: 1, s: 'ر.س.', d: 2 }, AED: { r: 0.98, s: 'د.إ.', d: 2 }, JOD: { r: 0.189, s: 'د.أ.', d: 3 }, EGP: { r: 13.1, s: 'ج.م.', d: 2 } }[this.state.currency]; }
+  money(sar) {
+    const f = this.fx();
+    return (sar * f.r).toLocaleString('en-US', { minimumFractionDigits: f.d, maximumFractionDigits: f.d }) + ' ' + f.s;
+  }
+  products() {
+    return [
+      { id: 1, name: 'قميص قطني مصري بأكمام طويلة', shop: 'دار القطن', price: 79, compare: 99, rating: 4.7, reviews: 312, stock: 24, icon: '#i-image' },
+      { id: 2, name: 'مكبّر صوت بلوتوث XL-900 مقاوم للماء', shop: 'إلكترو بيت', price: 249, compare: 0, rating: 4.4, reviews: 128, stock: 3, icon: '#i-image' },
+      { id: 3, name: 'طقم مفارش قطن — كينج', shop: 'دار القطن', price: 240, compare: 320, rating: 4.8, reviews: 64, stock: 0, icon: '#i-image' },
+      { id: 4, name: 'زيت أرغان مغربي أصلي 100 مل', shop: 'عطر الشام', price: 58, compare: 0, rating: 4.6, reviews: 201, stock: 41, icon: '#i-image' },
+      { id: 5, name: 'بنطال كتان واسع', shop: 'دار القطن', price: 149, compare: 189, rating: 4.3, reviews: 47, stock: 6, icon: '#i-image' },
+      { id: 6, name: 'ساعة يد جلدية كلاسيك', shop: 'إلكترو بيت', price: 420, compare: 0, rating: 4.5, reviews: 88, stock: 12, icon: '#i-image' },
+      { id: 7, name: 'مبخرة نحاسية مشغولة يدوياً', shop: 'حِرف دمشق', price: 185, compare: 210, rating: 4.9, reviews: 156, stock: 9, icon: '#i-image' },
+      { id: 8, name: 'حقيبة جلد طبيعي للحاسب', shop: 'حِرف دمشق', price: 320, compare: 0, rating: 4.7, reviews: 73, stock: 15, icon: '#i-image' }
+    ];
+  }
+  card(p) {
+    const st = this.state;
+    const wished = !!st.wish[p.id];
+    return {
+      name: p.name, shop: p.shop, icon: p.icon,
+      rating: p.rating ? p.rating.toFixed(1) : '', reviews: String(p.reviews || ''),
+      price: this.money(p.price),
+      compare: p.compare ? this.money(p.compare) : '',
+      badge: p.stock === 0 ? 'نفد' : (p.compare ? '−' + Math.round((1 - p.price / p.compare) * 100) + '%' : ''),
+      badgeBg: p.stock === 0 ? 'var(--inverse)' : 'var(--brand)',
+      badgeFg: p.stock === 0 ? 'var(--on-inverse)' : 'var(--on-brand)',
+      stockNote: p.stock === 0 ? 'نفد من المخزون' : (p.stock <= 6 ? 'بقي ' + p.stock + ' فقط' : ''),
+      stockColor: p.stock === 0 ? 'var(--danger-text)' : 'var(--warning-text)',
+      wishIcon: wished ? '#i-heart-fill' : '#i-heart',
+      wishColor: wished ? 'var(--brand)' : 'var(--text-muted)',
+      open: () => this.setState({ screen: p.stock === 0 ? 'ST-08' : 'ST-07', pdpId: p.id }),
+      openShop: () => this.go('ST-11'),
+      add: () => {
+        if (p.stock === 0) { this.toast('المنتج نفد — فعّل «أبلغني عند التوفّر»', 'warning'); this.setState({ screen: 'ST-08', pdpId: p.id }); return; }
+        this.setState(s => ({ cart: s.cart + 1 }));
+        this.toast('أُضيف إلى سلتك · ' + p.name);
+      },
+      wish: () => {
+        this.setState(s => ({ wish: Object.assign({}, s.wish, { [p.id]: !s.wish[p.id] }) }));
+        this.toast(wished ? 'أُزيل من المفضّلة' : 'أُضيف إلى المفضّلة');
+      }
+    };
+  }
+
+  detail() {
+    const st = this.state, S = (o) => this.setState(o), out = {};
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    out.stopClick = (e) => { e.stopPropagation(); };
+
+    const soldOutScreen = st.screen === 'ST-08';
+    out.isPdp = st.screen === 'ST-07' || soldOutScreen;
+    out.isST10 = st.screen === 'ST-10';
+    out.isST29 = st.screen === 'ST-29';
+    const isSuspended = st.screen === 'ST-12';
+    out.isShop = st.screen === 'ST-11' || isSuspended;
+    out.shopSuspended = isSuspended;
+    out.shopActive = !isSuspended;
+
+    /* ST-07 / ST-08 product page */
+    const p = this.products().filter(x => x.id === (st.pdpId || 1))[0] || this.products()[0];
+    const longName = 'قميص قطني مصري بأكمام طويلة مغزول على أنوال تقليدية في الرياض — نسيج مسامي 220 غرام يناسب حرارة الصيف، بقياسات من S إلى XXL';
+    out.pdpName = edge ? longName : p.name;
+    out.pdpCat = 'قمصان';
+    out.pdpShop = p.shop;
+    out.pdpRating = p.rating.toFixed(1);
+    out.pdpReviews = String(p.reviews);
+    out.goList = () => this.go('ST-03');
+    out.pdpOpenShop = () => this.go('ST-11');
+    out.pdpStars = [1, 2, 3, 4, 5].map(i => ({
+      icon: i <= Math.round(p.rating) ? '#i-star-fill' : '#i-star',
+      color: i <= Math.round(p.rating) ? 'var(--warning)' : 'var(--border-default)'
+    }));
+    out.pdpThumbs = [0, 1, 2, 3].map(i => ({
+      border: st.pdpImg === i ? 'var(--brand)' : 'var(--border-default)',
+      pick: () => S({ pdpImg: i })
+    }));
+    out.pdpImgLabel = 'صورة ' + (st.pdpImg + 1) + ' / 4 · 4:5';
+    out.pdpZoom = () => this.toast('تكبير الصورة — اسحب لتتنقّل');
+
+    const combos = { 'أحمر|M': 14, 'أحمر|L': 6, 'أحمر|XL': 0, 'أزرق|M': 9, 'أزرق|L': 0, 'أزرق|XL': 4, 'أسود|M': 0, 'أسود|L': 0, 'أسود|XL': 0 };
+    const colorDefs = [['أحمر', '#8C2F46'], ['أزرق', '#2D5F8B'], ['أسود', '#1E1814']];
+    const sizeDefs = ['M', 'L', 'XL'];
+    const colorHasAny = (c) => sizeDefs.some(s => combos[c + '|' + s] > 0);
+    const curColor = soldOutScreen ? 'أسود' : st.pdpColor;
+    const curSize = soldOutScreen ? 'M' : st.pdpSize;
+    const stock = empty ? 0 : (combos[curColor + '|' + curSize] || 0);
+    out.pdpColorLabel = curColor;
+    out.pdpSizeLabel = curSize;
+    out.pdpColors = colorDefs.map(c => {
+      const disabled = !colorHasAny(c[0]);
+      return {
+        label: c[0], swatch: c[1], on: curColor === c[0], disabled: disabled,
+        title: c[0] + (disabled ? ' — نفد بكل المقاسات' : ''),
+        border: curColor === c[0] ? 'var(--brand)' : 'var(--border-default)',
+        checkColor: '#FFFFFF',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1,
+        pick: () => { if (!disabled) S({ pdpColor: c[0], screen: 'ST-07' }); }
+      };
+    });
+    out.pdpSizes = sizeDefs.map(s => {
+      const n = combos[curColor + '|' + s] || 0;
+      const disabled = n === 0;
+      return {
+        label: s, disabled: disabled,
+        title: disabled ? 'غير متوفّر مع ' + curColor : n + ' متوفّر',
+        border: curSize === s ? 'var(--brand)' : 'var(--border-control)',
+        bg: curSize === s ? 'var(--brand-subtle)' : 'var(--card)',
+        fg: curSize === s ? 'var(--brand-text)' : (disabled ? 'var(--text-faint)' : 'var(--text-strong)'),
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.55 : 1,
+        pick: () => { if (!disabled) S({ pdpSize: s, pdpQty: 1, screen: 'ST-07' }); }
+      };
+    });
+    out.pdpComboNote = stock === 0 ? 'التركيبة ' + curColor + ' · ' + curSize + ' غير متوفّرة. اختر مقاساً آخر أو لوناً آخر.' : '';
+    const soldOut = stock === 0;
+    out.pdpSoldOut = soldOut;
+    out.pdpInStock = !soldOut;
+    out.pdpStockText = soldOut ? 'نفد من المخزون' : (stock <= 6 ? 'بقي ' + stock + ' فقط' : 'متوفّر في المخزون');
+    out.pdpStockColor = soldOut ? 'var(--danger-text)' : (stock <= 6 ? 'var(--warning-text)' : 'var(--success-text)');
+    out.pdpStockBg = soldOut ? 'var(--danger-subtle)' : (stock <= 6 ? 'var(--warning-subtle)' : 'var(--success-subtle)');
+    out.pdpStockBorder = soldOut ? 'var(--danger)' : (stock <= 6 ? 'var(--warning)' : 'var(--success)');
+    out.pdpStockDot = soldOut ? 'var(--danger)' : (stock <= 6 ? 'var(--warning)' : 'var(--success)');
+    out.pdpPrice = this.money(p.price);
+    out.pdpCompare = p.compare ? this.money(p.compare) : '';
+    out.pdpDiscount = p.compare ? '−' + Math.round((1 - p.price / p.compare) * 100) + '%' : '';
+    out.pdpCurrencyNote = st.currency === 'SAR' ? 'السعر بعملة المتجر' : 'سعر تقريبي للعرض · التحصيل بالريال السعودي';
+    out.pdpQty = String(st.pdpQty);
+    out.qtyMinus = () => S({ pdpQty: Math.max(1, st.pdpQty - 1) });
+    out.qtyPlus = () => {
+      if (st.pdpQty >= stock) { this.toast('لا يمكن طلب أكثر من المتوفّر (' + stock + ')', 'warning'); return; }
+      S({ pdpQty: st.pdpQty + 1 });
+    };
+    out.qtyHint = st.pdpQty >= stock && stock > 0 ? 'وصلت إلى أقصى كمية متوفّرة (' + stock + ').' : '';
+    out.pdpWishIcon = st.wish[p.id] ? '#i-heart-fill' : '#i-heart';
+    out.pdpWishColor = st.wish[p.id] ? 'var(--brand)' : 'var(--text-muted)';
+    out.pdpWish = () => { S({ wish: Object.assign({}, st.wish, { [p.id]: !st.wish[p.id] }) }); this.toast(st.wish[p.id] ? 'أُزيل من المفضّلة' : 'أُضيف إلى المفضّلة'); };
+    out.pdpAdd = () => { S({ cart: st.cart + st.pdpQty }); this.toast('أُضيف ' + st.pdpQty + ' إلى سلتك · ' + curColor + ' · ' + curSize); };
+    out.pdpCompareAdd = () => {
+      if (st.compare.indexOf(p.id) >= 0) { this.toast('المنتج في قائمة المقارنة بالفعل', 'warning'); return; }
+      if (st.compare.length >= 4) { this.toast('الحد الأقصى أربعة منتجات للمقارنة', 'warning'); return; }
+      S({ compare: st.compare.concat([p.id]) });
+      this.toast('أُضيف إلى المقارنة');
+    };
+    out.pdpNotify = () => { S({ notify: !st.notify }); this.toast(st.notify ? 'أُلغي التنبيه' : 'سنبلغك عند توفّر ' + curColor + ' · ' + curSize); };
+    out.notifyLabel = st.notify ? 'سنبلغك عند التوفّر' : 'أبلغني عند التوفّر';
+    out.notifyIcon = st.notify ? '#i-check-circle' : '#i-bell';
+    out.notifyBg = st.notify ? 'var(--success-subtle)' : 'transparent';
+    out.notifyFg = st.notify ? 'var(--success-text)' : 'var(--brand-text)';
+    out.notifyBorder = st.notify ? '1.5px solid var(--success)' : '1.5px solid var(--brand)';
+    out.pdpOtherVariants = 'متوفّر الآن: أحمر · M (14 قطعة) · أحمر · L (6) · أزرق · M (9) · أزرق · XL (4)';
+    const noShip = st.city === 'عمّان' || st.city === 'دبي';
+    out.pdpNoShip = noShip;
+    out.pdpShipText = noShip
+      ? 'هذا المتجر يشحن داخل السعودية فقط.'
+      : 'الشحن إلى ' + st.city + ' ' + this.money(15) + ' · يوصل في 2–4 أيام عمل';
+    const tabDefs = [['desc', 'الوصف'], ['specs', 'المواصفات'], ['reviews', 'التقييمات (' + p.reviews + ')'], ['qna', 'أسئلة المشترين']];
+    out.pdpTabs = tabDefs.map(t => ({
+      label: t[1],
+      underline: st.pdpTab === t[0] ? 'var(--brand)' : 'transparent',
+      fg: st.pdpTab === t[0] ? 'var(--brand-text)' : 'var(--text-muted)',
+      weight: st.pdpTab === t[0] ? '700' : '500',
+      pick: () => S({ pdpTab: t[0] })
+    }));
+    out.tabIsDesc = st.pdpTab === 'desc';
+    out.tabIsSpecs = st.pdpTab === 'specs';
+    out.tabIsReviews = st.pdpTab === 'reviews';
+    out.tabIsQna = st.pdpTab === 'qna';
+    out.pdpToReviews = () => S({ pdpTab: 'reviews' });
+    out.pdpDesc = 'قميص من قطن مصري مغزول في الرياض على أنوال تقليدية. النسيج مسامي بوزن 220 غرام للمتر المربع، يناسب حرارة الصيف ولا يبهت لونه بالغسل المتكرّر.';
+    out.pdpBullets = ['قطن مصري 100% — بلا ألياف صناعية.', 'أزرار صدف طبيعي مخيطة يدوياً.', 'يُغسل في الغسالة على 30 درجة، ولا يحتاج كيّاً قوياً.'];
+    out.pdpSpecs = [
+      { k: 'المادة', v: 'قطن مصري 100%' },
+      { k: 'وزن القماش', v: '220 g/m²' },
+      { k: 'طول الكم', v: 'طويل' },
+      { k: 'بلد الصنع', v: 'السعودية' },
+      { k: 'طريقة العناية', v: 'غسيل آلي 30° · كيّ منخفض' },
+      { k: 'الضمان', v: 'استبدال خلال 14 يوماً' }
+    ].map((s, i) => ({ k: s.k, v: s.v, bg: i % 2 ? 'var(--sunken)' : 'transparent' }));
+    out.noReviews = empty;
+    out.ratingBars = [[5, 210], [4, 68], [3, 22], [2, 8], [1, 4]].map(r => ({
+      star: String(r[0]), n: String(empty ? 0 : r[1]),
+      w: (empty ? 0 : Math.round((r[1] / 210) * 100)) + '%'
+    }));
+    const mkStars = (n) => [1, 2, 3, 4, 5].map(i => ({ icon: i <= n ? '#i-star-fill' : '#i-star', color: i <= n ? 'var(--warning)' : 'var(--border-default)' }));
+    out.reviews = empty ? [] : [
+      { initial: 'ن', name: 'نورة العتيبي', verified: true, date: '12 سبتمبر', text: 'القماش خفيف ومريح فعلاً، والمقاس مطابق للجدول. وصل قبل الموعد بيوم.', variant: 'أحمر · M', stars: mkStars(5) },
+      { initial: 'س', name: 'سعد الدوسري', verified: true, date: '8 سبتمبر', text: 'جيد لكن اللون أغمق قليلاً من الصورة. الخياطة ممتازة.', variant: 'أزرق · L', stars: mkStars(4) },
+      { initial: 'م', name: 'مها القحطاني', verified: false, date: '2 سبتمبر', text: 'اشتريت اثنين وأنصح بهما للصيف.', variant: 'أحمر · L', stars: mkStars(5) }
+    ];
+    out.qna = [
+      { q: 'هل القطن مصري أصلي؟', a: 'نعم، قطن مصري طويل التيلة ومغزول في الرياض. نرفق شهادة المنشأ مع الطلب.', meta: 'أجاب المتجر · قبل يومين' },
+      { q: 'هل ينكمش بعد الغسل؟', a: 'الانكماش أقل من 2% إذا غُسل على 30 درجة. ننصح بعدم استخدام المجفّف الكهربائي.', meta: 'أجاب المتجر · قبل 5 أيام' }
+    ];
+    out.pdpMoreTitle = 'المزيد من ' + p.shop;
+    out.pdpRelated = this.products().filter(x => x.id !== p.id).slice(0, 4).map(x => ({
+      name: x.name, price: this.money(x.price),
+      open: () => S({ screen: x.stock === 0 ? 'ST-08' : 'ST-07', pdpId: x.id, pdpTab: 'desc' }),
+      add: () => { S({ cart: st.cart + 1 }); this.toast('أُضيف إلى سلتك · ' + x.name); }
+    }));
+
+    /* ST-09 ask modal */
+    out.askDisplay = st.askOpen ? 'flex' : 'none';
+    out.openAsk = () => S({ askOpen: true });
+    out.closeAsk = () => S({ askOpen: false });
+    out.askVariant = curColor + ' · ' + curSize + ' · ' + this.money(p.price);
+    out.isGuest = edge;
+    out.askSignIn = () => this.toast('شاشة الدخول SH-01 تُصمَّم مع الشاشات المشتركة');
+    out.askText = st.askText;
+    out.onAskText = (e) => S({ askText: e.target.value.slice(0, 500) });
+    out.askCount = st.askText.length;
+    out.askCountColor = st.askText.length > 460 ? 'var(--warning-text)' : 'var(--text-faint)';
+    const askOk = st.askText.trim().length >= 10 && !edge;
+    out.askBorder = st.askText.length && st.askText.trim().length < 10 ? 'var(--danger)' : 'var(--border-control)';
+    out.askMsg = edge ? 'ادخل إلى حسابك لإرسال السؤال.' : (askOk ? 'يُرسل السؤال إلى المتجر ويظهر ردّه في رسائلك.' : 'اكتب سؤالاً من عشرة أحرف على الأقل.');
+    out.askMsgColor = askOk ? 'var(--success-text)' : (st.askText.length ? 'var(--danger-text)' : 'var(--text-muted)');
+    out.askDisabled = !askOk;
+    out.askBg = askOk ? 'var(--brand)' : 'var(--sunken)';
+    out.askFg = askOk ? 'var(--on-brand)' : 'var(--text-faint)';
+    out.askCursor = askOk ? 'pointer' : 'not-allowed';
+    out.sendAsk = () => { if (!askOk) return; S({ askOpen: false, askText: '' }); this.toast('أُرسل سؤالك — يردّ المتجر عادةً خلال يوم عمل'); };
+
+    /* ST-10 compare */
+    const cmpItems = this.products().filter(x => st.compare.indexOf(x.id) >= 0);
+    out.cmpEmpty = cmpItems.length === 0;
+    out.cmpHasItems = cmpItems.length > 0;
+    out.cmpCountText = cmpItems.length + ' من 4 منتجات · من قسم القمصان';
+    out.cmpGrid = '180px repeat(' + Math.max(1, cmpItems.length) + ', minmax(180px, 1fr))';
+    out.cmpCols = cmpItems.map(x => ({
+      name: x.name,
+      open: () => S({ screen: 'ST-07', pdpId: x.id }),
+      remove: () => { S({ compare: st.compare.filter(id => id !== x.id) }); this.toast('أُزيل من المقارنة'); }
+    }));
+    out.toggleDiff = () => S({ compareDiff: !st.compareDiff });
+    out.diffBg = st.compareDiff ? 'var(--brand-subtle)' : 'transparent';
+    out.diffFg = st.compareDiff ? 'var(--brand-text)' : 'var(--text-body)';
+    out.diffBorder = st.compareDiff ? 'var(--brand)' : 'var(--border-control)';
+    out.diffSwBg = st.compareDiff ? 'var(--brand)' : 'var(--border-control)';
+    out.diffSwX = st.compareDiff ? '18px' : '2px';
+    const rowDefs = [
+      { label: 'السعر', get: (x) => this.money(x.price), money: true },
+      { label: 'التقييم', get: (x) => x.rating.toFixed(1) + ' (' + x.reviews + ')', mono: true },
+      { label: 'المتجر', get: (x) => x.shop },
+      { label: 'الشحن', get: (x) => x.shop === 'دار القطن' ? this.money(15) + ' · 2–4 أيام' : this.money(25) + ' · 3–5 أيام', money: true },
+      { label: 'المادة', get: (x) => x.id === 2 ? 'بلاستيك ومعدن' : 'قطن مصري 100%' },
+      { label: 'المقاسات', get: (x) => x.id === 2 ? 'مقاس واحد' : 'M · L · XL' },
+      { label: 'الضمان', get: (x) => x.id === 2 ? 'سنتان' : 'استبدال 14 يوماً' }
+    ];
+    out.cmpRows = rowDefs.map(r => {
+      const vals = cmpItems.map(x => r.get(x));
+      const differs = vals.length > 1 && vals.some(v => v !== vals[0]);
+      return {
+        label: r.label, differs: differs && st.compareDiff,
+        rowBg: differs && st.compareDiff ? 'var(--warning-subtle)' : 'transparent',
+        cells: vals.map(v => ({
+          v: v,
+          color: r.money ? 'var(--money)' : 'var(--text-strong)',
+          weight: r.money ? '700' : '500',
+          font: (r.money || r.mono) ? 'var(--font-mono)' : 'var(--font-ui)',
+          dir: (r.money || r.mono) ? 'ltr' : 'rtl'
+        }))
+      };
+    });
+    out.cmpBarDisplay = (cmpItems.length >= 2 && st.screen !== 'ST-10') ? 'flex' : 'none';
+    out.cmpBarText = 'المقارنة: ' + cmpItems.length + ' منتجات';
+    out.pagePadBottom = out.cmpBarDisplay === 'flex' ? '130px' : '60px';
+    out.cmpBarItems = cmpItems.map(x => ({
+      name: x.name,
+      remove: () => S({ compare: st.compare.filter(id => id !== x.id) })
+    }));
+    out.openCompare = () => this.go('ST-10');
+
+    /* ST-11 / ST-12 shop */
+    out.shopName = isSuspended ? 'إلكترو بيت' : 'دار القطن';
+    out.shopSlug = isSuspended ? 'electro-bait' : 'dar-alqutn';
+    out.shopVerified = !isSuspended;
+    out.shopProductCount = empty ? 'لا منتجات منشورة' : '96 منتجاً';
+    out.msgShop = () => { if (!isSuspended) this.toast('رسائلك ST-28 تُصمَّم مع شاشات الحساب'); };
+    out.msgBg = isSuspended ? 'var(--sunken)' : 'var(--brand)';
+    out.msgFg = isSuspended ? 'var(--text-faint)' : 'var(--on-brand)';
+    out.msgCursor = isSuspended ? 'not-allowed' : 'pointer';
+    out.shopFilters = ['الكل', 'قمصان', 'بنطلونات', 'الأحدث'].map(f => ({
+      label: f,
+      bg: (st.shopFilter || 'الكل') === f ? 'var(--brand)' : 'transparent',
+      fg: (st.shopFilter || 'الكل') === f ? 'var(--on-brand)' : 'var(--text-body)',
+      border: (st.shopFilter || 'الكل') === f ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ shopFilter: f })
+    }));
+    out.shopProducts = (empty ? [] : this.products().filter(x => x.shop === 'دار القطن' || (st.shopFilter === 'الكل' || !st.shopFilter))).slice(0, 4).map(x => this.card(x));
+
+    out.openContentPage = (slug) => this.openContent(slug);
+
+    /* ST-29 sell */
+    out.goRegister = () => { window.location.href = encodeURI('Basta Batch 1 - Vendor Onboarding.dc.html'); };
+    out.scrollFaq = () => this.toast('الأسئلة الشائعة أدناه');
+    out.sellSteps = [
+      { n: '1', title: 'سجّل حسابك ومتجرك', body: 'اسمك وبريدك، ثم اسم المتجر ورابطه وقسمه الرئيسي.' },
+      { n: '2', title: 'ارفع المستندات', body: 'سجل تجاري وهوية وشهادة ضريبية وحساب بنكي باسم النشاط.' },
+      { n: '3', title: 'نراجع طلبك', body: 'عادةً خلال يوم عمل واحد. يمكنك تهيئة منتجاتك كمسودّات أثناء المراجعة.' },
+      { n: '4', title: 'ابدأ البيع', body: 'انشر منتجاتك بعد موافقة الإدارة، واستقبل طلباتك من لوحة التاجر.' }
+    ];
+    const faqDefs = [
+      { id: 1, q: 'كم عمولة بسطة؟', a: 'عمولة 10% من قيمة المنتجات بعد الخصم لكل عملية بيع، بلا اشتراك شهري ولا رسوم إدراج. تظهر العمولة في تفصيل كل طلب وفي كشف حسابك.' },
+      { id: 2, q: 'متى أستلم أرباحي؟', a: 'تُحرَّر أرباح كل طلب بعد 14 يوماً من تسليمه، ثم تصبح متاحة للتحويل. تطلب التحويل من محفظتك ويصل إلى حسابك البنكي خلال يومي عمل بعد الموافقة.' },
+      { id: 3, q: 'بأي عملة أُسعّر وأقبض؟', a: 'تختار عملة تسوية واحدة عند التسجيل — الريال السعودي أو الدرهم أو الدينار أو غيرها. تُسعّر بها وتُقبض بها، ويرى المشتري السعر بعملة العرض عنده. لا يمكن تغيير العملة بعد أول عملية بيع.' },
+      { id: 4, q: 'هل أحتاج سجلاً تجارياً؟', a: 'نعم، سجل تجاري ساري وهوية صاحب النشاط وشهادة ضريبية وحساب بنكي باسم النشاط نفسه.' },
+      { id: 5, q: 'من يتحمّل الشحن والإرجاع؟', a: 'تحدّد مناطق الشحن وتسعيرتها بنفسك من إعدادات الشحن. سياسة الإرجاع سياستك، وتظهر في صفحة متجرك وصفحات منتجاتك قبل الشراء.' }
+    ];
+    out.faqs = faqDefs.map(f => ({
+      q: f.q, a: f.a, open: st.faqOpen === f.id,
+      bg: st.faqOpen === f.id ? 'var(--brand-subtle)' : 'transparent',
+      rotate: st.faqOpen === f.id ? 'rotate(180deg)' : 'none',
+      toggle: () => S({ faqOpen: st.faqOpen === f.id ? 0 : f.id })
+    }));
+
+    return out;
+  }
+
+  browse() {
+    const st = this.state, S = (o) => this.setState(o), out = {};
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+
+    out.isST02 = st.screen === 'ST-02';
+    out.isST03 = st.screen === 'ST-03';
+    out.isST05 = st.screen === 'ST-05';
+    out.isSH05 = st.screen === 'SH-05';
+    const isSearch = st.screen === 'ST-04';
+    out.isSearchScreen = isSearch;
+    out.isList = st.screen === 'ST-03' || isSearch;
+
+    /* ST-02 category tree */
+    const treeDefs = [
+      { id: 1, name: 'إلكترونيات', level: 1, icon: '#i-boxes', count: 1240, kids: [
+        { id: 11, name: 'جوالات وأجهزة لوحية', level: 2, count: 520, kids: [
+          { id: 111, name: 'جوالات ذكية', level: 3, count: 380, kids: [{ id: 1111, name: 'جوالات أندرويد', level: 4, count: 210 }] }
+        ] },
+        { id: 12, name: 'صوتيات', level: 2, count: 310, kids: [{ id: 121, name: 'مكبّرات بلوتوث', level: 3, count: 120 }] }
+      ] },
+      { id: 2, name: 'أزياء', level: 1, icon: '#i-package', count: 3180, kids: [
+        { id: 21, name: 'أزياء نسائية', level: 2, count: 1840, kids: [
+          { id: 211, name: 'قمصان', level: 3, count: 420 },
+          { id: 212, name: 'عبايات', level: 3, count: 610 }
+        ] },
+        { id: 22, name: 'أزياء رجالية', level: 2, count: 980, kids: [{ id: 221, name: 'قمصان رجالية', level: 3, count: 340 }] }
+      ] },
+      { id: 3, name: 'الجمال والعناية', level: 1, icon: '#i-star', count: 860, kids: [{ id: 31, name: 'عطور', level: 2, count: 320 }] },
+      { id: 4, name: 'المنزل والمطبخ', level: 1, icon: '#i-store', count: 1520, kids: [{ id: 41, name: 'مفارش', level: 2, count: 280 }] },
+      { id: 5, name: 'بقالة', level: 1, icon: '#i-cart', count: 640, kids: [] },
+      { id: 6, name: 'حِرف يدوية', level: 1, icon: '#i-heart', count: 410, kids: [{ id: 61, name: 'نحاسيات', level: 2, count: 140 }] }
+    ];
+    const rows = [];
+    const walk = (nodes) => {
+      nodes.forEach(n => {
+        const open = !!st.catOpen[n.id];
+        const kids = n.kids || [];
+        const expandable = kids.length > 0;
+        rows.push({
+          name: n.name, count: (empty ? 'قريباً' : n.count + ' منتجاً'),
+          indent: ((n.level - 1) * 24) + 'px',
+          h: n.level === 1 ? '58px' : '44px',
+          size: n.level === 1 ? 'var(--text-base)' : 'var(--text-sm)',
+          weight: n.level === 1 ? '700' : '500',
+          hasIcon: n.level === 1, icon: n.icon || '#i-boxes',
+          bg: open && expandable ? 'var(--brand-subtle)' : 'transparent',
+          expandable: expandable, isLeaf: !expandable,
+          rotate: open ? 'rotate(180deg)' : 'none',
+          act: () => {
+            if (expandable) S({ catOpen: Object.assign({}, st.catOpen, { [n.id]: !open }) });
+            else this.go('ST-03');
+          }
+        });
+        if (open) walk(kids);
+      });
+    };
+    walk(treeDefs);
+    out.catTree = rows;
+
+    /* ST-03 / ST-04 listing */
+    out.listTitle = isSearch ? 'نتائج «موبايل»' : 'قمصان';
+    const filters = st.listFilters;
+    const activeKeys = Object.keys(filters).filter(k => filters[k]);
+    const base = this.products();
+    let items = base.slice();
+    if (activeKeys.indexOf('color:أزرق') >= 0) items = items.filter(p => p.id === 2);
+    if (activeKeys.indexOf('size:XL') >= 0) items = items.filter(p => p.id === 99);
+    if (activeKeys.indexOf('rating:4') >= 0) items = items.filter(p => p.rating >= 4.5);
+    if (activeKeys.indexOf('shop:دار القطن') >= 0) items = items.filter(p => p.shop === 'دار القطن');
+    const pMax = Number(st.priceMax === undefined ? 1000 : st.priceMax);
+    const pMin = Number(st.priceMin === undefined ? 0 : st.priceMin);
+    items = items.filter(p => p.price >= pMin && p.price <= pMax);
+    if (empty) items = [];
+    if (st.listSort === 'low') items.sort((a, b) => a.price - b.price);
+    if (st.listSort === 'high') items.sort((a, b) => b.price - a.price);
+    if (st.listSort === 'rated') items.sort((a, b) => b.rating - a.rating);
+    const total = empty ? 0 : (isSearch ? 36 : 128);
+    out.listCountText = empty ? 'لا منتجات في هذا القسم بعد' : (items.length ? items.length + ' من ' + total + ' نتيجة' : 'لا نتائج بعد التصفية');
+    out.resCount = String(total);
+    out.hasCorrection = isSearch && !empty;
+    out.keepOriginal = () => this.toast('نبحث عن «موبيل» كما كتبتها — 0 نتيجة');
+    out.tabProducts = () => S({ searchTab: 'products' });
+    out.tabShops = () => S({ searchTab: 'shops' });
+    out.tabPBg = st.searchTab === 'products' ? 'var(--brand)' : 'var(--card)';
+    out.tabPFg = st.searchTab === 'products' ? 'var(--on-brand)' : 'var(--text-body)';
+    out.tabSBg = st.searchTab === 'shops' ? 'var(--brand)' : 'var(--card)';
+    out.tabSFg = st.searchTab === 'shops' ? 'var(--on-brand)' : 'var(--text-body)';
+    out.showShopResults = isSearch && st.searchTab === 'shops';
+    out.showGrid = !(isSearch && st.searchTab === 'shops');
+    out.shopResults = [
+      { name: 'إلكترو بيت', rating: '4.4', products: 214, city: 'جدة' },
+      { name: 'دار القطن', rating: '4.7', products: 96, city: 'الرياض' },
+      { name: 'عطر الشام', rating: '4.6', products: 148, city: 'دبي' },
+      { name: 'حِرف دمشق', rating: '4.9', products: 62, city: 'عمّان' }
+    ].map(s => ({ name: s.name, rating: s.rating, products: String(s.products), city: s.city, open: () => this.go('ST-11') }));
+    out.showSubcats = !isSearch;
+    out.subcats = ['قمصان قطن', 'قمصان كتان', 'قمصان رسمية', 'تيشيرتات'].map((c, i) => ({
+      label: c, count: [420, 180, 96, 310][i],
+      bg: st.subcat === c ? 'var(--brand)' : 'var(--card)',
+      fg: st.subcat === c ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.subcat === c ? 'var(--brand)' : 'var(--border-control)',
+      pick: () => S({ subcat: st.subcat === c ? null : c })
+    }));
+    const sortDefs = [['relevance', 'الأكثر ملاءمة'], ['newest', 'الأحدث'], ['low', 'السعر من الأقل'], ['high', 'السعر من الأعلى'], ['rated', 'الأعلى تقييماً']];
+    out.sortLabel = (sortDefs.filter(s => s[0] === st.listSort)[0] || sortDefs[0])[1];
+    out.sortMenu = st.sortOpen ? 'block' : 'none';
+    out.toggleSort = () => S({ sortOpen: !st.sortOpen });
+    out.sortOptions = sortDefs.map(s => ({
+      label: s[1], on: st.listSort === s[0],
+      bg: st.listSort === s[0] ? 'var(--brand-subtle)' : 'transparent',
+      fg: st.listSort === s[0] ? 'var(--brand-text)' : 'var(--text-body)',
+      pick: () => S({ listSort: s[0], sortOpen: false })
+    }));
+    const toggleF = (k) => S({ listFilters: Object.assign({}, filters, { [k]: !filters[k] }) });
+    const colorDefs = [['أحمر', '#8C2F46', 84], ['أزرق', '#2D5F8B', 62], ['أسود', '#1E1814', 118], ['أبيض', '#FDFAF6', 74]];
+    out.filterGroups = [
+      { title: 'السعر', isPrice: true, isSwatch: false, isChips: false, isList: false, options: [] },
+      { title: 'اللون', isPrice: false, isSwatch: true, isChips: false, isList: false, options: colorDefs.map(c => ({
+        label: c[0], count: c[2], swatch: c[1], on: !!filters['color:' + c[0]],
+        border: filters['color:' + c[0]] ? 'var(--brand)' : 'var(--border-default)',
+        checkColor: c[0] === 'أبيض' ? 'var(--text-strong)' : '#FFFFFF',
+        toggle: () => toggleF('color:' + c[0])
+      })) },
+      { title: 'المقاس', isPrice: false, isSwatch: false, isChips: true, isList: false, options: ['S', 'M', 'L', 'XL'].map((s, i) => ({
+        label: s, count: [42, 96, 78, 0][i], on: !!filters['size:' + s],
+        bg: filters['size:' + s] ? 'var(--brand)' : 'transparent',
+        fg: filters['size:' + s] ? 'var(--on-brand)' : 'var(--text-body)',
+        border: filters['size:' + s] ? 'var(--brand)' : 'var(--border-control)',
+        toggle: () => toggleF('size:' + s)
+      })) },
+      { title: 'المتجر', isPrice: false, isSwatch: false, isChips: false, isList: true, options: ['دار القطن', 'إلكترو بيت', 'حِرف دمشق', 'عطر الشام'].map((s, i) => ({
+        label: s, count: [96, 214, 62, 148][i], on: !!filters['shop:' + s],
+        border: filters['shop:' + s] ? 'var(--brand)' : 'var(--border-control)',
+        boxBg: filters['shop:' + s] ? 'var(--brand)' : 'transparent',
+        opacity: filters['shop:' + s] ? 1 : 0,
+        toggle: () => toggleF('shop:' + s)
+      })) },
+      { title: 'التقييم', isPrice: false, isSwatch: false, isChips: false, isList: true, options: [['4.5 وأعلى', 'rating:4', 64], ['4.0 وأعلى', 'rating:40', 112]].map(r => ({
+        label: r[0], count: r[2], on: !!filters[r[1]],
+        border: filters[r[1]] ? 'var(--brand)' : 'var(--border-control)',
+        boxBg: filters[r[1]] ? 'var(--brand)' : 'transparent',
+        opacity: filters[r[1]] ? 1 : 0,
+        toggle: () => toggleF(r[1])
+      })) }
+    ];
+    out.priceMin = String(pMin);
+    out.priceMax = String(pMax);
+    out.onPriceMin = (e) => S({ priceMin: e.target.value.replace(/\D/g, '') });
+    out.onPriceMax = (e) => S({ priceMax: e.target.value.replace(/\D/g, '') });
+    out.onPriceRange = (e) => S({ priceMax: e.target.value });
+    out.priceNote = 'بين ' + this.money(pMin) + ' و' + this.money(pMax);
+    const chipLabels = { 'color:أحمر': 'اللون أحمر', 'color:أزرق': 'اللون أزرق', 'color:أسود': 'اللون أسود', 'color:أبيض': 'اللون أبيض', 'size:S': 'المقاس S', 'size:M': 'المقاس M', 'size:L': 'المقاس L', 'size:XL': 'المقاس XL', 'rating:4': 'تقييم 4.5+', 'rating:40': 'تقييم 4.0+' };
+    const chips = activeKeys.map(k => ({
+      key: k,
+      label: chipLabels[k] || (k.indexOf('shop:') === 0 ? 'المتجر ' + k.slice(5) : k),
+      remove: () => S({ listFilters: Object.assign({}, filters, { [k]: false }) })
+    }));
+    out.appliedChips = chips;
+    out.hasChips = chips.length > 0;
+    out.lastFilterLabel = chips.length ? chips[chips.length - 1].label : '';
+    out.removeLastFilter = () => { if (chips.length) chips[chips.length - 1].remove(); };
+    out.clearFilters = () => S({ listFilters: {}, priceMin: '0', priceMax: '1000' });
+    const shown = st.listPage * 8;
+    out.gridCards = items.slice(0, shown).map(p => this.card(p));
+    out.gridEmpty = items.length === 0;
+    out.gridHasItems = items.length > 0;
+    out.gridEmptyTitle = empty ? 'لا منتجات في هذا القسم بعد' : 'لا نتائج مع هذه التصفية';
+    out.gridEmptyBody = empty
+      ? 'هذا القسم جديد ولم تُنشر فيه منتجات بعد. تصفّح أقساماً أخرى أو عُد قريباً.'
+      : 'أزل آخر تصفية أضفتها لترى نتائج أوسع، أو وسّع نطاق السعر.';
+    out.skeletons = st.loadingMore ? [1, 2, 3, 4] : [];
+    out.loadingMore = !!st.loadingMore;
+    const more = items.length > shown;
+    out.loadMoreDisabled = !more || !!st.loadingMore;
+    out.loadMoreLabel = st.loadingMore ? 'نحمّل المزيد…' : (more ? 'اعرض المزيد' : 'وصلت إلى نهاية النتائج');
+    out.loadMoreBg = more ? 'var(--card)' : 'var(--sunken)';
+    out.loadMoreFg = more ? 'var(--text-strong)' : 'var(--text-faint)';
+    out.loadMoreBorder = more ? 'var(--border-control)' : 'var(--border-default)';
+    out.loadMoreCursor = more ? 'pointer' : 'not-allowed';
+    out.shownText = items.length ? 'يُعرض ' + Math.min(shown, items.length) + ' من ' + items.length : '';
+    out.loadMore = () => {
+      if (!more) return;
+      S({ loadingMore: true });
+      setTimeout(() => this.setState(s => ({ loadingMore: false, listPage: s.listPage + 1 })), 800);
+    };
+
+    /* ST-05 no results */
+    out.didYouMean = () => { S({ search: 'سماعة بلوتوث زرقاء', screen: 'ST-04' }); this.toast('أُعيد البحث عن «سماعة بلوتوث زرقاء»'); };
+    out.altCards = this.products().slice(1, 5).map(p => ({
+      name: p.name, price: this.money(p.price),
+      open: () => S({ screen: 'ST-07', pdpId: p.id }),
+      add: () => { this.setState(s => ({ cart: s.cart + 1 })); this.toast('أُضيف إلى سلتك · ' + p.name); }
+    }));
+
+    return out;
+  }
+
+  openContent(slug) {
+    try {
+      localStorage.setItem('basta.account.screen', 'ST-30');
+      localStorage.setItem('basta.account.page', slug || 'about');
+    } catch (e) {}
+    window.location.href = encodeURI('Basta Account & Shared.dc.html');
+  }
+
+  renderVals() {
+    const st = this.state, S = (o) => this.setState(o);
+    const P = st.pstate, empty = P === 'empty', edge = P === 'edge';
+    const out = {};
+
+    out.rootRef = (el) => { this.rootEl = el; };
+    out.fit = st.fit;
+    out.setLight = () => this.set('data-theme', 'light');
+    out.setDark = () => this.set('data-theme', 'dark');
+    out.setAr = () => { this.set('dir', 'rtl'); this.set('data-lang', 'ar'); };
+    out.setEn = () => { this.set('dir', 'ltr'); this.set('data-lang', 'en'); };
+    out.setCompact = () => this.set('data-density', 'compact');
+    out.setComfortable = () => this.set('data-density', 'comfortable');
+
+    const codes = ['ST-01', 'ST-02', 'ST-03', 'ST-04', 'ST-05', 'ST-06', 'ST-07', 'ST-08', 'ST-09', 'ST-10', 'ST-11', 'ST-12', 'ST-29', 'SH-05'];
+    out.screenTabs = codes.map(c => ({
+      code: c,
+      bg: st.screen === c ? 'var(--brand)' : 'var(--card)',
+      fg: st.screen === c ? 'var(--on-brand)' : 'var(--text-body)',
+      border: st.screen === c ? 'var(--brand)' : 'var(--border-control)',
+      go: () => { if (c === 'ST-06') { S({ screen: 'ST-01', search: 'سما', suggestOpen: true }); } else this.go(c); }
+    }));
+    const pstates = [['default', 'طبيعي'], ['loading', 'تحميل'], ['empty', 'فارغ'], ['error', 'خطأ'], ['edge', 'الحدّ']];
+    out.stateTabs = pstates.map(p => ({
+      label: p[1],
+      bg: P === p[0] ? 'var(--brand)' : 'var(--card)',
+      fg: P === p[0] ? 'var(--on-brand)' : 'var(--text-body)',
+      border: P === p[0] ? 'var(--brand)' : 'var(--border-control)',
+      go: () => S({ pstate: p[0] })
+    }));
+    out.loadingDisplay = P === 'loading' ? 'flex' : 'none';
+    out.errorDisplay = P === 'error' ? 'grid' : 'none';
+    out.contentDisplay = (P === 'loading' || P === 'error') ? 'none' : 'block';
+    out.retry = () => { S({ pstate: 'default' }); this.toast('أُعيد التحميل'); };
+
+    /* header */
+    out.searchVal = st.search;
+    out.searchBorder = st.suggestOpen ? 'var(--brand)' : 'var(--border-control)';
+    out.onSearch = (e) => S({ search: e.target.value, suggestOpen: e.target.value.length >= 3 });
+    out.openSuggest = () => S({ suggestOpen: true });
+    out.closeSuggest = () => S({ suggestOpen: false });
+    out.searchKey = (e) => {
+      if (e.key === 'Enter') { S({ suggestOpen: false, screen: st.search.trim() === 'سماعه بلوتوث زرقا' ? 'ST-05' : 'ST-04' }); }
+      if (e.key === 'Escape') S({ suggestOpen: false });
+    };
+    out.runSearch = () => S({ suggestOpen: false, screen: st.search.trim() === 'سماعه بلوتوث زرقا' ? 'ST-05' : 'ST-04' });
+    out.suggestDisplay = st.suggestOpen ? 'block' : 'none';
+    const q = st.search.trim();
+    const sugProducts = this.products().filter(p => !q || p.name.indexOf(q) >= 0 || q.length < 3).slice(0, 3);
+    out.suggestGroups = q.length < 3
+      ? [{ label: 'أحدث بحوثك', items: ['قميص قطن', 'مكبّر صوت بلوتوث', 'زيت أرغان'].map(t => ({ hit: '', rest: t, icon: '#i-clock', meta: '', price: '', bg: 'transparent', pick: () => S({ search: t, suggestOpen: true }) })) }]
+      : [
+        { label: 'منتجات', items: sugProducts.map(p => ({ hit: q, rest: p.name.indexOf(q) === 0 ? p.name.slice(q.length) : ' · ' + p.name, icon: '#i-image', meta: p.shop, price: this.money(p.price), bg: 'transparent', pick: () => { S({ suggestOpen: false, screen: 'ST-07', pdpId: p.id }); } })) },
+        { label: 'أقسام', items: [{ hit: q, rest: ' في الإلكترونيات', icon: '#i-boxes', meta: '1,240 منتجاً', price: '', bg: 'transparent', pick: () => this.go('ST-03') }] },
+        { label: 'متاجر', items: [{ hit: q, rest: ' — إلكترو بيت', icon: '#i-store', meta: 'تقييم 4.4 · الرياض', price: '', bg: 'transparent', pick: () => this.go('ST-11') }] }
+      ];
+    out.cityVal = st.city;
+    out.changeLocation = () => {
+      const cities = ['الرياض', 'جدة', 'الدمام', 'عمّان', 'دبي'];
+      const next = cities[(cities.indexOf(st.city) + 1) % cities.length];
+      S({ city: next });
+      this.toast('حُدّث الموقع إلى ' + next + ' — أُعيد حساب الشحن');
+    };
+    out.currencyCode = st.currency;
+    out.toggleCurrency = () => {
+      const cs = ['SAR', 'AED', 'JOD', 'EGP'];
+      const next = cs[(cs.indexOf(st.currency) + 1) % cs.length];
+      S({ currency: next });
+      this.toast('عملة العرض ' + next + ' — التحصيل بعملة المتجر');
+    };
+    out.cartCount = String(st.cart);
+    out.goCart = () => { try { localStorage.setItem('basta.purchase.screen', 'ST-13'); } catch (e) {} window.location.href = encodeURI('Basta Storefront Purchase.dc.html'); };
+    out.goAccount = () => { try { localStorage.setItem('basta.account.screen', 'ST-23'); } catch (e) {} window.location.href = encodeURI('Basta Account & Shared.dc.html'); };
+    out.goHome = () => this.go('ST-01');
+    out.goCategories = () => this.go('ST-02');
+    out.goSell = () => this.go('ST-29');
+    const cats = ['إلكترونيات', 'أزياء', 'الجمال والعناية', 'المنزل والمطبخ', 'بقالة', 'حِرف يدوية'];
+    out.topCats = cats.map(c => ({
+      label: c,
+      bg: 'transparent', fg: 'var(--text-body)',
+      go: () => this.go('ST-03')
+    }));
+
+    /* ST-01 home */
+    out.isST01 = st.screen === 'ST-01';
+    const heroes = [
+      { kicker: 'موسم الصيف', title: 'قطن يتنفّس، مصنوع في الرياض', body: 'قمصان وبنطلونات كتان من تجّار موثّقين، تُشحن من داخل المملكة.', cta: 'تسوّق الأزياء' },
+      { kicker: 'إلكترونيات', title: 'صوت أنقى بسعر أقل', body: 'مكبّرات وسماعات بضمان سنتين من متاجر معتمدة.', cta: 'تسوّق الإلكترونيات' },
+      { kicker: 'حِرف يدوية', title: 'من يد الصانع إلى بيتك', body: 'نحاسيات ومباخر وجلود مشغولة يدوياً في دمشق وفاس.', cta: 'تسوّق الحِرف' }
+    ];
+    const h = heroes[st.hero];
+    out.heroKicker = empty ? 'منصّة جديدة' : h.kicker;
+    out.heroTitle = empty ? 'بسطة تبدأ الآن' : h.title;
+    out.heroBody = empty ? 'أول المتاجر تنضم هذه الأيام. تصفّح الأقسام لترى ما وصل، وسجّل متجرك إن كنت تاجراً.' : h.body;
+    out.heroCtaLabel = empty ? 'تصفّح الأقسام' : h.cta;
+    out.heroCta = () => this.go(empty ? 'ST-02' : 'ST-03');
+    out.heroDots = heroes.map((x, i) => ({
+      w: st.hero === i ? '28px' : '8px',
+      bg: st.hero === i ? 'var(--on-brand)' : 'rgba(255,255,255,.5)',
+      pick: () => S({ hero: i })
+    }));
+    const catIcons = ['#i-boxes', '#i-package', '#i-star', '#i-store', '#i-cart', '#i-heart'];
+    out.catStrip = cats.map((c, i) => ({
+      label: c, icon: catIcons[i],
+      count: empty ? 'قريباً' : [1240, 3180, 860, 1520, 640, 410][i] + ' منتجاً',
+      go: () => this.go('ST-03')
+    }));
+    const all = this.products();
+    const deals = all.filter(p => p.compare).slice(0, 4);
+    const newIn = all.slice(4, 8);
+    out.homeSections = empty
+      ? [{ title: 'ابدأ من هنا', note: 'المنصّة جديدة — هذه أقسام جاهزة للتصفّح', cols: 4, hasTabs: false, tabs: [], linkLabel: 'كل الأقسام', link: () => this.go('ST-02'), cards: all.slice(0, 4).map(p => this.card(p)) }]
+      : [
+        { title: 'عروض اليوم', note: 'تنتهي بعد 6 ساعات', cols: 4, hasTabs: false, tabs: [], linkLabel: 'كل العروض', link: () => this.go('ST-03'), cards: deals.map(p => this.card(p)) },
+        { title: 'شوهد مؤخراً', note: '', cols: 4, hasTabs: false, tabs: [], linkLabel: '', link: () => {}, cards: all.slice(0, 4).map(p => this.card(p)) },
+        { title: 'وصل حديثاً', note: '', cols: 4, hasTabs: true, linkLabel: '', link: () => {},
+          tabs: ['إلكترونيات', 'أزياء', 'حِرف يدوية'].map(t => ({
+            label: t,
+            bg: st.newTab === t ? 'var(--brand)' : 'transparent',
+            fg: st.newTab === t ? 'var(--on-brand)' : 'var(--text-body)',
+            border: st.newTab === t ? 'var(--brand)' : 'var(--border-control)',
+            pick: () => S({ newTab: t })
+          })),
+          cards: newIn.map(p => this.card(p)) }
+      ];
+    out.shopCards = (empty ? all.slice(0, 2) : all).slice(0, 4).map((p, i) => ({
+      name: ['دار القطن', 'إلكترو بيت', 'عطر الشام', 'حِرف دمشق'][i],
+      rating: ['4.7', '4.4', '4.6', '4.9'][i],
+      city: ['الرياض', 'جدة', 'دبي', 'عمّان'][i],
+      verified: true,
+      open: () => this.go('ST-11')
+    }));
+    out.footerCols = [
+      { title: 'بسطة', links: [{ label: 'من نحن', go: () => this.openContent('about') }, { label: 'الأسئلة الشائعة', go: () => this.openContent('faq') }, { label: 'اتصل بنا', go: () => this.openContent('contact') }] },
+      { title: 'التسوّق', links: [{ label: 'كل الأقسام', go: () => this.go('ST-02') }, { label: 'سياسة الإرجاع', go: () => this.openContent('returns') }, { label: 'تتبّع طلبي', go: () => { try { localStorage.setItem('basta.purchase.screen', 'ST-20'); } catch (e) {} window.location.href = encodeURI('Basta Storefront Purchase.dc.html'); } }] },
+      { title: 'للتجّار', links: [{ label: 'بِع على بسطة', go: () => this.go('ST-29') }, { label: 'سجّل متجرك', go: () => { window.location.href = encodeURI('Basta Batch 1 - Vendor Onboarding.dc.html'); } }, { label: 'لوحة التاجر', go: () => { window.location.href = encodeURI('Basta Batch 2 - Vendor Products.dc.html'); } }] }
+    ];
+
+    Object.assign(out, this.browse(), this.detail());
+
+    out.toastMsg = st.toast ? st.toast.msg : '';
+    out.toastDisplay = st.toast ? 'flex' : 'none';
+    out.toastBg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-subtle)' : 'var(--inverse)';
+    out.toastFg = st.toast && st.toast.kind === 'warning' ? 'var(--warning-text)' : 'var(--on-inverse)';
+    out.toastIcon = st.toast && st.toast.kind === 'warning' ? '#i-alert' : '#i-check-circle';
+    out.closeToast = () => S({ toast: null });
+
+    return out;
+  }
+}
+</script>
+</body>
+</html>
