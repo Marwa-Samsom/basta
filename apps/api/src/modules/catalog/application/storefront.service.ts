@@ -105,7 +105,8 @@ export class StorefrontService {
         total: hit.total,
         engine: 'meili',
         tookMs: Date.now() - started,
-        facets: await this.facets(input),
+        // الأوجه من توزيع المحرّك: عدّ القاعدة يتجاهل الكلمة المبحوث عنها
+        facets: await this.facetsFromDistribution(hit.facets),
       };
     }
 
@@ -184,6 +185,19 @@ export class StorefrontService {
     return { AND: and };
   }
 
+  /**
+   * رابط الفئة إلى مسارها الداخلي. المسار المادّي تفصيل تخزين ("/3/17/")،
+   * والرابط العام يحمل اسماً مقروءاً — فالترجمة هنا لا في المتصفّح.
+   * فئة غير موجودة أو موقوفة تُرجع `null` فتصير النتيجة فارغة لا خطأ.
+   */
+  async categoryPathOf(slug: string): Promise<string | null> {
+    const row = await this.prisma.category.findFirst({
+      where: { slug, isActive: true },
+      select: { path: true },
+    });
+    return row?.path ?? null;
+  }
+
   private async categoryIdsUnder(path: string): Promise<string[]> {
     const rows = await this.prisma.category.findMany({
       where: { path: { startsWith: path }, isActive: true },
@@ -226,6 +240,53 @@ export class StorefrontService {
   }
 
   // -------------------------------------------------------------- الأوجه
+
+  /**
+   * أوجه البحث من توزيع المحرّك. المحرّك يعطي معرّفات وأعداداً، والأسماء
+   * تُقرأ من القاعدة — والبائع غير المعتمد يسقط هنا كما يسقط من النتائج.
+   */
+  private async facetsFromDistribution(
+    distribution: Readonly<Record<string, Readonly<Record<string, number>>>>,
+  ): Promise<StorefrontFacets> {
+    const vendorCounts = distribution['vendorId'] ?? {};
+    const brandCounts = distribution['brandId'] ?? {};
+    const valueCounts = distribution['attributeValueIds'] ?? {};
+
+    const [vendors, brands, values] = await Promise.all([
+      this.prisma.vendor.findMany({
+        where: { id: { in: Object.keys(vendorCounts) }, status: 'approved' },
+        select: { id: true, nameAr: true },
+      }),
+      this.prisma.brand.findMany({
+        where: { id: { in: Object.keys(brandCounts) } },
+        select: { id: true, nameAr: true },
+      }),
+      this.prisma.attributeValue.findMany({
+        where: { id: { in: Object.keys(valueCounts) } },
+        select: { id: true, valueAr: true, attributeId: true, attribute: { select: { nameAr: true } } },
+      }),
+    ]);
+
+    const byAttribute = new Map<string, { nameAr: string; values: FacetBucket[] }>();
+    for (const v of values) {
+      const entry = byAttribute.get(v.attributeId) ?? { nameAr: v.attribute.nameAr, values: [] };
+      entry.values.push({ id: v.id, label: v.valueAr, count: valueCounts[v.id] ?? 0 });
+      byAttribute.set(v.attributeId, entry);
+    }
+
+    return {
+      vendors: vendors
+        .map((v) => ({ id: v.id, label: v.nameAr, count: vendorCounts[v.id] ?? 0 }))
+        .sort((a, b) => b.count - a.count),
+      brands: brands.map((b) => ({ id: b.id, label: b.nameAr, count: brandCounts[b.id] ?? 0 })),
+      attributes: [...byAttribute.entries()].map(([attributeId, entry]) => ({
+        attributeId,
+        nameAr: entry.nameAr,
+        values: entry.values.sort((a, b) => b.count - a.count),
+      })),
+      priceRange: null,
+    };
+  }
 
   /**
    * الأوجه تُحسب من القاعدة لا من الفهرس: العدّ يجب أن يطابق ما سيراه

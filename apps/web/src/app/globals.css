@@ -712,3 +712,250 @@ textarea.field__control {
   .table td[data-label=''] { justify-content: stretch; }
   .table td[data-label=''] .btn { width: 100%; }
 }
+
+/* ===========================================================================
+   المتجر — المرحلة 07. كثافة comfortable، وكل قيمة رمز.
+   =========================================================================== */
+
+.store { min-height: 100dvh; display: flex; flex-direction: column; }
+
+.store__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface-card);
+  border-block-end: 1px solid var(--border-default);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+}
+
+.store__brand {
+  font-family: var(--font-display);
+  font-weight: var(--weight-black);
+  font-size: var(--text-xl);
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.store__main {
+  width: 100%;
+  max-width: var(--width-storefront);
+  margin-inline: auto;
+  padding-inline: var(--space-5);
+  padding-block: var(--space-6) var(--space-16);
+  flex: 1;
+}
+
+.store__foot {
+  padding: var(--space-6) var(--space-5);
+  border-block-start: 1px solid var(--border-default);
+  text-align: center;
+}
+
+.stack--loose { gap: var(--space-10); }
+
+/* البحث */
+.search {
+  position: relative;
+  display: flex;
+  gap: var(--space-2);
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.search__input { flex: 1; min-width: 0; }
+.search__list {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: calc(100% + var(--space-1));
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-drawer);
+}
+.search__option {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.search__option[aria-selected='true'],
+.search__option:hover { background: var(--brand-subtle); color: var(--brand-text); }
+
+/* البطل */
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--brand-subtle);
+}
+.hero h1 { font-size: var(--text-2xl); }
+
+/* الرقائق — فئات، أوجه، صفحات */
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  color: var(--text-body);
+  background: var(--surface-card);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+.chip:hover { border-color: var(--brand); }
+.chip--on { background: var(--brand-subtle); border-color: var(--brand); color: var(--brand-text); }
+
+/* شبكة المنتجات */
+.pgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-5);
+}
+.pcard { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.pcard__link { color: inherit; text-decoration: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.pcard__media {
+  position: relative;
+  aspect-ratio: 1;
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  /* surface-sunken وحده يساوي أرضية الصفحة في الداكن فتختفي البطاقة — الحدّ يرسمها */
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  display: grid;
+  place-items: center;
+}
+.pcard__media img { width: 100%; height: 100%; object-fit: cover; }
+.pcard[data-sold-out='true'] .pcard__media img { opacity: 0.55; }
+.pcard__placeholder {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  color: var(--text-faint);
+}
+.pcard__flag { position: absolute; inset-block-start: var(--space-2); inset-inline-start: var(--space-2); }
+.pcard__name {
+  font-family: var(--font-ui);
+  font-weight: var(--weight-semi);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pcard__price { display: flex; gap: var(--space-2); align-items: baseline; font-weight: var(--weight-bold); }
+.pcard__vendor { text-decoration: none; }
+
+/* القائمة بأوجهها */
+.listing {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+.facets { display: flex; flex-direction: column; gap: var(--space-5); }
+.facet { display: flex; flex-direction: column; gap: var(--space-2); }
+.facet__title { font-family: var(--font-ui); font-size: var(--text-sm); color: var(--text-muted); }
+.sort { color: var(--text-muted); text-decoration: none; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); }
+.sort--on { color: var(--brand-text); background: var(--brand-subtle); font-weight: var(--weight-semi); }
+
+@media (max-width: 860px) {
+  .listing { grid-template-columns: minmax(0, 1fr); }
+  .facets { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* صفحة المنتج */
+.product { display: flex; flex-direction: column; gap: var(--space-4); }
+.product__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: start;
+}
+.product__media {
+  aspect-ratio: 1;
+  max-width: 100%;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  display: grid;
+  place-items: center;
+}
+.product__media img { width: 100%; height: 100%; object-fit: cover; }
+.product__placeholder { font-family: var(--font-display); font-size: calc(var(--text-3xl) * 3); color: var(--text-faint); }
+.product__price { display: flex; gap: var(--space-3); align-items: baseline; font-size: var(--text-2xl); font-weight: var(--weight-bold); }
+.product__desc { line-height: var(--leading-normal); white-space: pre-line; }
+
+@media (max-width: 860px) {
+  .product__layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+}
+
+.options { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-md);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-body);
+  font: inherit;
+  cursor: pointer;
+}
+.option[aria-pressed='true'] { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); font-weight: var(--weight-semi); }
+/* غير المتوفّر يُرى معطّلاً لا يُخفى: من لا يرى مقاسه يظنّ المتجر لا يبيعه */
+.option[data-unavailable='true'] { text-decoration: line-through; color: var(--text-faint); }
+.option__swatch {
+  inline-size: var(--space-4);
+  block-size: var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+}
+
+.specs { margin: 0; display: flex; flex-direction: column; }
+.specs__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) 2fr;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--border-subtle);
+}
+.specs__row dt { color: var(--text-muted); }
+.specs__row dd { margin: 0; color: var(--text-strong); }
+
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+/* اللمس في المتجر: الرقائق والخيارات والترتيب أهداف لمس كالأزرار (44+) */
+@media (pointer: coarse), (max-width: 640px) {
+  .chip,
+  .option,
+  .sort {
+    min-height: var(--control-lg);
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* بطاقتان في السطر على الجوال: بطاقة واحدة بعرض الشاشة تُضيع التصفّح */
+  .pgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+}

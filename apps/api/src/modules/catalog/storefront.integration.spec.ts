@@ -198,6 +198,15 @@ describe('بوابة 07 · البحث العربي', () => {
     expect(median).toBeLessThan(100);
   });
 
+  it('أوجه البحث تعدّ المطابقات لا المتجر كله', async () => {
+    if (!dbUp || !meiliUp) return;
+    const res = await app.inject({ method: 'GET', ...api('/storefront/products?q=قمييص') });
+    const body = res.json() as { total: number; facets: { vendors: { count: number }[] } };
+    const counted = body.facets.vendors.reduce((sum, v) => sum + v.count, 0);
+    // كل منتج لبائع واحد: مجموع عدّاد البائعين هو عدد المطابقات بالضبط
+    expect(counted).toBe(body.total);
+  });
+
   it('الاقتراحات أثناء الكتابة تعيد أسماء لا منتجات كاملة', async () => {
     if (!dbUp || !meiliUp) return;
     const res = await app.inject({ method: 'GET', ...api('/storefront/suggest?q=قمي') });

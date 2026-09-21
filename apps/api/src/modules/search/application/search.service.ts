@@ -22,6 +22,12 @@ export interface SearchResult {
   readonly tookMs: number;
   /** `db` تعني أن المحرّك لم يستجب وأن النتيجة جاءت من قاعدة البيانات */
   readonly engine: 'meili' | 'db';
+  /**
+   * عدد النتائج لكل قيمة وجه **على كل المطابقات** لا على الصفحة المعروضة.
+   * القاعدة لا تستطيع حسابها للبحث المتسامح (لا تعرف أن «قمييص» تطابق
+   * «قميص»)، فالمحرّك يحسبها بالمطابقة نفسها التي أعاد بها النتائج.
+   */
+  readonly facets: Readonly<Record<string, Readonly<Record<string, number>>>>;
 }
 
 /**
@@ -125,6 +131,7 @@ export class SearchService {
         hits: { id: string }[];
         estimatedTotalHits: number;
         processingTimeMs: number;
+        facetDistribution?: Record<string, Record<string, number>>;
       }>(
         'POST',
         `/indexes/${this.meili.index}/search`,
@@ -133,6 +140,7 @@ export class SearchService {
           offset: (page - 1) * pageSize,
           limit: pageSize,
           attributesToRetrieve: ['id'],
+          facets: ['vendorId', 'brandId', 'attributeValueIds'],
           ...(filter.length > 0 ? { filter } : {}),
           ...(sort.length > 0 ? { sort } : {}),
         },
@@ -146,6 +154,7 @@ export class SearchService {
         pageSize,
         tookMs: res.processingTimeMs,
         engine: 'meili',
+        facets: res.facetDistribution ?? {},
       };
     } catch (err) {
       /**

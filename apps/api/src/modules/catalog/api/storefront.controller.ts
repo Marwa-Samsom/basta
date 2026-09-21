@@ -13,7 +13,7 @@ export class StorefrontQueryDto {
   @MaxLength(120)
   q?: string;
 
-  /** مسار الفئة المادّي — يشمل كل الفروع تحته */
+  /** رابط الفئة (slug) — يشمل كل الفروع تحته */
   @IsOptional()
   @IsString()
   @MaxLength(120)
@@ -85,10 +85,14 @@ export class StorefrontController {
   @Public()
   @Get('storefront/products')
   @ApiOperation({ summary: 'تصفّح وبحث بأوجه تصفية — ST-03 و ST-04' })
-  list(@Query() query: StorefrontQueryDto) {
+  async list(@Query() query: StorefrontQueryDto) {
+    // فئة مجهولة تُترجم إلى مسار لا يطابق شيئاً: نتيجة فارغة لا 400
+    const categoryPath = query.category
+      ? ((await this.storefront.categoryPathOf(query.category)) ?? '/__none__/')
+      : undefined;
     return this.storefront.list({
       ...(query.q ? { q: query.q } : {}),
-      ...(query.category ? { categoryPath: query.category } : {}),
+      ...(categoryPath ? { categoryPath } : {}),
       ...(query.vendorId ? { vendorId: query.vendorId } : {}),
       ...(query.brandId ? { brandId: query.brandId } : {}),
       ...(query.attrs ? { attributeValueIds: query.attrs.split(',').filter(Boolean) } : {}),
