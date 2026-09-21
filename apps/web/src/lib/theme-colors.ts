@@ -10,3 +10,4 @@
  */
 export const THEME_COLOR_LIGHT = '#F8F3EC'; // = --surface-page (beige-50)
 export const THEME_COLOR_DARK = '#14100D'; // = --surface-page (beige-950)
+export const THEME_BRAND = '#8C2F46'; // = --brand (burgundy-500) — لون التطبيق المثبَّت

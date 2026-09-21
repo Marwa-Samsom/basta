@@ -56,14 +56,24 @@ export function adminNeedsTotpSetup(roles: readonly string[], totpEnabledAt: Dat
 }
 
 /**
- * دَين تقني موثّق — مقاومة إعادة التشغيل.
- *
- * رمز TOTP صالح لنافذته كاملة (90 ثانية بنافذة ±1)، فمن يلتقطه يستطيع
- * إعادة استعماله داخلها. المكتبة تدعم `afterTimeStep` لرفض ما سبق آخر
- * خطوة استُعملت، لكنه يتطلّب عموداً يخزّن آخر خطوة لكل مستخدم.
- *
- * القرار: مؤجَّل إلى المرحلة 12 (التصليب الأمني) لا مُهمَل. المخاطرة
- * محدودة لأن المهاجم يحتاج كلمة المرور والرمز معاً داخل تسعين ثانية،
- * والمكسب لا يوازي توسيع المخطط في منتصف المرحلة 04.
+ * يتحقق ويعيد الخطوة الزمنية التي طابقها الرمز، أو null. بتمرير آخر خطوة
+ * مستعملة يُرفض كل رمز لا يتجاوزها — رمز ملتقَط لا يُقبل ثانيةً داخل
+ * نافذته. المستدعي يحفظ الخطوة المعادة بكتابة شرطيّة (auth.service).
  */
-export const REPLAY_PROTECTION_PENDING = true;
+export function verifyTotpStep(token: string, secret: string, afterTimeStep?: number | null): number | null {
+  const cleaned = token.replace(/\s/g, '');
+  if (!/^\d{6}$/.test(cleaned)) return null;
+  try {
+    const r = verifySync({
+      strategy: 'totp',
+      secret,
+      token: cleaned,
+      crypto,
+      base32,
+      ...(afterTimeStep !== null && afterTimeStep !== undefined ? { afterTimeStep } : {}),
+    });
+    return r.valid && 'timeStep' in r ? (r.timeStep as number) : null;
+  } catch {
+    return null;
+  }
+}

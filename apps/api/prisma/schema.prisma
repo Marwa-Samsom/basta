@@ -52,6 +52,8 @@ model User {
   // 2FA إلزامي على الإدارة ولا يمكن تعطيله — SRS A-07
   totpSecretEnc String?
   totpEnabledAt DateTime? @db.Timestamptz
+  /// آخر خطوة TOTP استُعملت — يُرفض ما لا يتجاوزها (مقاومة إعادة التشغيل)
+  totpLastStep    Int?
 
   lastLoginAt DateTime? @db.Timestamptz
   deletedAt   DateTime? @db.Timestamptz

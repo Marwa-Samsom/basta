@@ -2,6 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getCategories } from '@/lib/storefront';
 
+/**
+ * يُصيَّر عند الطلب لا وقت البناء: البناء لا يعتمد على خادم API حيّ (المرحلة 12).
+ * التخزين باقٍ على مستوى البيانات — كل fetch يحمل مدة إعادة تحققه.
+ */
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = { title: 'كل الفئات' };
 
 /** ST-02 — كل الفئات بفروعها. */

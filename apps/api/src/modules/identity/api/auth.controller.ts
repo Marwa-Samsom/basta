@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Actor } from '../../../common/security/actor';
 import { AuthService } from '../application/auth.service';
 import { AllowLimited, CurrentActor, Public } from '../../../common/security/decorators';
+import { AuthLimited } from '../../../common/security/throttle';
 import { LoginDto, RefreshDto, RegisterDto, TotpConfirmDto } from './dto/auth.dto';
 
 interface RawReq {
@@ -24,6 +25,7 @@ export class AuthController {
   }
 
   @Public()
+  @AuthLimited()
   @Post('register')
   @ApiOperation({ summary: 'إنشاء حساب عميل' })
   register(@Body() dto: RegisterDto, @Req() req: RawReq) {
@@ -31,6 +33,7 @@ export class AuthController {
   }
 
   @Public()
+  @AuthLimited()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'تسجيل الدخول — الإدارة تحتاج رمز تحقق ثنائي' })
@@ -83,6 +86,7 @@ export class AuthController {
 
   @ApiBearerAuth()
   @AllowLimited()
+  @AuthLimited()
   @Post('totp/confirm')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'تأكيد التهيئة — يُبطل الجلسات المحدودة' })

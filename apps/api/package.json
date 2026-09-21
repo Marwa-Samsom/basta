@@ -16,7 +16,10 @@
     "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "db:studio": "dotenv -e ../../.env -- prisma studio",
     "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
-    "admin:grant": "dotenv -e ../../.env -- tsx scripts/grant-admin.ts"
+    "admin:grant": "dotenv -e ../../.env -- tsx scripts/grant-admin.ts",
+    "demo:seed": "dotenv -e ../../.env -- tsx scripts/seed-demo.ts",
+    "images:backfill": "dotenv -e ../../.env -- tsx scripts/backfill-medium.ts",
+    "probe:load": "dotenv -e ../../.env -- tsx scripts/load-probe.ts"
   },
   "prisma": {
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts"

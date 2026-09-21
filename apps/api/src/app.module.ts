@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { BastaThrottlerGuard, THROTTLE } from './common/security/throttle';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { HealthController } from './common/health.controller';
@@ -32,11 +33,14 @@ import { AdminModule } from './modules/admin/public';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     /**
-     * تحديد المعدّل — SRS C-01: عشر محاولات من عنوان واحد خلال 15 دقيقة.
-     * التخزين في الذاكرة الآن لغياب Redis على هذا الجهاز؛ يُستبدل بمخزن
-     * Redis عند توفّره، وإلا لم يسرِ الحدّ عبر أكثر من نسخة من التطبيق.
+     * تحديد المعدّل — حدّ عام واسع، وحدّ تخمين صارم على مسارات الدخول وحدها
+     * (SRS C-01). التفصيل في common/security/throttle.ts. التخزين في الذاكرة:
+     * نسخة واحدة من الخادم محلياً؛ تعدّد النسخ يحتاج مخزناً مشتركاً.
      */
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 900_000, limit: 100 }]),
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: THROTTLE.defaultTtl, limit: THROTTLE.defaultLimit },
+      { name: 'auth', ttl: THROTTLE.authTtl, limit: THROTTLE.authLimit },
+    ]),
     PrismaModule,
     IdentityModule,
     VendorsModule,
@@ -52,6 +56,6 @@ import { AdminModule } from './modules/admin/public';
     AdminModule,
   ],
   controllers: [HealthController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: BastaThrottlerGuard }],
 })
 export class AppModule {}

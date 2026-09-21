@@ -4,14 +4,31 @@
     {
       "name": "api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:api"],
+      "runtimeArgs": [
+        "run",
+        "dev:api"
+      ],
       "port": 4000
     },
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:web"],
+      "runtimeArgs": [
+        "run",
+        "dev:web"
+      ],
       "port": 3000
+    },
+    {
+      "name": "web-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "serve:probe",
+        "-w",
+        "@basta/web"
+      ],
+      "port": 3100
     }
   ]
 }

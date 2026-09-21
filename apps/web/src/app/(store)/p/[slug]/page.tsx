@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getProduct, imageUrl, num } from '@/lib/storefront';
 import { VariantPicker } from '@/components/variant-picker';
+import { JsonLd, SITE_URL, breadcrumbJsonLd, productJsonLd } from '@/lib/seo';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -11,6 +12,14 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title: product.nameAr,
     description: product.descriptionAr?.slice(0, 160) ?? `${product.nameAr} من ${product.vendor.nameAr}`,
+    alternates: { canonical: `${SITE_URL}/p/${encodeURIComponent(product.slug)}` },
+    openGraph: {
+      type: 'website',
+      locale: 'ar',
+      title: product.nameAr,
+      url: `${SITE_URL}/p/${encodeURIComponent(product.slug)}`,
+      ...(product.images[0]?.urls['full'] ? { images: [imageUrl(product.images[0].urls['full'])!] } : {}),
+    },
   };
 }
 
@@ -28,6 +37,16 @@ export default async function ProductPage({ params }: Params) {
 
   return (
     <article className="product">
+      <JsonLd
+        data={[
+          productJsonLd(product),
+          breadcrumbJsonLd([
+            { name: 'الرئيسية', path: '/' },
+            { name: product.category.nameAr, path: `/c/${product.category.slug}` },
+            { name: product.nameAr, path: `/p/${product.slug}` },
+          ]),
+        ]}
+      />
       <nav className="small muted" aria-label="مسار التصفّح">
         <Link href="/">الرئيسية</Link> · <Link href={`/c/${product.category.slug}`}>{product.category.nameAr}</Link>
       </nav>
@@ -35,8 +54,24 @@ export default async function ProductPage({ params }: Params) {
       <div className="product__layout">
         <div className="product__media">
           {cover ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl(cover.urls['full'] ?? null) ?? ''} alt={cover.altAr ?? product.nameAr} width={800} height={800} />
+            /*
+             * صورة الغلاف هي LCP الصفحة (المرحلة 12): الهاتف يأخذ 800 بكسل
+             * بصيغة AVIF، والشاشة الواسعة 1600، وWebP احتياط لما لا يقرأ AVIF.
+             * أولوية جلب عالية — تبدأ قبل السكربتات لا بعدها.
+             */
+            <picture>
+              {cover.urls['mediumAvif'] ? <source media="(max-width: 767px)" type="image/avif" srcSet={imageUrl(cover.urls['mediumAvif']) ?? ''} /> : null}
+              {cover.urls['medium'] ? <source media="(max-width: 767px)" type="image/webp" srcSet={imageUrl(cover.urls['medium']) ?? ''} /> : null}
+              {cover.urls['avif'] ? <source type="image/avif" srcSet={imageUrl(cover.urls['avif']) ?? ''} /> : null}
+              <img
+                src={imageUrl(cover.urls['full'] ?? null) ?? ''}
+                alt={cover.altAr ?? product.nameAr}
+                width={800}
+                height={800}
+                fetchPriority="high"
+                decoding="async"
+              />
+            </picture>
           ) : (
             <div className="product__placeholder" aria-hidden>
               {product.nameAr.slice(0, 1)}

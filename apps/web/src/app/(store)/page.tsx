@@ -3,6 +3,12 @@ import { ProductGrid } from '@/components/product-card';
 import { getBanners, getCategories, getFeatured, imageUrl, listProducts } from '@/lib/storefront';
 
 /**
+ * يُصيَّر عند الطلب لا وقت البناء: البناء لا يعتمد على خادم API حيّ (المرحلة 12).
+ * التخزين باقٍ على مستوى البيانات — كل fetch يحمل مدة إعادة تحققه.
+ */
+export const dynamic = 'force-dynamic';
+
+/**
  * ST-01 — الرئيسية. البانرات والمميّز من لوحة الإدارة (AD-19)؛ ما لم تُضف
  * الإدارة شيئاً يبقى ما هو حقيقي: الفئات وأحدث المنشور — لا صور مصطنعة.
  */

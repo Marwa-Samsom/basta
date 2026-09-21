@@ -127,6 +127,13 @@ export class StorefrontController {
   }
 
   @Public()
+  @Get('storefront/sitemap')
+  @ApiOperation({ summary: 'روابط ما يُفهرس — لخريطة الموقع' })
+  sitemap() {
+    return this.storefront.sitemap();
+  }
+
+  @Public()
   @Get('storefront/featured')
   @ApiOperation({ summary: 'المنتجات المميّزة في الرئيسية بترتيب الإدارة — AD-19' })
   featured() {

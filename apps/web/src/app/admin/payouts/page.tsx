@@ -36,7 +36,21 @@ export default function AdminPayoutsPage() {
 
   return (
     <div className="stack stack--loose">
-      <AdminHeader title="طلبات السحب" hint="تحتاج صلاحية payouts.approve — هذه الصفحة تحرّك مالاً." />
+      <AdminHeader title="طلبات السحب" hint="تحتاج صلاحية payouts.approve — هذه الصفحة تحرّك مالاً.">
+        <button
+          type="button"
+          className="btn btn--secondary btn--sm"
+          disabled={act.busy}
+          onClick={() =>
+            void act.run(async () => {
+              await api('/admin/finance/release-due', { method: 'POST' });
+              reload();
+            }, 'شُغّل تحرير الأرصدة المستحقة (الشروط نفسها: انقضاء التعليق بلا نزاع ولا إرجاع).')
+          }
+        >
+          تحرير المستحق الآن
+        </button>
+      </AdminHeader>
       <Feedback error={act.error} notice={act.notice} />
       <Tabs value={status} onChange={setStatus} options={Object.entries(STATUS).map(([key, label]) => ({ key, label }))} />
       {!data ? (

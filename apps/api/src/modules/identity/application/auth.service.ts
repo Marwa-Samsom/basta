@@ -3,7 +3,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Role } from '../../../common/security/actor';
 import { AuditService } from '../infrastructure/audit.service';
 import { hashPassword, verifyPassword } from '../domain/password';
-import { adminNeedsTotpSetup, generateTotpSecret, totpUri, verifyTotp } from '../domain/totp';
+import { adminNeedsTotpSetup, generateTotpSecret, totpUri, verifyTotpStep } from '../domain/totp';
 import { TokenService, type AccessClaims, type TokenPair } from './token.service';
 
 export interface RequestMeta {
@@ -133,9 +133,14 @@ export class AuthService {
 
     // إداري فعّل 2FA: لا رمز بلا إثبات ثانٍ
     if (isAdminUser && user.totpEnabledAt && user.totpSecretEnc) {
-      if (!input.totp || !verifyTotp(input.totp, user.totpSecretEnc)) {
-        throw new UnauthorizedException('رمز التحقق الثنائي مطلوب وصحيح.');
-      }
+      const step = input.totp ? verifyTotpStep(input.totp, user.totpSecretEnc, user.totpLastStep) : null;
+      if (step === null) throw new UnauthorizedException('رمز التحقق الثنائي مطلوب وصحيح.');
+      // الحجز شرطيّ: دخولان متزامنان بالرمز نفسه لا ينجحان معاً (المرحلة 12)
+      const claimed = await this.prisma.user.updateMany({
+        where: { id: user.id, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] },
+        data: { totpLastStep: step },
+      });
+      if (claimed.count === 0) throw new UnauthorizedException('رمز التحقق الثنائي استُعمل. انتظر الرمز التالي.');
     }
 
     const claims = await this.buildClaims(user.id);
@@ -199,13 +204,14 @@ export class AuthService {
 
   async confirmTotpSetup(userId: string, token: string): Promise<void> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    if (!user.totpSecretEnc || !verifyTotp(token, user.totpSecretEnc)) {
+    const step = user.totpSecretEnc ? verifyTotpStep(token, user.totpSecretEnc, user.totpLastStep) : null;
+    if (step === null) {
       throw new UnauthorizedException('الرمز غير صحيح. تأكد من وقت جهازك وأعد المحاولة.');
     }
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { totpEnabledAt: new Date() },
+      data: { totpEnabledAt: new Date(), totpLastStep: step },
     });
     await this.audit.record({
       actorUserId: userId,

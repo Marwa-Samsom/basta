@@ -25,11 +25,13 @@ async function bootstrap() {
     .setVersion('0.1.0')
     .addBearerAuth()
     .build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
+  // خريطة كل المسارات هدية للمهاجم في الإنتاج — تُفتح هناك صراحةً فقط (المرحلة 12)
+  const docs = process.env['NODE_ENV'] !== 'production' || process.env['API_DOCS'] === 'true';
+  if (docs) SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
 
   const port = Number(process.env.PORT ?? 4000);
   await app.listen({ port, host: '0.0.0.0' });
-  Logger.log(`API على http://localhost:${port}/api/v1 · التوثيق /api/docs`, 'Bootstrap');
+  Logger.log(`API على http://localhost:${port}/api/v1${docs ? ' · التوثيق /api/docs' : ''}`, 'Bootstrap');
 }
 
 void bootstrap();

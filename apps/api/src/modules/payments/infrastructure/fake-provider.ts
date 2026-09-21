@@ -75,6 +75,7 @@ export class FakePaymentProvider implements PaymentProvider {
 
     this.intents.set(intentId, truth);
     this.byKey.set(request.idempotencyKey, reply);
+    if (truth.status === 'captured') this.charged.set(intentId, request.amountMinor);
     return reply;
   }
 
@@ -88,6 +89,8 @@ export class FakePaymentProvider implements PaymentProvider {
 
   /** ما رُدّ لكل تفويض — ليتحقّق الاختبار من المبلغ الذي وصل البوابة فعلاً */
   private readonly refunded = new Map<string, bigint[]>();
+  /** ما خُصم فعلاً لكل تفويض — البوابة الحقيقية ترفض ردّ أكثر منه */
+  private readonly charged = new Map<string, bigint>();
 
   async refund(intentId: string, amountMinor: bigint): Promise<{ refundId: string }> {
     // الذاكرة تُفقد عند إعادة التشغيل محلياً؛ التفويض الوهمي يُعرف من شكله
@@ -95,6 +98,11 @@ export class FakePaymentProvider implements PaymentProvider {
       throw new InvalidInputError('تفويض غير معروف للاسترداد.');
     }
     if (amountMinor <= 0n) throw new InvalidInputError('مبلغ الاسترداد موجب.');
+    const charged = this.charged.get(intentId);
+    const already = (this.refunded.get(intentId) ?? []).reduce((a, b) => a + b, 0n);
+    if (charged !== undefined && already + amountMinor > charged) {
+      throw new InvalidInputError('الاسترداد يتجاوز المبلغ المحصَّل.');
+    }
     this.refunded.set(intentId, [...(this.refunded.get(intentId) ?? []), amountMinor]);
     return { refundId: `fake_re_${randomUUID()}` };
   }

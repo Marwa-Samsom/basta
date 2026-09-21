@@ -2,6 +2,7 @@ node_modules/
 dist/
 .next/
 .next-verify/
+.next-prod/
 out/
 build/
 coverage/
@@ -35,3 +36,5 @@ logs/
 # وثائق البائعين — هوية وسجل تجاري وكشوف بنكية. لا تدخل git أبداً
 private/
 apps/api/private/
+test-results/
+playwright-report/

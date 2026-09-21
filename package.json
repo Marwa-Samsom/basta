@@ -31,7 +31,11 @@
     "db:verify-restore": "bash scripts/db-backup.sh verify",
     "verify:quick": "bash scripts/verify-local.sh --keep",
     "search:start": ".localdb/meili/meilisearch.exe --http-addr 127.0.0.1:7701 --db-path .localdb/meili/data --master-key basta_local_dev_key_0001 --env development",
-    "admin:grant": "npm run admin:grant -w @basta/api --"
+    "admin:grant": "npm run admin:grant -w @basta/api --",
+    "probe:lcp": "node scripts/probes/lcp-probe.mjs",
+    "probe:load": "npm run probe:load -w @basta/api --",
+    "drill:rollback": "bash scripts/rollback-drill.sh",
+    "demo:seed": "npm run demo:seed -w @basta/api"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.18.0",
@@ -40,5 +44,16 @@
     "eslint-plugin-boundaries": "^7.2.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "@nestjs/platform-fastify": {
+      "fastify": "5.12.1"
+    },
+    "exceljs": {
+      "uuid": "^11.1.1"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "^8.0.2"
+    }
   }
 }

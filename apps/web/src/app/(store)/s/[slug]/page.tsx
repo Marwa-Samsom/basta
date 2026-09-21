@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProductGrid } from '@/components/product-card';
 import { getShop, num } from '@/lib/storefront';
+import { JsonLd, SITE_URL, shopJsonLd } from '@/lib/seo';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -13,19 +14,22 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     description: shop.vendor.descriptionAr?.slice(0, 160) ?? `متجر ${shop.vendor.nameAr} على بسطة`,
     // المعلَّق يُعرض ولا يُفهرس: الرابط لا ينكسر، ولا يظهر في محرّكات البحث
     ...(shop.vendor.isSuspended ? { robots: { index: false, follow: false } } : {}),
+    alternates: { canonical: `${SITE_URL}/s/${encodeURIComponent(shop.vendor.slug)}` },
   };
 }
 
 /** ST-11 صفحة البائع، و ST-12 حالة التعليق. */
 export default async function ShopPage({ params }: Params) {
   const { slug } = await params;
-  const { vendor, products, total } = await getShop(slug);
+  const shop = await getShop(slug);
+  const { vendor, products, total } = shop;
   const since = new Intl.DateTimeFormat('ar-JO-u-nu-latn', { year: 'numeric', month: 'long' }).format(
     new Date(vendor.since),
   );
 
   return (
     <div className="stack">
+      {vendor.isSuspended ? null : <JsonLd data={shopJsonLd(shop)} />}
       <header className="stack stack--tight">
         <h1>{vendor.nameAr}</h1>
         <p className="small muted">

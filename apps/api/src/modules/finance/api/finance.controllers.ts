@@ -17,6 +17,7 @@ import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } 
 import { ForbiddenActorError, vendorScopeOf, type Actor } from '../../../common/security/actor';
 import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
 import { FinanceService } from '../application/finance.service';
+import { ReleaseScheduler } from '../application/release-scheduler';
 
 const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('المورد غير موجود.') });
 
@@ -131,7 +132,18 @@ export class VendorFinanceController {
 @Roles('admin')
 @Controller('admin/finance')
 export class AdminFinanceController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(
+    private readonly finance: FinanceService,
+    private readonly release: ReleaseScheduler,
+  ) {}
+
+  /** تشغيل تحرير الأرصدة المستحقة الآن بدل انتظار الساعة — الشروط نفسها (ADR-007) */
+  @Post('release-due')
+  @RequirePermission('payouts.approve')
+  @HttpCode(HttpStatus.OK)
+  async releaseDue() {
+    return { released: await this.release.tick() };
+  }
 
   @Get('payouts')
   @RequirePermission('payouts.approve')

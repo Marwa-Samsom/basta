@@ -10,6 +10,9 @@ export default defineConfig({
   plugins: [swc.vite({ module: { type: 'es6' } })],
   test: {
     environment: 'node',
+    // ملفات الاختبار تدخل عشرات المرات من العنوان نفسه؛ حدّ التخمين الحقيقي
+    // يُختبر في security.integration.spec.ts بقيمته الفعلية
+    env: { THROTTLE_AUTH_LIMIT: '100000', THROTTLE_DEFAULT_LIMIT: '100000' },
     include: ['src/**/*.spec.ts'],
     coverage: { reporter: ['text', 'lcov'], include: ['src/**/*.ts'] },
   },

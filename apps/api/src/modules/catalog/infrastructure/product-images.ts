@@ -23,6 +23,8 @@ export const IMAGE_MAX_EDGE = 8000;
 export const IMAGE_MAX_PIXELS = 40_000_000;
 export const IMAGE_FULL_EDGE = 1600;
 export const IMAGE_THUMB_EDGE = 400;
+/** مقاس الهاتف — المرحلة 12: صورة المنتج هي LCP صفحته، و1600 على شبكة جوال تتجاوز 2.5 ثانية */
+export const IMAGE_MEDIUM_EDGE = 800;
 export const MAX_IMAGES_PER_PRODUCT = 10;
 
 const ACCEPTED_FORMATS = new Set(['jpeg', 'png', 'webp', 'avif', 'heif']);
@@ -32,7 +34,7 @@ export class ImageRejectedError extends DomainError {
   readonly httpStatus = 422;
 }
 
-export type RenditionName = 'full.webp' | 'full.avif' | 'thumb.webp';
+export type RenditionName = 'full.webp' | 'full.avif' | 'medium.webp' | 'medium.avif' | 'thumb.webp';
 
 export interface ProcessedImage {
   readonly width: number;
@@ -84,9 +86,14 @@ export async function processProductImage(input: Buffer): Promise<ProcessedImage
     .resize({ width: IMAGE_FULL_EDGE, height: IMAGE_FULL_EDGE, fit: 'inside', withoutEnlargement: true });
 
   try {
-    const [webp, avif, thumb] = await Promise.all([
+    const medium = source
+      .clone()
+      .resize({ width: IMAGE_MEDIUM_EDGE, height: IMAGE_MEDIUM_EDGE, fit: 'inside', withoutEnlargement: true });
+    const [webp, avif, mediumWebp, mediumAvif, thumb] = await Promise.all([
       full.clone().webp({ quality: 80 }).toBuffer({ resolveWithObject: true }),
       full.clone().avif({ quality: 55, effort: 4 }).toBuffer(),
+      medium.clone().webp({ quality: 78 }).toBuffer(),
+      medium.clone().avif({ quality: 52, effort: 4 }).toBuffer(),
       source
         .clone()
         .resize({ width: IMAGE_THUMB_EDGE, height: IMAGE_THUMB_EDGE, fit: 'inside', withoutEnlargement: true })
@@ -100,6 +107,8 @@ export async function processProductImage(input: Buffer): Promise<ProcessedImage
       renditions: [
         { name: 'full.webp', buffer: webp.data },
         { name: 'full.avif', buffer: avif },
+        { name: 'medium.webp', buffer: mediumWebp },
+        { name: 'medium.avif', buffer: mediumAvif },
         { name: 'thumb.webp', buffer: thumb },
       ],
     };
@@ -146,6 +155,8 @@ export class LocalImageStorage {
     return {
       'full.webp': `${base}full.webp`,
       'full.avif': `${base}full.avif`,
+      'medium.webp': `${base}medium.webp`,
+      'medium.avif': `${base}medium.avif`,
       'thumb.webp': `${base}thumb.webp`,
     };
   }

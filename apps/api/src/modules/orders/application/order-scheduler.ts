@@ -67,6 +67,8 @@ export class OrderScheduler implements OnApplicationBootstrap, OnModuleDestroy {
     const stale = await this.prisma.subOrder.findMany({
       where: { status: 'awaiting_vendor', placedAt: { lt: new Date(now.getTime() - hours * HOUR) } },
       select: { id: true },
+      // الأقدم أولاً: بلا ترتيب قد يعود الصفّ المتعثّر أولاً في كل دورة فيحجب ما بعده
+      orderBy: { placedAt: 'asc' },
       take: 100,
     });
     let done = 0;
@@ -90,6 +92,7 @@ export class OrderScheduler implements OnApplicationBootstrap, OnModuleDestroy {
         disputes: { none: { status: { in: ['open', 'escalated'] } } },
       },
       select: { id: true },
+      orderBy: { deliveredAt: 'asc' },
       take: 100,
     });
     let done = 0;

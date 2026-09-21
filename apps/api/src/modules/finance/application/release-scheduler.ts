@@ -46,6 +46,7 @@ export class ReleaseScheduler implements OnApplicationBootstrap, OnModuleDestroy
           ledgerEntries: { some: { entryType: 'sale_credit' }, none: { entryType: 'hold_release_out' } },
         },
         select: { id: true },
+        orderBy: { holdReleaseAt: 'asc' },
         take: 500,
       });
       let n = 0;

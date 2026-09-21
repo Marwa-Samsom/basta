@@ -1,5 +1,28 @@
 import { fileURLToPath } from 'node:url';
 
+/**
+ * سياسة المحتوى — المرحلة 12، OWASP A03/A05. لا مصدر خارجي في الموقع أصلاً
+ * (الخطوط والصور محلية)، فالسياسة تقول ذلك صراحةً: السكربت من الموقع نفسه،
+ * والصور والطلبات من الموقع وخادم الـ API وحده. 'unsafe-inline' للسكربت لأن
+ * Next يحقن بيانات التهيئة سطرياً، و 'unsafe-eval' في التطوير وحده.
+ */
+const api = new URL(process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000/api/v1').origin;
+const dev = process.env.NODE_ENV !== 'production';
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${api}`,
+  "font-src 'self' data:",
+  `connect-src 'self' ${api}${dev ? ' ws: http://localhost:* http://127.0.0.1:*' : ''}`,
+  "manifest-src 'self'",
+  "worker-src 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // بناء الفحص (npm run verify) يكتب في مجلد منفصل: البناء في .next نفسه الذي
@@ -20,6 +43,9 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Content-Security-Policy', value: csp },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          ...(dev ? [] : [{ key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }]),
         ],
       },
     ];

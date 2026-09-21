@@ -22,8 +22,20 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
    * اجتياز الفحص المسبق — بينما تعمل الطلبات نفسها من curl لأنه لا يفحص.
    * حفظ الحساب البنكي (PUT) كشفها في المرحلة 06.
    */
+  /**
+   * المصادر المسموحة: موقع الواجهة وحده في الإنتاج (وما يُضاف صراحةً في
+   * CORS_ORIGINS). في التطوير أي منفذ محلي — بناء الإنتاج للفحص يعمل على 3100.
+   */
+  const allowed = [process.env.NEXT_PUBLIC_SITE_URL, ...(process.env.CORS_ORIGINS ?? '').split(',')]
+    .map((o) => o?.trim())
+    .filter((o): o is string => !!o);
+  const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+  const production = process.env.NODE_ENV === 'production';
   app.enableCors({
-    origin: process.env.NEXT_PUBLIC_SITE_URL ?? true,
+    origin: (origin: string | undefined, cb: (err: Error | null, ok: boolean) => void) => {
+      if (!origin) return cb(null, true); // طلبات الخادم إلى الخادم لا تحمل Origin
+      cb(null, allowed.length === 0 ? !production : allowed.includes(origin) || (!production && local.test(origin)));
+    },
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     // رمز السلة ومفتاح عدم التكرار ترويستان مخصّصتان — غيابهما هنا يُسقط الدفع من المتصفّح وحده
@@ -43,5 +55,30 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
     decorateReply: false,
     index: false,
     dotfiles: 'deny',
+    // الصورة لا تتغيّر تحت اسمها — كل رفع مفتاح جديد — فتُخزَّن طويلاً
+    maxAge: '30d',
+    immutable: true,
   });
+
+  /**
+   * ترويسات الأمان — المرحلة 12، OWASP A05. الواجهة البرمجية لا تُعرض في
+   * إطار ولا تُفسَّر كصفحة: JSON وصور فقط. والردّ على طلب مصادَق لا يُخزَّن
+   * في أي وسيط — بيانات حساب في ذاكرة وكيل مشترك تسريب.
+   */
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onSend', async (req: { headers: Record<string, unknown>; url: string }, reply: { header: (k: string, v: string) => unknown; getHeader: (k: string) => unknown }) => {
+      reply.header('X-Content-Type-Options', 'nosniff');
+      reply.header('X-Frame-Options', 'DENY');
+      reply.header('Referrer-Policy', 'no-referrer');
+      reply.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+      reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+      if (process.env['NODE_ENV'] === 'production') {
+        reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+      }
+      if (req.headers['authorization'] && !reply.getHeader('cache-control')) {
+        reply.header('Cache-Control', 'private, no-store');
+      }
+    });
 }

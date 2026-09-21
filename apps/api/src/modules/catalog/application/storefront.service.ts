@@ -203,6 +203,20 @@ export class StorefrontService {
     return this.cards(ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])));
   }
 
+  /**
+   * خريطة الموقع — المرحلة 12. ما يُفهرس هو ما يراه الزائر: قاعدة الرؤية
+   * نفسها للمنتجات، والمتاجر المعتمدة، والفئات الفعّالة، والصفحات المنشورة.
+   */
+  async sitemap() {
+    const [products, shops, categories, pages] = await Promise.all([
+      this.prisma.product.findMany({ where: VISIBLE, select: { slug: true, updatedAt: true }, orderBy: { updatedAt: 'desc' }, take: 45_000 }),
+      this.prisma.vendor.findMany({ where: { status: 'approved' }, select: { slug: true, updatedAt: true }, take: 5_000 }),
+      this.prisma.category.findMany({ where: { isActive: true }, select: { slug: true } }),
+      this.prisma.cmsPage.findMany({ where: { isPublished: true }, select: { slug: true, updatedAt: true } }),
+    ]);
+    return { products, shops, categories, pages };
+  }
+
   async categoryPathOf(slug: string): Promise<string | null> {
     const row = await this.prisma.category.findFirst({
       where: { slug, isActive: true },
@@ -480,6 +494,8 @@ export class StorefrontService {
           thumb: `/uploads/${i.fileKey}/thumb.webp`,
           full: `/uploads/${i.fileKey}/full.webp`,
           avif: `/uploads/${i.fileKey}/full.avif`,
+          medium: `/uploads/${i.fileKey}/medium.webp`,
+          mediumAvif: `/uploads/${i.fileKey}/medium.avif`,
         },
       })),
       attributes: product.attrValues.map((a) => ({
