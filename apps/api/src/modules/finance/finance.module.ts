@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/public';
 import { AdminFinanceController, VendorFinanceController } from './api/finance.controllers';
 import { FinanceService } from './application/finance.service';
 import { LedgerService } from './application/ledger.service';
@@ -10,6 +11,7 @@ import { ReleaseScheduler } from './application/release-scheduler';
  * داخل معاملته.
  */
 @Module({
+  imports: [NotificationsModule],
   controllers: [VendorFinanceController, AdminFinanceController],
   providers: [LedgerService, FinanceService, ReleaseScheduler],
   exports: [LedgerService, FinanceService, ReleaseScheduler],

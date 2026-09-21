@@ -127,6 +127,13 @@ export class StorefrontController {
   }
 
   @Public()
+  @Get('storefront/featured')
+  @ApiOperation({ summary: 'المنتجات المميّزة في الرئيسية بترتيب الإدارة — AD-19' })
+  featured() {
+    return this.storefront.featured();
+  }
+
+  @Public()
   @Get('storefront/categories')
   @ApiOperation({ summary: 'شجرة الفئات — ST-02' })
   tree() {

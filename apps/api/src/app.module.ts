@@ -14,6 +14,8 @@ import { OrdersModule } from './modules/orders/public';
 import { ShippingModule } from './modules/shipping/public';
 import { AftersalesModule } from './modules/aftersales/public';
 import { FinanceModule } from './modules/finance/public';
+import { NotificationsModule } from './modules/notifications/public';
+import { AdminModule } from './modules/admin/public';
 
 /**
  * Modular Monolith — ADR-002.
@@ -46,6 +48,8 @@ import { FinanceModule } from './modules/finance/public';
     ShippingModule,
     AftersalesModule,
     FinanceModule,
+    NotificationsModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

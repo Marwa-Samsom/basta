@@ -17,6 +17,8 @@ import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagg
 import type { MultipartFile } from '@fastify/multipart';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { InvalidInputError } from '../../../common/errors/domain-error';
+import { PrismaService } from '../../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/public';
 import type { Actor } from '../../../common/security/actor';
 import {
   CurrentActor,
@@ -111,6 +113,8 @@ export class AdminCatalogController {
   constructor(
     private readonly categories: CategoryService,
     private readonly products: ProductService,
+    private readonly notifications: NotificationsService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('categories')
@@ -160,6 +164,27 @@ export class AdminCatalogController {
     await this.categories.unlinkAttribute(id, attributeId);
   }
 
+  @Get('categories')
+  @ApiOperation({ summary: 'كل الفئات مسطّحة بمسارها — ومنها غير الفعّالة لتُعاد — AD-08' })
+  listCategories() {
+    return this.prisma.category.findMany({
+      orderBy: [{ path: 'asc' }],
+      select: { id: true, parentId: true, slug: true, nameAr: true, nameEn: true, depth: true, sort: true, isActive: true, path: true, _count: { select: { products: true, children: true } } },
+    });
+  }
+
+  @Get('attributes')
+  @ApiOperation({ summary: 'كل السمات بقيمها والفئات المرتبطة — AD-09' })
+  listAttributes() {
+    return this.prisma.attribute.findMany({
+      orderBy: [{ sort: 'asc' }, { code: 'asc' }],
+      include: {
+        values: { orderBy: { sort: 'asc' }, select: { id: true, valueAr: true, valueEn: true, hexColor: true } },
+        categories: { select: { isRequired: true, category: { select: { id: true, nameAr: true } } } },
+      },
+    });
+  }
+
   @Get('products')
   @ApiOperation({ summary: 'منتجات المنصة — ?status=pending_review طابور المراجعة، الأقدم أولاً (Q-15)' })
   listProducts(@Query() query: ListProductsQueryDto) {
@@ -184,6 +209,14 @@ export class AdminCatalogController {
   @ApiOperation({ summary: 'رفض منتج قيد المراجعة أو منشور بسبب يراه البائع' })
   async rejectProduct(@Param('id', uuidParam) id: string, @Body() dto: RejectProductDto): Promise<void> {
     await this.products.reject(id, dto.reason);
+    const p = await this.prisma.product.findUnique({ where: { id }, select: { nameAr: true, vendorId: true } });
+    if (p) {
+      await this.notifications.enqueueVendor({
+        code: 'product_rejected',
+        vendorId: p.vendorId,
+        vars: { product_name: p.nameAr, reason: dto.reason, link: `/vendor/products/${id}` },
+      });
+    }
   }
 }
 

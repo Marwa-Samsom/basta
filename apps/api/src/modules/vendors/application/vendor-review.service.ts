@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor } from '../../../common/security/actor';
 import { AuditService } from '../../identity/public';
+import { NotificationsService } from '../../notifications/public';
 import {
   assertTransition,
   DOCUMENT_LABELS,
@@ -40,6 +41,7 @@ export class VendorReviewService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async queue(query: { status?: string; limit?: number; offset?: number } = {}): Promise<{
@@ -165,6 +167,7 @@ export class VendorReviewService {
       entityType: 'Vendor',
       entityId: vendorId,
     });
+    await this.notifications.enqueueVendor({ code: 'vendor_approved', vendorId, vars: { link: '/vendor' } });
   }
 
   async reject(actor: Actor, vendorId: string, reason: string): Promise<void> {
@@ -197,6 +200,11 @@ export class VendorReviewService {
       entityType: 'Vendor',
       entityId: vendorId,
       after: { reason: trimmed },
+    });
+    await this.notifications.enqueueVendor({
+      code: 'vendor_rejected',
+      vendorId,
+      vars: { reason: trimmed, link: '/vendor/onboarding/status' },
     });
   }
 

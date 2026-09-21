@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Alert, Spinner, StatusBadge } from '@/components/ui';
 import { useOnboarding } from '@/lib/vendor';
+import { NotificationBell } from '@/components/notification-bell';
 
 const NAV = [
   { href: '/vendor', label: 'المؤشرات' },
@@ -74,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           بسطة · لوحة البائع
         </Link>
         <span className="row">
+          <NotificationBell />
           <span className="small muted">{data.nameAr}</span>
           <StatusBadge status={data.status} />
         </span>

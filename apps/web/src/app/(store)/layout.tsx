@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { NotificationBell } from '@/components/notification-bell';
 import { SearchBox } from '@/components/search-box';
 
 /**
@@ -22,6 +23,7 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
           <Link href="/account/orders">طلباتي</Link>
           <Link href="/vendor">بِع على بسطة</Link>
           <Link href="/login">دخول</Link>
+          <NotificationBell />
         </nav>
       </header>
 

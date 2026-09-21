@@ -190,6 +190,19 @@ export class StorefrontService {
    * والرابط العام يحمل اسماً مقروءاً — فالترجمة هنا لا في المتصفّح.
    * فئة غير موجودة أو موقوفة تُرجع `null` فتصير النتيجة فارغة لا خطأ.
    */
+  /**
+   * المنتجات المميّزة بترتيب الإدارة (AD-19). قاعدة الرؤية نفسها: منتج صار
+   * مخفياً بعد تمييزه يسقط من القسم بصمت ولا يظهر مكسوراً.
+   */
+  async featured(): Promise<StorefrontProductCard[]> {
+    const row = await this.prisma.setting.findUnique({ where: { key: 'home_featured_product_ids' } });
+    const ids = Array.isArray(row?.valueJson) ? (row.valueJson as string[]) : [];
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.product.findMany({ where: { ...VISIBLE, id: { in: ids } }, include: CARD_INCLUDE });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return this.cards(ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])));
+  }
+
   async categoryPathOf(slug: string): Promise<string | null> {
     const row = await this.prisma.category.findFirst({
       where: { slug, isActive: true },

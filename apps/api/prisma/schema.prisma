@@ -1357,6 +1357,12 @@ model NotificationTemplate {
   subject       String?
   body          String
   variablesJson Json?
+  isEnabled     Boolean   @default(true)
+  /// بوابة 11: كل قالب عربي مراجَع لغوياً — ومن راجعه
+  reviewedAt    DateTime? @db.Timestamptz
+  reviewedBy    String?
+  updatedAt     DateTime  @default(now()) @db.Timestamptz
+  updatedBy     String?   @db.Uuid
 
   @@id([code, channel, locale])
   @@map("notification_templates")
@@ -1368,8 +1374,15 @@ model Notification {
   channel      String
   templateCode String
   payloadJson  Json
+  /// queued · sending · sent · failed · skipped — صندوق صادر يُرسل بعد الالتزام
   status       String    @default("queued")
   error        String?
+  /// النص كما أُرسل — تعديل القالب لاحقاً لا يغيّره
+  recipient    String?
+  subject      String?
+  body         String?
+  attempts     Int       @default(0)
+  deliveryRef  String?
   sentAt       DateTime? @db.Timestamptz
   readAt       DateTime? @db.Timestamptz
   createdAt    DateTime  @default(now()) @db.Timestamptz
@@ -1398,6 +1411,7 @@ model CmsPage {
   bodyAr      String
   isPublished Boolean  @default(false)
   updatedAt   DateTime @updatedAt @db.Timestamptz
+  updatedBy   String?  @db.Uuid
 
   @@map("cms_pages")
 }
@@ -1412,6 +1426,8 @@ model Banner {
   startsAt  DateTime? @db.Timestamptz
   endsAt    DateTime? @db.Timestamptz
   isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  updatedBy String?   @db.Uuid
 
   @@index([placement, isActive])
   @@map("banners")

@@ -9,6 +9,8 @@ import {
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CartService } from '../../cart/public';
 import { LedgerService } from '../../finance/public';
+import { NotificationsService } from '../../notifications/public';
+import { format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type ChargeOutcome, type PaymentProvider } from '../../payments/public';
 import { PricingService } from '../../pricing/public';
@@ -82,6 +84,7 @@ export class CheckoutService {
     private readonly inventory: InventoryService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
     private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ================================================================ الطلب
@@ -310,6 +313,42 @@ export class CheckoutService {
           // بترتيب البائع لتُقفل المحافظ بترتيب ثابت — لا تعطّل متبادل بين طلبين
           for (const p of [...posted].sort((a, b) => a.vendorId.localeCompare(b.vendorId))) {
             await this.ledger.postSale(tx, p.id);
+          }
+
+          // الإشعارات في الصندوق الصادر ضمن المعاملة نفسها — تُرسل بعد الالتزام
+          const paid = await tx.order.findUniqueOrThrow({
+            where: { id: orderId },
+            select: { grandTotalMinorUnits: true, currency: true, customer: { select: { fullName: true } } },
+          });
+          const deadline = await tx.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } });
+          await this.notifications.enqueue(
+            {
+              code: 'order_placed',
+              userId: order.customerUserId,
+              vars: {
+                name: (paid.customer?.fullName ?? 'عميلنا').split(/s+/)[0]!,
+                order_number: order.orderNumber,
+                amount: formatMoney(money(paid.grandTotalMinorUnits, paid.currency)),
+                store_count: String(snapshot.subOrders.length),
+                link: `/account/orders/${order.orderNumber}`,
+              },
+            },
+            tx,
+          );
+          for (const [i, so] of snapshot.subOrders.entries()) {
+            await this.notifications.enqueueVendor(
+              {
+                code: 'vendor_new_order',
+                vendorId: so.vendorId,
+                vars: {
+                  order_number: `${order.orderNumber}-${i + 1}`,
+                  amount: formatMoney(money(BigInt(so.vendor.total), so.currency)),
+                  deadline_hours: String(Number(deadline?.valueJson) || 48),
+                  link: '/vendor/orders',
+                },
+              },
+              tx,
+            );
           }
 
           await tx.payment.update({

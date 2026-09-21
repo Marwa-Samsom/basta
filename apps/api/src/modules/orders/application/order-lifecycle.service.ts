@@ -7,6 +7,8 @@ import {
 } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { LedgerService } from '../../finance/public';
+import { NotificationsService } from '../../notifications/public';
+import { format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type PaymentProvider } from '../../payments/public';
 import { planFullRefund, planPartialRefund } from '../domain/refunds';
@@ -14,6 +16,7 @@ import {
   assertTransition,
   deriveParent,
   isCancellation,
+  STATUS_LABELS,
   type SubOrderStatus,
   type TransitionActor,
 } from '../domain/state-machine';
@@ -63,6 +66,7 @@ export class OrderLifecycleService {
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
     private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
   ) {}
 
@@ -205,6 +209,7 @@ export class OrderLifecycleService {
     }
 
     await this.syncParent(tx, sub.orderId);
+    await this.notify(tx, sub.id, from, to, input);
     return refunds;
   }
 
@@ -368,6 +373,23 @@ export class OrderLifecycleService {
           where: { id: refundId },
           data: { status: 'succeeded', providerRefundId: result.refundId },
         });
+        const o = await tx.subOrder.findUniqueOrThrow({
+          where: { id: refund.subOrderId },
+          select: { order: { select: { orderNumber: true, currency: true, customerUserId: true, customer: { select: { fullName: true } } } } },
+        });
+        await this.notifications.enqueue(
+          {
+            code: 'refund_issued',
+            userId: o.order.customerUserId,
+            vars: {
+              name: firstName(o.order.customer?.fullName),
+              order_number: o.order.orderNumber,
+              amount: formatMoney(money(refund.amountMinorUnits, o.order.currency)),
+              link: `/account/orders/${o.order.orderNumber}`,
+            },
+          },
+          tx,
+        );
         const total = await tx.refund.aggregate({
           where: { paymentId: refund.payment.id, status: 'succeeded' },
           _sum: { amountMinorUnits: true },
@@ -466,6 +488,47 @@ export class OrderLifecycleService {
     return { id: ret.id, items: ret.itemsJson as unknown as { orderItemId: string; qty: number }[] };
   }
 
+  // ------------------------------------------------------------ الإشعار
+
+  /**
+   * ما يهمّ المشتري من الانتقالات يُبلَّغ به، في معاملة الانتقال نفسها
+   * (صندوق صادر). الانتقالات الداخلية (قبول، تجهيز) تظهر في صفحة التتبّع
+   * ولا تستحقّ رسالة — الإغراق بالإشعارات يعلّم المشتري تجاهلها.
+   */
+  private async notify(tx: Tx, subOrderId: string, from: SubOrderStatus, to: SubOrderStatus, input: TransitionInput) {
+    const s = await tx.subOrder.findUniqueOrThrow({
+      where: { id: subOrderId },
+      select: {
+        subOrderNumber: true,
+        vendorId: true,
+        vendor: { select: { nameAr: true } },
+        order: { select: { orderNumber: true, customerUserId: true, customer: { select: { fullName: true } } } },
+      },
+    });
+    const common = {
+      name: firstName(s.order.customer?.fullName),
+      order_number: s.order.orderNumber,
+      store_name: s.vendor.nameAr,
+      link: `/account/orders/${s.order.orderNumber}`,
+    };
+    if (to === 'shipped' || to === 'delivered' || to === 'delivery_failed') {
+      if (to === 'delivered' && from === 'return_requested') return;
+      await this.notifications.enqueue({ code: 'order_status_changed', userId: s.order.customerUserId, vars: { ...common, status: STATUS_LABELS[to] } }, tx);
+    }
+    if (isCancellation(to) && to !== 'canceled_by_customer') {
+      await this.notifications.enqueue(
+        { code: 'order_canceled', userId: s.order.customerUserId, vars: { ...common, reason: input.reason?.trim() || STATUS_LABELS[to] } },
+        tx,
+      );
+    }
+    if (to === 'return_requested') {
+      await this.notifications.enqueueVendor(
+        { code: 'return_requested', vendorId: s.vendorId, vars: { order_number: s.subOrderNumber, reason: input.reason?.trim() || 'غير محدّد', link: `/vendor/orders/${subOrderId}` } },
+        tx,
+      );
+    }
+  }
+
   // ------------------------------------------------------------ الأب
 
   /** الأب مشتقّ من أبنائه بعد كل انتقال — لا يُحدَّث يدوياً أبداً (ORDER-STATES §2) */
@@ -484,3 +547,5 @@ export class OrderLifecycleService {
     return Number.isFinite(value) && value > 0 ? value : fallback;
   }
 }
+
+const firstName = (full: string | null | undefined): string => (full ?? '').trim().split(/s+/)[0] || 'عميلنا';

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/public';
+import { format as formatMoney, money } from '../../../common/money/money';
 import { LedgerService } from './ledger.service';
 
 export const ENTRY_LABELS: Record<string, string> = {
@@ -45,6 +47,7 @@ export class FinanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // -------------------------------------------------------------- المحفظة
@@ -217,6 +220,12 @@ export class FinanceService {
   async markPaid(adminId: string, id: string, transferReference: string) {
     if (transferReference.trim().length < 3) throw new InvalidInputError('مرجع التحويل مطلوب.');
     await this.move(adminId, id, ['approved'], { status: 'paid', paidAt: new Date(), transferReference: transferReference.trim() }, 'payout.paid');
+    const p = await this.prisma.payoutRequest.findUniqueOrThrow({ where: { id } });
+    await this.notifications.enqueueVendor({
+      code: 'payout_paid',
+      vendorId: p.vendorId,
+      vars: { amount: formatMoney(money(p.amountMinorUnits, p.currency)), reference: transferReference.trim(), link: '/vendor/finance' },
+    });
   }
 
   /** الرفض قيد معاكس يعيد المال للمتاح — لا حذف لقيد السحب */
@@ -247,6 +256,14 @@ export class FinanceService {
       await tx.auditLog.create({
         data: { actorUserId: adminId, actorRole: 'admin', action: 'payout.reject', entityType: 'PayoutRequest', entityId: id, afterJson: { reason } },
       });
+      await this.notifications.enqueueVendor(
+        {
+          code: 'payout_rejected',
+          vendorId: p.vendorId,
+          vars: { amount: formatMoney(money(p.amountMinorUnits, p.currency)), reason: reason.trim(), link: '/vendor/finance' },
+        },
+        tx,
+      );
     });
   }
 

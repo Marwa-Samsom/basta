@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Role } from '@prisma/client';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/public';
 
 /** حالات يُفتح فيها نزاع: بعد الشحن وحتى قبل الإكمال */
 const DISPUTABLE = ['shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned'] as const;
@@ -23,7 +24,10 @@ const ROLE: Record<Party['kind'], Role> = { customer: 'customer', vendor: 'vendo
  */
 @Injectable()
 export class DisputesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async open(
     customerUserId: string,
@@ -98,6 +102,30 @@ export class DisputesService {
     await this.prisma.disputeMessage.create({
       data: { disputeId: id, senderUserId: party.userId, senderRole: ROLE[party.kind], body: body.trim(), attachments: [] },
     });
+    // الطرف الآخر يُبلَّغ: رسالة لا يراها صاحبها لا تحلّ نزاعاً
+    const s = await this.prisma.subOrder.findUniqueOrThrow({
+      where: { id: d.subOrder.id },
+      select: { vendorId: true, order: { select: { customerUserId: true, customer: { select: { fullName: true } } } } },
+    });
+    if (party.kind !== 'customer') {
+      await this.notifications.enqueue({
+        code: 'dispute_message',
+        userId: s.order.customerUserId,
+        vars: {
+          name: (s.order.customer?.fullName ?? '').trim().split(/\s+/)[0] || 'عميلنا',
+          order_number: d.subOrder.subOrderNumber,
+          link: `/account/disputes/${id}`,
+        },
+      });
+    }
+    if (party.kind !== 'vendor') {
+      const v = await this.prisma.vendor.findUniqueOrThrow({ where: { id: s.vendorId }, select: { ownerUserId: true, nameAr: true } });
+      await this.notifications.enqueue({
+        code: 'dispute_message',
+        userId: v.ownerUserId,
+        vars: { name: v.nameAr, order_number: d.subOrder.subOrderNumber, link: `/vendor/disputes/${id}` },
+      });
+    }
   }
 
   /** تصعيد للإدارة — من المشتري أو البائع حين لا يتّفقان */

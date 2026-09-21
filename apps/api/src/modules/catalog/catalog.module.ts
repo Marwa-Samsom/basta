@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InventoryModule } from '../inventory/public';
+import { NotificationsModule } from '../notifications/public';
 import { SearchModule } from '../search/public';
 import { VendorsModule } from '../vendors/public';
 import {
@@ -16,7 +17,7 @@ import { StorefrontService } from './application/storefront.service';
 import { LocalImageStorage } from './infrastructure/product-images';
 
 @Module({
-  imports: [InventoryModule, VendorsModule, SearchModule],
+  imports: [InventoryModule, VendorsModule, SearchModule, NotificationsModule],
   controllers: [
     CategoriesController,
     AdminCatalogController,

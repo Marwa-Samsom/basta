@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CartModule } from '../cart/public';
 import { FinanceModule } from '../finance/public';
+import { NotificationsModule } from '../notifications/public';
 import { InventoryModule } from '../inventory/public';
 import { PaymentsModule } from '../payments/public';
 import { PricingModule } from '../pricing/public';
@@ -9,7 +10,7 @@ import { CheckoutService } from './application/checkout.service';
 import { PaymentReconciler } from './application/payment-reconciler';
 
 @Module({
-  imports: [CartModule, PricingModule, InventoryModule, PaymentsModule, FinanceModule],
+  imports: [CartModule, PricingModule, InventoryModule, PaymentsModule, FinanceModule, NotificationsModule],
   controllers: [CheckoutController, PaymentWebhookController],
   providers: [CheckoutService, PaymentReconciler],
   exports: [CheckoutService],

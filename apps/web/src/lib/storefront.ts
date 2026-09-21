@@ -169,6 +169,28 @@ export const getShop = (slug: string): Promise<ShopPage> =>
 
 export const getCategories = (): Promise<Category[]> => get('/storefront/categories', 300);
 
+export interface Banner {
+  id: string;
+  titleAr: string | null;
+  linkUrl: string | null;
+  imageUrl: string;
+}
+
+export interface ContentPage {
+  slug: string;
+  titleAr: string;
+  bodyAr: string;
+  updatedAt: string;
+}
+
+/** ما تديره الإدارة (AD-18 و AD-19) — دقيقة تخزين تكفي، والخطأ لا يُسقط الرئيسية */
+export const getBanners = (placement: string): Promise<Banner[]> =>
+  get<Banner[]>(`/storefront/banners?placement=${placement}`, 60).catch(() => []);
+
+export const getFeatured = (): Promise<ProductCard[]> => get<ProductCard[]>('/storefront/featured', 60).catch(() => []);
+
+export const getPage = (slug: string): Promise<ContentPage> => get(`/pages/${slugPath(slug)}`, 300);
+
 export function listProducts(params: Record<string, string | undefined>): Promise<ListResult> {
   const query = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v) query.set(k, v);
