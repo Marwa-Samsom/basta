@@ -18,3 +18,9 @@ export {
   UPLOADS_URL_PREFIX,
 } from '../infrastructure/product-images';
 export { IMPORT_COLUMNS, IMPORT_MAX_ROWS } from '../domain/import-plan';
+
+export {
+  StorefrontService,
+  type StorefrontProductCard,
+  type StorefrontListResult,
+} from '../application/storefront.service';

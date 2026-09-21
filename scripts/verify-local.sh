@@ -37,6 +37,23 @@ fi
 "$PGBIN/pg_isready" -h localhost -p 5432 -U basta >/dev/null 2>&1 || die "الخادم لا يستجيب"
 ok "PostgreSQL جاهز"
 
+# محرّك البحث (ADR-014). اختبارات البحث تتخطّى نفسها بلا محرّك كي يبقى
+# `npm test` عاملاً أثناء التطوير — لكن الفحص الكامل لا يقبل تخطّياً: بوابة
+# المرحلة 07 كلها بحث، والاختبار المتخطّى يُعدّ «ناجحاً» فيكذب (الدرس 5).
+MEILI="$ROOT/.localdb/meili/meilisearch.exe"
+if ! curl -s -m 2 http://127.0.0.1:7701/health 2>/dev/null | grep -q available; then
+  [[ -x "$MEILI" ]] || die "محرّك البحث غير منزَّل — scripts/probes/README.md فيه الأمر"
+  (cd "$ROOT/.localdb/meili" && "$MEILI" --http-addr 127.0.0.1:7701 --db-path ./data \
+    --master-key basta_local_dev_key_0001 --env development >/dev/null 2>&1 &)
+  for _ in $(seq 1 20); do
+    curl -s -m 1 http://127.0.0.1:7701/health 2>/dev/null | grep -q available && break
+    sleep 0.5
+  done
+fi
+curl -s -m 2 http://127.0.0.1:7701/health 2>/dev/null | grep -q available \
+  || die "محرّك البحث لا يستجيب على 7701"
+ok "Meilisearch جاهز"
+
 # -----------------------------------------------------------------------------
 if [[ "$KEEP_DB" == false ]]; then
   say "هدم القاعدة وإعادة بنائها من الصفر"

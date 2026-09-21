@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, type ProductStatus } from '@prisma/client';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
@@ -24,6 +24,7 @@ import {
   type Tx,
 } from '../../inventory/public';
 import { VendorDirectory } from '../../vendors/public';
+import { StorefrontService } from './storefront.service';
 import { productSlug } from '../domain/slug';
 import {
   assertVariantMatrix,
@@ -160,10 +161,13 @@ const EMPTY_STOCK: StockSummaryView = {
  */
 @Injectable()
 export class ProductService {
+  private readonly logger = new Logger('Catalog');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
     private readonly vendors: VendorDirectory,
+    private readonly storefront: StorefrontService,
     private readonly categories: CategoryService,
     private readonly storage: LocalImageStorage,
   ) {}
@@ -606,6 +610,7 @@ export class ProductService {
         { archivedAt: now, isActive: false },
       );
     });
+    this.reindex(id);
   }
 
   async publish(scope: VendorScope, id: string): Promise<ProductDetailView> {
@@ -647,6 +652,7 @@ export class ProductService {
     if (product.status !== 'active' && product.status !== 'pending_review') {
       await this.products(scope).updateOwned(id, { status: 'pending_review', rejectReason: null });
     }
+    this.reindex(id);
     return this.get(scope, id);
   }
 
@@ -655,6 +661,7 @@ export class ProductService {
     const found = await this.products(scope).findFirst({ where: { id, deletedAt: null }, select: { id: true } });
     if (!found) throw new NotFoundError('المنتج غير موجود.', { id });
     await this.products(scope).updateOwned(id, { status: 'draft' });
+    this.reindex(id);
     return this.get(scope, id);
   }
 
@@ -681,6 +688,7 @@ export class ProductService {
       data: { status: 'active', rejectReason: null, publishedAt: product.publishedAt ?? new Date() },
     });
     if (count === 0) throw new InvalidStateTransitionError('pending_review', 'active');
+    this.reindex(id);
   }
 
   /** رفض بسبب يراه البائع — لمنتج قيد المراجعة أو منشور. المسودة لم تُرسل فلا تُرفض. */
@@ -694,6 +702,7 @@ export class ProductService {
       if (!product) throw new NotFoundError('المنتج غير موجود.', { id });
       throw new InvalidStateTransitionError(product.status, 'rejected');
     }
+    this.reindex(id);
   }
 
   /** تفاصيل المنتج كما يراها البائع، لمراجِع الإدارة — بنطاق بائعه صراحةً. */
@@ -1100,6 +1109,19 @@ export class ProductService {
       updatedAt: row.updatedAt,
     };
   }
+
+  /**
+   * مزامنة فهرس البحث بعد تغيير يمسّ ظهور المنتج.
+   *
+   * **لا تُنتظر ولا تُسقط العملية التجارية.** نشرٌ يفشل لأن محرّك البحث نائم
+   * خسارةٌ مباشرة، ومنتجٌ نُشر ولم يُفهرس يظهر بعد أول إعادة بناء (ADR-014).
+   * والفشل يُسجَّل بمستوى خطأ فلا يمرّ صامتاً.
+   */
+  private reindex(productId: string): void {
+    void this.storefront.syncIndex([productId]).catch((err: unknown) => {
+      this.logger.error(`تعذّرت مزامنة فهرس المنتج ${productId}`, err as Error);
+    });
+  }
 }
 
 const hasVariants = (variants: readonly { options: readonly OptionChoice[] }[]): boolean =>
@@ -1124,4 +1146,5 @@ function asAttributeInput(a: ProductDetailRow['attrValues'][number]): AttributeI
     ...(a.valueNumber !== null ? { number: a.valueNumber.toNumber() } : {}),
     ...(a.valueBoolean !== null ? { boolean: a.valueBoolean } : {}),
   };
+
 }

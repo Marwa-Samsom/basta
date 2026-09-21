@@ -24,6 +24,10 @@ export interface Env {
   jwtAccessTtl: string;
   jwtRefreshTtl: string;
   nodeEnv: string;
+  /** محرّك البحث — اختياري: غيابه يُسقط البحث إلى قاعدة البيانات لا يُسقط المتجر (ADR-014) */
+  meiliUrl: string;
+  meiliKey: string;
+  meiliIndex: string;
 }
 
 let cached: Env | null = null;
@@ -50,6 +54,9 @@ export function loadEnv(): Env {
     jwtAccessTtl: process.env['JWT_ACCESS_TTL'] ?? '15m',
     jwtRefreshTtl: process.env['JWT_REFRESH_TTL'] ?? '30d',
     nodeEnv: process.env['NODE_ENV'] ?? 'development',
+    meiliUrl: process.env['MEILI_URL'] ?? 'http://127.0.0.1:7701',
+    meiliKey: process.env['MEILI_KEY'] ?? '',
+    meiliIndex: process.env['MEILI_INDEX'] ?? 'products',
   };
   return cached;
 }
