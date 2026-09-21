@@ -18,6 +18,7 @@ export default function StoreLayout({ children }: { children: React.ReactNode })
         <SearchBox />
         <nav className="row small" aria-label="روابط سريعة">
           <Link href="/categories">الفئات</Link>
+          <Link href="/cart">السلة</Link>
           <Link href="/vendor">بِع على بسطة</Link>
           <Link href="/login">دخول</Link>
         </nav>

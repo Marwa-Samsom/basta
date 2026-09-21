@@ -81,10 +81,12 @@ interface RequestOptions {
   /** ملف: يُرسل multipart بلا ترويسة نوع يدوية — المتصفّح يضع الحدّ الفاصل */
   file?: File;
   auth?: boolean;
+  /** ترويسات إضافية — رمز السلة ومفتاح عدم التكرار */
+  headers?: Record<string, string>;
 }
 
 async function raw(path: string, options: RequestOptions, token: string | null): Promise<Response> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...(options.headers ?? {}) };
   let body: BodyInit | undefined;
 
   if (options.file) {

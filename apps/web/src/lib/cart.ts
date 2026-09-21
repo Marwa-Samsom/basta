@@ -1,0 +1,117 @@
+'use client';
+
+import { api, ApiError } from './api';
+
+/**
+ * السلة في المتصفّح — رمز في التخزين المحلي، والسلة نفسها في الخادم.
+ * الرمز يُرسل في ترويسة لا في العنوان: العنوان يتسرّب في السجلات وترويسة Referer.
+ */
+
+const TOKEN_KEY = 'basta.cart';
+const CURRENCY_KEY = 'basta.currency';
+
+export interface Money {
+  minorUnits: string;
+  currency?: string;
+  formatted: string;
+}
+
+export interface CartLine {
+  variantId: string;
+  productId: string;
+  nameAr: string;
+  variantLabel: string | null;
+  imageKey: string | null;
+  qty: number;
+  available: number;
+  unitPrice: Money;
+  lineTotal: Money;
+  priceChanged: boolean;
+}
+
+export interface CartView {
+  token: string;
+  currency: string;
+  itemCount: number;
+  groups: {
+    vendorId: string;
+    vendorNameAr: string;
+    lines: CartLine[];
+    subtotal: Money;
+    shipping: Money | null;
+  }[];
+  totals: Record<'items' | 'discount' | 'shipping' | 'tax' | 'total', Money>;
+  shippingKnown: boolean;
+  taxInclusive: boolean;
+  couponCode: string | null;
+  blockers: string[];
+}
+
+export const displayCurrency = (): string => {
+  if (typeof window === 'undefined') return 'JOD';
+  return window.localStorage.getItem(CURRENCY_KEY) ?? 'JOD';
+};
+
+const readToken = (): string | null =>
+  typeof window === 'undefined' ? null : window.localStorage.getItem(TOKEN_KEY);
+
+export const cartHeaders = (): Record<string, string> => {
+  const token = readToken();
+  return token ? { 'x-cart-token': token } : {};
+};
+
+async function ensureToken(): Promise<string> {
+  const existing = readToken();
+  if (existing) return existing;
+  const cart = await api<CartView>('/cart', { method: 'POST', body: { currency: displayCurrency() } });
+  window.localStorage.setItem(TOKEN_KEY, cart.token);
+  return cart.token;
+}
+
+/** يُستدعى مرة ثانية بسلة جديدة إن انتهت القديمة — الرمز المنتهي لا يترك المشتري عالقاً */
+async function withCart<T>(run: (token: string) => Promise<T>): Promise<T> {
+  const token = await ensureToken();
+  try {
+    return await run(token);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404 && /السلة/.test(err.message)) {
+      window.localStorage.removeItem(TOKEN_KEY);
+      return run(await ensureToken());
+    }
+    throw err;
+  }
+}
+
+export const cartApi = {
+  get: (): Promise<CartView | null> => {
+    const token = readToken();
+    if (!token) return Promise.resolve(null);
+    return api<CartView>('/cart', { headers: { 'x-cart-token': token } }).catch((err) => {
+      if (err instanceof ApiError && err.status === 404) {
+        window.localStorage.removeItem(TOKEN_KEY);
+        return null;
+      }
+      throw err;
+    });
+  },
+  add: (variantId: string, qty: number) =>
+    withCart((t) =>
+      api<CartView>('/cart/items', { method: 'POST', body: { variantId, qty }, headers: { 'x-cart-token': t } }),
+    ),
+  setQty: (variantId: string, qty: number) =>
+    withCart((t) =>
+      api<CartView>(`/cart/items/${variantId}`, {
+        method: 'PATCH',
+        body: { qty },
+        headers: { 'x-cart-token': t },
+      }),
+    ),
+  coupon: (code: string | null) =>
+    withCart((t) =>
+      api<CartView>('/cart/coupon', { method: 'PUT', body: { code: code ?? '' }, headers: { 'x-cart-token': t } }),
+    ),
+  quote: (address: { country: string; region: string; city: string }) =>
+    withCart((t) =>
+      api<CartView>('/checkout/quote', { method: 'POST', body: address, headers: { 'x-cart-token': t } }),
+    ),
+};

@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { cartApi } from '@/lib/cart';
 import type { ProductPage } from '@/lib/storefront';
 
 type Variant = ProductPage['variants'][number];
@@ -99,11 +101,47 @@ export function VariantPicker({ variants }: { variants: Variant[] }) {
         )}
       </p>
 
-      {/* السلة في المرحلة 08 — الزرّ يظهر معطّلاً بسببه لا مخفيّاً */}
-      <button type="button" className="btn btn--primary btn--block" disabled>
-        أضف إلى السلة
+      <AddToCart variantId={current.id} disabled={current.available <= 0} />
+    </div>
+  );
+}
+
+function AddToCart({ variantId, disabled }: { variantId: string; disabled: boolean }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'added' | 'error'>('idle');
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function add(): Promise<void> {
+    setState('busy');
+    setMessage(null);
+    try {
+      await cartApi.add(variantId, 1);
+      setState('added');
+    } catch (err) {
+      setState('error');
+      setMessage(err instanceof Error ? err.message : 'تعذّرت الإضافة إلى السلة.');
+    }
+  }
+
+  return (
+    <div className="stack stack--tight">
+      <button
+        type="button"
+        className="btn btn--primary btn--block"
+        disabled={disabled || state === 'busy'}
+        onClick={() => void add()}
+      >
+        {disabled ? 'نفد' : state === 'busy' ? 'جارٍ الإضافة…' : 'أضف إلى السلة'}
       </button>
-      <p className="small muted">السلة وإتمام الشراء يُفعَّلان في المرحلة القادمة.</p>
+      {state === 'added' ? (
+        <p className="small" role="status">
+          أُضيف إلى سلّتك. <Link href="/cart">اذهب إلى السلة</Link>
+        </p>
+      ) : null}
+      {message ? (
+        <p className="field__error" role="alert">
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }
