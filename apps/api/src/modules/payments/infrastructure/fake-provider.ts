@@ -86,9 +86,21 @@ export class FakePaymentProvider implements PaymentProvider {
     return this.intents.get(intentId) ?? { status: 'failed', intentId, code: 'not_found', message: 'تفويض غير معروف.' };
   }
 
-  async refund(intentId: string, _amountMinor: bigint): Promise<{ refundId: string }> {
-    if (!this.intents.has(intentId)) throw new InvalidInputError('تفويض غير معروف للاسترداد.');
+  /** ما رُدّ لكل تفويض — ليتحقّق الاختبار من المبلغ الذي وصل البوابة فعلاً */
+  private readonly refunded = new Map<string, bigint[]>();
+
+  async refund(intentId: string, amountMinor: bigint): Promise<{ refundId: string }> {
+    // الذاكرة تُفقد عند إعادة التشغيل محلياً؛ التفويض الوهمي يُعرف من شكله
+    if (!this.intents.has(intentId) && !intentId.startsWith('fake_pi_')) {
+      throw new InvalidInputError('تفويض غير معروف للاسترداد.');
+    }
+    if (amountMinor <= 0n) throw new InvalidInputError('مبلغ الاسترداد موجب.');
+    this.refunded.set(intentId, [...(this.refunded.get(intentId) ?? []), amountMinor]);
     return { refundId: `fake_re_${randomUUID()}` };
+  }
+
+  refundsOf(intentId: string): readonly bigint[] {
+    return this.refunded.get(intentId) ?? [];
   }
 
   async void(intentId: string): Promise<void> {

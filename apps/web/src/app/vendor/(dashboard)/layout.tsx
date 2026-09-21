@@ -8,6 +8,8 @@ import { useOnboarding } from '@/lib/vendor';
 
 const NAV = [
   { href: '/vendor', label: 'المؤشرات' },
+  { href: '/vendor/orders', label: 'الطلبات' },
+  { href: '/vendor/disputes', label: 'النزاعات' },
   { href: '/vendor/products', label: 'المنتجات' },
   { href: '/vendor/inventory', label: 'المخزون' },
   { href: '/vendor/products/import', label: 'الاستيراد الجماعي' },

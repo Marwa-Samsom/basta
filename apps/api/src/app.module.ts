@@ -10,6 +10,9 @@ import { CartModule } from './modules/cart/public';
 import { CheckoutModule } from './modules/checkout/public';
 import { InventoryModule } from './modules/inventory/public';
 import { VendorsModule } from './modules/vendors/public';
+import { OrdersModule } from './modules/orders/public';
+import { ShippingModule } from './modules/shipping/public';
+import { AftersalesModule } from './modules/aftersales/public';
 
 /**
  * Modular Monolith — ADR-002.
@@ -38,6 +41,9 @@ import { VendorsModule } from './modules/vendors/public';
     CatalogModule,
     CartModule,
     CheckoutModule,
+    OrdersModule,
+    ShippingModule,
+    AftersalesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
