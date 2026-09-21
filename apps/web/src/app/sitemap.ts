@@ -13,7 +13,9 @@ interface SitemapData {
  * خريطة الموقع الديناميكية — المرحلة 12. تُولَّد عند الطلب وتُخزَّن ساعة:
  * منتج نُشر اليوم يظهر فيها اليوم لا بعد بناء جديد.
  */
-export const revalidate = 3600;
+// عند الطلب لا وقت البناء: البناء لا يعتمد على API حيّ (كشفه CI). بيانات الجلب
+// نفسها تُخزَّن ساعة عبر next.revalidate
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // الفشل يُرمى لا يُستبدل بخريطة فارغة: الفارغة تُخزَّن ساعة فيظنّ المحرّك أن الموقع خلا

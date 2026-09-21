@@ -152,7 +152,9 @@ next_env="apps/web/next-env.d.ts"
 next_env_backup="$(mktemp)"
 cp "$next_env" "$next_env_backup"
 trap 'cp "$next_env_backup" "$next_env"; rm -f "$next_env_backup"' EXIT
-NEXT_DIST_DIR=.next-verify npm run build >/dev/null 2>&1 || die "البناء"
+# عنوان API لا يجيب: البناء في CI بلا خادم، وصفحة تجلب بياناتها وقت البناء
+# نجحت هنا لأن الخادم المحلي يعمل ثم سقطت هناك (خريطة الموقع، المرحلة 12)
+NEXT_DIST_DIR=.next-verify NEXT_PUBLIC_API_URL=http://127.0.0.1:9/api/v1 npm run build >/dev/null 2>&1 || die "البناء — ومنه: صفحة تجلب من الـ API وقت البناء"
 cp "$next_env_backup" "$next_env"; rm -f "$next_env_backup"; trap - EXIT
 ok "api و web يُبنيان"
 
