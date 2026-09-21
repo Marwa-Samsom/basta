@@ -111,6 +111,30 @@ async function main() {
     await prisma.currency.upsert({ where: { code: c.code }, update: c, create: c });
   }
 
+  /**
+   * أسعار الصرف من العملة الأساس (USD) — ADR-013. للإضافة فقط: السعر الجديد
+   * سطر جديد بتاريخ نفاذه، والطلب يلقط السعر النافذ لحظة الدفع. القيم هنا
+   * أسعار تطوير ثابتة؛ مصدر حيّ يُوصل في المرحلة 12.
+   */
+  console.log('▸ أسعار الصرف');
+  const FX: readonly (readonly [string, string])[] = [
+    ['SAR', '3.7500000000'],
+    ['AED', '3.6725000000'],
+    ['JOD', '0.7090000000'],
+    ['KWD', '0.3070000000'],
+    ['EGP', '48.5000000000'],
+    ['EUR', '0.9200000000'],
+    ['USD', '1.0000000000'],
+  ];
+  for (const [quote, rate] of FX) {
+    const existing = await prisma.exchangeRate.findFirst({ where: { baseCode: 'USD', quoteCode: quote } });
+    if (!existing) {
+      await prisma.exchangeRate.create({
+        data: { baseCode: 'USD', quoteCode: quote, rate, source: 'seed', effectiveAt: new Date('2026-01-01') },
+      });
+    }
+  }
+
   console.log('▸ الإعدادات');
   for (const [key, value] of SETTINGS) {
     await prisma.setting.upsert({

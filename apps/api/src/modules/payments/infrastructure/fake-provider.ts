@@ -1,0 +1,146 @@
+import { Injectable } from '@nestjs/common';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { InvalidInputError } from '../../../common/errors/domain-error';
+import type {
+  ChargeOutcome,
+  ChargeRequest,
+  PaymentProvider,
+  ProviderEvent,
+} from '../domain/provider';
+
+/**
+ * المزوّد الوهمي — يحاكي كل ما تفعله بوابة حقيقية، بما فيه ما تفعله خطأً.
+ *
+ * رمز الدفع يختار السيناريو، فيُصنع كل فشل عند الطلب:
+ *   tok_success    تحصيل ناجح فوراً
+ *   tok_decline    بطاقة مرفوضة
+ *   tok_insufficient رصيد غير كافٍ
+ *   tok_3ds        يحتاج تحقّقاً، ويكتمل بإشعار
+ *   tok_timeout    **الاتصال ينقطع بعد الخصم**: المزوّد نجح ولم نسمع — بوابة 08 البند 4
+ *   tok_timeout_fail الاتصال ينقطع والخصم لم يقع
+ *
+ * الحالة في الذاكرة: تكفي لإثبات المصالحة داخل عملية واحدة، والبوابة الحقيقية
+ * تحفظها عندها لا عندنا.
+ */
+export const FAKE_WEBHOOK_SECRET = process.env['FAKE_PAYMENTS_SECRET'] ?? 'basta-fake-webhook-secret';
+
+@Injectable()
+export class FakePaymentProvider implements PaymentProvider {
+  readonly name = 'fake';
+
+  /** ما «يعرفه» المزوّد عن كل تفويض — مصدر الحقيقة الذي تسأله المصالحة */
+  private readonly intents = new Map<string, ChargeOutcome>();
+  /** عدم التكرار عند المزوّد: المفتاح نفسه يعيد النتيجة نفسها لا خصماً ثانياً */
+  private readonly byKey = new Map<string, ChargeOutcome>();
+
+  async charge(request: ChargeRequest): Promise<ChargeOutcome> {
+    const seen = this.byKey.get(request.idempotencyKey);
+    if (seen) return seen.status === 'unknown' ? this.truth(seen.intentId) : seen;
+
+    const intentId = `fake_pi_${randomUUID()}`;
+    let truth: ChargeOutcome;
+    let reply: ChargeOutcome;
+
+    switch (request.paymentToken) {
+      case 'tok_success':
+        truth = reply = { status: 'captured', intentId };
+        break;
+      case 'tok_decline':
+        truth = reply = { status: 'failed', intentId, code: 'card_declined', message: 'رفض البنك البطاقة.' };
+        break;
+      case 'tok_insufficient':
+        truth = reply = {
+          status: 'failed',
+          intentId,
+          code: 'insufficient_funds',
+          message: 'الرصيد غير كافٍ.',
+        };
+        break;
+      case 'tok_3ds':
+        truth = { status: 'captured', intentId };
+        reply = { status: 'requires_action', intentId, actionUrl: `/checkout/verify?intent=${intentId}` };
+        break;
+      case 'tok_timeout':
+        // المال خُصم فعلاً عند المزوّد — لكن الردّ لم يصلنا
+        truth = { status: 'captured', intentId };
+        reply = { status: 'unknown', intentId };
+        break;
+      case 'tok_timeout_fail':
+        truth = { status: 'failed', intentId, code: 'processing_error', message: 'تعذّرت المعالجة.' };
+        reply = { status: 'unknown', intentId };
+        break;
+      default:
+        throw new InvalidInputError('وسيلة دفع غير معروفة.', { token: request.paymentToken });
+    }
+
+    this.intents.set(intentId, truth);
+    this.byKey.set(request.idempotencyKey, reply);
+    return reply;
+  }
+
+  async retrieve(intentId: string): Promise<ChargeOutcome> {
+    return this.truth(intentId);
+  }
+
+  private truth(intentId: string): ChargeOutcome {
+    return this.intents.get(intentId) ?? { status: 'failed', intentId, code: 'not_found', message: 'تفويض غير معروف.' };
+  }
+
+  async refund(intentId: string, _amountMinor: bigint): Promise<{ refundId: string }> {
+    if (!this.intents.has(intentId)) throw new InvalidInputError('تفويض غير معروف للاسترداد.');
+    return { refundId: `fake_re_${randomUUID()}` };
+  }
+
+  async void(intentId: string): Promise<void> {
+    this.intents.set(intentId, { status: 'failed', intentId, code: 'voided', message: 'أُلغي التفويض.' });
+  }
+
+  // ------------------------------------------------------------ الإشعارات
+
+  /** يوقّع إشعاراً كما توقّعه البوابة — للاختبار ولمحاكاة 3-D Secure */
+  static sign(body: string): string {
+    return createHmac('sha256', FAKE_WEBHOOK_SECRET).update(body).digest('hex');
+  }
+
+  parseWebhook(rawBody: string, signature: string | undefined): ProviderEvent {
+    const expected = FakePaymentProvider.sign(rawBody);
+    const given = signature ?? '';
+    // مقارنة بزمن ثابت: المقارنة العادية تكشف التوقيع حرفاً حرفاً بقياس الزمن
+    const valid =
+      given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+    if (!valid) throw new InvalidInputError('توقيع الإشعار غير صالح.');
+
+    const data = JSON.parse(rawBody) as {
+      id: string;
+      type: ProviderEvent['type'];
+      intentId: string;
+      orderId: string;
+      amountMinor: string;
+      currency: string;
+      failureCode?: string;
+    };
+    return {
+      eventId: data.id,
+      type: data.type,
+      intentId: data.intentId,
+      orderId: data.orderId,
+      amountMinor: BigInt(data.amountMinor),
+      currency: data.currency,
+      ...(data.failureCode ? { failureCode: data.failureCode } : {}),
+    };
+  }
+
+  /** ما يرسله المزوّد بعد أن يكتمل التحقّق — تستدعيه الاختبارات وشاشة 3-D Secure */
+  eventFor(intentId: string, orderId: string, amountMinor: bigint, currency: string): string {
+    const truth = this.truth(intentId);
+    return JSON.stringify({
+      id: `evt_${randomUUID()}`,
+      type: truth.status === 'captured' ? 'payment.captured' : 'payment.failed',
+      intentId,
+      orderId,
+      amountMinor: amountMinor.toString(),
+      currency,
+      ...(truth.status === 'failed' ? { failureCode: truth.code } : {}),
+    });
+  }
+}

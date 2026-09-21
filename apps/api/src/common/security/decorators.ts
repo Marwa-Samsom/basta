@@ -27,3 +27,16 @@ export const CurrentActor = createParamDecorator((_: unknown, ctx: ExecutionCont
   if (!req.actor) throw new UnauthorizedException('مطلوب تسجيل الدخول.');
   return req.actor;
 });
+
+export const OPTIONAL_AUTH = 'basta:optionalAuth';
+
+/**
+ * مسار مفتوح للضيف، ويتعرّف على المسجَّل إن أرسل رمزه — السلة وإتمام الشراء.
+ * الفاعل يُقرأ بـ `@MaybeActor()` لا `@CurrentActor()`: غيابه حالة طبيعية هنا.
+ */
+export const OptionalAuth = () => SetMetadata(OPTIONAL_AUTH, true);
+
+export const MaybeActor = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext): Actor | null =>
+    ctx.switchToHttp().getRequest<{ actor?: Actor }>().actor ?? null,
+);

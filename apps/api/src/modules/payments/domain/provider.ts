@@ -1,0 +1,52 @@
+/**
+ * طبقة الدفع المجرّدة — ADR-012.
+ *
+ * خمس عمليات لا غير. لا وحدة خارج وحدة الدفع تعرف اسم مزوّد، والمزوّد الوهمي
+ * **مخرَج دائم** لا سقالة: عليه تُبنى اختبارات المرحلة وتبقى بعد وصل البوابة
+ * الحقيقية، لأنه وحده يستطيع أن يصنع الفشل عند الطلب.
+ */
+
+export type ChargeOutcome =
+  /** التفويض والتحصيل تمّا — المال محجوز للمنصة */
+  | { readonly status: 'captured'; readonly intentId: string }
+  /** رُفض: بطاقة مرفوضة أو رصيد ناقص. نهائي — لا يُعاد بالمعرّف نفسه */
+  | { readonly status: 'failed'; readonly intentId: string; readonly code: string; readonly message: string }
+  /** يحتاج خطوة من المشتري (3-D Secure). يكتمل بإشعار لاحق */
+  | { readonly status: 'requires_action'; readonly intentId: string; readonly actionUrl: string }
+  /**
+   * **لا نعرف.** انقطع الاتصال بعد الإرسال: قد يكون المال خُصم وقد لا يكون.
+   * هذه الحالة هي سبب وجود المصالحة — لا تُعامل فشلاً (فيدفع مرتين) ولا
+   * نجاحاً (فيُشحن بلا مال). تُحسم بسؤال المزوّد لاحقاً.
+   */
+  | { readonly status: 'unknown'; readonly intentId: string };
+
+export interface ChargeRequest {
+  /** مفتاح عدم التكرار عند المزوّد: إعادة الإرسال لا تخصم مرتين — ADR-011 */
+  readonly idempotencyKey: string;
+  readonly orderId: string;
+  readonly amountMinor: bigint;
+  readonly currency: string;
+  /** رمز وسيلة الدفع من نموذج المزوّد — لا رقم بطاقة يمرّ بخادمنا أبداً */
+  readonly paymentToken: string;
+}
+
+export interface ProviderEvent {
+  readonly eventId: string;
+  readonly type: 'payment.captured' | 'payment.failed';
+  readonly intentId: string;
+  readonly orderId: string;
+  readonly amountMinor: bigint;
+  readonly currency: string;
+  readonly failureCode?: string;
+}
+
+export interface PaymentProvider {
+  readonly name: string;
+  charge(request: ChargeRequest): Promise<ChargeOutcome>;
+  /** سؤال المزوّد عن حقيقة تفويض — للمصالحة بعد «لا نعرف» */
+  retrieve(intentId: string): Promise<ChargeOutcome>;
+  refund(intentId: string, amountMinor: bigint): Promise<{ refundId: string }>;
+  void(intentId: string): Promise<void>;
+  /** يتحقّق من توقيع الإشعار ويحلّله. التوقيع الخاطئ يُرفض قبل أي أثر */
+  parseWebhook(rawBody: string, signature: string | undefined): ProviderEvent;
+}

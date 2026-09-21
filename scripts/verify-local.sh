@@ -88,7 +88,7 @@ ok "TRUNCATE مرفوض على الجداول المحميّة"
   || die "الدينار ليس بثلاث خانات"
 ok "العملات وخاناتها صحيحة"
 
-for v in audit_wallet_drift audit_inventory_drift audit_reservation_drift; do
+for v in audit_wallet_drift audit_inventory_drift audit_reservation_drift audit_order_split_drift audit_paid_without_split; do
   [[ "$(q "SELECT count(*) FROM \"$v\"")" == "0" ]] || die "$v يُظهر انحرافاً"
 done
 ok "لا انحراف في views التدقيق"

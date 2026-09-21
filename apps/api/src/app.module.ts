@@ -6,6 +6,8 @@ import { PrismaModule } from './common/prisma/prisma.module';
 import { HealthController } from './common/health.controller';
 import { IdentityModule } from './modules/identity/identity.module';
 import { CatalogModule } from './modules/catalog/public';
+import { CartModule } from './modules/cart/public';
+import { CheckoutModule } from './modules/checkout/public';
 import { InventoryModule } from './modules/inventory/public';
 import { VendorsModule } from './modules/vendors/public';
 
@@ -34,6 +36,8 @@ import { VendorsModule } from './modules/vendors/public';
     VendorsModule,
     InventoryModule,
     CatalogModule,
+    CartModule,
+    CheckoutModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

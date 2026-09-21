@@ -11,6 +11,7 @@ import { TokenService } from '../../application/token.service';
 import {
   ALLOW_LIMITED,
   IS_PUBLIC,
+  OPTIONAL_AUTH,
   REQUIRED_PERMISSION,
   REQUIRED_ROLES,
 } from '../../../../common/security/decorators';
@@ -33,12 +34,31 @@ export class AuthGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const targets = [ctx.getHandler(), ctx.getClass()];
 
-    if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
-
     const req = ctx.switchToHttp().getRequest<{
       headers: Record<string, string | undefined>;
       actor?: Actor;
     }>();
+
+    /**
+     * مسار مفتوح يتعرّف على المسجَّل إن حضر رمزه — السلة وإتمام الشراء.
+     * الضيف يمرّ بلا فاعل، والمسجَّل يمرّ بفاعله. **رمز فاسد يُرفض لا يُتجاهل:**
+     * تجاهله يجعل المسجَّل يشتري ضيفاً بصمت فيضيع الطلب من «طلباتي».
+     */
+    if (this.reflector.getAllAndOverride<boolean>(OPTIONAL_AUTH, targets)) {
+      const bearer = req.headers['authorization'];
+      if (bearer?.startsWith('Bearer ')) {
+        const claims = await this.tokens.verifyAccess(bearer.slice(7));
+        req.actor = {
+          userId: claims.sub,
+          roles: claims.roles as Role[],
+          permissions: claims.permissions,
+          ...(claims.vendorId ? { vendorId: claims.vendorId } : {}),
+        };
+      }
+      return true;
+    }
+
+    if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
 
     const header = req.headers['authorization'];
     if (!header?.startsWith('Bearer ')) {

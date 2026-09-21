@@ -730,6 +730,12 @@ model Order {
   billingAddressSnapshot  Json?
   customerNote            String?
 
+  /// ADR-003: ما يُقسَّم عند نجاح الدفع — لا السلة، فالسلة قد تتغيّر بعد «ادفع»
+  pricingSnapshot Json?
+  /// حجوزات المخزون المأخوذة عند بدء الدفع: تُثبَّت عند النجاح وتُحرَّر عند الفشل
+  reservationIds  String[]  @default([]) @db.Uuid
+  paidAt          DateTime? @db.Timestamptz
+
   placedAt   DateTime  @default(now()) @db.Timestamptz
   canceledAt DateTime? @db.Timestamptz
 
@@ -764,6 +770,8 @@ model SubOrder {
   /// ADR-004: اللقطة تُقرأ في كل احتساب لاحق، ولا يُستشار جدول القواعد ثانيةً
   commissionRateBpsSnapshot Int
   commissionMinorUnits      BigInt
+  /// حصّة هذا الفرعي **بعملة الدفع**. مجموعها = grandTotal الأب بالبناء — بوابة 08
+  chargeTotalMinorUnits     BigInt?
   /// = itemsSubtotal − discount − commission + shipping (لا عمولة على الشحن — ADR-008)
   vendorNetMinorUnits       BigInt
 
