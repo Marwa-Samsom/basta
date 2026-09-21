@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FinanceModule } from '../finance/public';
 import { InventoryModule } from '../inventory/public';
 import { PaymentsModule } from '../payments/public';
 import {
@@ -11,7 +12,7 @@ import { OrderQueryService } from './application/order-query.service';
 import { OrderScheduler } from './application/order-scheduler';
 
 @Module({
-  imports: [InventoryModule, PaymentsModule],
+  imports: [InventoryModule, PaymentsModule, FinanceModule],
   controllers: [VendorOrdersController, CustomerOrdersController, AdminOrdersController],
   providers: [OrderLifecycleService, OrderQueryService, OrderScheduler],
   exports: [OrderLifecycleService, OrderQueryService, OrderScheduler],

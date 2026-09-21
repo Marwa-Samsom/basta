@@ -174,9 +174,10 @@ model Currency {
   isBase              Boolean @default(false)
   sort                Int     @default(0)
 
-  wallets      Wallet[]
-  ratesAsBase  ExchangeRate[] @relation("RateBase")
-  ratesAsQuote ExchangeRate[] @relation("RateQuote")
+  wallets         Wallet[]
+  platformEntries PlatformLedgerEntry[]
+  ratesAsBase     ExchangeRate[]        @relation("RateBase")
+  ratesAsQuote    ExchangeRate[]        @relation("RateQuote")
 
   @@map("currencies")
 }
@@ -787,15 +788,16 @@ model SubOrder {
   canceledAt    DateTime? @db.Timestamptz
   cancelReason  String?
 
-  order         Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendor        Vendor                  @relation(fields: [vendorId], references: [id])
-  items         OrderItem[]
-  statusHistory SubOrderStatusHistory[]
-  shipment      Shipment?
-  returns       ReturnRequest[]
-  disputes      Dispute[]
-  refunds       Refund[]
-  ledgerEntries LedgerEntry[]
+  order           Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor          Vendor                  @relation(fields: [vendorId], references: [id])
+  items           OrderItem[]
+  statusHistory   SubOrderStatusHistory[]
+  shipment        Shipment?
+  returns         ReturnRequest[]
+  disputes        Dispute[]
+  refunds         Refund[]
+  ledgerEntries   LedgerEntry[]
+  platformEntries PlatformLedgerEntry[]
 
   @@index([orderId])
   @@index([vendorId, status, placedAt(sort: Desc)])
@@ -1075,17 +1077,19 @@ model PaymentEvent {
 }
 
 model Refund {
-  id               String   @id @default(uuid()) @db.Uuid
-  subOrderId       String   @db.Uuid
-  paymentId        String   @db.Uuid
-  amountMinorUnits BigInt
-  reason           String
-  status           String   @default("pending")
-  providerRefundId String?
-  requestedBy      String?  @db.Uuid
-  approvedBy       String?  @db.Uuid
-  ledgerEntryId    String?  @db.Uuid
-  createdAt        DateTime @default(now()) @db.Timestamptz
+  id                     String   @id @default(uuid()) @db.Uuid
+  subOrderId             String   @db.Uuid
+  paymentId              String   @db.Uuid
+  amountMinorUnits       BigInt
+  reason                 String
+  status                 String   @default("pending")
+  providerRefundId       String?
+  requestedBy            String?  @db.Uuid
+  approvedBy             String?  @db.Uuid
+  ledgerEntryId          String?  @db.Uuid
+  /// قيمة الاسترداد بعملة البائع — ما يقابله في الدفتر (amountMinorUnits بعملة الدفع)
+  vendorAmountMinorUnits BigInt?
+  createdAt              DateTime @default(now()) @db.Timestamptz
 
   subOrder SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
   payment  Payment  @relation(fields: [paymentId], references: [id])
@@ -1190,6 +1194,30 @@ model LedgerEntry {
   @@index([walletId, bucket])
   @@index([refType, refId])
   @@map("ledger_entries")
+}
+
+/// نصيب المنصة لكل فرعي — للإضافة فقط كدفتر البائع. مع دفتر البائع والاستردادات
+/// يساوي ما دُفع بالقرش: المنظر audit_money_conservation (بوابة 10).
+model PlatformLedgerEntry {
+  id               String   @id @default(uuid()) @db.Uuid
+  subOrderId       String   @db.Uuid
+  currency         String   @db.Char(3)
+  /// commission · tax_held · discount_subsidy · rounding
+  entryType        String
+  /// credit = للمنصة، debit = عليها
+  direction        String
+  amountMinorUnits BigInt
+  reversesEntryId  String?  @db.Uuid
+  refundId         String?  @db.Uuid
+  memo             String?
+  createdAt        DateTime @default(now()) @db.Timestamptz
+
+  subOrder SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Restrict, map: "platform_ledger_suborder_fk")
+  curr     Currency @relation(fields: [currency], references: [code], map: "platform_ledger_currency_fk")
+
+  @@index([subOrderId])
+  @@index([currency, createdAt])
+  @@map("platform_ledger_entries")
 }
 
 enum PayoutStatus {

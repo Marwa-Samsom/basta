@@ -161,3 +161,18 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
+
+/** ملف من الخادم بجلسة المستخدم — كشف الحساب CSV. التنزيل يبقى في المتصفّح */
+export async function apiBlob(path: string): Promise<Blob> {
+  let token = session.read()?.accessToken ?? null;
+  let res = await raw(path, {}, token);
+  if (res.status === 401) {
+    const renewed = await refresh();
+    if (renewed) {
+      token = renewed.accessToken;
+      res = await raw(path, {}, token);
+    }
+  }
+  if (!res.ok) throw await ApiError.from(res);
+  return res.blob();
+}

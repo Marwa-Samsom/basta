@@ -8,6 +8,7 @@ import {
 } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CartService } from '../../cart/public';
+import { LedgerService } from '../../finance/public';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type ChargeOutcome, type PaymentProvider } from '../../payments/public';
 import { PricingService } from '../../pricing/public';
@@ -80,6 +81,7 @@ export class CheckoutService {
     private readonly pricing: PricingService,
     private readonly inventory: InventoryService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
+    private readonly ledger: LedgerService,
   ) {}
 
   // ================================================================ الطلب
@@ -251,6 +253,7 @@ export class CheckoutService {
           await this.inventory.commit(order.reservationIds, { orderId }, tx);
 
           const snapshot = order.pricingSnapshot as unknown as Snapshot;
+          const posted: { id: string; vendorId: string }[] = [];
           let n = 0;
           for (const so of snapshot.subOrders) {
             n++;
@@ -300,6 +303,13 @@ export class CheckoutService {
             await tx.subOrderStatusHistory.create({
               data: { subOrderId: sub.id, fromStatus: null, toStatus: 'awaiting_vendor', reason: 'نجح الدفع' },
             });
+            posted.push({ id: sub.id, vendorId: so.vendorId });
+          }
+
+          // قيود البيع في معاملة التقسيم نفسها (ADR-005): فرعي بلا قيد لا يوجد.
+          // بترتيب البائع لتُقفل المحافظ بترتيب ثابت — لا تعطّل متبادل بين طلبين
+          for (const p of [...posted].sort((a, b) => a.vendorId.localeCompare(b.vendorId))) {
+            await this.ledger.postSale(tx, p.id);
           }
 
           await tx.payment.update({

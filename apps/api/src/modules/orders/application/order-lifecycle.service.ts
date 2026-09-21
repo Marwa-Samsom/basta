@@ -6,6 +6,7 @@ import {
   NotFoundError,
 } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { LedgerService } from '../../finance/public';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type PaymentProvider } from '../../payments/public';
 import { planFullRefund, planPartialRefund } from '../domain/refunds';
@@ -61,6 +62,7 @@ export class OrderLifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly ledger: LedgerService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
   ) {}
 
@@ -261,7 +263,14 @@ export class OrderLifecycleService {
     for (const item of sub.items) {
       await tx.orderItem.update({ where: { id: item.id }, data: { refundedQty: item.qty } });
     }
-    return this.createRefund(tx, subOrderId, sub.orderId, plan.chargeMinor, reason, by);
+    const refundId = await this.createRefund(tx, subOrderId, sub.orderId, plan.chargeMinor, reason, by);
+    // الدفتر في المعاملة نفسها: ما بقي للبائع وللمنصة يُعكس، والباقي للمشتري
+    const posted = await this.ledger.postFullRefund(tx, subOrderId, refundId, by);
+    await tx.refund.update({
+      where: { id: refundId },
+      data: { vendorAmountMinorUnits: posted.vendorAmount, ledgerEntryId: posted.ledgerEntryId },
+    });
+    return refundId;
   }
 
   private async recordPartialRefund(
@@ -295,10 +304,17 @@ export class OrderLifecycleService {
       chargeTotalMinor: sub.chargeTotalMinorUnits ?? 0n,
       alreadyRefundedChargeMinor: sub.refunds.reduce((a, r) => a + r.amountMinorUnits, 0n),
     });
+    const refundId = await this.createRefund(tx, subOrderId, sub.orderId, plan.chargeMinor, 'إرجاع', by);
+    // قبل زيادة refundedQty: الدفتر يتحقّق من الكمية المتاحة للإرجاع بنفسه
+    const posted = await this.ledger.postPartialRefund(tx, subOrderId, items, refundId, by);
+    await tx.refund.update({
+      where: { id: refundId },
+      data: { vendorAmountMinorUnits: posted.vendorAmount, ledgerEntryId: posted.ledgerEntryId },
+    });
     for (const line of plan.lines) {
       await tx.orderItem.update({ where: { id: line.orderItemId }, data: { refundedQty: { increment: line.qty } } });
     }
-    return this.createRefund(tx, subOrderId, sub.orderId, plan.chargeMinor, 'إرجاع', by);
+    return refundId;
   }
 
   private async createRefund(

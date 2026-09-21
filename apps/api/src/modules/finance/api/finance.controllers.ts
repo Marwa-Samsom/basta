@@ -1,0 +1,185 @@
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
+import { ForbiddenActorError, vendorScopeOf, type Actor } from '../../../common/security/actor';
+import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
+import { FinanceService } from '../application/finance.service';
+
+const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('المورد غير موجود.') });
+
+function vendorIdOf(actor: Actor): string {
+  try {
+    return vendorScopeOf(actor).vendorId;
+  } catch (err) {
+    if (err instanceof ForbiddenActorError) throw new ForbiddenException(err.message);
+    throw err;
+  }
+}
+
+const range = (from?: string, to?: string) => ({
+  ...(from ? { from: new Date(from) } : {}),
+  ...(to ? { to: new Date(`${to}T23:59:59.999Z`) } : {}),
+});
+
+export class PayoutDto {
+  @Matches(/^[A-Z]{3}$/)
+  currency!: string;
+
+  /** بالوحدات الصغرى نصاً — لا عدد عشري يمرّ في مال (ADR-001) */
+  @Matches(/^[1-9][0-9]{0,15}$/, { message: 'المبلغ عدد صحيح موجب بالوحدات الصغرى.' })
+  amountMinorUnits!: string;
+}
+
+export class StatementQueryDto {
+  @Matches(/^[A-Z]{3}$/)
+  currency!: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  from?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  to?: string;
+}
+
+export class ReasonDto {
+  @IsString()
+  @Length(5, 500)
+  reason!: string;
+}
+
+export class PaidDto {
+  @IsString()
+  @Length(3, 120)
+  transferReference!: string;
+}
+
+export class CommissionDto {
+  @IsIn(['global', 'category', 'vendor'])
+  scope!: 'global' | 'category' | 'vendor';
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  vendorId?: string;
+
+  @IsInt()
+  @Min(0)
+  @Max(5000)
+  rateBps!: number;
+}
+
+@ApiTags('vendor-finance')
+@ApiBearerAuth()
+@Roles('vendor_owner', 'vendor_staff')
+@Controller('vendor/finance')
+export class VendorFinanceController {
+  constructor(private readonly finance: FinanceService) {}
+
+  @Get('wallets')
+  wallets(@CurrentActor() a: Actor) {
+    return this.finance.wallets(vendorIdOf(a));
+  }
+
+  @Get('statement')
+  statement(@CurrentActor() a: Actor, @Query() q: StatementQueryDto) {
+    return this.finance.statement(vendorIdOf(a), q.currency, range(q.from, q.to));
+  }
+
+  @Get('statement.csv')
+  @Header('content-type', 'text/csv; charset=utf-8')
+  @Header('content-disposition', 'attachment; filename="basta-statement.csv"')
+  statementCsv(@CurrentActor() a: Actor, @Query() q: StatementQueryDto) {
+    return this.finance.statementCsv(vendorIdOf(a), q.currency, range(q.from, q.to));
+  }
+
+  @Get('payouts')
+  payouts(@CurrentActor() a: Actor) {
+    return this.finance.payouts({ vendorId: vendorIdOf(a) });
+  }
+
+  /** المالك وحده يسحب — الموظّف يرى ولا يحرّك المال */
+  @Post('payouts')
+  @Roles('vendor_owner')
+  requestPayout(@CurrentActor() a: Actor, @Body() dto: PayoutDto) {
+    return this.finance.requestPayout(vendorIdOf(a), a.userId, {
+      currency: dto.currency,
+      amountMinorUnits: BigInt(dto.amountMinorUnits),
+    });
+  }
+}
+
+@ApiTags('admin-finance')
+@ApiBearerAuth()
+@Roles('admin')
+@Controller('admin/finance')
+export class AdminFinanceController {
+  constructor(private readonly finance: FinanceService) {}
+
+  @Get('payouts')
+  @RequirePermission('payouts.approve')
+  payouts(@Query('status') status?: string) {
+    return this.finance.payouts({ ...(status ? { status } : {}) });
+  }
+
+  @Post('payouts/:id/approve')
+  @RequirePermission('payouts.approve')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  approve(@CurrentActor() a: Actor, @Param('id', uuidParam) id: string) {
+    return this.finance.approvePayout(a.userId, id);
+  }
+
+  @Post('payouts/:id/paid')
+  @RequirePermission('payouts.approve')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  paid(@CurrentActor() a: Actor, @Param('id', uuidParam) id: string, @Body() dto: PaidDto) {
+    return this.finance.markPaid(a.userId, id, dto.transferReference);
+  }
+
+  @Post('payouts/:id/reject')
+  @RequirePermission('payouts.approve')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  reject(@CurrentActor() a: Actor, @Param('id', uuidParam) id: string, @Body() dto: ReasonDto) {
+    return this.finance.rejectPayout(a.userId, id, dto.reason);
+  }
+
+  @Get('commissions')
+  @RequirePermission('commissions.edit')
+  commissions() {
+    return this.finance.commissionRules();
+  }
+
+  @Post('commissions')
+  @RequirePermission('commissions.edit')
+  setCommission(@CurrentActor() a: Actor, @Body() dto: CommissionDto) {
+    return this.finance.setCommission(a.userId, {
+      scope: dto.scope,
+      categoryId: dto.categoryId ?? null,
+      vendorId: dto.vendorId ?? null,
+      rateBps: dto.rateBps,
+    });
+  }
+
+  @Get('platform')
+  @RequirePermission('payouts.approve')
+  platform() {
+    return this.finance.platformSummary();
+  }
+}

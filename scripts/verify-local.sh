@@ -75,7 +75,7 @@ fi
 say "حرّاس قاعدة البيانات يرفضون الخرق"
 q() { "$PGBIN/psql" -h localhost -p 5432 -U basta -d basta -tAc "$1" 2>/dev/null | tr -d ' \r'; }
 
-for tbl in ledger_entries audit_logs inventory_movements; do
+for tbl in ledger_entries platform_ledger_entries audit_logs inventory_movements; do
   if "$PGBIN/psql" -h localhost -p 5432 -U basta -d basta \
        -c "TRUNCATE TABLE \"$tbl\";" >/dev/null 2>&1; then
     die "$tbl قابل للمحو — حارس ADR-005 معطّل"
@@ -88,7 +88,7 @@ ok "TRUNCATE مرفوض على الجداول المحميّة"
   || die "الدينار ليس بثلاث خانات"
 ok "العملات وخاناتها صحيحة"
 
-for v in audit_wallet_drift audit_inventory_drift audit_reservation_drift audit_order_split_drift audit_paid_without_split; do
+for v in audit_wallet_drift audit_withdrawn_drift audit_money_conservation audit_sub_order_without_ledger audit_inventory_drift audit_reservation_drift audit_order_split_drift audit_paid_without_split; do
   [[ "$(q "SELECT count(*) FROM \"$v\"")" == "0" ]] || die "$v يُظهر انحرافاً"
 done
 ok "لا انحراف في views التدقيق"

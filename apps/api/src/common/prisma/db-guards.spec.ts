@@ -64,6 +64,7 @@ describe('ADR-005 · دفتر الأستاذ للإضافة فقط', () => {
   dbIt('يرفض TRUNCATE — الثغرة التي تتجاوز مشغّلات الصفوف', async () => {
     for (const table of [
       'ledger_entries',
+      'platform_ledger_entries',
       'audit_logs',
       'inventory_movements',
       'exchange_rates',
@@ -78,9 +79,8 @@ describe('ADR-005 · دفتر الأستاذ للإضافة فقط', () => {
    * الحارس قاعدة مطلقة لا أثر جانبي لوجود بيانات: يُطلَق على الجدول الفارغ
    * كما يُطلَق على الممتلئ. مشغّل الصف كان يمرّ صامتاً على الفارغ.
    */
-  dbIt('يرفض الجملة ولو كان الجدول فارغاً', async () => {
-    const count = await prisma.ledgerEntry.count();
-    expect(count).toBe(0);
+  dbIt('يرفض الجملة ولو لم تمسّ صفاً واحداً', async () => {
+    // WHERE 1=0 لا يطابق شيئاً مهما امتلأ الجدول — منذ المرحلة 10 لم يعد الدفتر فارغاً
     await expect(
       prisma.$executeRawUnsafe(`DELETE FROM "ledger_entries" WHERE 1=0`),
     ).rejects.toThrow();
