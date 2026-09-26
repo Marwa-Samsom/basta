@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert, Spinner } from '@/components/ui';
 import { useOnboarding } from '@/lib/vendor';
@@ -27,6 +28,7 @@ const NAV: DashNavGroup[] = [
 
 const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
   approved: { label: 'معتمد', tone: 'success' },
+  in_review: { label: 'قيد المراجعة', tone: 'warning' },
   suspended: { label: 'معلَّق', tone: 'warning' },
   banned: { label: 'محظور', tone: 'danger' },
 };
@@ -65,8 +67,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  // التأهيل غير مكتمل: اللوحة بلا معنى قبله، والطريق واحد
-  if (data.status === 'pending' || data.status === 'in_review' || data.status === 'rejected') {
+  /**
+   * التأهيل لم يُرسَل أو رُفض: الطريق واحد، إلى صفحة الحالة. أمّا قيد
+   * المراجعة فيدخل — VD-03 يدعوه لتجهيز منتجاته مسوّداتٍ أثناء الانتظار،
+   * والنشر وحده ممنوع حتى الاعتماد (مانع في الخادم). منعُه من اللوحة كان
+   * يعيد رابط «هيّئ منتجاتك» إلى صفحة الحالة نفسها في حلقة.
+   */
+  if (data.status === 'pending' || data.status === 'rejected') {
     router.replace('/vendor/onboarding/status');
     return null;
   }
@@ -91,7 +98,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       groups={NAV}
       tools={<NotificationBell />}
       banner={
-        data.status === 'suspended' ? (
+        data.status === 'in_review' ? (
+          <Alert tone="info" title="متجرك قيد المراجعة">
+            جهّز منتجاتك الآن — تُحفظ مسوّداتٍ، وتستطيع إرسالها للنشر فور اعتماد متجرك.{' '}
+            <Link href="/vendor/onboarding/status">تابع حالة طلبك</Link>
+          </Alert>
+        ) : data.status === 'suspended' ? (
           <Alert tone="danger" title="متجرك معلَّق مؤقتاً — منتجاتك مخفية عن المشترين">
             لا تستطيع نشر منتج جديد، وطلباتك القائمة تُكمَل كما هي. راسل الدعم لمعرفة السبب ورفع التعليق.
           </Alert>

@@ -420,6 +420,41 @@ export class InventoryService {
     return rows.map(toView);
   }
 
+  // ---------------------------------------------------------- تنبيه النفاد
+
+  /**
+   * ما بلغ العتبة ولم يُنبَّه عنه بائعه بعد، الأقدم أولاً. المخزون لا يعرف
+   * البائع ولا المنتج — يعطي الصفوف، والكتالوج ينبّه (SRS V-04).
+   */
+  async pendingLowStock(limit = EXPIRE_BATCH): Promise<StockView[]> {
+    const rows = await this.prisma.$queryRaw<LockedRow[]>`
+      SELECT "variantId", "onHand", "reserved", "lowStockThreshold", "lowStockSince"
+      FROM "inventory"
+      WHERE "lowStockSince" IS NOT NULL
+        AND ("lowStockNotifiedAt" IS NULL OR "lowStockNotifiedAt" < "lowStockSince")
+      ORDER BY "lowStockSince" ASC
+      LIMIT ${limit}::int`;
+    return rows.map(toView);
+  }
+
+  /**
+   * يحجز الصفوف للتنبيه ويعيد ما حُجز فعلاً. الشرط داخل التحديث نفسه:
+   * جولتان متزامنتان على الصف نفسه تحجزه إحداهما وحدها، فلا يصل البائعَ
+   * تنبيهان عن نزول واحد. يُستدعى داخل معاملة إدراج التنبيه.
+   */
+  async claimLowStockAlerts(variantIds: readonly string[], tx?: Tx): Promise<string[]> {
+    if (variantIds.length === 0) return [];
+    const db = tx ?? this.prisma;
+    const claimed = await db.$queryRaw<{ variantId: string }[]>`
+      UPDATE "inventory"
+      SET "lowStockNotifiedAt" = now()
+      WHERE "variantId" = ANY(${[...variantIds]}::uuid[])
+        AND "lowStockSince" IS NOT NULL
+        AND ("lowStockNotifiedAt" IS NULL OR "lowStockNotifiedAt" < "lowStockSince")
+      RETURNING "variantId"`;
+    return claimed.map((r) => r.variantId);
+  }
+
   /** ما بلغ العتبة من هذه المتغيّرات، الأقدم أولاً — مصدر تنبيه البائع. */
   async lowStock(variantIds: readonly string[]): Promise<StockView[]> {
     if (variantIds.length === 0) return [];

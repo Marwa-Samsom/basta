@@ -10,6 +10,12 @@ import { num, PRODUCT_STATUS, type Page, type ProductListItem, type ProductStatu
 
 type TabKey = ProductStatus | 'all';
 
+/**
+ * التاريخ نصّ عربي باسم الشهر لا رقم: بصيغة «26/9/2026» العربية علامات
+ * اتجاه خفية، فإن وُضع في خلية `num` اللاتينية انقلب إلى «262026/9/».
+ */
+const EDITED = new Intl.DateTimeFormat('ar-u-nu-latn', { dateStyle: 'medium' });
+
 const TABS: readonly { key: TabKey; label: string }[] = [
   { key: 'all', label: 'الكل' },
   { key: 'draft', label: 'مسوّدة' },
@@ -259,8 +265,8 @@ export default function ProductsPage() {
                           {PRODUCT_STATUS[p.status].label}
                         </span>
                       </td>
-                      <td className="num" data-label="آخر تعديل">
-                        {new Date(p.updatedAt).toLocaleDateString('ar-JO-u-nu-latn')}
+                      <td data-label="آخر تعديل">
+                        {EDITED.format(new Date(p.updatedAt))}
                       </td>
                       <td className="end" data-label="">
                         <Link

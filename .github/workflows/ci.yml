@@ -17,8 +17,8 @@ jobs:
     name: فحص الأنواع والنمط والحدود
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: '22', cache: npm }
       - run: npm ci
       - run: npm run db:generate
@@ -30,7 +30,7 @@ jobs:
     name: حرّاس الرموز والاتجاه
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # نظام التصميم: كل لون يأتي من رمز، ولا قيمة صريحة في مكوّن
       - name: لا قيم لون صريحة خارج tokens.css
@@ -97,8 +97,8 @@ jobs:
       JWT_REFRESH_SECRET: ci_refresh_secret_not_for_production_00
       NODE_ENV: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: '22', cache: npm }
       - run: npm ci
       - run: npm run db:generate
@@ -114,8 +114,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [quality, guards]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: '22', cache: npm }
       - run: npm ci
       - run: npm run db:generate

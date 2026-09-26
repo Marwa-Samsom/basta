@@ -113,6 +113,13 @@ export const EVENTS: readonly EventDef[] = [
     variables: ['store_name', 'product_name', 'reason', 'link'],
     sample: { store_name: 'متجر الورد', product_name: 'فستان كتان', reason: 'الصورة الأولى لا تُظهر المنتج', link: '/vendor/products' },
   },
+  {
+    code: 'low_stock',
+    labelAr: 'مخزون قارب النفاد',
+    audience: 'vendor',
+    variables: ['store_name', 'items', 'link'],
+    sample: { store_name: 'متجر الورد', items: 'فستان كتان (DRS-RED-M): بقي 2، وشاح حرير (SCF-01): نفد', link: '/vendor/inventory' },
+  },
 ];
 
 export interface TemplateSeed {
@@ -190,6 +197,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'فريق {{store_name}}،\n\nلم ننشر المنتج «{{product_name}}». السبب: {{reason}}.\n\nعدّلوه وأعيدوا إرساله للمراجعة: {{link}}\n\nبسطة',
     'المنتج «{{product_name}}» يحتاج تعديلاً'),
   t('product_rejected', 'in_app', 'لم يُنشر «{{product_name}}»: {{reason}}.'),
+
+  t('low_stock', 'email',
+    'فريق {{store_name}}،\n\nقارب مخزون هذه المنتجات على النفاد: {{items}}.\n\nزيدوا الكمية قبل أن تنفد فيتوقّف بيعها: {{link}}\n\nبسطة',
+    'مخزون قارب النفاد في {{store_name}}'),
+  t('low_stock', 'in_app', 'مخزون قارب النفاد: {{items}}.'),
 ];
 
 const VAR = /\{\{\s*([a-z_]+)\s*\}\}/g;

@@ -10,6 +10,7 @@ import {
 } from './api/catalog.controllers';
 import { StorefrontController } from './api/storefront.controller';
 import { CategoryService } from './application/category.service';
+import { LowStockNotifier } from './application/low-stock-notifier';
 import { ProductImageService } from './application/product-image.service';
 import { ProductImportService } from './application/product-import.service';
 import { ProductService } from './application/product.service';
@@ -31,6 +32,7 @@ import { LocalImageStorage } from './infrastructure/product-images';
     ProductImportService,
     StorefrontService,
     LocalImageStorage,
+    LowStockNotifier,
   ],
   exports: [CategoryService, ProductService, StorefrontService],
 })

@@ -167,7 +167,7 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
               <div className="ao-doc__head">
                 <h2 className="ao-doc__title">{d.label}</h2>
                 <span className={`badge ${DOC_TONE[d.status] ?? TONE[d.status] ?? ''}`}>{DOC_STATUS[d.status] ?? d.status}</span>
-                {d.uploadedAt ? <span className="ao-doc__file num">{when(d.uploadedAt)}</span> : null}
+                {d.uploadedAt ? <span className="ao-doc__file">{when(d.uploadedAt)}</span> : null}
               </div>
               {d.uploaded ? (
                 <button type="button" className="ao-doc__preview" onClick={() => void open(d)}>

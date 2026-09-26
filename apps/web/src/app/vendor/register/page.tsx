@@ -28,6 +28,10 @@ const BUSINESS_TYPES = [
  *
  * خطوة «الحساب» في التصميم تمّت قبل هذه الصفحة: الوصول إليها يتطلّب دخولاً،
  * فالشريط يعرضها مكتملة والنموذج يبدأ من المتجر.
+ *
+ * ومن له متجر لم يُرسَل بعد (أو رُفض) يصل هنا بزرّ «رجوع» من المستندات:
+ * الصفحة نفسها تصير تعديلاً — تملأ النموذج من متجره وتحفظ عبر
+ * `PATCH /vendor/onboarding/shop`. التسجيل ثانيةً كان يُرفض بـ«لديك متجر».
  */
 export default function VendorRegisterPage() {
   const router = useRouter();
@@ -44,6 +48,36 @@ export default function VendorRegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [existing, setExisting] = useState<Onboarding | null>(null);
+  const existingSlug = existing?.slug ?? null;
+
+  useEffect(() => {
+    if (!session.read()) return;
+    let alive = true;
+    api<Onboarding>('/vendor/onboarding')
+      .then((v) => {
+        if (!alive) return;
+        // قيد المراجعة لا يُعدَّل، والمعتمد يعدّل ملفه من لوحته
+        if (v.status !== 'pending' && v.status !== 'rejected') {
+          router.replace(v.status === 'in_review' ? '/vendor/onboarding/status' : '/vendor/store');
+          return;
+        }
+        setExisting(v);
+        setForm({
+          nameAr: v.nameAr,
+          nameEn: v.nameEn ?? '',
+          slug: v.slug,
+          country: v.country,
+          businessType: v.businessType ?? 'individual',
+        });
+        setSlugTouched(true);
+      })
+      // 404 = لا متجر بعد: الصفحة تسجيل جديد كما هي
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
   const candidate = slugTouched ? form.slug : form.nameEn || form.nameAr;
 
@@ -57,6 +91,11 @@ export default function VendorRegisterPage() {
     timer.current = setTimeout(async () => {
       if (candidate.trim().length < 2) {
         setCheck(null);
+        return;
+      }
+      // رابط المتجر نفسه ليس محجوزاً لغيره
+      if (existingSlug && candidate.trim() === existingSlug) {
+        setCheck({ slug: existingSlug, available: true, suggestion: existingSlug });
         return;
       }
       setChecking(true);
@@ -73,13 +112,27 @@ export default function VendorRegisterPage() {
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [candidate]);
+  }, [candidate, existingSlug]);
 
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
+      if (existing) {
+        await api<Onboarding>('/vendor/onboarding/shop', {
+          method: 'PATCH',
+          body: {
+            nameAr: form.nameAr,
+            nameEn: form.nameEn || null,
+            ...(check?.slug && check.slug !== existing.slug ? { slug: check.slug } : {}),
+            country: form.country,
+            businessType: form.businessType,
+          },
+        });
+        router.push('/vendor/onboarding/documents');
+        return;
+      }
       const res = await api<{ vendor: Onboarding; tokens: Tokens }>('/vendor/onboarding/apply', {
         method: 'POST',
         body: {
@@ -98,7 +151,7 @@ export default function VendorRegisterPage() {
         router.push('/login?next=/vendor/register');
         return;
       }
-      setError(err instanceof Error ? err.message : 'تعذّر تسجيل المتجر.');
+      setError(err instanceof Error ? err.message : existing ? 'تعذّر حفظ بيانات المتجر.' : 'تعذّر تسجيل المتجر.');
     } finally {
       setBusy(false);
     }
@@ -133,8 +186,12 @@ export default function VendorRegisterPage() {
   return (
     <OnboardingFrame step={2}>
       <OnboardingHead
-        title="سجّل متجرك على بسطة"
-        lead="بيانات متجرك الأساسية أولاً، والمستندات في الخطوة التالية."
+        title={existing ? 'بيانات متجرك' : 'سجّل متجرك على بسطة'}
+        lead={
+          existing
+            ? 'عدّل ما تريد ثم تابع إلى المستندات. ما رفعته منها محفوظ.'
+            : 'بيانات متجرك الأساسية أولاً، والمستندات في الخطوة التالية.'
+        }
       />
 
       <div className="vo-split">
@@ -250,7 +307,7 @@ export default function VendorRegisterPage() {
                 disabled={busy || form.nameAr.trim().length < 2 || check?.available === false}
               >
                 {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
-                {busy ? 'جارٍ التسجيل…' : 'التالي: المستندات'}
+                {busy ? (existing ? 'جارٍ الحفظ…' : 'جارٍ التسجيل…') : 'التالي: المستندات'}
                 {busy ? null : <Icon name="next" size={16} mirror />}
               </button>
             </div>

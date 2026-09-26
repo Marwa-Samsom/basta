@@ -171,7 +171,7 @@ export default function StorePage() {
                     {data.nameEn ? ' · ' : ''}
                     {since ? (
                       <>
-                        على بسطة منذ <span className="num">{since}</span> ·{' '}
+                        على بسطة منذ {since} ·{' '}
                       </>
                     ) : null}
                     عملة المتجر <span className="num">{data.settlementCurrency}</span>

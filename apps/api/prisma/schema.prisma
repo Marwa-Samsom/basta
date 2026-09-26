@@ -53,7 +53,7 @@ model User {
   totpSecretEnc String?
   totpEnabledAt DateTime? @db.Timestamptz
   /// آخر خطوة TOTP استُعملت — يُرفض ما لا يتجاوزها (مقاومة إعادة التشغيل)
-  totpLastStep    Int?
+  totpLastStep  Int?
 
   lastLoginAt DateTime? @db.Timestamptz
   deletedAt   DateTime? @db.Timestamptz
@@ -546,16 +546,19 @@ model ProductImage {
 /// reserved إسقاط لمجموع الحجوزات النشطة — يُدقَّق ليلياً (INV-11).
 /// قيود CHECK تُضاف في المهاجرة: onHand >= 0, reserved >= 0, reserved <= onHand
 model Inventory {
-  variantId         String    @id @db.Uuid
-  onHand            Int       @default(0)
-  reserved          Int       @default(0)
-  lowStockThreshold Int       @default(5)
-  backorderAllowed  Boolean   @default(false)
+  variantId          String    @id @db.Uuid
+  onHand             Int       @default(0)
+  reserved           Int       @default(0)
+  lowStockThreshold  Int       @default(5)
+  backorderAllowed   Boolean   @default(false)
   /// لحظة نزول onHand إلى العتبة أو دونها، وتُمسح عند تجاوزها صعوداً.
-  /// وحدة الإشعارات (المرحلة 11) تستهلكها — المخزون يرصد ولا يرسل.
-  lowStockSince     DateTime? @db.Timestamptz
-  version           Int       @default(0)
-  updatedAt         DateTime  @updatedAt @db.Timestamptz
+  /// الكتالوج يستهلكها (LowStockNotifier) — المخزون يرصد ولا يرسل.
+  lowStockSince      DateTime? @db.Timestamptz
+  /// آخر تنبيه للبائع بالنفاد. الصف معلَّق ما دام lowStockSince أحدث منه —
+  /// الكتالوج يحجزه بتحديث شرطيّ ويُدرج التنبيه في المعاملة نفسها.
+  lowStockNotifiedAt DateTime? @db.Timestamptz
+  version            Int       @default(0)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz
 
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
@@ -1353,9 +1356,9 @@ model Setting {
 }
 
 model NotificationTemplate {
-  code          String  @db.VarChar(64)
+  code          String    @db.VarChar(64)
   channel       String // email | sms | whatsapp | push | in_app
-  locale        String  @db.Char(2)
+  locale        String    @db.Char(2)
   subject       String?
   body          String
   variablesJson Json?
