@@ -58,7 +58,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
           <SearchBox />
           <div className="store__tools">
             <NotificationBell />
-            <Link href="/account/orders" className="icon-btn" aria-label="حسابي وطلباتي">
+            <Link href="/account" className="icon-btn" aria-label="حسابي وطلباتي">
               <Icon name="user" size={19} />
             </Link>
             <CartButton />
@@ -70,7 +70,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
             كل الأقسام
           </Link>
           <CategoryStrip categories={top} />
-          <Link href="/vendor/register" className="btn btn--soft btn--sm store__sell">
+          <Link href="/sell" className="btn btn--soft btn--sm store__sell">
             بِع على بسطة
           </Link>
         </nav>

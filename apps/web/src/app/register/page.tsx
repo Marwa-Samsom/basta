@@ -5,24 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api, session, type Tokens } from '@/lib/api';
 import { Icon } from '@/components/icons';
-import { Field, TextInput } from '@/components/ui';
+import { TextInput } from '@/components/ui';
+import { NewPasswordField } from '../reset/new-password-field';
+
+/** بعد التأكيد أو تخطّيه — وجهة التسجيل كما كانت قبل صفحة الرمز */
+const AFTER_VERIFY = '/vendor/register';
 
 /**
- * قوة كلمة المرور بطولها — كما يقول التلميح: العبارة الطويلة أقوى من الرموز.
- * أقلّ من اثني عشر حرفاً يرفضه الخادم، فهو «ضعيفة» هنا أيضاً.
+ * SH-02 — إنشاء حساب. يليه الدخول مباشرةً فلا يُطلب إدخال البيانات مرتين،
+ * ثم SH-03 تأكيد البريد — ومعها «تخطَّ الآن»: التأكيد لا يحجب الحساب.
  */
-const STRENGTH_LABEL = ['—', 'ضعيفة', 'متوسطة', 'قوية'] as const;
-function strength(password: string): 0 | 1 | 2 | 3 {
-  if (!password) return 0;
-  if (password.length < 12) return 1;
-  return password.length < 16 ? 2 : 3;
-}
-
-/** SH-02 — إنشاء حساب. يليه الدخول مباشرةً فلا يُطلب إدخال البيانات مرتين. */
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '' });
-  const [shown, setShown] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -50,15 +45,13 @@ export default function RegisterPage() {
         body: { email: form.email, password: form.password },
       });
       session.write(login.tokens);
-      router.push('/vendor/register');
+      router.push(`/verify?next=${encodeURIComponent(AFTER_VERIFY)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذّر إنشاء الحساب.');
     } finally {
       setBusy(false);
     }
   }
-
-  const level = strength(form.password);
 
   return (
     <main className="ac-auth">
@@ -68,7 +61,7 @@ export default function RegisterPage() {
             بسطة
           </Link>
           <h1 className="ac-auth__title">أنشئ حسابك</h1>
-          <p className="ac-auth__sub">حساب واحد يكفي للشراء والبيع معاً.</p>
+          <p className="ac-auth__sub">دقيقة واحدة، ثم نرسل إلى بريدك رمز تأكيد من ست خانات.</p>
         </header>
 
         <form className="ac-auth__card" onSubmit={submit} noValidate>
@@ -90,43 +83,11 @@ export default function RegisterPage() {
             onChange={set('email')}
           />
 
-          <Field label="كلمة المرور" hint="اثنا عشر حرفاً على الأقل. العبارة الطويلة أقوى من الرموز المعقّدة.">
-            {(props) => (
-              <>
-                <span className="ac-pw">
-                  <input
-                    className="field__control"
-                    type={shown ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    dir="ltr"
-                    required
-                    value={form.password}
-                    onChange={set('password')}
-                    {...props}
-                  />
-                  {/* الاسم لا يحوي «كلمة المرور»: التسمية تخصّ الحقل وحده */}
-                  <button
-                    type="button"
-                    className="ac-pw__toggle"
-                    aria-label="إظهار الحروف"
-                    aria-pressed={shown}
-                    onClick={() => setShown((s) => !s)}
-                  >
-                    <Icon name={shown ? 'eye-off' : 'eye'} size={18} />
-                  </button>
-                </span>
-                <span className="ac-strength" data-level={level}>
-                  <span className="ac-strength__track" aria-hidden>
-                    <span className="ac-strength__fill" />
-                  </span>
-                  <span className="ac-strength__label" aria-live="polite">
-                    <span className="visually-hidden">القوة: </span>
-                    {STRENGTH_LABEL[level]}
-                  </span>
-                </span>
-              </>
-            )}
-          </Field>
+          <NewPasswordField
+            label="كلمة المرور"
+            value={form.password}
+            onChange={(password) => setForm((f) => ({ ...f, password }))}
+          />
 
           <TextInput
             label="رقم الجوال"

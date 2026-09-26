@@ -12,6 +12,11 @@ export interface AccessClaims {
   permissions: string[];
   /** رمز محدود: إداري لم يفعّل 2FA بعد. لا يفتح إلا مسار التهيئة. */
   limited?: true;
+  /**
+   * معرّف الجلسة = عائلة رمز التحديث. به تعرف صفحة الحساب «هذا الجهاز»، وبه
+   * تُنهى الجلسات الأخرى دون الحالية. يُضاف عند الإصدار لا في المطالبات.
+   */
+  sid?: string;
 }
 
 export interface TokenPair {
@@ -45,7 +50,7 @@ export class TokenService {
     familyId: string = randomUUID(),
   ): Promise<TokenPair> {
     const env = loadEnv();
-    const accessToken = await this.jwt.signAsync(claims, {
+    const accessToken = await this.jwt.signAsync({ ...claims, sid: familyId }, {
       secret: env.jwtAccessSecret,
       expiresIn: env.jwtAccessTtl as `${number}m`,
     });

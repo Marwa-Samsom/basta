@@ -5,6 +5,8 @@ import { AuthService } from '../application/auth.service';
 import { AllowLimited, CurrentActor, Public } from '../../../common/security/decorators';
 import { AuthLimited } from '../../../common/security/throttle';
 import { LoginDto, RefreshDto, RegisterDto, TotpConfirmDto } from './dto/auth.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/account.dto';
+import { RecoveryService } from '../application/recovery.service';
 
 interface RawReq {
   headers: Record<string, string | undefined>;
@@ -14,9 +16,13 @@ interface RawReq {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly recovery: RecoveryService,
+  ) {}
 
-  private static meta(req: RawReq) {
+  /** بيانات الطلب للتدقيق — مشتركة مع متحكّم الحساب */
+  static meta(req: RawReq) {
     return {
       userAgent: req.headers['user-agent'],
       // خلف وسيط عكسي، العنوان الحقيقي في X-Forwarded-For لا في ip
@@ -39,6 +45,28 @@ export class AuthController {
   @ApiOperation({ summary: 'تسجيل الدخول — الإدارة تحتاج رمز تحقق ثنائي' })
   login(@Body() dto: LoginDto, @Req() req: RawReq) {
     return this.auth.login(dto, AuthController.meta(req));
+  }
+
+  /**
+   * SH-04 — الرد واحد لكل بريد، مسجّلاً كان أو لا. والحدّ الصارم على العنوان
+   * يمنع استعمال المسار لإغراق بريد أحد برموز.
+   */
+  @Public()
+  @AuthLimited()
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'اطلب رمز استعادة كلمة المرور — لا يكشف وجود الحساب' })
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: RawReq) {
+    return this.recovery.forgotPassword(dto.email, AuthController.meta(req));
+  }
+
+  @Public()
+  @AuthLimited()
+  @Post('password/reset')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'كلمة مرور جديدة بالرمز — تُنهى كل الجلسات' })
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: RawReq) {
+    return this.recovery.resetPassword(dto, AuthController.meta(req));
   }
 
   @Public()

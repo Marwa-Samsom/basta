@@ -176,16 +176,40 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
 
   // ------------------------------------------------------- داخل الموقع
 
-  async inbox(userId: string) {
-    const [items, unread] = await Promise.all([
+  /**
+   * صندوق الإشعارات داخل الموقع.
+   *
+   * بلا خيارات يعود كما كان دائماً (آخر 30) — الجرس في الرأس يعتمد عليه.
+   * ومركز الإشعارات (ST-27) يطلب صفحة بعد صفحة بمؤشّر `before` (معرّف آخر
+   * إشعار رآه)، ويصفّي غير المقروء. الترتيب (الوقت، ثم المعرّف) ثابت، فلا
+   * يتكرّر إشعار بين صفحتين ولا يسقط، ولو تساوى وقتا إشعارين.
+   * المؤشّر نفسه يُقرأ في نطاق المستخدم: معرّف إشعار غيره لا يعني شيئاً.
+   */
+  async inbox(userId: string, opts: { before?: string; limit?: number; unreadOnly?: boolean } = {}) {
+    const limit = Math.min(Math.max(opts.limit ?? 30, 1), 50);
+    const base: Prisma.NotificationWhereInput = { userId, channel: 'in_app', status: 'sent' };
+    let after: Prisma.NotificationWhereInput = {};
+    if (opts.before) {
+      const cursor = await this.prisma.notification.findFirst({
+        where: { ...base, id: opts.before },
+        select: { id: true, createdAt: true },
+      });
+      if (!cursor) throw new NotFoundError('انتهت صلاحية موضع التصفّح. حدّث الصفحة.');
+      after = {
+        OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }],
+      };
+    }
+    const where: Prisma.NotificationWhereInput = { ...base, ...after, ...(opts.unreadOnly ? { readAt: null } : {}) };
+    const [rows, unread] = await Promise.all([
       this.prisma.notification.findMany({
-        where: { userId, channel: 'in_app', status: 'sent' },
-        orderBy: { createdAt: 'desc' },
-        take: 30,
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
         select: { id: true, templateCode: true, body: true, payloadJson: true, readAt: true, createdAt: true },
       }),
-      this.prisma.notification.count({ where: { userId, channel: 'in_app', status: 'sent', readAt: null } }),
+      this.prisma.notification.count({ where: { ...base, readAt: null } }),
     ]);
+    const items = rows.slice(0, limit);
     return {
       unread,
       items: items.map((i) => ({
@@ -196,6 +220,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
         readAt: i.readAt,
         createdAt: i.createdAt,
       })),
+      nextCursor: rows.length > limit ? items[items.length - 1]!.id : null,
     };
   }
 

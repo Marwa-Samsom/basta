@@ -1,9 +1,11 @@
 'use client';
 
+import '@/styles/screens/account-area.css';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { Alert, Field, PageHead, TextInput } from '@/components/ui';
+import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
 import { cartApi, cartHeaders, type CartView } from '@/lib/cart';
 import { imageUrl } from '@/lib/storefront';
@@ -40,6 +42,25 @@ function shipments(n: number): string {
 }
 
 type StepState = 'done' | 'current' | 'todo';
+
+/**
+ * عنوان محفوظ في حقول النموذج كما هي: الحي يسبق الشارع في حقل «الشارع ورقم
+ * البناء»، والطابق يلحق المبنى. حدود حقول الدفع (200 و 80) لا تُتجاوز —
+ * إن طال الدمج بقي الشارع وحده.
+ */
+function fieldsOf(a: SavedAddress) {
+  const street = [a.area, a.street].filter(Boolean).join('، ');
+  const building = [a.building, a.floor ? `الطابق ${a.floor}` : null].filter(Boolean).join('، ');
+  return {
+    recipientName: a.recipientName,
+    phone: a.phone,
+    country: a.country,
+    region: a.region,
+    city: a.city,
+    street: street.length <= 200 ? street : a.street,
+    building: building.length <= 80 ? building : (a.building ?? ''),
+  };
+}
 
 /** خطوة مرقّمة — الدائرة تصير علامة صحّ حين تكتمل، والحالية بإطار العلامة */
 function Section({ n, title, state, children }: { n: number; title: string; state: StepState; children: ReactNode }) {
@@ -93,9 +114,46 @@ export default function CheckoutPage() {
   const [blockers, setBlockers] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const attemptKey = useRef<string | null>(null);
+  // العناوين المحفوظة للداخل — تملأ الحقول نفسها ولا تغيّر شيئاً في الدفع
+  const [saved, setSaved] = useState<SavedAddress[]>([]);
+  const [picked, setPicked] = useState<string | null>(null);
 
-  const set = (key: keyof typeof address) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (key: keyof typeof address) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setAddress((a) => ({ ...a, [key]: e.target.value }));
+    // تعديل يدوي بعد الاختيار يجعل الحقول عنواناً آخر — لا تبقى البطاقة مختارة وهي لا تطابق
+    if (key !== 'phone') setPicked(null);
+  };
+
+  const pick = (a: SavedAddress) => {
+    setAddress(fieldsOf(a));
+    setPicked(a.id);
+  };
+
+  const pickNew = () => {
+    setAddress((a) => ({ ...a, recipientName: '', region: '', city: '', street: '', building: '' }));
+    setPicked('new');
+  };
+
+  useEffect(() => {
+    if (!signedIn) return;
+    let alive = true;
+    api<{ items: SavedAddress[] }>('/me/addresses')
+      .then(({ items }) => {
+        if (!alive || items.length === 0) return;
+        setSaved(items);
+        // الافتراضي يُملأ مسبقاً ما دامت الحقول فارغة — لا يُكتب فوق ما كتبه المشتري
+        const def = items.find((i) => i.isDefault);
+        if (!def) return;
+        setAddress((cur) =>
+          cur.recipientName || cur.region || cur.city || cur.street ? cur : { ...fieldsOf(def), phone: cur.phone || def.phone },
+        );
+        setPicked((p) => p ?? def.id);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [signedIn]);
 
   async function calculate(): Promise<void> {
     setBusy(true);
@@ -187,6 +245,51 @@ export default function CheckoutPage() {
           </Section>
 
           <Section n={2} title="عنوان التوصيل" state={stateOf(2)}>
+            {signedIn && saved.length > 0 ? (
+              <fieldset className="aa-pick-set">
+                <legend>عناوينك المحفوظة</legend>
+                <div className="aa-picks">
+                  {saved.map((a) => (
+                    <label key={a.id} className="aa-pick">
+                      <span className="aa-pick__head">
+                        <input
+                          type="radio"
+                          name="saved-address"
+                          value={a.id}
+                          checked={picked === a.id}
+                          onChange={() => pick(a)}
+                          aria-labelledby={`pick-${a.id}`}
+                          aria-describedby={`pick-${a.id}-line`}
+                        />
+                        <span className="aa-pick__label" id={`pick-${a.id}`}>
+                          {addressTitle(a)}
+                          {a.isDefault ? <span className="visually-hidden"> — الافتراضي</span> : null}
+                        </span>
+                      </span>
+                      <span className="aa-pick__line" id={`pick-${a.id}-line`}>
+                        {addressLine(a)}
+                      </span>
+                      <bdi className="aa-pick__phone num" dir="ltr">
+                        {a.phone}
+                      </bdi>
+                    </label>
+                  ))}
+                  <label className="aa-pick aa-pick--new">
+                    <input
+                      type="radio"
+                      name="saved-address"
+                      value="new"
+                      checked={picked === 'new'}
+                      onChange={pickNew}
+                    />
+                    <span className="aa-pick__head">
+                      <Icon name="plus" size={20} />
+                      <span className="aa-pick__label">عنوان جديد</span>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+            ) : null}
             <div className="sp-fields sp-fields--3">
               <TextInput label="اسم المستلم" value={address.recipientName} onChange={set('recipientName')} />
               <Field label="البلد">

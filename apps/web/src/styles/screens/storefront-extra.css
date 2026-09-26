@@ -1,0 +1,577 @@
+/* storefront-extra — شاشات المتجر المضافة. رموز فقط، خصائص منطقية فقط.
+   ST-10 المقارنة (زرّ وشريط وصفحة) · ST-24 شوهدت مؤخّراً · ST-29 بِع على بسطة
+   ST-31 تتبّع بلا حساب · SH-08 دعوة التثبيت
+   المصدر: Basta Storefront Discovery / Purchase / Account & Shared .dc.html */
+
+.sx-page { display: grid; gap: var(--space-4); min-width: 0; }
+
+/* ------------------------------------------------------------ مشترك */
+
+.sx-spin { animation: spin 0.9s linear infinite; }
+
+/* نافذة تأكيد — <dialog> أصلية تحبس التركيز */
+.sx-dialog {
+  inline-size: min(460px, calc(100% - 2 * var(--space-6)));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+  color: var(--text-body);
+}
+.sx-dialog::backdrop { background: color-mix(in srgb, var(--surface-inverse) 55%, transparent); }
+.sx-dialog__body { display: grid; gap: 10px; padding: 18px var(--space-5); font-size: var(--text-base); line-height: 1.8; }
+.sx-dialog__title { font-size: var(--text-md); font-weight: var(--weight-bold); color: var(--text-strong); }
+.sx-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+}
+
+/* رسالة عابرة — منطقة حيّة دائمة، فارغة بلا صندوق */
+.sx-toast {
+  position: fixed;
+  z-index: var(--z-toast);
+  inset-block-start: var(--space-4);
+  inset-inline: 0;
+  margin-inline: auto;
+  inline-size: fit-content;
+  max-inline-size: calc(100% - 2 * var(--space-4));
+  padding: 10px var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-inverse);
+  color: var(--text-on-inverse);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semi);
+}
+.sx-toast:empty { padding: 0; box-shadow: none; }
+
+/* شارة التوفّر — نقطة ولون، كما في صفحة المنتج */
+.sx-stock { display: inline-flex; align-items: center; gap: 7px; font-size: var(--text-sm); font-weight: var(--weight-semi); }
+.sx-stock__dot { inline-size: 8px; block-size: 8px; border-radius: var(--radius-full); flex: none; }
+.sx-stock[data-tone='success'] { color: var(--success-text); }
+.sx-stock[data-tone='success'] .sx-stock__dot { background: var(--success); }
+.sx-stock[data-tone='warning'] { color: var(--warning-text); }
+.sx-stock[data-tone='warning'] .sx-stock__dot { background: var(--warning); }
+.sx-stock[data-tone='danger'] { color: var(--danger-text); }
+.sx-stock[data-tone='danger'] .sx-stock__dot { background: var(--danger); }
+
+/* ============================================================ ST-10 المقارنة */
+
+/* زرّ «قارن» — مربّع 52 بجانب «أضف إلى السلة» */
+.sx-cmp-toggle {
+  inline-size: 52px;
+  min-block-size: 52px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.sx-cmp-toggle:hover { background: var(--surface-sunken); color: var(--text-strong); }
+.sx-cmp-toggle[aria-pressed='true'] { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); }
+
+/* الشريط العائم — يلتصق بأسفل الشاشة ثم يستقرّ آخر الصفحة */
+.sx-cmpbar {
+  position: sticky;
+  z-index: var(--z-sticky);
+  inset-block-end: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--surface-card);
+  border: 1.5px solid var(--brand);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.sx-cmpbar__lead { display: flex; align-items: center; gap: 9px; flex: none; }
+.sx-cmpbar__icon {
+  inline-size: 34px;
+  block-size: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+}
+.sx-cmpbar__text { display: grid; gap: 2px; }
+.sx-cmpbar__title { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--text-strong); }
+.sx-cmpbar__note { font-size: var(--text-2xs); color: var(--text-muted); }
+.sx-cmpbar__items {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 7px;
+  margin: 0;
+  padding: 0 0 2px;
+  list-style: none;
+  overflow-x: auto;
+}
+.sx-cmpbar__chip {
+  flex: none;
+  max-inline-size: 220px;
+  min-block-size: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-inline: 10px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.sx-cmpbar__name {
+  font-size: var(--text-xs);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sx-cmpbar__x,
+.sx-cmp__remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sx-cmpbar__x { inline-size: 24px; block-size: 24px; }
+.sx-cmpbar__x:hover,
+.sx-cmp__remove:hover { background: var(--danger-subtle); color: var(--danger-text); }
+.sx-cmpbar__go { flex: none; min-block-size: 44px; white-space: nowrap; }
+
+/* مفتاح «أبرِز الفروق» */
+.sx-switch {
+  min-block-size: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+}
+.sx-switch__track {
+  position: relative;
+  inline-size: 36px;
+  block-size: 20px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.sx-switch__thumb {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  inline-size: 16px;
+  block-size: 16px;
+  border-radius: var(--radius-full);
+  background: var(--surface-card);
+  transition: inset-inline-start var(--duration-fast) var(--ease-out);
+}
+.sx-switch[aria-checked='true'] { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); }
+.sx-switch[aria-checked='true'] .sx-switch__track { background: var(--brand); }
+.sx-switch[aria-checked='true'] .sx-switch__thumb { inset-inline-start: 18px; }
+
+/* الجدول — عمود التسميات 180 وعمود لكل منتج، يتمرّر أفقياً إن ضاق */
+.sx-cmp__scroll { overflow-x: auto; padding: 0; }
+.sx-cmp__table {
+  inline-size: 100%;
+  min-inline-size: calc(180px + var(--sx-cols, 1) * 180px);
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.sx-cmp__table th,
+.sx-cmp__table td {
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--border-subtle);
+  text-align: start;
+  vertical-align: middle;
+  font-size: var(--text-sm);
+}
+.sx-cmp__table td,
+.sx-cmp__table thead th + th { border-inline-start: 1px solid var(--border-subtle); }
+.sx-cmp__table td { color: var(--text-strong); font-weight: var(--weight-medium); }
+.sx-cmp__table tbody th { inline-size: 180px; color: var(--text-muted); font-weight: var(--weight-normal); }
+.sx-cmp__table thead th { border-block-end-color: var(--border-default); vertical-align: top; }
+.sx-cmp__corner { inline-size: 180px; font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--text-faint); }
+.sx-cmp__table tr[data-differs] { background: var(--warning-subtle); }
+
+.sx-cmp__media { display: flex; align-items: flex-start; gap: 9px; margin-block-end: 9px; }
+.sx-cmp__thumb {
+  inline-size: 56px;
+  block-size: 70px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+}
+.sx-cmp__thumb img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.sx-cmp__remove { margin-inline-start: auto; inline-size: 28px; block-size: 28px; }
+.sx-cmp__name {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-strong);
+  line-height: 1.5;
+  text-decoration: none;
+}
+a.sx-cmp__name:hover { color: var(--brand-text); text-decoration: underline; }
+.sx-cmp__gone { font-size: var(--text-xs); font-weight: var(--weight-normal); color: var(--warning-text); }
+
+.sx-cmp__label { display: inline; }
+.sx-cmp__diff {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: var(--space-2);
+  min-block-size: 19px;
+  padding-inline: 7px;
+  border-radius: var(--radius-full);
+  background: var(--warning-subtle);
+  color: var(--warning-text);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+}
+.sx-cmp__table tr[data-differs] .sx-cmp__diff { background: var(--surface-card); }
+
+.sx-cmp__price { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.sx-cmp__price .money { font-size: var(--text-md); font-weight: var(--weight-bold); }
+.sx-cmp__from { font-size: var(--text-xs); color: var(--text-muted); }
+.sx-cmp__shop { display: inline-flex; align-items: center; gap: 6px; color: var(--text-strong); }
+.sx-cmp__shop:hover { color: var(--brand-text); }
+.sx-cmp__rating { display: inline-flex; align-items: center; gap: 5px; }
+.sx-cmp__star { color: var(--warning); }
+.sx-cmp__muted { color: var(--text-muted); font-weight: var(--weight-normal); }
+.sx-cmp__prose { font-weight: var(--weight-normal); color: var(--text-body); line-height: 1.7; }
+.sx-cmp__none { color: var(--text-faint); }
+.sx-cmp__skel { inline-size: 70%; block-size: 14px; }
+.sx-cmp__more { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--text-muted); }
+
+/* ============================================================ ST-24 شوهدت مؤخّراً */
+
+.sx-recent__group { display: grid; gap: 11px; }
+.sx-recent__label { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--text-strong); }
+.sx-recent__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sx-rcard {
+  block-size: 100%;
+  display: grid;
+  align-content: start;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+}
+a.sx-rcard:hover { box-shadow: var(--shadow-md); }
+.sx-rcard__media {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+}
+.sx-rcard__media img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.sx-rcard__body { display: grid; gap: 5px; padding: 10px; }
+.sx-rcard__name { font-size: var(--text-xs); color: var(--text-strong); line-height: 1.5; min-block-size: 2.6em; }
+.sx-rcard__price { display: inline-flex; align-items: baseline; gap: 5px; }
+.sx-rcard__price .money { font-size: var(--text-sm); font-weight: var(--weight-bold); }
+.sx-rcard__from { font-size: var(--text-2xs); color: var(--text-muted); }
+.sx-rcard__skel { inline-size: 60%; block-size: 12px; }
+.sx-rcard__gone { font-size: var(--text-2xs); color: var(--warning-text); }
+.sx-rcard__when { font-size: var(--text-2xs); color: var(--text-muted); }
+
+/* ============================================================ ST-29 بِع على بسطة */
+
+.sx-sell { display: grid; gap: var(--space-8); }
+.sx-sell__hero {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+  padding: 46px var(--space-8);
+  border-radius: var(--radius-lg);
+  background: var(--brand);
+  color: var(--text-on-brand);
+}
+.sx-sell__kicker { font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--text-on-brand); }
+.sx-sell__title {
+  max-inline-size: 26ch;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-black);
+  line-height: 1.25;
+  color: var(--text-on-brand);
+}
+.sx-sell__lead { max-inline-size: 60ch; font-size: var(--text-md); line-height: 1.9; color: var(--text-on-brand); }
+.sx-sell__ctas { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-block-start: 6px; }
+.sx-sell__ctas .btn { min-block-size: 50px; font-size: var(--text-md); }
+.sx-sell__ghost {
+  --btn-fg: var(--text-on-brand);
+  --btn-border: color-mix(in srgb, var(--text-on-brand) 50%, transparent);
+  border-width: 1.5px;
+}
+.sx-sell__ghost:hover { --btn-bg: color-mix(in srgb, var(--text-on-brand) 12%, transparent); color: var(--text-on-brand); }
+
+.sx-sell__body { display: grid; gap: 30px; }
+.sx-sell__h2 { font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-black); }
+.sx-sell__block { display: grid; gap: 14px; }
+
+/* ثلاث بطاقات مال — الفيروزي هنا لأنها عن المال: العمولة والعملة والأرباح */
+.sx-sell__values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sx-sell__value {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: 20px;
+  border: 1px solid var(--price-border);
+  border-radius: var(--radius-md);
+  background: var(--price-subtle);
+}
+.sx-sell__value p { font-size: var(--text-sm); color: var(--text-body); line-height: 1.8; }
+.sx-sell__value-icon {
+  inline-size: 44px;
+  block-size: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--surface-card);
+  color: var(--price);
+}
+.sx-sell__value-title { font-size: var(--text-md); font-weight: var(--weight-bold); color: var(--text-strong); }
+
+.sx-sell__steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sx-sell__step {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: 18px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
+.sx-sell__step p { font-size: var(--text-sm); color: var(--text-body); line-height: 1.8; }
+.sx-sell__step-n {
+  inline-size: 34px;
+  block-size: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: var(--text-on-brand);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+.sx-sell__step-title { font-size: var(--text-base); font-weight: var(--weight-bold); color: var(--text-strong); }
+
+/* الأسئلة — <details> أصلي، والشيفرون يدور حين يُفتح */
+.sx-faq { max-inline-size: 820px; scroll-margin-block-start: var(--space-6); }
+.sx-faq__list {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
+.sx-faq__item + .sx-faq__item { border-block-start: 1px solid var(--border-subtle); }
+.sx-faq__q {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 15px var(--space-4);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semi);
+  color: var(--text-strong);
+  line-height: 1.6;
+  cursor: pointer;
+  list-style: none;
+}
+.sx-faq__q::-webkit-details-marker { display: none; }
+.sx-faq__q > span { flex: 1; min-width: 0; }
+.sx-faq__q:hover { background: var(--surface-sunken); }
+.sx-faq__item[open] > .sx-faq__q { background: var(--brand-subtle); }
+.sx-faq__chev { flex: none; color: var(--text-muted); transition: transform var(--duration-base) var(--ease-out); }
+.sx-faq__item[open] .sx-faq__chev { transform: rotate(180deg); }
+.sx-faq__a { padding: 0 var(--space-4) 15px; font-size: var(--text-base); color: var(--text-body); line-height: 1.9; }
+.sx-faq__item[open] .sx-faq__a { padding-block-start: var(--space-3); }
+
+.sx-sell__cta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 26px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+}
+.sx-sell__cta-text { display: grid; gap: 5px; min-width: 0; flex: 1; }
+.sx-sell__cta-title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: var(--weight-black); }
+.sx-sell__cta-note { font-size: var(--text-sm); color: var(--text-muted); }
+.sx-sell__cta-btn { flex: none; min-block-size: 50px; font-size: var(--text-md); }
+
+/* ============================================================ ST-31 تتبّع بلا حساب */
+
+.sx-track__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+.sx-track__form { padding: 0; }
+.sx-track__foot { display: flex; align-items: flex-start; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-muted); }
+.sx-track__foot > .icon { flex: none; margin-block-start: 2px; }
+.sx-track__none { display: flex; align-items: center; gap: 7px; font-size: var(--text-sm); color: var(--text-muted); }
+
+/* ============================================================ SH-08 دعوة التثبيت */
+
+.sx-install {
+  position: fixed;
+  z-index: var(--z-drawer);
+  inset-block-end: var(--space-4);
+  inset-inline-end: var(--space-4);
+  inline-size: min(380px, calc(100% - 2 * var(--space-4)));
+  display: grid;
+  gap: 13px;
+  padding: 10px var(--space-4) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+  animation: sx-sheet-up var(--duration-base) var(--ease-out);
+}
+.sx-install__grip {
+  display: none;
+  justify-self: center;
+  inline-size: 40px;
+  block-size: 4px;
+  border-radius: var(--radius-full);
+  background: var(--border-default);
+}
+.sx-install__head { display: flex; align-items: center; gap: var(--space-3); padding-block-start: 6px; }
+.sx-install__icon {
+  inline-size: 52px;
+  block-size: 52px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: var(--brand);
+  color: var(--text-on-brand);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-black);
+}
+.sx-install__text { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.sx-install__title { font-family: var(--font-display); font-size: var(--text-md); font-weight: var(--weight-black); color: var(--text-strong); line-height: 1.4; }
+.sx-install__sub { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.6; }
+.sx-install__close { flex: none; align-self: flex-start; }
+.sx-install__points { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.sx-install__points li { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-body); }
+.sx-install__points .icon { flex: none; color: var(--success-text); }
+.sx-install__actions { display: grid; gap: 9px; }
+.sx-install__actions .btn--primary { min-block-size: 48px; font-weight: var(--weight-bold); }
+
+@keyframes sx-sheet-up { from { transform: translateY(16px); } to { transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sx-install { animation: none; }
+  .sx-spin { animation: none; }
+}
+
+/* ------------------------------------------------------------ الجوال */
+
+@media (max-width: 1100px) {
+  .sx-recent__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 860px) {
+  .sx-sell__values { grid-template-columns: minmax(0, 1fr); }
+  .sx-sell__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sx-track__layout { grid-template-columns: minmax(0, 1fr); }
+  .sx-recent__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  /* منتجان جنباً إلى جنب ويتمرّر الباقي — Mobile 400 */
+  .sx-cmp__table { min-inline-size: calc(110px + var(--sx-cols, 1) * 150px); }
+  .sx-cmp__table tbody th,
+  .sx-cmp__corner { inline-size: 110px; }
+  .sx-cmp__table th,
+  .sx-cmp__table td { padding: 10px var(--space-3); }
+
+  /* الشريط يلفّ: العنوان والزرّ في سطر، والأسماء تحتهما */
+  .sx-cmpbar { flex-wrap: wrap; padding: var(--space-3); gap: 10px; }
+  .sx-cmpbar__lead { flex: 1; }
+  .sx-cmpbar__items { order: 3; flex-basis: 100%; }
+  .sx-cmpbar__go { min-block-size: 40px; padding-inline: var(--space-3); }
+  /* صفحة المنتج على الجوال فيها شريط إضافة ثابت أسفل الشاشة — الشريط هنا يبقى في مكانه */
+  .sd-pdp .sx-cmpbar { position: static; }
+  .sx-cmp-toggle { inline-size: 48px; min-block-size: 48px; }
+
+  .sx-recent__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .sx-sell__hero { padding: var(--space-8) var(--space-5); }
+  .sx-sell__title { font-size: var(--text-2xl); }
+  .sx-sell__steps { grid-template-columns: minmax(0, 1fr); }
+  .sx-sell__ctas .btn,
+  .sx-sell__cta-btn { inline-size: 100%; }
+  .sx-sell__cta { padding: var(--space-5); }
+
+  /* ورقة سفلية على الهاتف */
+  .sx-install {
+    inset-inline: 0;
+    inset-block-end: 0;
+    inline-size: auto;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+  .sx-install__grip { display: block; }
+
+  .sx-dialog__foot { flex-direction: column-reverse; }
+  .sx-dialog__foot .btn { inline-size: 100%; }
+}

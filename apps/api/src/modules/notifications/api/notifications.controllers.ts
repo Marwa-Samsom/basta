@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsObject, IsOptional, IsString, IsUrl, Length, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUrl, IsUUID, Length, Max, MaxLength, Min } from 'class-validator';
 import type { Actor } from '../../../common/security/actor';
 import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
 import { NotificationsService } from '../application/notifications.service';
@@ -38,6 +39,24 @@ export class ReviewDto {
   reviewer!: string;
 }
 
+/** تصفّح الصندوق — كل الحقول اختيارية، وبلاها يعود الرد كما كان (آخر 30) */
+export class InboxQueryDto {
+  @IsOptional()
+  @IsUUID()
+  before?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+
+  @IsOptional()
+  @IsIn(['1', 'true'])
+  unread?: string;
+}
+
 export class PushDto {
   @IsUrl({ require_tld: false })
   endpoint!: string;
@@ -53,8 +72,12 @@ export class MyNotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
   @Get()
-  inbox(@CurrentActor() a: Actor) {
-    return this.notifications.inbox(a.userId);
+  inbox(@CurrentActor() a: Actor, @Query() q: InboxQueryDto) {
+    return this.notifications.inbox(a.userId, {
+      ...(q.before ? { before: q.before } : {}),
+      ...(q.limit ? { limit: q.limit } : {}),
+      ...(q.unread ? { unreadOnly: true } : {}),
+    });
   }
 
   @Post('read')

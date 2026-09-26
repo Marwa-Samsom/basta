@@ -17,6 +17,7 @@ import { AftersalesModule } from './modules/aftersales/public';
 import { FinanceModule } from './modules/finance/public';
 import { NotificationsModule } from './modules/notifications/public';
 import { AdminModule } from './modules/admin/public';
+import { AddressesModule } from './modules/addresses/public';
 
 /**
  * Modular Monolith — ADR-002.
@@ -54,6 +55,7 @@ import { AdminModule } from './modules/admin/public';
     FinanceModule,
     NotificationsModule,
     AdminModule,
+    AddressesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: BastaThrottlerGuard }],

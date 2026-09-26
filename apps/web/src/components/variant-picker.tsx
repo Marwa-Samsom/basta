@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { cartApi } from '@/lib/cart';
 import type { ProductPage } from '@/lib/storefront';
@@ -17,8 +17,11 @@ const LOW_STOCK = 3;
  * يُصيَّر في الخادم بالمتغيّر الأرخص محدّداً، فالسعر في مصدر HTML حقيقي لا
  * «اختر خياراً». والخيار غير المتوفّر يُعرض معطّلاً لا مخفيّاً: المشتري الذي
  * لا يرى مقاسه يظنّ أن المتجر لا يبيعه أصلاً، لا أنه نفد.
+ *
+ * `actions` أزرار أيقونة بجانب «أضف إلى السلة» في الصفّ نفسه (زرّ «قارن»)
+ * — تبقى ظاهرة حين ينفد الخيار أيضاً.
  */
-export function VariantPicker({ variants }: { variants: Variant[] }) {
+export function VariantPicker({ variants, actions }: { variants: Variant[]; actions?: ReactNode }) {
   const [selected, setSelected] = useState<string>(variants[0]?.id ?? '');
 
   const axes = useMemo(() => {
@@ -144,7 +147,7 @@ export function VariantPicker({ variants }: { variants: Variant[] }) {
             : 'متوفّر في المخزون'}
       </p>
 
-      <AddToCart key={current.id} variantId={current.id} available={current.available} />
+      <AddToCart key={current.id} variantId={current.id} available={current.available} actions={actions} />
 
       {others.length > 0 ? (
         <p className="sd-others">
@@ -158,7 +161,15 @@ export function VariantPicker({ variants }: { variants: Variant[] }) {
   );
 }
 
-function AddToCart({ variantId, available }: { variantId: string; available: number }) {
+function AddToCart({
+  variantId,
+  available,
+  actions,
+}: {
+  variantId: string;
+  available: number;
+  actions?: ReactNode;
+}) {
   const [state, setState] = useState<'idle' | 'busy' | 'added' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
@@ -213,6 +224,7 @@ function AddToCart({ variantId, available }: { variantId: string; available: num
           <Icon name="cart" size={19} />
           {disabled ? 'نفد من المخزون' : state === 'busy' ? 'جارٍ الإضافة…' : 'أضف إلى السلة'}
         </button>
+        {actions}
       </div>
       {!disabled && qty >= available && available > 1 ? (
         <p className="sd-buy__hint">

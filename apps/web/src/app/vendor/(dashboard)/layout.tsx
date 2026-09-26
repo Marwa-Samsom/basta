@@ -24,8 +24,11 @@ const NAV: DashNavGroup[] = [
       { href: '/vendor/inventory', label: 'المخزون', icon: 'boxes' },
       { href: '/vendor/orders', label: 'الطلبات', icon: 'truck' },
       { href: '/vendor/disputes', label: 'المرتجعات والنزاعات', icon: 'return' },
+      { href: '/vendor/shipping', label: 'الشحن', icon: 'truck' },
       { href: '/vendor/finance', label: 'المحفظة', icon: 'wallet' },
+      { href: '/vendor/reports', label: 'التقارير', icon: 'chart' },
       { href: '/vendor/store', label: 'ملف المتجر', icon: 'store' },
+      { href: '/vendor/notifications', label: 'الإشعارات', icon: 'bell' },
     ],
   },
 ];

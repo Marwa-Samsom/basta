@@ -37,6 +37,7 @@ export class AuthGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest<{
       headers: Record<string, string | undefined>;
       actor?: Actor;
+      sessionId?: string | null;
     }>();
 
     /**
@@ -82,6 +83,8 @@ export class AuthGuard implements CanActivate {
       ...(claims.vendorId ? { vendorId: claims.vendorId } : {}),
     };
     req.actor = actor;
+    // الجلسة من الرمز الموقَّع نفسه — لا من ترويسة يرسلها العميل
+    req.sessionId = typeof claims.sid === 'string' ? claims.sid : null;
 
     // 2 · الدور
     const roles = this.reflector.getAllAndOverride<Role[]>(REQUIRED_ROLES, targets);

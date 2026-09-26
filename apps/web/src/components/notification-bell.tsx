@@ -83,6 +83,15 @@ export function NotificationBell() {
               <span className="bell__when">{when(n.createdAt)}</span>
             </div>
           ))}
+          <div className="bell__head">
+            <Link
+              href="/account/notifications"
+              className="btn btn--ghost btn--sm btn--block"
+              onClick={() => setOpen(false)}
+            >
+              كل الإشعارات
+            </Link>
+          </div>
         </div>
       ) : null}
     </div>

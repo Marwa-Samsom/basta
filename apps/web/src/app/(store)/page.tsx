@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import '@/styles/screens/storefront-extra.css';
+import { CompareBar } from '@/components/compare';
 import { Icon } from '@/components/icons';
+import { InstallPrompt } from '@/components/install-prompt';
 import { ProductGrid } from '@/components/product-card';
+import { RecentSection } from '@/components/recent';
 import { EmptyState } from '@/components/ui';
 import { getBanners, getCategories, getFeatured, imageUrl, listProducts, type ProductCard } from '@/lib/storefront';
 
@@ -109,6 +113,9 @@ export default async function HomePage() {
         </section>
       ) : null}
 
+      {/* ST-24 — من تخزين هذا الجهاز، يُرسم في المتصفّح ولا يظهر إن لم يُشاهَد شيء */}
+      <RecentSection />
+
       <section className="sd-section" aria-labelledby="sd-latest-title">
         <div className="sd-section__head">
           <h2 id="sd-latest-title" className="sd-section__title">
@@ -152,6 +159,10 @@ export default async function HomePage() {
           </div>
         </section>
       ) : null}
+
+      <CompareBar />
+      {/* SH-08 — لا يُرسم إلا حين يعرض المتصفّح التثبيت */}
+      <InstallPrompt />
     </div>
   );
 }

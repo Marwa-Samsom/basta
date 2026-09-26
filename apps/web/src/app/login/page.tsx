@@ -1,5 +1,6 @@
 'use client';
 
+import '@/styles/screens/identity.css';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
@@ -170,6 +171,10 @@ function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
               />
               <PasswordField value={password} onChange={setPassword} />
+              {/* رابط لا تسمية: البحث بالتسمية «كلمة المرور» يبقى يجد الحقل وحده */}
+              <Link href="/forgot" className="id-forgot">
+                نسيت كلمة المرور؟
+              </Link>
             </>
           )}
 

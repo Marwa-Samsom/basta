@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import '@/styles/screens/storefront-extra.css';
+import { CompareBar, CompareToggle } from '@/components/compare';
 import { Icon } from '@/components/icons';
+import { RecordView } from '@/components/recent';
 import { Crumbs } from '@/components/listing';
 import { ProductGrid } from '@/components/product-card';
 import { getProduct, getShop, imageUrl, num } from '@/lib/storefront';
@@ -54,8 +57,12 @@ export default async function ProductPage({ params }: Params) {
     mediumAvif: imageUrl(img.urls['mediumAvif'] ?? null),
   }));
 
+  // ST-24 و ST-10: ما يُحفظ في الجهاز — المعرّف والاسم والصورة، لا السعر
+  const thumb = product.images[0]?.urls['thumb'] ?? null;
+
   return (
     <article className="sd-pdp">
+      <RecordView slug={product.slug} nameAr={product.nameAr} thumb={thumb} />
       <JsonLd
         data={[
           productJsonLd(product),
@@ -112,7 +119,21 @@ export default async function ProductPage({ params }: Params) {
             </div>
           ) : null}
 
-          <VariantPicker variants={product.variants} />
+          <VariantPicker
+            variants={product.variants}
+            actions={
+              <CompareToggle
+                item={{
+                  slug: product.slug,
+                  nameAr: product.nameAr,
+                  thumb,
+                  categoryId: product.category.id,
+                  categorySlug: product.category.slug,
+                  categoryNameAr: product.category.nameAr,
+                }}
+              />
+            }
+          />
 
           <section className="sd-policy" aria-label="الشحن والإرجاع">
             <div className="sd-policy__row">
@@ -166,6 +187,8 @@ export default async function ProductPage({ params }: Params) {
           <ProductGrid products={more} />
         </section>
       ) : null}
+
+      <CompareBar />
     </article>
   );
 }
