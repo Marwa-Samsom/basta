@@ -69,7 +69,7 @@ export default function AdminReturnsPage() {
             تظهر هنا طلبات الإرجاع حين يفتحها المشترون.
           </Empty>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="طلبات الإرجاع">
             <table className="table ao-table">
               <thead>
                 <tr>
@@ -137,7 +137,7 @@ export default function AdminReturnsPage() {
             تظهر هنا المبالغ المعادة للمشترين بمرجع البوابة.
           </Empty>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="الاستردادات">
             <table className="table ao-table">
               <thead>
                 <tr>

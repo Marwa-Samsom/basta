@@ -122,7 +122,9 @@
 .table tr[data-tone='warning'] td { background: var(--warning-subtle); }
 .table tr[data-tone='success'] td { background: var(--success-subtle); }
 .table tr[data-tone='selected'] td { background: var(--brand-subtle); }
-.table tr[data-tone='off'] td { opacity: 0.6; }
+/* الموقوف بخلفيته لا بشفافيته — الشفافية أسقطت نصّه إلى 2.66؛ الصورة وحدها تخفت */
+.table tr[data-tone='off'] td { background: var(--surface-sunken); }
+.table tr[data-tone='off'] img { opacity: 0.6; }
 .table tr[data-tone='muted'] .ac2-rate { color: var(--text-faint); }
 .ac2-rate { color: var(--text-strong); font-weight: var(--weight-bold); }
 .table .ac2-rate { font-size: var(--text-sm); }

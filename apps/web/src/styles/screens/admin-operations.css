@@ -341,7 +341,7 @@
 
 .ao-cur { margin-inline-start: auto; }
 .ao-cur .seg__opt { gap: 6px; font-size: var(--text-xs); font-weight: var(--weight-semi); }
-.ao-cur__code { font-size: var(--text-2xs); opacity: 0.75; }
+.ao-cur__code { font-size: var(--text-2xs); } /* لا شفافية: على المفتاح المختار نزلت إلى 4.18 */
 
 .ao-metrics {
   display: grid;
@@ -756,7 +756,7 @@
 }
 .ao-msg__role[data-role='end'] { background: var(--brand-subtle); color: var(--brand-text); }
 .ao-msg__role[data-role='center'] { background: var(--info-subtle); color: var(--info-text); }
-.ao-msg__when { font-size: var(--text-2xs); color: var(--text-faint); }
+.ao-msg__when { font-size: var(--text-2xs); color: var(--text-muted); } /* الباهت على الفقاعة 4.14 — تحت AA */
 .ao-msg__body {
   padding: 10px 12px;
   border: 1px solid var(--border-default);

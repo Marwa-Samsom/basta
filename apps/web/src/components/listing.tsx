@@ -91,7 +91,7 @@ function FacetGroups({ base, params, result }: { base: string; params: Search; r
         <Link
           className="sd-facet__item"
           href={withParam(base, params, 'inStock', inStock ? undefined : 'true')}
-          aria-pressed={inStock}
+          {...(inStock ? { 'aria-current': 'true' as const } : {})}
         >
           <Check on={inStock} />
           <span className="sd-facet__label">المتوفّر فقط</span>
@@ -107,7 +107,7 @@ function FacetGroups({ base, params, result }: { base: string; params: Search; r
                 key={v.id}
                 className="sd-fchip"
                 href={withParam(base, params, 'attrs', toggleAttr(params, v.id))}
-                aria-pressed={selectedAttrs.has(v.id)}
+                {...(selectedAttrs.has(v.id) ? { 'aria-current': 'true' as const } : {})}
               >
                 {v.label} <span className="num sd-fchip__count">{num(v.count)}</span>
               </Link>
@@ -126,7 +126,7 @@ function FacetGroups({ base, params, result }: { base: string; params: Search; r
                 key={v.id}
                 className="sd-facet__item"
                 href={withParam(base, params, 'vendorId', on ? undefined : v.id)}
-                aria-pressed={on}
+                {...(on ? { 'aria-current': 'true' as const } : {})}
               >
                 <Check on={on} />
                 <span className="sd-facet__label">{v.label}</span>
