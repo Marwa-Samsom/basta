@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useId, useRef, useState } from 'react';
+import { Icon } from '@/components/icons';
 
 const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://127.0.0.1:4000/api/v1';
 
@@ -62,12 +63,13 @@ function SearchBoxInner() {
       <label htmlFor={`${listId}-input`} className="visually-hidden">
         ابحث في بسطة
       </label>
+      <Icon name="search" size={18} className="search__icon" />
       <input
         id={`${listId}-input`}
         name="q"
         type="search"
-        className="field__control search__input"
-        placeholder="ابحث عن منتج أو متجر…"
+        className="search__input"
+        placeholder="ابحث عن منتج أو متجر"
         autoComplete="off"
         role="combobox"
         aria-expanded={open && suggestions.length > 0}
@@ -93,8 +95,8 @@ function SearchBoxInner() {
           }
         }}
       />
-      <button type="submit" className="btn btn--primary">
-        بحث
+      <button type="submit" className="search__go">
+        ابحث
       </button>
 
       {open && suggestions.length > 0 ? (
@@ -111,6 +113,9 @@ function SearchBoxInner() {
                 go(s);
               }}
             >
+              <span className="search__option-icon" aria-hidden>
+                <Icon name="search" size={16} />
+              </span>
               {s}
             </li>
           ))}

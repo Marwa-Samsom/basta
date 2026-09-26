@@ -8,6 +8,13 @@ import { api, ApiError } from './api';
  */
 
 const TOKEN_KEY = 'basta.cart';
+
+/** يُطلق بعد كل تعديل على السلة — رأس المتجر يعيد قراءة العدد */
+export const CART_EVENT = 'basta:cart';
+const changed = <T>(value: T): T => {
+  window.dispatchEvent(new Event(CART_EVENT));
+  return value;
+};
 const CURRENCY_KEY = 'basta.currency';
 
 export interface Money {
@@ -97,7 +104,7 @@ export const cartApi = {
   add: (variantId: string, qty: number) =>
     withCart((t) =>
       api<CartView>('/cart/items', { method: 'POST', body: { variantId, qty }, headers: { 'x-cart-token': t } }),
-    ),
+    ).then(changed),
   setQty: (variantId: string, qty: number) =>
     withCart((t) =>
       api<CartView>(`/cart/items/${variantId}`, {
@@ -105,11 +112,11 @@ export const cartApi = {
         body: { qty },
         headers: { 'x-cart-token': t },
       }),
-    ),
+    ).then(changed),
   coupon: (code: string | null) =>
     withCart((t) =>
       api<CartView>('/cart/coupon', { method: 'PUT', body: { code: code ?? '' }, headers: { 'x-cart-token': t } }),
-    ),
+    ).then(changed),
   quote: (address: { country: string; region: string; city: string }) =>
     withCart((t) =>
       api<CartView>('/checkout/quote', { method: 'POST', body: address, headers: { 'x-cart-token': t } }),

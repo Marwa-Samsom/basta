@@ -1,0 +1,506 @@
+/* vendor-orders-money — أنماط شاشات هذا الملف من docs/02-design/screens. رموز فقط، خصائص منطقية فقط.
+   VD-12 الطلبات · VD-13 تفاصيل الطلب · VD-14 النزاعات · VD-17 المحفظة وكشف الحساب · VD-18 طلب السحب.
+   الصفحات داخل `.dash__main` بكثافة compact. */
+
+/* ------------------------------------------------------------------ مشترك */
+
+.vm-page { display: grid; gap: 14px; min-width: 0; align-content: start; }
+
+/* زرّ الرجوع الصغير المؤطّر — «← الطلبات» في رأس VD-13 */
+.vm-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  block-size: 32px;
+  padding-inline: 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-decoration: none;
+  white-space: nowrap;
+  justify-self: start;
+}
+.vm-back:hover { background: var(--surface-sunken); color: var(--text-strong); }
+
+.vm-card-title {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-md);
+  color: var(--text-strong);
+}
+
+.vm-count { font-size: var(--text-2xs); color: var(--text-faint); }
+
+.vm-hint { font-size: var(--text-2xs); color: var(--text-muted); line-height: 1.7; }
+
+.vm-muted { color: var(--text-muted); font-size: var(--text-xs); }
+.vm-strong { color: var(--text-strong); font-size: var(--text-sm); }
+.vm-mono { font-family: var(--font-mono); }
+
+.vm-list-empty { padding: 20px var(--space-4); color: var(--text-muted); font-size: var(--text-sm); }
+.vm-list-empty--center { padding-block: 38px; display: grid; justify-items: center; gap: var(--space-2); text-align: center; }
+.vm-list-empty__title { font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--text-strong); }
+
+/* هيكل التحميل — كتل التصميم: عنوان 26×240 ثم كتلة 96 ثم لوحة 260 */
+.vm-loading { display: flex; flex-direction: column; gap: 14px; padding: var(--space-4); }
+.vm-loading--page { padding: 0; }
+.vm-loading__title { block-size: 26px; inline-size: 240px; max-inline-size: 100%; border-radius: var(--radius-sm); }
+.vm-loading__block { block-size: 96px; }
+.vm-loading__panel { block-size: 260px; }
+.vm-loading__row { block-size: 36px; border-radius: var(--radius-sm); }
+
+.vm-error-icon { background: var(--danger-subtle); color: var(--danger-text); }
+
+/* ---------------------------------------------------------- VD-12 الطلبات */
+
+.vm-search { inline-size: 250px; max-inline-size: 100%; }
+.vm-search .field__control { font-size: var(--text-sm); }
+
+/* رقائق الحالة في رأس البطاقة: المختارة بلون العلامة المصمت كما في التصميم */
+.vm-tabs {
+  padding: 11px var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+  gap: 7px;
+}
+.vm-tabs .tabs__tab {
+  min-height: 32px;
+  padding-inline: 12px;
+  border-color: var(--border-strong);
+  white-space: nowrap;
+}
+.vm-tabs .tabs__tab[aria-selected='true'] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--text-on-brand);
+}
+
+.vm-table th { letter-spacing: 0.06em; }
+.vm-table td { padding-block: 11px; }
+.vm-table .money { font-size: var(--text-sm); }
+
+.vm-order-link {
+  color: var(--text-strong);
+  font-weight: var(--weight-semi);
+  text-decoration: none;
+}
+.vm-order-link:hover { color: var(--brand-text); text-decoration: underline; }
+
+/* -------------------------------------------------- VD-13 تفاصيل الطلب */
+
+.vm-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.vm-detail-head h1 {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semi);
+  font-size: var(--text-lg);
+  color: var(--text-strong);
+}
+.vm-detail-head > .page-head { flex: 1 1 auto; }
+.vm-detail-head__meta { margin-inline-start: auto; font-size: var(--text-xs); color: var(--text-muted); }
+
+/* شارة الحالة الكبيرة بنقطتها — لون النقطة لون نصّ الشارة */
+.vm-status { min-block-size: 26px; padding-inline: 11px; gap: 6px; font-size: var(--text-xs); }
+.vm-status__dot {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  flex: none;
+}
+
+/* سطر معلومة واحد — «بعد بدء التجهيز لا يستطيع المشتري إلغاء الطلب» */
+.vm-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border: 1px solid var(--info);
+  border-radius: var(--radius-sm);
+  background: var(--info-subtle);
+  color: var(--info-text);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+.vm-note .icon { flex: none; }
+
+.vm-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-4);
+  align-items: start;
+}
+.vm-detail__main { display: grid; gap: 14px; min-width: 0; }
+.vm-detail__side { position: sticky; inset-block-start: var(--space-4); display: grid; gap: 14px; min-width: 0; }
+
+/* بيانات الشحن — شبكة عمودين، والعنوان يمتدّ */
+.vm-kv {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.vm-kv > div { display: grid; gap: 3px; align-content: start; min-width: 0; }
+.vm-kv dt { font-size: var(--text-2xs); color: var(--text-faint); }
+.vm-kv dd { margin: 0; font-size: var(--text-sm); color: var(--text-strong); overflow-wrap: anywhere; }
+.vm-kv dd.num { justify-self: start; }
+.vm-kv__wide { grid-column: 1 / -1; }
+.vm-kv__strong { font-weight: var(--weight-semi); }
+.vm-kv__body { color: var(--text-body); line-height: 1.7; }
+.vm-kv dd.vm-kv__empty { color: var(--text-faint); }
+
+/* أسطر المنتجات */
+.vm-lines { list-style: none; margin: 0; padding: 0; }
+.vm-lines > li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+}
+.vm-lines > li:last-child { border-block-end: 0; }
+.vm-line__main { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.vm-line__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vm-line__variant { font-weight: var(--weight-normal); color: var(--text-muted); }
+.vm-line__sku { font-size: var(--text-2xs); color: var(--text-muted); justify-self: start; }
+.vm-line__qty { font-size: var(--text-sm); color: var(--text-body); flex: none; }
+.vm-line__refund { font-family: var(--font-ui); font-size: var(--text-2xs); color: var(--text-muted); }
+.vm-line__total { flex: none; min-inline-size: 108px; text-align: end; font-size: var(--text-sm); font-weight: var(--weight-semi); }
+
+/* مسار الطلب — عقد عمودية بخطّ يصلها */
+.vm-timeline { list-style: none; margin: 0; padding: 0; display: grid; }
+.vm-timeline__step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 11px; }
+.vm-timeline__rail { display: flex; flex-direction: column; align-items: center; }
+.vm-timeline__dot {
+  inline-size: 26px;
+  block-size: 26px;
+  flex: none;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--brand);
+  background: var(--brand);
+  color: var(--text-on-brand);
+  display: grid;
+  place-items: center;
+}
+.vm-timeline__step[data-state='current'] .vm-timeline__dot { background: var(--brand-subtle); color: var(--brand-text); }
+.vm-timeline__step[data-state='bad'] .vm-timeline__dot { background: var(--danger-subtle); color: var(--danger-text); border-color: var(--danger); }
+.vm-timeline__line { inline-size: 2px; flex: 1; min-block-size: 26px; background: var(--brand); }
+.vm-timeline__body { display: grid; gap: 3px; padding-block-end: 14px; min-width: 0; }
+.vm-timeline__label { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--text-strong); }
+.vm-timeline__meta { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: var(--text-2xs); color: var(--text-faint); }
+.vm-timeline__date { font-family: var(--font-mono); color: var(--text-muted); }
+.vm-timeline__note { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.6; }
+
+/* تفصيل المبالغ — إطار المال */
+.vm-amounts { border-color: var(--price-border); gap: 10px; }
+.vm-amounts__rows { margin: 0; display: grid; gap: 10px; }
+.vm-amounts__rows > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
+.vm-amounts__rows dd { margin: 0; font-weight: var(--weight-semi); }
+.vm-amounts__total {
+  padding-block-start: 10px;
+  border-block-start: 1px solid var(--price-border);
+}
+.vm-amounts__total dt { font-weight: var(--weight-bold); color: var(--text-strong); }
+.vm-amounts__total dd { font-size: var(--text-md); font-weight: var(--weight-bold); }
+.vm-refunds { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* الإجراءات المتاحة — أزرار مكدّسة بعرض البطاقة */
+.vm-actions { gap: 10px; }
+.vm-actions > .btn { inline-size: 100%; }
+.vm-subpanel {
+  display: grid;
+  gap: 10px;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--border-subtle);
+}
+.vm-subpanel > .btn { inline-size: 100%; }
+.vm-waybill {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-body);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* طلب الإرجاع — VD-14 */
+.vm-return { gap: 13px; }
+.vm-return__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vm-return__head h2 { font-size: var(--text-md); }
+.vm-return__date { margin-inline-start: auto; font-size: var(--text-xs); color: var(--text-muted); }
+.vm-field { display: grid; gap: 7px; }
+.vm-field__label { font-size: var(--text-2xs); color: var(--text-faint); }
+.vm-field__text { font-size: var(--text-sm); color: var(--text-body); line-height: 1.8; }
+.vm-return__items { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.vm-return__items > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+/* -------------------------------------------------------- VD-14 النزاعات */
+
+.vm-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px var(--space-4);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-md);
+  background: var(--warning-subtle);
+}
+.vm-banner > .icon { flex: none; color: var(--warning-text); margin-block-start: 2px; }
+.vm-banner__text { display: grid; gap: 3px; min-width: 0; }
+.vm-banner__title { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--warning-text); }
+.vm-banner__body { font-size: var(--text-xs); color: var(--text-body); line-height: 1.7; }
+.vm-banner__link { margin-inline-start: auto; flex: none; font-size: var(--text-xs); color: var(--warning-text); white-space: nowrap; }
+.vm-banner__link:hover { color: var(--warning-text); }
+
+.vm-disputes { min-width: 0; }
+.vm-dispute { display: grid; gap: 14px; min-width: 0; max-inline-size: 960px; }
+
+/* ---------------------------------------------------- VD-17 المحفظة */
+
+.vm-wallet { display: grid; gap: 12px; min-width: 0; }
+.vm-wallet__title { font-size: var(--text-md); }
+
+.vm-balances {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.vm-balances--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.vm-balances .stat__note { font-size: var(--text-2xs); color: var(--text-faint); }
+.vm-balances .stat__value.vm-big { font-size: var(--text-2xl); }
+.vm-balances__main .stat__label { color: var(--text-strong); font-weight: var(--weight-semi); }
+
+.vm-pair { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: var(--text-sm); color: var(--text-muted); }
+.vm-pair .money { font-weight: var(--weight-semi); }
+
+/* الرصيد السالب — شريط خطر بمربّع أيقونة مصمت */
+.vm-neg {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: var(--danger-subtle);
+}
+.vm-neg__icon {
+  inline-size: 32px;
+  block-size: 32px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  background: var(--danger);
+  color: var(--text-on-brand);
+  display: grid;
+  place-items: center;
+}
+.vm-neg__text { display: grid; gap: 5px; min-width: 0; }
+.vm-neg__title { font-size: var(--text-base); font-weight: var(--weight-bold); color: var(--danger-text); }
+.vm-neg__body { font-size: var(--text-sm); color: var(--text-body); line-height: 1.8; }
+
+/* طلب السحب بجانب سجلّه — VD-18 */
+.vm-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+.vm-split--single { grid-template-columns: minmax(0, 1fr); }
+.vm-split__col { display: grid; gap: 14px; min-width: 0; }
+
+.vm-withdraw { border-color: var(--price-border); gap: 14px; }
+.vm-withdraw__avail { display: grid; gap: 5px; }
+.vm-withdraw__avail-label { font-size: var(--text-sm); color: var(--text-muted); }
+.vm-withdraw__avail-value { font-size: var(--text-2xl); font-weight: var(--weight-semi); justify-self: start; }
+.vm-withdraw__submit { min-height: 44px; font-size: var(--text-base); }
+
+/* حقل المبلغ: الرقم ثم رمز العملة ثم «الكل» في إطار واحد */
+.vm-amount {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+.vm-amount:focus-within { border-color: var(--brand); outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.vm-amount__input {
+  flex: 1;
+  min-width: 0;
+  block-size: 44px;
+  padding-inline: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--price);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semi);
+}
+.vm-amount__input:focus-visible { outline: none; }
+.vm-amount__input::placeholder { color: var(--text-faint); font-weight: var(--weight-normal); }
+.vm-amount__unit {
+  display: flex;
+  align-items: center;
+  padding-inline: 10px;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  border-inline-start: 1px solid var(--border-default);
+}
+.vm-amount__all {
+  padding-inline: 12px;
+  border: 0;
+  border-inline-start: 1px solid var(--border-default);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semi);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vm-amount__all:hover { background: var(--brand); color: var(--text-on-brand); }
+.vm-amount__all:focus-visible { outline-offset: -2px; }
+
+/* سجلّ السحوبات */
+.vm-payouts { list-style: none; margin: 0; padding: 0; }
+.vm-payout {
+  display: grid;
+  gap: 9px;
+  padding: 13px var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+}
+.vm-payout:last-child { border-block-end: 0; }
+.vm-payout__top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.vm-payout__amount { font-size: var(--text-md); font-weight: var(--weight-semi); }
+.vm-payout__date { margin-inline-start: auto; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+.vm-payout__bank { font-size: var(--text-xs); color: var(--text-muted); }
+.vm-payout__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+}
+.vm-payout__note > .icon { flex: none; margin-block-start: 2px; }
+.vm-payout__note--danger { border-color: var(--danger); background: var(--danger-subtle); color: var(--danger-text); }
+
+/* مراحل السحب الجاري */
+.vm-steps { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 3px; }
+.vm-step { display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0; }
+.vm-step:last-child { flex: none; }
+.vm-step__dot {
+  inline-size: 20px;
+  block-size: 20px;
+  flex: none;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-faint);
+  display: grid;
+  place-items: center;
+}
+.vm-step[data-done='true'] .vm-step__dot { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); }
+.vm-step__label { font-size: var(--text-2xs); color: var(--text-faint); white-space: nowrap; }
+.vm-step[data-done='true'] .vm-step__label { color: var(--text-body); }
+.vm-step__line { block-size: 1.5px; flex: 1; min-inline-size: 8px; background: var(--border-default); }
+.vm-step__line[data-done='true'] { background: var(--brand); }
+
+/* ------------------------------------------------ VD-17 كشف الحساب */
+
+.vm-stmt-head { gap: 10px; }
+.vm-filters { margin-inline-start: auto; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.vm-filter { display: inline-flex; align-items: center; gap: 6px; }
+.vm-filter__label { font-size: var(--text-2xs); color: var(--text-muted); white-space: nowrap; }
+.vm-filter .field__control { inline-size: auto; min-height: 30px; font-size: var(--text-xs); }
+
+.vm-types {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 9px var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+}
+.vm-type {
+  block-size: 26px;
+  padding-inline: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-body);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semi);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.vm-type:hover { background: var(--surface-sunken); }
+.vm-type[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); }
+
+.vm-entry { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.vm-entry__memo { display: block; margin-block-start: 3px; font-size: var(--text-2xs); color: var(--text-muted); }
+
+/* ----------------------------------------------------------- الانهيار */
+
+@media (max-width: 1080px) {
+  .vm-detail { grid-template-columns: minmax(0, 1fr); }
+  .vm-detail__side { position: static; }
+  .vm-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 860px) {
+  .vm-balances,
+  .vm-balances--two { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 400 — البطاقات فوق بعضها، والبحث بعرض الشاشة، والرقائق تمرّر أفقياً */
+@media (max-width: 640px) {
+  .vm-search { inline-size: 100%; }
+  .page-head:has(.vm-search) .page-head__actions { inline-size: 100%; }
+  .vm-tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .vm-kv { grid-template-columns: minmax(0, 1fr); }
+  .vm-detail-head__meta { margin-inline-start: 0; inline-size: 100%; }
+  .vm-lines > li { flex-wrap: wrap; }
+  .vm-line__main { flex-basis: 100%; }
+  .vm-line__total { margin-inline-start: auto; min-inline-size: 0; }
+  .vm-banner { flex-wrap: wrap; }
+  .vm-banner__link { margin-inline-start: 29px; }
+  .vm-filters { margin-inline-start: 0; inline-size: 100%; }
+  .vm-steps { flex-wrap: wrap; row-gap: 6px; }
+  /* الجدول المنهار بطاقات: خلية المال تبقى بخطّها ولونها */
+  .vm-table td.end { text-align: start; }
+}

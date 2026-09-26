@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { AdminHeader, Empty, Loading, Tabs } from '@/components/admin';
-import { Card } from '@/components/ui';
-import { PRODUCT_STATUS, TONE, useAdminData } from '@/lib/admin';
+import { Icon } from '@/components/icons';
+import { media, PRODUCT_STATUS, TONE, useAdminData } from '@/lib/admin';
 import { money, when } from '@/lib/orders';
 
 interface Item {
@@ -28,53 +28,69 @@ export default function AdminProductsPage() {
   const [status, setStatus] = useState('pending_review');
   const [search, setSearch] = useState('');
   const q = new URLSearchParams({ status, pageSize: '100', ...(search.trim() ? { search: search.trim() } : {}) });
-  const { data, error, forbidden } = useAdminData<{ items: Item[]; total: number }>(`/admin/products?${q}`);
+  const { data, error, forbidden, reload } = useAdminData<{ items: Item[]; total: number }>(`/admin/products?${q}`);
+  const queue = status === 'pending_review';
 
   return (
-    <div className="stack stack--loose">
-      <AdminHeader title="مراجعة المنتجات" hint="الاعتماد ينشر فوراً، والرفض يصل البائع بسببه حرفياً.">
-        <input className="field__control" placeholder="اسم المنتج أو المتجر" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="بحث" />
-      </AdminHeader>
-      <Tabs value={status} onChange={setStatus} options={['pending_review', 'active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: PRODUCT_STATUS[k]! }))} />
-      {!data ? (
-        <Loading error={error} forbidden={forbidden} />
-      ) : data.items.length === 0 ? (
-        <Card>
-          <Empty>لا منتجات هنا.</Empty>
-        </Card>
-      ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>المنتج</th>
-                <th>المتجر</th>
-                <th>الفئة</th>
-                <th>المتغيّرات</th>
-                <th>من</th>
-                <th>آخر تعديل</th>
-                <th>الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((p) => (
-                <tr key={p.id}>
-                  <td className="wrap">
-                    <Link href={`/admin/products/${p.id}`}>{p.nameAr}</Link>
-                  </td>
-                  <td className="small">{p.vendor.nameAr}</td>
-                  <td className="small">{p.categoryNameAr}</td>
-                  <td className="num">{p.variantCount}</td>
-                  <td className="money">{p.priceFrom ? money(p.priceFrom.minorUnits, p.priceFrom.currency) : '—'}</td>
-                  <td className="small">{when(p.updatedAt)}</td>
-                  <td>
-                    <span className={`badge ${TONE[p.status] ?? ''}`}>{PRODUCT_STATUS[p.status] ?? p.status}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="ao-page">
+      <AdminHeader title="مراجعة المنتجات" count={data ? `${data.total} منتج` : undefined} hint="الاعتماد ينشر فوراً، والرفض يصل البائع بسببه حرفياً." />
+      <div className="toolbar">
+        <Tabs value={status} onChange={setStatus} label="حالة المنتج" options={['pending_review', 'active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: PRODUCT_STATUS[k]! }))} />
+        <div className="toolbar__end">
+          <span className="input-icon ao-search">
+            <Icon name="search" size={15} />
+            <input className="field__control" type="search" placeholder="اسم المنتج أو المتجر" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="بحث" />
+          </span>
         </div>
+      </div>
+      {!data ? (
+        <Loading error={error} forbidden={forbidden} onRetry={reload} />
+      ) : data.items.length === 0 ? (
+        search.trim() ? (
+          <Empty icon="search" title="لا منتجات بهذا البحث" actions={<button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>أزل التصفية</button>}>
+            جرّب اسماً آخر أو امسح البحث.
+          </Empty>
+        ) : queue ? (
+          <Empty icon="check-circle" tone="success" title="انتهى الطابور">
+            لا منتجات تنتظر المراجعة الآن. ستظهر المنتجات الجديدة والمعدّلة بعد النشر هنا مباشرة.
+          </Empty>
+        ) : (
+          <Empty icon="package" title="لا منتجات بهذه الحالة" />
+        )
+      ) : (
+        <ul className="ao-plist" aria-label="المنتجات">
+          {data.items.map((p) => {
+            const thumb = media(p.thumbnail);
+            return (
+              <li key={p.id}>
+                <Link href={`/admin/products/${p.id}`} className="ao-pitem">
+                  <span className="ao-pitem__thumb" aria-hidden>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {thumb ? <img src={thumb} alt="" width={42} height={42} /> : <Icon name="image" size={19} />}
+                  </span>
+                  <span className="ao-pitem__text">
+                    <span className="ao-pitem__name">{p.nameAr}</span>
+                    <span className="ao-pitem__sub">
+                      {p.vendor.nameAr} · {p.categoryNameAr}
+                    </span>
+                    <span className="ao-pitem__tags">
+                      <span className={`badge ${TONE[p.status] ?? ''}`}>{PRODUCT_STATUS[p.status] ?? p.status}</span>
+                      <span className="ao-pitem__meta">
+                        <span className="num">{p.variantCount}</span> متغيّراً
+                      </span>
+                      <span className="ao-pitem__meta">عُدّل {when(p.updatedAt)}</span>
+                    </span>
+                    {p.rejectReason ? <span className="ao-pitem__reason">«{p.rejectReason}»</span> : null}
+                  </span>
+                  <span className="ao-pitem__end">
+                    {p.priceFrom ? <span className="money num">{money(p.priceFrom.minorUnits, p.priceFrom.currency)}</span> : <span className="muted">—</span>}
+                    <Icon name="chev-end" size={16} mirror />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

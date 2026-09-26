@@ -3,8 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
-import { Alert, Card, Field, Stepper, TextInput } from '@/components/ui';
+import { Alert, Field, TextInput } from '@/components/ui';
+import { Icon, type IconName } from '@/components/icons';
 import { COUNTRIES, type Onboarding } from '@/lib/vendor';
+import { OnboardingFrame, OnboardingHead } from '../onboarding/onboarding-chrome';
 
 interface SlugCheck {
   slug: string;
@@ -12,12 +14,20 @@ interface SlugCheck {
   suggestion: string;
 }
 
+const BUSINESS_TYPES = [
+  { value: 'individual', label: 'فرد', hint: 'سجل تجاري فردي أو عمل حر' },
+  { value: 'company', label: 'شركة', hint: 'شركة ذات مسؤولية محدودة أو أكبر' },
+] as const;
+
 /**
  * VD-01 — تسجيل المتجر.
  *
  * الرابط يُشتقّ من الاسم الإنجليزي ويُفحص أثناء الكتابة بتأخير: الفحص عند كل
  * ضغطة مفتاح يُغرق الخادم، والفحص عند الإرسال وحده يُفاجئ البائع بعد أن أتمّ
  * النموذج. والمستعمَل يُقترح له بديل جاهز بدل رفض جاف.
+ *
+ * خطوة «الحساب» في التصميم تمّت قبل هذه الصفحة: الوصول إليها يتطلّب دخولاً،
+ * فالشريط يعرضها مكتملة والنموذج يبدأ من المتجر.
  */
 export default function VendorRegisterPage() {
   const router = useRouter();
@@ -94,69 +104,107 @@ export default function VendorRegisterPage() {
     }
   }
 
-  const slugState = check
-    ? check.available
-      ? { hint: `الرابط متاح: basta.com/s/${check.slug}`, error: null }
-      : { hint: undefined, error: `الرابط مستعمَل. المقترح: ${check.suggestion}` }
-    : { hint: 'يُشتقّ من الاسم الإنجليزي، وتستطيع تغييره.', error: null };
+  /**
+   * حالة الرابط أربع كما في التصميم: فارغ، يُفحص، متاح، محجوز. والأيقونة
+   * داخل الحقل تتبعها، والرسالة تحته بلونها — المتاح أخضر لا رمادي.
+   */
+  const slugState: 'idle' | 'checking' | 'ok' | 'taken' = checking
+    ? 'checking'
+    : check
+      ? check.available
+        ? 'ok'
+        : 'taken'
+      : 'idle';
+  const slugIcon: Record<typeof slugState, IconName> = {
+    idle: 'info',
+    checking: 'spinner',
+    ok: 'check-circle',
+    taken: 'alert',
+  };
+  const slugHint =
+    slugState === 'ok'
+      ? 'الرابط متاح.'
+      : slugState === 'checking'
+        ? 'نتحقّق من توفّر الرابط…'
+        : 'يُشتقّ من الاسم الإنجليزي، وتستطيع تغييره.';
+  const slugError = slugState === 'taken' ? 'الرابط محجوز لمتجر آخر — اختر رابطاً غيره.' : null;
+  const slugValue = slugTouched ? form.slug : (check?.slug ?? '');
 
   return (
-    <main className="shell">
-      <header className="stack stack--tight">
-        <h1>سجّل متجرك</h1>
-        <p className="muted">أربع خطوات، ثم يراجع فريقنا وثائقك.</p>
-      </header>
+    <OnboardingFrame step={2}>
+      <OnboardingHead
+        title="سجّل متجرك على بسطة"
+        lead="بيانات متجرك الأساسية أولاً، والمستندات في الخطوة التالية."
+      />
 
-      <Stepper current="المتجر" />
+      <div className="vo-split">
+        <section className="card">
+          <h2 className="vo-card-title">بيانات المتجر</h2>
 
-      <Card title="بيانات المتجر">
-        <form className="stack" onSubmit={submit} noValidate>
-          {error ? <Alert tone="danger">{error}</Alert> : null}
+          <form className="vo-form" onSubmit={submit} noValidate>
+            {error ? <Alert tone="danger">{error}</Alert> : null}
 
-          <TextInput
-            label="اسم المتجر بالعربية"
-            required
-            maxLength={80}
-            value={form.nameAr}
-            onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))}
-          />
+            <div className="grid-2">
+              <TextInput
+                label="اسم المتجر بالعربية"
+                required
+                maxLength={80}
+                value={form.nameAr}
+                onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))}
+              />
 
-          <TextInput
-            label="اسم المتجر بالإنجليزية"
-            optional
-            dir="ltr"
-            maxLength={80}
-            value={form.nameEn}
-            onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
-          />
+              <TextInput
+                label="اسم المتجر بالإنجليزية"
+                optional
+                dir="ltr"
+                maxLength={80}
+                hint="يُولَّد رابط المتجر تلقائياً من الاسم الإنجليزي."
+                value={form.nameEn}
+                onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
+              />
+            </div>
 
-          <TextInput
-            label="رابط المتجر"
-            dir="ltr"
-            value={slugTouched ? form.slug : (check?.slug ?? '')}
-            hint={slugState.hint}
-            error={slugState.error}
-            onChange={(e) => {
-              setSlugTouched(true);
-              setForm((f) => ({ ...f, slug: e.target.value }));
-            }}
-          />
+            <div className="vo-slug-field" data-state={slugState}>
+              <Field label="رابط المتجر" hint={slugHint} error={slugError}>
+                {(props) => (
+                  <span className="vo-slug" dir="ltr" data-state={slugState}>
+                    <span className="vo-slug__prefix" aria-hidden>
+                      basta.com/s/
+                    </span>
+                    <input
+                      className="vo-slug__input"
+                      {...props}
+                      value={slugValue}
+                      onChange={(e) => {
+                        setSlugTouched(true);
+                        setForm((f) => ({ ...f, slug: e.target.value }));
+                      }}
+                    />
+                    <span className="vo-slug__icon" aria-hidden>
+                      <Icon
+                        name={slugIcon[slugState]}
+                        size={17}
+                        {...(slugState === 'checking' ? { className: 'vo-spin' } : {})}
+                      />
+                    </span>
+                  </span>
+                )}
+              </Field>
+            </div>
 
-          {check && !check.available ? (
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm"
-              onClick={() => {
-                setSlugTouched(true);
-                setForm((f) => ({ ...f, slug: check.suggestion }));
-              }}
-            >
-              استعمل {check.suggestion}
-            </button>
-          ) : null}
-          {checking ? <p className="small muted">يُفحص التوفّر…</p> : null}
+            {check && !check.available ? (
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm vo-fit"
+                onClick={() => {
+                  setSlugTouched(true);
+                  setForm((f) => ({ ...f, slug: check.suggestion }));
+                }}
+              >
+                استخدم <span className="num">{check.suggestion}</span>
+              </button>
+            ) : null}
 
-          <div className="grid-2">
             <Field label="البلد">
               {(props) => (
                 <select
@@ -174,30 +222,93 @@ export default function VendorRegisterPage() {
               )}
             </Field>
 
-            <Field label="نوع النشاط">
-              {(props) => (
-                <select
-                  className="field__control"
-                  {...props}
-                  value={form.businessType}
-                  onChange={(e) => setForm((f) => ({ ...f, businessType: e.target.value }))}
-                >
-                  <option value="individual">فرد</option>
-                  <option value="company">شركة</option>
-                </select>
-              )}
-            </Field>
-          </div>
+            <fieldset className="vo-choices">
+              <legend>نوع النشاط</legend>
+              <div className="vo-choices__grid">
+                {BUSINESS_TYPES.map((b) => (
+                  <label key={b.value} className="vo-radio">
+                    <span className="vo-radio__head">
+                      <input
+                        type="radio"
+                        name="businessType"
+                        value={b.value}
+                        checked={form.businessType === b.value}
+                        onChange={() => setForm((f) => ({ ...f, businessType: b.value }))}
+                      />
+                      {b.label}
+                    </span>
+                    <span className="vo-radio__hint">{b.hint}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
-          <button
-            className="btn btn--primary btn--block"
-            type="submit"
-            disabled={busy || form.nameAr.trim().length < 2 || check?.available === false}
-          >
-            {busy ? 'جارٍ التسجيل…' : 'التالي: الوثائق'}
-          </button>
-        </form>
-      </Card>
-    </main>
+            <div className="vo-actions">
+              <button
+                className="btn btn--primary"
+                type="submit"
+                disabled={busy || form.nameAr.trim().length < 2 || check?.available === false}
+              >
+                {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
+                {busy ? 'جارٍ التسجيل…' : 'التالي: المستندات'}
+                {busy ? null : <Icon name="next" size={16} mirror />}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <aside className="vo-col">
+          <section className="card">
+            <h3 className="vo-side-title">معاينة رابط المتجر</h3>
+            <div className="vo-urlbox">
+              <span className="vo-urlbox__url" dir="ltr">
+                basta.com/s/{slugValue || '…'}
+              </span>
+              <span className="vo-shopline">
+                <span className="vo-shopline__icon" aria-hidden>
+                  <Icon name="store" size={20} />
+                </span>
+                <span className="vo-shopline__text">
+                  <span className="vo-shopline__name">{form.nameAr || 'اسم متجرك'}</span>
+                  {form.nameEn ? (
+                    <span className="vo-shopline__en" dir="ltr">
+                      {form.nameEn}
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+            </div>
+            <div className="vo-note">
+              <span className="vo-note__title">الرابط لا يتغيّر بسهولة</span>
+              <span className="vo-note__text">
+                تغييره بعد النشر يكسر الروابط المحفوظة عند المشترين، لذا اخترْه بعناية الآن.
+              </span>
+            </div>
+          </section>
+
+          <section className="card">
+            <h3 className="vo-side-title">ما تحتاجه للتسجيل</h3>
+            <ul className="vo-checklist">
+              <li>
+                <Icon name="check-circle" size={16} />
+                سجل تجاري ساري وهوية صاحب النشاط
+              </li>
+              <li>
+                <Icon name="check-circle" size={16} />
+                شهادة ضريبية وحساب بنكي باسم النشاط
+              </li>
+              <li>
+                <Icon name="check-circle" size={16} />
+                تستطيع الحفظ والعودة لاحقاً — كل مستند يُحفظ فور رفعه
+              </li>
+            </ul>
+            <p className="vo-callout vo-callout--info">
+              <Icon name="info" size={16} />
+              <span>تُراجَع المستندات خلال يوم عمل إلى ثلاثة أيام، وتصلك النتيجة على بريدك.</span>
+            </p>
+          </section>
+        </aside>
+      </div>
+    </OnboardingFrame>
   );
 }

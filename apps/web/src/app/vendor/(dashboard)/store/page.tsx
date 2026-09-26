@@ -3,7 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { Alert, Card, Spinner, TextArea } from '@/components/ui';
+import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
+import { Icon } from '@/components/icons';
 import { useOnboarding, type Onboarding } from '@/lib/vendor';
 
 const MAX = 2000;
@@ -19,6 +20,7 @@ export default function StorePage() {
   const { data, loading, missing, error, set } = useOnboarding();
   const [form, setForm] = useState<{
     descriptionAr: string;
+    descriptionEn: string;
     shippingPolicyAr: string;
     returnPolicyAr: string;
   } | null>(null);
@@ -33,6 +35,7 @@ export default function StorePage() {
    */
   const values = form ?? {
     descriptionAr: data?.descriptionAr ?? '',
+    descriptionEn: data?.descriptionEn ?? '',
     shippingPolicyAr: data?.shippingPolicyAr ?? '',
     returnPolicyAr: data?.returnPolicyAr ?? '',
   };
@@ -43,16 +46,16 @@ export default function StorePage() {
   }
   if (loading && !data) {
     return (
-      <main className="shell">
+      <div className="vo-store">
         <Spinner />
-      </main>
+      </div>
     );
   }
   if (error || !data) {
     return (
-      <main className="shell">
+      <div className="vo-store">
         <Alert tone="danger">{error ?? 'تعذّر تحميل ملف المتجر.'}</Alert>
-      </main>
+      </div>
     );
   }
 
@@ -70,71 +73,137 @@ export default function StorePage() {
     }
   }
 
-  return (
-    <main className="shell shell--wide">
-      <header className="stack stack--tight">
-        <h1>ملف المتجر</h1>
-        <p className="muted">ما يراه المشتري في صفحة متجرك: basta.com/s/{data.slug}</p>
-      </header>
+  const since = data.approvedAt ? new Date(data.approvedAt).getFullYear() : null;
 
-      <div className="grid-2">
-        <form className="stack" onSubmit={save} noValidate>
+  return (
+    <div className="vo-store">
+      <PageHead
+        title="ملف المتجر"
+        meta={<span className="num">basta.com/s/{data.slug}</span>}
+        actions={
+          <a className="btn btn--secondary" href={`/s/${data.slug}`} target="_blank" rel="noopener noreferrer">
+            <Icon name="eye" size={16} />
+            عاين صفحة متجري
+          </a>
+        }
+      />
+      <p className="vo-store__lead">هذا ما يراه المشتري في صفحة متجرك، والمعاينة بجانب الحقول تتحدّث أثناء الكتابة.</p>
+
+      <div className="vo-store__grid">
+        <form className="vo-col" onSubmit={save} noValidate>
           {failure ? <Alert tone="danger">{failure}</Alert> : null}
           {saved && !failure ? <Alert tone="success">حُفظ ملف المتجر.</Alert> : null}
 
-          <Card title="التعريف">
-            <TextArea
-              label="نبذة عن المتجر"
-              hint={`${values.descriptionAr.length} من ${MAX} حرف`}
-              maxLength={MAX}
-              value={values.descriptionAr}
-              onChange={(e) => setForm({ ...values, descriptionAr: e.target.value })}
-            />
-          </Card>
+          <section className="card" aria-labelledby="store-texts">
+            <h2 className="vo-side-title" id="store-texts">
+              الوصف والسياسات
+            </h2>
 
-          <Card title="السياسات" hint="تظهر للمشتري قبل الشراء وتقلّل الأسئلة والنزاعات.">
-            <TextArea
-              label="سياسة الشحن"
-              maxLength={MAX}
-              value={values.shippingPolicyAr}
-              onChange={(e) => setForm({ ...values, shippingPolicyAr: e.target.value })}
-            />
-            <TextArea
-              label="سياسة الإرجاع"
-              maxLength={MAX}
-              value={values.returnPolicyAr}
-              onChange={(e) => setForm({ ...values, returnPolicyAr: e.target.value })}
-            />
-          </Card>
+            <div className="vo-count" data-near={values.descriptionAr.length > MAX * 0.9}>
+              <TextArea
+                label="الوصف بالعربية"
+                hint={`${values.descriptionAr.length} / ${MAX}`}
+                maxLength={MAX}
+                rows={3}
+                value={values.descriptionAr}
+                onChange={(e) => setForm({ ...values, descriptionAr: e.target.value })}
+              />
+            </div>
 
-          <button className="btn btn--primary" type="submit" disabled={busy}>
-            {busy ? 'جارٍ الحفظ…' : 'حفظ الملف'}
-          </button>
+            <TextArea
+              label="الوصف بالإنجليزية"
+              optional
+              dir="ltr"
+              maxLength={MAX}
+              rows={2}
+              value={values.descriptionEn}
+              onChange={(e) => setForm({ ...values, descriptionEn: e.target.value })}
+            />
+
+            <div className="grid-2">
+              <TextArea
+                label="سياسة الشحن"
+                maxLength={MAX}
+                rows={2}
+                value={values.shippingPolicyAr}
+                onChange={(e) => setForm({ ...values, shippingPolicyAr: e.target.value })}
+              />
+              <TextArea
+                label="سياسة الإرجاع"
+                maxLength={MAX}
+                rows={2}
+                value={values.returnPolicyAr}
+                onChange={(e) => setForm({ ...values, returnPolicyAr: e.target.value })}
+              />
+            </div>
+            <p className="card__hint">تظهر السياستان للمشتري قبل الشراء وتقلّلان الأسئلة والنزاعات.</p>
+
+            <div className="vo-actions">
+              <button className="btn btn--primary" type="submit" disabled={busy}>
+                {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
+                {busy ? 'جارٍ الحفظ…' : 'حفظ الملف'}
+              </button>
+            </div>
+          </section>
         </form>
 
-        <Card title="معاينة صفحة المتجر">
-          <div className="stack stack--tight">
-            <h3>{data.nameAr}</h3>
-            <p className="small muted">
-              {data.nameEn ?? ''} {data.nameEn ? '·' : ''} عملة المتجر{' '}
-              <span className="num">{data.settlementCurrency}</span>
-            </p>
+        <aside className="vo-preview" aria-label="معاينة صفحة المتجر">
+          <span className="vo-preview__eyebrow eyebrow">معاينة حيّة</span>
+          <div className="vo-preview__card" data-density="comfortable">
+            <div className="vo-preview__cover" aria-hidden />
+            <div className="vo-preview__body">
+              <div className="vo-preview__ident">
+                <span className="vo-preview__logo" aria-hidden>
+                  <Icon name="store" size={26} />
+                </span>
+                <div className="vo-preview__meta">
+                  <span className="vo-preview__title">
+                    <span className="vo-preview__name">{data.nameAr}</span>
+                    {data.status === 'approved' ? (
+                      <span className="badge badge--success">
+                        <Icon name="shield" size={12} />
+                        موثّق
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="vo-preview__sub">
+                    {data.nameEn ? <bdi>{data.nameEn}</bdi> : null}
+                    {data.nameEn ? ' · ' : ''}
+                    {since ? (
+                      <>
+                        على بسطة منذ <span className="num">{since}</span> ·{' '}
+                      </>
+                    ) : null}
+                    عملة المتجر <span className="num">{data.settlementCurrency}</span>
+                  </span>
+                </div>
+              </div>
+
+              <p className="vo-preview__desc" data-empty={!values.descriptionAr || undefined}>
+                {values.descriptionAr || 'أضف وصفاً عربياً ليعرف المشتري ماذا تبيع ومن أين تشحن.'}
+              </p>
+
+              <div className="vo-preview__policies">
+                <p className="vo-preview__policy" data-empty={!values.shippingPolicyAr || undefined}>
+                  <Icon name="package" size={14} />
+                  <span>
+                    <span className="visually-hidden">الشحن: </span>
+                    {values.shippingPolicyAr || 'لم تُكتب سياسة شحن.'}
+                  </span>
+                </p>
+                <p className="vo-preview__policy" data-empty={!values.returnPolicyAr || undefined}>
+                  <Icon name="refresh" size={14} />
+                  <span>
+                    <span className="visually-hidden">الإرجاع: </span>
+                    {values.returnPolicyAr || 'لم تُكتب سياسة إرجاع.'}
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
-          <p>{values.descriptionAr || <span className="muted">لم تُكتب نبذة بعد.</span>}</p>
-          <div className="stack stack--tight">
-            <span className="field__label">الشحن</span>
-            <p className="small">
-              {values.shippingPolicyAr || <span className="muted">لم تُكتب سياسة شحن.</span>}
-            </p>
-          </div>
-          <div className="stack stack--tight">
-            <span className="field__label">الإرجاع</span>
-            <p className="small">
-              {values.returnPolicyAr || <span className="muted">لم تُكتب سياسة إرجاع.</span>}
-            </p>
-          </div>
-        </Card>
+          <p className="vo-preview__foot">هكذا يظهر رأس صفحة متجرك للمشترين.</p>
+        </aside>
       </div>
-    </main>
+    </div>
   );
 }

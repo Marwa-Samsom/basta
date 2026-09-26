@@ -1,0 +1,429 @@
+/* admin-catalog-system — أنماط شاشات هذا الملف من docs/02-design/screens. رموز فقط، خصائص منطقية فقط.
+   AD-08…11 · AD-16…20 · AD-23…26 — «Basta Admin Catalog - System.dc.html»، كثافة مضغوطة. */
+
+/* ------------------------------------------------------------ هيكل الصفحة */
+
+.ac2-page { display: grid; gap: var(--space-3); min-width: 0; align-content: start; }
+.ac2-col { display: grid; gap: var(--space-3); min-width: 0; align-content: start; }
+
+/* عمود رئيسي ولوحة جانبية — 340 في الشجرة والإعدادات، 320 في الصرف */
+.ac2-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+.ac2-split--narrow { grid-template-columns: minmax(0, 1fr) 320px; }
+.ac2-split--wide { grid-template-columns: minmax(0, 1fr) 400px; }
+.ac2-split--half { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.ac2-sticky { position: sticky; inset-block-start: 14px; }
+
+@media (max-width: 1100px) {
+  .ac2-split,
+  .ac2-split--narrow,
+  .ac2-split--wide,
+  .ac2-split--half { grid-template-columns: minmax(0, 1fr); }
+  .ac2-sticky { position: static; }
+}
+
+/* عنوان البطاقة — Almarai عريض بحجم النص الصغير كما في التصميم */
+.ac2-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  color: var(--text-strong);
+}
+.ac2-hint { font-size: var(--text-xs); color: var(--text-muted); line-height: var(--leading-normal); }
+.ac2-fine { font-size: var(--text-2xs); color: var(--text-muted); line-height: var(--leading-normal); }
+.ac2-end { margin-inline-start: auto; display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.ac2-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  color: var(--text-faint);
+}
+
+/* ملاحظة بأيقونة — تحذير «لا يمسّ الطلبات السابقة» وأخواته */
+.ac2-callout {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 13px;
+  border-radius: var(--radius-sm);
+}
+.ac2-callout > .icon { margin-block-start: 2px; }
+.ac2-callout--sm { padding: 9px 11px; gap: var(--space-2); font-size: var(--text-xs); }
+
+/* مفتاح تشغيل — 42×23، المقبض 19 */
+.ac2-switch {
+  position: relative;
+  flex: none;
+  inline-size: 42px;
+  block-size: 23px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.ac2-switch::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  inline-size: 19px;
+  block-size: 19px;
+  border-radius: var(--radius-full);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+  transition: inset-inline-start var(--duration-fast) var(--ease-out);
+}
+.ac2-switch[aria-checked='true'] { background: var(--brand); }
+.ac2-switch[aria-checked='true']::after { inset-inline-start: 21px; }
+.ac2-switch:disabled { opacity: 0.55; cursor: not-allowed; }
+.ac2-switch-row { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-body); }
+
+/* شريط الأدوات: تبويبات الفلترة يميناً، والبحث والإجراء الأساسي في الطرف */
+.ac2-search { inline-size: 240px; max-inline-size: 100%; }
+.ac2-search .field__control { inline-size: 100%; }
+@media (max-width: 640px) {
+  .ac2-search { inline-size: 100%; }
+  .toolbar__end:has(.ac2-search) { inline-size: 100%; }
+}
+
+/* شبكة نموذج مضغوطة — الحقول تتراصّ وتنزل حين يضيق العرض */
+.ac2-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+.ac2-form__wide { grid-column: 1 / -1; }
+.ac2-form__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.ac2-check { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-body); min-height: var(--ctrl-h); }
+.ac2-check input { inline-size: 16px; block-size: 16px; accent-color: var(--brand); }
+
+/* ------------------------------------------------------------ خلايا الجداول */
+
+.ac2-cell { display: grid; gap: 2px; min-width: 0; }
+.ac2-cell__main { color: var(--text-strong); font-weight: var(--weight-semi); font-size: var(--text-sm); }
+.ac2-cell__sub { color: var(--text-muted); font-size: var(--text-2xs); }
+.ac2-code { color: var(--text-strong); font-weight: var(--weight-bold); }
+.table .ac2-code { font-size: var(--text-sm); }
+.ac2-faint { color: var(--text-faint); }
+.ac2-muted-cell { color: var(--text-muted); font-size: var(--text-xs); }
+.ac2-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* صفّ بخلفية حالته — منتهٍ رمادي، تحذير برتقالي خفيف */
+.table tr[data-tone='muted'] td { background: var(--surface-sunken); }
+.table tr[data-tone='warning'] td { background: var(--warning-subtle); }
+.table tr[data-tone='success'] td { background: var(--success-subtle); }
+.table tr[data-tone='selected'] td { background: var(--brand-subtle); }
+.table tr[data-tone='off'] td { opacity: 0.6; }
+.table tr[data-tone='muted'] .ac2-rate { color: var(--text-faint); }
+.ac2-rate { color: var(--text-strong); font-weight: var(--weight-bold); }
+.table .ac2-rate { font-size: var(--text-sm); }
+
+/* ملاحظة تحت الصفّ — AD-23 «لم يفعّل التحقّق بخطوتين» */
+.ac2-rownote td { padding-block-start: 0; }
+.ac2-rownote .ac2-callout { inline-size: fit-content; max-inline-size: 100%; background: var(--surface-card); white-space: normal; }
+
+/* شريط الاستعمال — الكوبونات */
+.ac2-usage { display: grid; gap: 4px; min-inline-size: 120px; }
+.ac2-bar { display: block; block-size: 5px; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.ac2-bar__fill { display: block; block-size: 100%; background: var(--brand); }
+.ac2-bar__fill[data-tone='warning'] { background: var(--warning); }
+
+/* ------------------------------------------------------------ AD-08 الشجرة */
+
+.ac2-tree {
+  list-style: none;
+  margin: 0;
+  padding: 10px;
+  display: grid;
+  gap: 2px;
+  background: var(--surface-sunken);
+}
+.ac2-node {
+  --ac2-depth: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin-inline-start: calc(var(--ac2-depth) * 22px);
+  padding-block: 4px;
+  padding-inline: 10px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+}
+.ac2-node[data-selected='true'] { border-color: var(--brand); background: var(--brand-subtle); }
+.ac2-node__pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-block-size: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.ac2-node__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text-strong);
+  font-weight: var(--weight-medium);
+}
+.ac2-node[data-depth='0'] .ac2-node__name { font-weight: var(--weight-bold); }
+.ac2-node__meta { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+.ac2-node__count { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); }
+.ac2-node__rename { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; }
+.ac2-node__rename .field__control { flex: 1; min-width: 0; min-height: 28px; border-color: var(--brand); }
+.ac2-node .icon-btn { inline-size: 26px; block-size: 26px; border: 0; color: var(--text-muted); }
+.ac2-node .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ac2-node .icon-btn:hover { background: var(--surface-card); color: var(--brand-text); }
+
+@media (max-width: 640px) {
+  .ac2-node { margin-inline-start: calc(var(--ac2-depth) * 12px); }
+  .ac2-node__meta[data-hide-sm] { display: none; }
+}
+
+/* خصائص التصنيف المختار: الموروثة على أرضية غائرة، والخاصة على البطاقة */
+.ac2-attrs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ac2-attr {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  font-size: var(--text-xs);
+  color: var(--text-strong);
+}
+.ac2-attr[data-inherited='true'] { background: var(--surface-sunken); }
+.ac2-attr__name { flex: 1; min-width: 0; }
+.ac2-required { font-size: var(--text-2xs); font-weight: var(--weight-bold); color: var(--danger-text); }
+.ac2-divider { border-block-start: 1px solid var(--border-subtle); padding-block-start: 11px; display: grid; gap: var(--space-2); }
+fieldset.ac2-divider { margin: 0; padding-inline: 0; padding-block-end: 0; border: 0; border-block-start: 1px solid var(--border-subtle); min-width: 0; }
+fieldset.ac2-divider > legend { float: inline-start; inline-size: 100%; padding: 0; margin-block-end: var(--space-2); }
+
+/* محرّر خصيصة ينفتح تحت صفّها — AD-09 */
+.ac2-expand td { background: var(--surface-page); white-space: normal; }
+.ac2-expand__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); }
+@media (max-width: 860px) { .ac2-expand__grid { grid-template-columns: minmax(0, 1fr); } }
+.ac2-values { display: flex; flex-wrap: wrap; gap: 6px; }
+.ac2-swatch { inline-size: 10px; block-size: 10px; border-radius: var(--radius-full); border: 1px solid var(--border-default); }
+.ac2-inline { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.ac2-inline .field__control { flex: 1 1 160px; min-width: 0; }
+
+/* ------------------------------------------------------------ AD-10 العمولات */
+
+.ac2-priority {
+  inline-size: 24px;
+  block-size: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: var(--text-on-brand);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+}
+.ac2-section-empty { padding: var(--space-3) var(--space-4); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* ------------------------------------------------------------ AD-11 العملات */
+
+.ac2-dec[data-three='true'] { color: var(--warning-text); }
+.ac2-symbol { color: var(--text-strong); font-weight: var(--weight-semi); }
+
+/* ------------------------------------------------------------ AD-19 اللافتات */
+
+.ac2-thumb {
+  inline-size: 72px;
+  block-size: 30px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--surface-sunken);
+  object-fit: cover;
+}
+.ac2-banner { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.ac2-flip { transform: rotate(180deg); }
+.ac2-preview-img { display: block; max-inline-size: 100%; border-radius: var(--radius-md); border: 1px solid var(--border-default); }
+
+/* ترتيب المنتجات المميّزة */
+.ac2-rank { list-style: none; margin: 0; padding: 0; display: grid; }
+.ac2-rank__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 9px var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+}
+.ac2-rank__num {
+  inline-size: 24px;
+  block-size: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+}
+.ac2-rank__name { flex: 1; min-width: 0; font-size: var(--text-sm); color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ------------------------------------------------------------ AD-20 الإشعارات */
+
+.ac2-matrix th:not(:first-child),
+.ac2-matrix td:not(:first-child) { text-align: center; }
+.ac2-matrix td:not(:first-child) { padding-inline: 4px; }
+.ac2-cellbtn {
+  inline-size: 100%;
+  min-inline-size: 96px;
+  block-size: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding-inline: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+.ac2-cellbtn[data-state='reviewed'] { background: var(--success-subtle); border-color: var(--success); color: var(--success-text); }
+.ac2-cellbtn[data-state='unreviewed'] { background: var(--warning-subtle); border-color: var(--warning); color: var(--warning-text); }
+.ac2-cellbtn[data-state='off'] { background: var(--surface-sunken); color: var(--text-faint); }
+.ac2-cellbtn[data-state='empty'] { background: transparent; border-style: dashed; color: var(--text-muted); }
+.ac2-cellbtn[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); border-style: solid; }
+.ac2-cellbtn:hover:not([aria-pressed='true']) { border-color: var(--brand); }
+
+.ac2-vars { display: flex; gap: 6px; flex-wrap: wrap; }
+.ac2-var {
+  min-block-size: 28px;
+  padding-inline: 10px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-full);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semi);
+  cursor: pointer;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.ac2-var:hover { background: var(--brand); color: var(--text-on-brand); }
+.ac2-labelrow { display: flex; align-items: baseline; gap: var(--space-2); }
+.ac2-labelrow .ac2-counter { margin-inline-start: auto; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+.ac2-editor textarea.field__control { line-height: 1.8; resize: vertical; }
+
+.ac2-preview {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  line-height: 1.95;
+}
+.ac2-preview__subject { font-weight: var(--weight-bold); color: var(--text-strong); line-height: 1.6; }
+.ac2-preview__body { white-space: pre-wrap; }
+.ac2-token { border-radius: 3px; padding: 1px 5px; font-weight: var(--weight-bold); background: var(--brand-subtle); color: var(--brand-text); }
+.ac2-token[data-unknown='true'] { background: var(--danger-subtle); color: var(--danger-text); }
+.ac2-note-danger { color: var(--danger-text); }
+.ac2-note-warning { color: var(--warning-text); }
+
+/* ------------------------------------------------------------ AD-24 التدقيق */
+
+.ac2-audit tbody tr[data-clickable='true'] { cursor: pointer; }
+.ac2-diff { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-3); }
+@media (max-width: 860px) { .ac2-diff { grid-template-columns: minmax(0, 1fr); } }
+.ac2-diff__pane { display: grid; gap: 6px; min-width: 0; }
+.ac2-diff pre {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-body);
+}
+.ac2-diff__pane[data-side='before'] pre { background: var(--danger-subtle); border-color: var(--danger); }
+.ac2-diff__pane[data-side='after'] pre { background: var(--success-subtle); border-color: var(--success); }
+
+/* ------------------------------------------------------------ AD-25 التقارير */
+
+.ac2-views { display: flex; gap: 7px; flex-wrap: wrap; }
+.ac2-dates { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.ac2-dates .field__control { inline-size: auto; }
+.ac2-group td {
+  background: var(--surface-sunken);
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xs);
+  color: var(--text-strong);
+}
+.ac2-rate-sub { display: block; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); direction: ltr; unicode-bidi: isolate; }
+
+/* ------------------------------------------------------------ AD-26 الإعدادات */
+
+.ac2-setting { display: grid; gap: 9px; padding: 13px 14px; border-block-end: 1px solid var(--border-subtle); }
+.ac2-setting:last-child { border-block-end: 0; }
+.ac2-setting__row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.ac2-setting__label { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.ac2-setting__name { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--text-strong); }
+.ac2-setting__key { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); direction: ltr; unicode-bidi: isolate; text-align: start; }
+.ac2-setting__now { font-size: var(--text-2xs); color: var(--text-muted); }
+
+/* حقل برقم ووحدته ملتصقين — 150 عرضاً */
+.ac2-unit {
+  display: flex;
+  align-items: stretch;
+  inline-size: 150px;
+  flex: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-card);
+}
+.ac2-unit:focus-within { border-color: var(--brand); }
+.ac2-unit .field__control { flex: 1; min-width: 0; border: 0; border-radius: 0; font-family: var(--font-mono); }
+.ac2-unit .field__control:focus-visible { outline: none; }
+.ac2-unit__suffix {
+  display: flex;
+  align-items: center;
+  padding-inline: 9px;
+  background: var(--surface-sunken);
+  border-inline-start: 1px solid var(--border-default);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+.ac2-setting__select { inline-size: 150px; flex: none; }

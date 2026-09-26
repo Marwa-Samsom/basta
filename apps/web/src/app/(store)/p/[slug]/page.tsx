@@ -1,10 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getProduct, imageUrl, num } from '@/lib/storefront';
-import { VariantPicker } from '@/components/variant-picker';
+import { Icon } from '@/components/icons';
+import { Crumbs } from '@/components/listing';
+import { ProductGrid } from '@/components/product-card';
+import { getProduct, getShop, imageUrl, num } from '@/lib/storefront';
+import { ProductGallery, VariantPicker, type GalleryImage } from '@/components/variant-picker';
 import { JsonLd, SITE_URL, breadcrumbJsonLd, productJsonLd } from '@/lib/seo';
 
 type Params = { params: Promise<{ slug: string }> };
+
+/** «المزيد من المتجر» — سطر واحد من البطاقات */
+const MORE_FROM_SHOP = 4;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
@@ -27,16 +33,29 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * ST-07 — صفحة المنتج، و ST-08 حالة النفاد.
  *
  * **مكوّن خادم.** بوابة المرحلة 07 البند الرابع: الاسم والسعر والوصف والبائع
- * في مصدر HTML قبل تشغيل أي سكربت. اختيار المتغيّر وحده عميل، ويُصيَّر مسبقاً
- * بالمتغيّر الأرخص فيظهر سعر حقيقي حتى قبل أن يعمل.
+ * في مصدر HTML قبل تشغيل أي سكربت. اختيار المتغيّر والمعرض وحدهما عميل،
+ * ويُصيَّران مسبقاً بالمتغيّر الأرخص والغلاف فيظهر سعر وصورة حقيقيان قبل أن يعملا.
  */
 export default async function ProductPage({ params }: Params) {
   const { slug } = await params;
   const product = await getProduct(slug);
-  const cover = product.images[0];
+
+  // منتجات أخرى من المتجر نفسه — تحسين لا شرط: تعذّر جلبها لا يُسقط الصفحة
+  const shop = await getShop(product.vendor.slug).catch(() => null);
+  const more = (shop?.products ?? []).filter((p) => p.id !== product.id).slice(0, MORE_FROM_SHOP);
+
+  const images: GalleryImage[] = product.images.map((img) => ({
+    id: img.id,
+    alt: img.altAr ?? product.nameAr,
+    full: imageUrl(img.urls['full'] ?? null) ?? '',
+    thumb: imageUrl(img.urls['thumb'] ?? img.urls['full'] ?? null) ?? '',
+    avif: imageUrl(img.urls['avif'] ?? null),
+    medium: imageUrl(img.urls['medium'] ?? null),
+    mediumAvif: imageUrl(img.urls['mediumAvif'] ?? null),
+  }));
 
   return (
-    <article className="product">
+    <article className="sd-pdp">
       <JsonLd
         data={[
           productJsonLd(product),
@@ -47,56 +66,41 @@ export default async function ProductPage({ params }: Params) {
           ]),
         ]}
       />
-      <nav className="small muted" aria-label="مسار التصفّح">
-        <Link href="/">الرئيسية</Link> · <Link href={`/c/${product.category.slug}`}>{product.category.nameAr}</Link>
-      </nav>
+      <Crumbs
+        items={[
+          { href: '/', label: 'الرئيسية' },
+          { href: `/c/${product.category.slug}`, label: product.category.nameAr },
+          { label: product.nameAr },
+        ]}
+      />
 
-      <div className="product__layout">
-        <div className="product__media">
-          {cover ? (
-            /*
-             * صورة الغلاف هي LCP الصفحة (المرحلة 12): الهاتف يأخذ 800 بكسل
-             * بصيغة AVIF، والشاشة الواسعة 1600، وWebP احتياط لما لا يقرأ AVIF.
-             * أولوية جلب عالية — تبدأ قبل السكربتات لا بعدها.
-             */
-            <picture>
-              {cover.urls['mediumAvif'] ? <source media="(max-width: 767px)" type="image/avif" srcSet={imageUrl(cover.urls['mediumAvif']) ?? ''} /> : null}
-              {cover.urls['medium'] ? <source media="(max-width: 767px)" type="image/webp" srcSet={imageUrl(cover.urls['medium']) ?? ''} /> : null}
-              {cover.urls['avif'] ? <source type="image/avif" srcSet={imageUrl(cover.urls['avif']) ?? ''} /> : null}
-              <img
-                src={imageUrl(cover.urls['full'] ?? null) ?? ''}
-                alt={cover.altAr ?? product.nameAr}
-                width={800}
-                height={800}
-                fetchPriority="high"
-                decoding="async"
-              />
-            </picture>
-          ) : (
-            <div className="product__placeholder" aria-hidden>
-              {product.nameAr.slice(0, 1)}
-            </div>
-          )}
-        </div>
+      <div className="sd-pdp__layout">
+        <ProductGallery images={images} name={product.nameAr} soldOut={product.isSoldOut} />
 
-        <div className="product__info stack">
-          <h1>{product.nameAr}</h1>
-          {product.nameEn ? (
-            <p className="muted" dir="ltr" lang="en">
-              {product.nameEn}
-            </p>
-          ) : null}
-
-          <p className="small">
-            من{' '}
-            <Link href={`/s/${product.vendor.slug}`}>{product.vendor.nameAr}</Link>
-            {product.vendor.ratingCount > 0 ? (
-              <span className="muted">
-                {' '}· تقييم <span className="num">{product.vendor.ratingAvg.toFixed(1)}</span> من{' '}
-                <span className="num">{num(product.vendor.ratingCount)}</span>
-              </span>
+        <div className="sd-pdp__info">
+          <div className="sd-pdp__titles">
+            <h1 className="sd-pdp__name">{product.nameAr}</h1>
+            {product.nameEn ? (
+              <p className="sd-pdp__en" dir="ltr" lang="en">
+                {product.nameEn}
+              </p>
             ) : null}
-          </p>
+            <div className="sd-pdp__byline">
+              <Link href={`/s/${product.vendor.slug}`} className="sd-pdp__shop">
+                <Icon name="store" size={15} />
+                {product.vendor.nameAr}
+              </Link>
+              {product.vendor.ratingCount > 0 ? (
+                <span className="sd-rating">
+                  <Icon name="star-fill" size={15} className="sd-rating__star" />
+                  <span className="num sd-rating__avg">{product.vendor.ratingAvg.toFixed(1)}</span>
+                  <span className="sd-rating__count">
+                    تقييم المتجر من <span className="num">{num(product.vendor.ratingCount)}</span>
+                  </span>
+                </span>
+              ) : null}
+            </div>
+          </div>
 
           {product.isSoldOut ? (
             <div className="alert alert--warning" role="status">
@@ -110,34 +114,58 @@ export default async function ProductPage({ params }: Params) {
 
           <VariantPicker variants={product.variants} />
 
-          {product.descriptionAr ? (
-            <section className="stack stack--tight">
-              <h2>الوصف</h2>
-              <p className="product__desc">{product.descriptionAr}</p>
-            </section>
-          ) : null}
-
-          {product.attributes.length > 0 ? (
-            <section className="stack stack--tight">
-              <h2>المواصفات</h2>
-              <dl className="specs">
-                {product.attributes.map((a) => (
-                  <div key={a.attributeId} className="specs__row">
-                    <dt>{a.nameAr}</dt>
-                    <dd>{a.valueAr ?? a.number ?? (a.boolean === null ? '—' : a.boolean ? 'نعم' : 'لا')}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          ) : null}
-
-          <section className="stack stack--tight">
-            <h2>الشحن والإرجاع</h2>
-            <p className="small">{product.vendor.shippingPolicyAr ?? 'يحدّد البائع مدّة الشحن عند الطلب.'}</p>
-            <p className="small">{product.vendor.returnPolicyAr ?? 'سياسة الإرجاع العامة في بسطة تسري.'}</p>
+          <section className="sd-policy" aria-label="الشحن والإرجاع">
+            <div className="sd-policy__row">
+              <Icon name="truck" size={17} />
+              <p>{product.vendor.shippingPolicyAr ?? 'يحدّد البائع مدّة الشحن عند الطلب.'}</p>
+            </div>
+            <div className="sd-policy__row">
+              <Icon name="return" size={17} />
+              <p>{product.vendor.returnPolicyAr ?? 'سياسة الإرجاع العامة في بسطة تسري.'}</p>
+            </div>
           </section>
         </div>
       </div>
+
+      {product.descriptionAr ? (
+        <section className="sd-pdp__block" aria-labelledby="sd-desc">
+          <h2 id="sd-desc" className="sd-pdp__tabs">
+            <span className="sd-pdp__tab">الوصف</span>
+          </h2>
+          <p className="sd-pdp__desc">{product.descriptionAr}</p>
+        </section>
+      ) : null}
+
+      {product.attributes.length > 0 ? (
+        <section className="sd-pdp__block" aria-labelledby="sd-specs">
+          <h2 id="sd-specs" className="sd-pdp__tabs">
+            <span className="sd-pdp__tab">المواصفات</span>
+          </h2>
+          <dl className="sd-specs">
+            {product.attributes.map((a) => (
+              <div key={a.attributeId} className="sd-specs__row">
+                <dt>{a.nameAr}</dt>
+                <dd>{a.valueAr ?? a.number ?? (a.boolean === null ? '—' : a.boolean ? 'نعم' : 'لا')}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
+
+      {more.length > 0 ? (
+        <section className="sd-section" aria-labelledby="sd-more">
+          <div className="sd-section__head">
+            <h2 id="sd-more" className="sd-section__title">
+              المزيد من {product.vendor.nameAr}
+            </h2>
+            <Link href={`/s/${product.vendor.slug}`} className="sd-section__link">
+              كل منتجات المتجر
+              <Icon name="chev-end" size={14} mirror />
+            </Link>
+          </div>
+          <ProductGrid products={more} />
+        </section>
+      ) : null}
     </article>
   );
 }

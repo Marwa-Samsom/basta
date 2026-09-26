@@ -3,12 +3,16 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Alert, Card, Spinner, TextInput } from '@/components/ui';
+import { Alert, EmptyState, PageHead, Spinner } from '@/components/ui';
+import { Icon } from '@/components/icons';
+import { ProductThumb } from '@/components/product-editor';
 import { num, PRODUCT_STATUS, type Page, type ProductListItem, type ProductStatus } from '@/lib/catalog';
 
-const TABS: readonly { key: ProductStatus | 'all'; label: string }[] = [
+type TabKey = ProductStatus | 'all';
+
+const TABS: readonly { key: TabKey; label: string }[] = [
   { key: 'all', label: 'الكل' },
-  { key: 'draft', label: 'مسوّدات' },
+  { key: 'draft', label: 'مسوّدة' },
   { key: 'pending_review', label: 'قيد المراجعة' },
   { key: 'active', label: 'منشور' },
   { key: 'rejected', label: 'مرفوض' },
@@ -19,17 +23,30 @@ const TABS: readonly { key: ProductStatus | 'all'; label: string }[] = [
  * VD-07 — قائمة المنتجات.
  *
  * التبويب والبحث يُرسلان إلى الخادم لا يُصفّيان صفحةً محمّلة: البائع صاحب
- * 500 منتج لا تُحمَّل عنده القائمة كلها ليبحث فيها.
+ * 500 منتج لا تُحمَّل عنده القائمة كلها ليبحث فيها. وعدّاد كل تبويب مجموعه
+ * من الخادم (`total` بصفحة من سطر واحد) لا عدّ ما في الصفحة.
  */
+/**
+ * التبويب الأول من `?status=` — تقرير الاستيراد يفتح المسوّدات مباشرة.
+ * الصفحة لا تُصيَّر في الخادم (القشرة تنتظر حالة المتجر أولاً)، فقراءة
+ * العنوان هنا لا تُحدث اختلافاً بين الخادم والمتصفّح.
+ */
+const initialTab = (): TabKey => {
+  if (typeof window === 'undefined') return 'all';
+  const wanted = new URLSearchParams(window.location.search).get('status');
+  return TABS.find((t) => t.key === wanted)?.key ?? 'all';
+};
+
 export default function ProductsPage() {
-  const [tab, setTab] = useState<ProductStatus | 'all'>('all');
+  const [tab, setTab] = useState<TabKey>(initialTab);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState<Page<ProductListItem> | null>(null);
+  const [counts, setCounts] = useState<Partial<Record<TabKey, number>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
-    async (status: ProductStatus | 'all', term: string): Promise<void> => {
+    async (status: TabKey, term: string): Promise<void> => {
       const params = new URLSearchParams({ pageSize: '20' });
       if (status !== 'all') params.set('status', status);
       if (term.trim()) params.set('search', term.trim());
@@ -51,119 +68,232 @@ export default function ProductsPage() {
     return () => clearTimeout(timer);
   }, [tab, search, load]);
 
+  // عدّادات التبويبات — مرة عند الفتح؛ فشلها لا يمنع القائمة، فالتبويب يبقى بلا رقم
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const entries = await Promise.all(
+        TABS.map(async (t) => {
+          const q = t.key === 'all' ? 'pageSize=1' : `status=${t.key}&pageSize=1`;
+          try {
+            const res = await api<Page<ProductListItem>>(`/vendor/products?${q}`);
+            return [t.key, res.total] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (!alive) return;
+      setCounts(Object.fromEntries(entries.filter((e) => e !== null)));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const filtered = Boolean(search.trim()) || tab !== 'all';
+  const storeEmpty = page !== null && page.items.length === 0 && !filtered;
+  const total = counts.all;
+
   return (
-    <>
-      <header className="row row--between">
-        <h1>المنتجات</h1>
-        <Link className="btn btn--primary" href="/vendor/products/new">
-          منتج جديد
-        </Link>
-      </header>
-
-      <div className="tabs" role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            className="tabs__tab"
-            aria-selected={tab === t.key}
-            onClick={() => {
-              setTab(t.key);
-              setLoading(true);
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <TextInput
-        label="بحث"
-        hint="بالاسم أو رمز SKU."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+    <div className="vp-page">
+      <PageHead
+        title="المنتجات"
+        count={
+          total !== undefined
+            ? page && filtered
+              ? `${num(total)} منتج · ${num(page.total)} معروض`
+              : `${num(total)} منتج`
+            : undefined
+        }
+        actions={
+          <>
+            <Link className="btn btn--secondary" href="/vendor/products/import">
+              <Icon name="upload" size={16} />
+              استيراد
+            </Link>
+            <Link className="btn btn--primary" href="/vendor/products/new">
+              <Icon name="plus" size={16} />
+              أضف منتجاً
+            </Link>
+          </>
+        }
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {loading && !page ? <Spinner label="جارٍ تحميل المنتجات…" /> : null}
 
-      {page && page.items.length === 0 ? (
-        <div className="empty">
-          <p>
-            {search || tab !== 'all'
-              ? 'لا منتجات تطابق هذا الفلتر.'
-              : 'لم تُضف منتجاً بعد. ابدأ بواحد، أو استورد قائمتك دفعةً واحدة.'}
-          </p>
-          <div className="row">
-            <Link className="btn btn--primary" href="/vendor/products/new">
-              أضف أول منتج
-            </Link>
-            <Link className="btn btn--secondary" href="/vendor/products/import">
-              استيراد من ملف
-            </Link>
+      {storeEmpty ? (
+        <EmptyState
+          icon="package"
+          title="لا منتجات بعد"
+          actions={
+            <>
+              <Link className="btn btn--primary" href="/vendor/products/new">
+                <Icon name="plus" size={16} />
+                أضف منتجاً يدوياً
+              </Link>
+              <Link className="btn btn--secondary" href="/vendor/products/import">
+                <Icon name="upload" size={16} />
+                استورد ملفاً
+              </Link>
+            </>
+          }
+        >
+          ابدأ بمنتج واحد لتفهم الشكل، أو ارفع ملفاً إن كان عندك كتالوج جاهز. المسوّدات تُحفظ ولا
+          تظهر للمشترين.
+        </EmptyState>
+      ) : (
+        <section className="card card--flush">
+          <div className="card__head vp-toolbar">
+            <div className="tabs" role="tablist" aria-label="حالة المنتج">
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  className="tabs__tab"
+                  aria-selected={tab === t.key}
+                  onClick={() => {
+                    setTab(t.key);
+                    setLoading(true);
+                  }}
+                >
+                  {t.label}
+                  {counts[t.key] !== undefined ? (
+                    <span className="tabs__count">{num(counts[t.key] ?? 0)}</span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+            <span className="input-icon vp-search">
+              <Icon name="search" size={16} />
+              <input
+                type="search"
+                className="field__control"
+                aria-label="بحث في المنتجات بالاسم أو رمز SKU"
+                placeholder="ابحث بالاسم أو الرمز"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </span>
           </div>
-        </div>
-      ) : null}
 
-      {page && page.items.length > 0 ? (
-        <>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">المنتج</th>
-                  <th scope="col">المتغيّرات</th>
-                  <th scope="col">السعر</th>
-                  <th scope="col">المتاح</th>
-                  <th scope="col">الحالة</th>
-                  <th scope="col">آخر تعديل</th>
-                </tr>
-              </thead>
-              <tbody>
-                {page.items.map((p) => (
-                  <tr key={p.id}>
-                    <td className="wrap">
-                      <Link href={`/vendor/products/${p.id}`}>{p.nameAr}</Link>
-                    </td>
-                    <td className="num" data-label="المتغيّرات">{p.variantCount > 1 ? num(p.variantCount) : '—'}</td>
-                    <td data-label="السعر">
-                      {p.priceFrom ? (
-                        <span className="money num">
-                          {p.priceTo && p.priceTo.minorUnits !== p.priceFrom.minorUnits
-                            ? `${p.priceFrom.formatted} – ${p.priceTo.formatted}`
-                            : p.priceFrom.formatted}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="num" data-label="المتاح">
-                      {num(p.available)}
-                      {p.isLow ? <span className="badge badge--warning badge--after">منخفض</span> : null}
-                    </td>
-                    <td data-label="الحالة">
-                      <span className={`badge ${PRODUCT_STATUS[p.status].tone}`}>
-                        {PRODUCT_STATUS[p.status].label}
-                      </span>
-                    </td>
-                    <td className="num" data-label="آخر تعديل">{new Date(p.updatedAt).toLocaleDateString('ar-JO-u-nu-latn')}</td>
+          {loading && !page ? (
+            <div className="card__body">
+              <Spinner label="جارٍ تحميل المنتجات…" />
+            </div>
+          ) : null}
+
+          {page && page.items.length === 0 ? (
+            <div className="vp-nomatch">
+              <p className="vp-nomatch__title">
+                {search.trim() ? `لا نتائج تطابق «${search.trim()}»` : 'لا منتجات تطابق هذا الفلتر.'}
+              </p>
+              <p className="small muted">جرّب اسماً أو رمزاً أقصر، أو انتقل إلى تبويب آخر.</p>
+              {search ? (
+                <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
+                  امسح البحث
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {page && page.items.length > 0 ? (
+            <div className="table-wrap">
+              <table className="table vp-products">
+                <thead>
+                  <tr>
+                    <th scope="col">المنتج</th>
+                    <th scope="col">السعر</th>
+                    <th scope="col" className="end">المتاح</th>
+                    <th scope="col">الحالة</th>
+                    <th scope="col">آخر تعديل</th>
+                    <th scope="col" className="end">
+                      <span className="visually-hidden">إجراءات</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="small muted">
-            {num(page.items.length)} من {num(page.total)} منتجاً
-          </p>
-        </>
-      ) : null}
+                </thead>
+                <tbody>
+                  {page.items.map((p) => (
+                    <tr key={p.id}>
+                      <td className="wrap">
+                        <Link className="vp-prod" href={`/vendor/products/${p.id}`}>
+                          <ProductThumb src={p.thumbnail} />
+                          <span className="vp-prod__text">
+                            <span className="vp-prod__name">{p.nameAr}</span>
+                            <span className="vp-prod__sub">
+                              {p.variantCount > 1 ? (
+                                <>
+                                  <span className="num">{num(p.variantCount)}</span> متغيّرات
+                                </>
+                              ) : (
+                                'بلا متغيّرات'
+                              )}
+                            </span>
+                          </span>
+                        </Link>
+                      </td>
+                      <td data-label="السعر">
+                        {p.priceFrom ? (
+                          <span className="money num">
+                            {p.priceTo && p.priceTo.minorUnits !== p.priceFrom.minorUnits
+                              ? `${p.priceFrom.formatted} – ${p.priceTo.formatted}`
+                              : p.priceFrom.formatted}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="end" data-label="المتاح">
+                        <span
+                          className="num vp-avail"
+                          data-tone={p.available <= 0 ? 'out' : p.isLow ? 'low' : undefined}
+                        >
+                          {num(p.available)}
+                        </span>
+                        {p.isLow ? <span className="badge badge--warning badge--after">منخفض</span> : null}
+                      </td>
+                      <td data-label="الحالة">
+                        <span className={`badge ${PRODUCT_STATUS[p.status].tone}`} title={PRODUCT_STATUS[p.status].hint}>
+                          {p.status === 'rejected' ? <Icon name="alert" size={11} /> : null}
+                          {PRODUCT_STATUS[p.status].label}
+                        </span>
+                      </td>
+                      <td className="num" data-label="آخر تعديل">
+                        {new Date(p.updatedAt).toLocaleDateString('ar-JO-u-nu-latn')}
+                      </td>
+                      <td className="end" data-label="">
+                        <Link
+                          className="icon-btn icon-btn--sm"
+                          href={`/vendor/products/${p.id}`}
+                          aria-label={`حرّر ${p.nameAr}`}
+                        >
+                          <Icon name="file" size={14} />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
 
-      {page && page.total > page.pageSize ? (
-        <Card hint="الصفحات الكاملة في المرحلة القادمة — اعرض بالبحث حتى ذلك الحين." title="">
-          <span className="small muted">تُعرض أول {num(page.pageSize)} نتيجة.</span>
-        </Card>
-      ) : null}
-    </>
+          {page && page.items.length > 0 ? (
+            <div className="card__foot vp-foot">
+              <span className="small muted">
+                <span className="num">{num(page.items.length)}</span> من{' '}
+                <span className="num">{num(page.total)}</span> منتجاً
+              </span>
+              {page.total > page.pageSize ? (
+                <span className="small muted">
+                  تُعرض أول <span className="num">{num(page.pageSize)}</span> نتيجة — الصفحات الكاملة
+                  في المرحلة القادمة، اعرض بالبحث حتى ذلك الحين.
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      )}
+    </div>
   );
 }

@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Alert, Card, Spinner } from '@/components/ui';
+import { Alert, EmptyState, PageHead, Spinner } from '@/components/ui';
+import { Icon } from '@/components/icons';
+import { ProductThumb } from '@/components/product-editor';
 import { num, PRODUCT_STATUS, type LowStockRow, type Page, type ProductListItem } from '@/lib/catalog';
 
 interface Snapshot {
@@ -14,14 +16,15 @@ interface Snapshot {
   active: number;
   low: LowStockRow[];
   recent: ProductListItem[];
+  rejectedItems: ProductListItem[];
 }
 
 /**
  * VD-06 — مؤشّرات البائع.
  *
- * **لا رقم معروض هنا مصطنع.** بطاقات المبيعات والطلبات والمحفظة تحتاج
- * الطلبات والمال (المرحلتان 09 و10)، فتُذكر صراحةً أنها لم تُفعَّل بعد بدل
- * أن تُعرض بأصفار تبدو حقيقية: صفر مبيعات يعني «لم تبع» لا «لم يُبنَ بعد».
+ * **لا رقم معروض هنا مصطنع.** بطاقات المبيعات والطلبات والمحفظة لا تُقرأ في
+ * هذه الصفحة، فلا تُعرض بأصفار تبدو حقيقية: صفر مبيعات يعني «لم تبع» لا «لم
+ * يُقرأ». البائع يُحال إلى صفحتيهما حيث الأرقام الفعلية.
  */
 export default function DashboardHome() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -48,6 +51,7 @@ export default function DashboardHome() {
           active: active.total,
           low,
           recent: all.items,
+          rejectedItems: rejected.items,
         });
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : 'تعذّر تحميل المؤشرات.');
@@ -61,132 +65,229 @@ export default function DashboardHome() {
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (!snap) return <Spinner label="جارٍ تحميل المؤشرات…" />;
 
-  return (
-    <>
-      <header className="row row--between">
-        <h1>المؤشرات</h1>
-        <Link className="btn btn--primary" href="/vendor/products/new">
-          منتج جديد
-        </Link>
-      </header>
+  const out = snap.low.filter((l) => l.available <= 0).length;
+  const near = snap.low.length - out;
 
-      <div className="stats">
-        <Stat label="منتجات منشورة" value={num(snap.active)} note="تظهر للمشترين" />
-        <Stat
-          label="قيد المراجعة"
-          value={num(snap.inReview)}
-          note={snap.inReview > 0 ? 'بانتظار الإدارة' : 'لا شيء ينتظر'}
-        />
-        <Stat
-          label="مرفوضة"
-          value={num(snap.rejected)}
-          note={snap.rejected > 0 ? 'تحتاج تصحيحاً' : 'لا رفض'}
-        />
-        <Stat label="مسوّدات" value={num(snap.drafts)} note="لم تُرسل بعد" />
-        <Stat
-          label="مخزون منخفض"
-          value={num(snap.low.length)}
-          note={snap.low.length > 0 ? 'متغيّرات تحت حدّ التنبيه' : 'المخزون بخير'}
-        />
-      </div>
+  return (
+    <div className="vp-page">
+      <PageHead
+        title={greeting()}
+        meta="ملخّص متجرك الآن"
+        actions={
+          <Link className="btn btn--primary" href="/vendor/products/new">
+            <Icon name="plus" size={16} />
+            أضف منتجاً
+          </Link>
+        }
+      />
 
       {snap.total === 0 ? (
-        <div className="empty">
-          <p>متجرك جاهز ولا منتج فيه بعد. أضف أول منتج أو استورد قائمتك من ملف.</p>
-          <div className="row">
-            <Link className="btn btn--primary" href="/vendor/products/new">
-              أضف أول منتج
-            </Link>
-            <Link className="btn btn--secondary" href="/vendor/products/import">
-              استيراد من ملف
-            </Link>
-          </div>
-        </div>
-      ) : null}
-
-      {snap.rejected > 0 ? (
-        <Card title="منتجات مرفوضة تحتاج تصحيحاً">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">المنتج</th>
-                  <th scope="col">الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {snap.recent
-                  .filter((p) => p.status === 'rejected')
-                  .map((p) => (
-                    <tr key={p.id}>
-                      <td className="wrap">
-                        <Link href={`/vendor/products/${p.id}`}>{p.nameAr}</Link>
-                      </td>
-                      <td>
-                        <span className={`badge ${PRODUCT_STATUS[p.status].tone}`}>
-                          {PRODUCT_STATUS[p.status].label}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      ) : null}
-
-      {snap.low.length > 0 ? (
-        <Card
-          title="تنبيهات المخزون"
-          aside={
-            <Link className="btn btn--secondary btn--sm" href="/vendor/inventory">
-              كل المخزون
-            </Link>
+        <EmptyState
+          icon="chart"
+          title="لا بيانات بعد"
+          actions={
+            <>
+              <Link className="btn btn--primary" href="/vendor/products/new">
+                <Icon name="plus" size={16} />
+                أضف أول منتج
+              </Link>
+              <Link className="btn btn--secondary" href="/vendor/products/import">
+                <Icon name="upload" size={16} />
+                استيراد من ملف
+              </Link>
+            </>
           }
         >
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">المنتج</th>
-                  <th scope="col">SKU</th>
-                  <th scope="col">المتاح</th>
-                  <th scope="col">الحد</th>
-                </tr>
-              </thead>
-              <tbody>
-                {snap.low.slice(0, 8).map((l) => (
-                  <tr key={l.variantId}>
-                    <td className="wrap">
-                      <Link href={`/vendor/products/${l.productId}`}>{l.productNameAr}</Link>
-                    </td>
-                    <td className="num">{l.sku}</td>
-                    <td className="num">{num(l.available)}</td>
-                    <td className="num">{num(l.lowStockThreshold)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+          متجرك جاهز ولا منتج فيه بعد. أضف أول منتج أو استورد قائمتك من ملف.
+        </EmptyState>
       ) : null}
 
-      <Card title="المبيعات والطلبات والمحفظة">
-        <p className="small muted">
-          هذه البطاقات تُفعَّل مع الطلبات والمال في مرحلتيهما. لا تُعرض هنا بأصفار: صفر مبيعات يعني
-          «لم تبع بعد» لا «لم يُبنَ بعد»، والفرق بينهما قرار تتّخذه أنت على أساسه.
-        </p>
-      </Card>
-    </>
+      <div className="stats vp-kpis">
+        <Link className="stat" href="/vendor/products">
+          <span className="stat__label">
+            <Icon name="package" size={15} />
+            منتجات منشورة
+          </span>
+          <span className="stat__value num">{num(snap.active)}</span>
+          <span className="stat__note">تظهر للمشترين</span>
+        </Link>
+
+        <Link className="stat" href="/vendor/products">
+          <span className="stat__label">
+            <Icon name="clock" size={15} />
+            قيد المراجعة ومرفوض
+          </span>
+          <span className="vp-kpi__pair">
+            <span className="stat__value num">{num(snap.inReview)}</span>
+            <span className="stat__note">{snap.inReview > 0 ? 'بانتظار الإدارة' : 'لا شيء ينتظر'}</span>
+          </span>
+          {snap.rejected > 0 ? (
+            <span className="badge badge--danger vp-kpi__badge">
+              <Icon name="alert" size={13} />
+              <span className="num">{num(snap.rejected)}</span> مرفوض — يحتاج تصحيحاً
+            </span>
+          ) : (
+            <span className="stat__note">لا رفض</span>
+          )}
+        </Link>
+
+        <Link className="stat" href="/vendor/products">
+          <span className="stat__label">
+            <Icon name="file" size={15} />
+            مسوّدات
+          </span>
+          <span className="stat__value num">{num(snap.drafts)}</span>
+          <span className="stat__note">لم تُرسل بعد</span>
+        </Link>
+
+        <Link className="stat" href="/vendor/inventory">
+          <span className="stat__label">
+            <Icon name="boxes" size={15} />
+            مخزون منخفض
+          </span>
+          <span className="stat__value num">{num(snap.low.length)}</span>
+          {snap.low.length > 0 ? (
+            <span className="vp-kpi__badges">
+              {near > 0 ? (
+                <span className="badge badge--warning">
+                  <span className="num">{num(near)}</span> قارب النفاد
+                </span>
+              ) : null}
+              {out > 0 ? (
+                <span className="badge badge--danger">
+                  <span className="num">{num(out)}</span> نفد
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+          <span className="stat__note">
+            {snap.low.length > 0 ? 'متغيّرات تحت حدّ التنبيه' : 'المخزون بخير'}
+          </span>
+        </Link>
+      </div>
+
+      <div className="vp-home">
+        <div className="vp-home__main">
+          {snap.recent.length > 0 ? (
+            <section className="card card--flush">
+              <header className="card__head">
+                <h2>أحدث المنتجات</h2>
+                <Link className="btn btn--ghost btn--sm vp-head-link" href="/vendor/products">
+                  كل المنتجات
+                  <Icon name="chev-end" size={13} mirror />
+                </Link>
+              </header>
+              <ul className="vp-list">
+                {snap.recent.map((p) => (
+                  <li key={p.id}>
+                    <Link className="vp-list__row" href={`/vendor/products/${p.id}`}>
+                      <ProductThumb src={p.thumbnail} size="sm" />
+                      <span className="vp-list__text">
+                        <span className="vp-list__name">{p.nameAr}</span>
+                        {p.priceFrom ? (
+                          <span className="vp-list__sub money num">{p.priceFrom.formatted}</span>
+                        ) : null}
+                      </span>
+                      <span className={`badge ${PRODUCT_STATUS[p.status].tone}`}>
+                        {PRODUCT_STATUS[p.status].label}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section className="card vp-note-card">
+            <header className="card__title">
+              <h2>المبيعات والطلبات والمحفظة</h2>
+            </header>
+            <p className="small muted">
+              أرقامها لا تُعرض هنا بأصفار: صفر مبيعات يعني «لم تبع بعد»، والفرق قرار تتّخذه على
+              أساسه. افتحها من صفحاتها حيث الأرقام الفعلية.
+            </p>
+            <div className="row">
+              <Link className="btn btn--secondary btn--sm" href="/vendor/orders">
+                <Icon name="truck" size={14} />
+                الطلبات
+              </Link>
+              <Link className="btn btn--secondary btn--sm" href="/vendor/finance">
+                <Icon name="wallet" size={14} />
+                المحفظة
+              </Link>
+            </div>
+          </section>
+        </div>
+
+        <div className="vp-home__side">
+          {snap.low.length > 0 ? (
+            <section className="card card--flush">
+              <header className="card__head">
+                <h2>تنبيهات المخزون</h2>
+                <Link className="btn btn--ghost btn--sm vp-head-link" href="/vendor/inventory">
+                  المخزون
+                  <Icon name="chev-end" size={13} mirror />
+                </Link>
+              </header>
+              <ul className="vp-list">
+                {snap.low.slice(0, 8).map((l) => (
+                  <li key={l.variantId}>
+                    <Link className="vp-list__row" href={`/vendor/products/${l.productId}`}>
+                      <ProductThumb src={null} size="sm" />
+                      <span className="vp-list__text">
+                        <span className="vp-list__name">{l.productNameAr}</span>
+                        <span className="vp-list__sub num">{l.sku}</span>
+                      </span>
+                      {l.available <= 0 ? (
+                        <span className="badge badge--danger">نفد</span>
+                      ) : (
+                        <span className="badge badge--warning">
+                          بقي <span className="num">{num(l.available)}</span>
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {snap.rejected > 0 ? (
+            <section className="card card--flush">
+              <header className="card__head">
+                <h2>منتجات مرفوضة</h2>
+                <Link className="btn btn--ghost btn--sm vp-head-link" href="/vendor/products">
+                  المنتجات
+                  <Icon name="chev-end" size={13} mirror />
+                </Link>
+              </header>
+              <ul className="vp-list">
+                {snap.rejectedItems.map((p) => (
+                  <li key={p.id}>
+                    <Link className="vp-list__row vp-list__row--top" href={`/vendor/products/${p.id}`}>
+                      <span className="vp-alert-dot" aria-hidden>
+                        <Icon name="alert" size={13} />
+                      </span>
+                      <span className="vp-list__text">
+                        <span className="vp-list__name vp-list__name--wrap">{p.nameAr}</span>
+                        <span className="vp-list__sub vp-list__sub--danger">
+                          {PRODUCT_STATUS.rejected.hint}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note: string }) {
-  return (
-    <div className="stat">
-      <span className="stat__label">{label}</span>
-      <span className="stat__value num">{value}</span>
-      <span className="stat__note">{note}</span>
-    </div>
-  );
+/** تحية بحسب ساعة جهاز البائع — الصفحة تُرسم عند العميل بعد وصول البيانات */
+function greeting(): string {
+  const h = new Date().getHours();
+  return h >= 5 && h < 12 ? 'صباح الخير' : 'مساء الخير';
 }

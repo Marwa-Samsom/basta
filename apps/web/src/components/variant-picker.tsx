@@ -2,10 +2,14 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { Icon } from '@/components/icons';
 import { cartApi } from '@/lib/cart';
 import type { ProductPage } from '@/lib/storefront';
 
 type Variant = ProductPage['variants'][number];
+
+/** «بقي N فقط» تحت هذا العدد — ما فوقه «متوفّر» */
+const LOW_STOCK = 3;
 
 /**
  * اختيار المتغيّر — لون ومقاس.
@@ -46,75 +50,125 @@ export function VariantPicker({ variants }: { variants: Variant[] }) {
 
   const discounted =
     current.compareAtPrice && BigInt(current.compareAtPrice.minorUnits) > BigInt(current.price.minorUnits);
+  // نسبة الخصم من المبلغين نفسيهما — عرض فقط، لا حساب مال
+  const discountPct =
+    discounted && current.compareAtPrice
+      ? Math.round((1 - Number(current.price.minorUnits) / Number(current.compareAtPrice.minorUnits)) * 100)
+      : 0;
+
+  const soldOut = current.available <= 0;
+  const stockTone = soldOut ? 'danger' : current.available <= LOW_STOCK ? 'warning' : 'success';
+  // ST-08: حين ينفد الخيار المختار نقول ما المتوفّر الآن بدل طريق مسدود
+  const others = soldOut
+    ? variants.filter((v) => v.available > 0 && v.options.length > 0)
+    : [];
 
   return (
-    <div className="stack">
-      <p className="product__price">
-        <span className="money num">{current.price.formatted}</span>
+    <div className="sd-buybox">
+      <div className="sd-price">
+        <span className="money num sd-price__now">{current.price.formatted}</span>
         {discounted && current.compareAtPrice ? (
-          <s className="muted num small">{current.compareAtPrice.formatted}</s>
+          <>
+            <s className="num sd-price__was">{current.compareAtPrice.formatted}</s>
+            {discountPct > 0 ? (
+              <span className="sd-price__off">
+                <span className="num">−{discountPct}%</span>
+              </span>
+            ) : null}
+          </>
         ) : null}
+      </div>
+
+      {axes.map(([attributeId, axis]) => {
+        const isColor = [...axis.values.values()].some((v) => v.hexColor);
+        return (
+          <fieldset key={attributeId} className="sd-axis">
+            <legend className="sd-axis__label">
+              <span className="sd-axis__name">{axis.nameAr}</span>
+              <span className="sd-axis__value">{axis.values.get(chosen.get(attributeId) ?? '')?.valueAr}</span>
+            </legend>
+            <div className="sd-axis__opts">
+              {[...axis.values.entries()].map(([valueId, value]) => {
+                const reachable = variants.some(
+                  (v) =>
+                    v.available > 0 &&
+                    v.options.some((o) => o.attributeId === attributeId && o.valueId === valueId),
+                );
+                const on = chosen.get(attributeId) === valueId;
+                return isColor && value.hexColor ? (
+                  <button
+                    key={valueId}
+                    type="button"
+                    className="sd-swatch"
+                    aria-pressed={on}
+                    aria-label={reachable ? value.valueAr : `${value.valueAr} — نفد`}
+                    data-unavailable={!reachable}
+                    onClick={() => pick(attributeId, valueId)}
+                    title={reachable ? value.valueAr : `${value.valueAr} — نفد`}
+                    style={{ background: value.hexColor }}
+                  >
+                    {on ? (
+                      <span className="sd-swatch__check" aria-hidden>
+                        <Icon name="check" size={13} />
+                      </span>
+                    ) : null}
+                  </button>
+                ) : (
+                  <button
+                    key={valueId}
+                    type="button"
+                    className="sd-size"
+                    aria-pressed={on}
+                    data-unavailable={!reachable}
+                    onClick={() => pick(attributeId, valueId)}
+                    title={reachable ? value.valueAr : `${value.valueAr} — نفد`}
+                  >
+                    {value.hexColor ? (
+                      <span className="sd-size__dot" style={{ background: value.hexColor }} aria-hidden />
+                    ) : null}
+                    {value.valueAr}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        );
+      })}
+
+      <p className="sd-stock" data-tone={stockTone} role="status">
+        <span className="sd-stock__dot" aria-hidden />
+        {soldOut
+          ? 'هذا الخيار نفد'
+          : current.available <= LOW_STOCK
+            ? `بقي ${current.available} فقط`
+            : 'متوفّر في المخزون'}
       </p>
 
-      {axes.map(([attributeId, axis]) => (
-        <fieldset key={attributeId} className="options">
-          <legend className="field__label">
-            {axis.nameAr}: <span className="muted">{axis.values.get(chosen.get(attributeId) ?? '')?.valueAr}</span>
-          </legend>
-          <div className="row">
-            {[...axis.values.entries()].map(([valueId, value]) => {
-              const reachable = variants.some(
-                (v) =>
-                  v.available > 0 &&
-                  v.options.some((o) => o.attributeId === attributeId && o.valueId === valueId),
-              );
-              return (
-                <button
-                  key={valueId}
-                  type="button"
-                  className="option"
-                  aria-pressed={chosen.get(attributeId) === valueId}
-                  data-unavailable={!reachable}
-                  onClick={() => pick(attributeId, valueId)}
-                  title={reachable ? value.valueAr : `${value.valueAr} — نفد`}
-                >
-                  {value.hexColor ? (
-                    <span className="option__swatch" style={{ background: value.hexColor }} aria-hidden />
-                  ) : null}
-                  {value.valueAr}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-      ))}
+      <AddToCart key={current.id} variantId={current.id} available={current.available} />
 
-      <p className="small" role="status">
-        {current.available > 0 ? (
-          current.available <= 3 ? (
-            <span className="badge badge--warning">بقي {current.available} فقط</span>
-          ) : (
-            <span className="badge badge--approved">متوفّر</span>
-          )
-        ) : (
-          <span className="badge badge--pending">هذا الخيار نفد</span>
-        )}
-      </p>
-
-      <AddToCart variantId={current.id} disabled={current.available <= 0} />
+      {others.length > 0 ? (
+        <p className="sd-others">
+          متوفّر الآن:{' '}
+          {others
+            .map((v) => `${v.options.map((o) => o.valueAr).join(' · ')} (${v.available})`)
+            .join('، ')}
+        </p>
+      ) : null}
     </div>
   );
 }
 
-function AddToCart({ variantId, disabled }: { variantId: string; disabled: boolean }) {
+function AddToCart({ variantId, available }: { variantId: string; available: number }) {
   const [state, setState] = useState<'idle' | 'busy' | 'added' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [qty, setQty] = useState(1);
+  const disabled = available <= 0;
 
   async function add(): Promise<void> {
     setState('busy');
     setMessage(null);
     try {
-      await cartApi.add(variantId, 1);
+      await cartApi.add(variantId, qty);
       setState('added');
     } catch (err) {
       setState('error');
@@ -123,17 +177,52 @@ function AddToCart({ variantId, disabled }: { variantId: string; disabled: boole
   }
 
   return (
-    <div className="stack stack--tight">
-      <button
-        type="button"
-        className="btn btn--primary btn--block"
-        disabled={disabled || state === 'busy'}
-        onClick={() => void add()}
-      >
-        {disabled ? 'نفد' : state === 'busy' ? 'جارٍ الإضافة…' : 'أضف إلى السلة'}
-      </button>
+    <div className="sd-buy">
+      <div className="sd-buy__row">
+        {disabled ? null : (
+          <div className="sd-qty" role="group" aria-label="الكمية">
+            <button
+              type="button"
+              className="sd-qty__btn"
+              aria-label="أنقص"
+              disabled={qty <= 1}
+              onClick={() => setQty((n) => Math.max(1, n - 1))}
+            >
+              <Icon name="minus" size={17} />
+            </button>
+            <span className="num sd-qty__val" aria-live="polite">
+              {qty}
+            </span>
+            <button
+              type="button"
+              className="sd-qty__btn"
+              aria-label="زد"
+              disabled={qty >= available}
+              onClick={() => setQty((n) => Math.min(available, n + 1))}
+            >
+              <Icon name="plus" size={17} />
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          className="btn btn--primary sd-buy__add"
+          disabled={disabled || state === 'busy'}
+          onClick={() => void add()}
+        >
+          <Icon name="cart" size={19} />
+          {disabled ? 'نفد من المخزون' : state === 'busy' ? 'جارٍ الإضافة…' : 'أضف إلى السلة'}
+        </button>
+      </div>
+      {!disabled && qty >= available && available > 1 ? (
+        <p className="sd-buy__hint">
+          <Icon name="info" size={14} />
+          بلغت الحد المتاح
+        </p>
+      ) : null}
       {state === 'added' ? (
-        <p className="small" role="status">
+        <p className="sd-buy__done" role="status">
+          <Icon name="check-circle" size={15} />
           أُضيف إلى سلّتك. <Link href="/cart">اذهب إلى السلة</Link>
         </p>
       ) : null}
@@ -142,6 +231,90 @@ function AddToCart({ variantId, disabled }: { variantId: string; disabled: boole
           {message}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+export interface GalleryImage {
+  id: string;
+  alt: string;
+  full: string;
+  thumb: string;
+  avif: string | null;
+  medium: string | null;
+  mediumAvif: string | null;
+}
+
+/**
+ * معرض صور المنتج — ST-07: مصغّرات في عمود وصورة كبيرة 4:5.
+ *
+ * يُصيَّر في الخادم بالغلاف محدّداً، فالصورة الكبيرة (LCP) في مصدر HTML
+ * بأولوية جلب عالية؛ المصغّرات وحدها تحتاج السكربت لتبدّل الصورة.
+ */
+export function ProductGallery({
+  images,
+  name,
+  soldOut,
+}: {
+  images: GalleryImage[];
+  name: string;
+  soldOut: boolean;
+}) {
+  const [index, setIndex] = useState(0);
+  const shown = images[index] ?? images[0];
+
+  return (
+    <div className={images.length > 1 ? 'sd-gallery sd-gallery--thumbs' : 'sd-gallery'}>
+      {images.length > 1 ? (
+        <div className="sd-gallery__thumbs" role="group" aria-label="صور المنتج">
+          {images.map((img, i) => (
+            <button
+              key={img.id}
+              type="button"
+              className="sd-gallery__thumb"
+              aria-pressed={i === index}
+              aria-label={`صورة ${i + 1} من ${images.length}`}
+              onClick={() => setIndex(i)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={img.thumb} alt="" loading="lazy" width={84} height={84} />
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="sd-gallery__stage">
+        {shown ? (
+          /*
+           * صورة الغلاف هي LCP الصفحة (المرحلة 12): الهاتف يأخذ 800 بكسل
+           * بصيغة AVIF، والشاشة الواسعة 1600، وWebP احتياط لما لا يقرأ AVIF.
+           * أولوية جلب عالية — تبدأ قبل السكربتات لا بعدها.
+           */
+          <picture key={shown.id}>
+            {shown.mediumAvif ? <source media="(max-width: 767px)" type="image/avif" srcSet={shown.mediumAvif} /> : null}
+            {shown.medium ? <source media="(max-width: 767px)" type="image/webp" srcSet={shown.medium} /> : null}
+            {shown.avif ? <source type="image/avif" srcSet={shown.avif} /> : null}
+            <img
+              src={shown.full}
+              alt={shown.alt}
+              width={800}
+              height={1000}
+              fetchPriority={index === 0 ? 'high' : 'auto'}
+              decoding="async"
+            />
+          </picture>
+        ) : (
+          <span className="sd-gallery__placeholder" aria-hidden>
+            {name.slice(0, 1)}
+          </span>
+        )}
+        {soldOut ? <span className="sd-gallery__flag">نفد من المخزون</span> : null}
+        {images.length > 1 ? (
+          <span className="num sd-gallery__count" aria-hidden>
+            {index + 1} / {images.length}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

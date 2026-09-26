@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Alert, Card, Spinner } from '@/components/ui';
+import { Icon } from '@/components/icons';
+import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { api, session } from '@/lib/api';
 import { labelOf, money, toneOf, when } from '@/lib/orders';
+import { imageUrl } from '@/lib/storefront';
 
 interface Row {
   number: string;
@@ -13,7 +15,11 @@ interface Row {
   currency: string;
   grandTotalMinorUnits: string;
   placedAt: string;
-  stores: { vendor: string; status: string; items: { productNameSnapshotAr: string; qty: number }[] }[];
+  stores: {
+    vendor: string;
+    status: string;
+    items: { productNameSnapshotAr: string; imageKeySnapshot?: string | null; qty: number }[];
+  }[];
 }
 
 const PARENT_LABEL: Record<string, string> = {
@@ -23,6 +29,17 @@ const PARENT_LABEL: Record<string, string> = {
   canceled: 'ملغى',
   refunded: 'مُسترَد',
 };
+
+const PARENT_TONE: Record<string, string> = {
+  processing: 'badge--review',
+  partially_completed: 'badge--warning',
+  completed: 'badge--approved',
+  canceled: 'badge--rejected',
+  refunded: 'badge--pending',
+};
+
+const thumbOf = (key: string | null | undefined): string | null =>
+  key ? imageUrl(`/uploads/${key}/thumb.webp`) : null;
 
 /**
  * ST-18 — طلباتي.
@@ -46,45 +63,95 @@ export default function MyOrdersPage() {
   }, [router]);
 
   return (
-    <main className="page stack stack--loose">
-      <header className="row row--between">
-        <h1>طلباتي</h1>
-        <Link href="/account/disputes" className="small">
-          النزاعات
-        </Link>
-      </header>
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-      {!rows && !error ? <Spinner label="جارٍ جلب طلباتك…" /> : null}
-      {rows && rows.length === 0 ? (
-        <Card>
-          <p className="empty muted">لا طلبات بعد.</p>
-          <Link href="/" className="btn btn--primary">
-            تسوّق الآن
+    <div className="sp-page">
+      <PageHead
+        title="طلباتي"
+        {...(rows && rows.length > 0 ? { count: rows.length } : {})}
+        actions={
+          <Link href="/account/disputes" className="btn btn--secondary btn--sm">
+            <Icon name="msg" size={15} />
+            النزاعات
           </Link>
-        </Card>
+        }
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {!rows && !error ? (
+        <div className="sp-skel" role="status">
+          <span className="visually-hidden">جارٍ جلب طلباتك…</span>
+          <span className="skeleton sp-skel__row" aria-hidden />
+          <span className="skeleton sp-skel__row" aria-hidden />
+          <span className="skeleton sp-skel__row" aria-hidden />
+        </div>
       ) : null}
-      {rows?.map((o) => (
-        <Link key={o.number} href={`/account/orders/${o.number}`} className="card stack stack--tight" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="row row--between">
-            <strong className="num">{o.number}</strong>
-            <span className="badge badge--pending">{PARENT_LABEL[o.status] ?? o.status}</span>
-          </div>
-          <div className="row row--between small muted">
-            <span>{when(o.placedAt)}</span>
-            <span className="money">{money(o.grandTotalMinorUnits, o.currency)}</span>
-          </div>
-          <ul className="stack stack--tight">
-            {o.stores.map((s, i) => (
-              <li key={i} className="row row--between small">
-                <span>
-                  {s.vendor} · {s.items.map((it) => it.productNameSnapshotAr).join('، ')}
+      {rows && rows.length === 0 ? (
+        <EmptyState
+          icon="package"
+          title="لا طلبات بعد"
+          actions={
+            <Link href="/" className="btn btn--primary">
+              تسوّق الآن
+            </Link>
+          }
+        >
+          طلباتك تظهر هنا بعد أول عملية شراء.
+        </EmptyState>
+      ) : null}
+      {rows && rows.length > 0 ? (
+        <ul className="sp-orders">
+          {rows.map((o) => (
+            <li key={o.number}>
+              <Link href={`/account/orders/${o.number}`} className="sp-order">
+                <span className="sp-order__head">
+                  <span className="tile-icon sp-tile" aria-hidden>
+                    <Icon name="package" size={15} />
+                  </span>
+                  <span className="sp-order__no num">{o.number}</span>
+                  <span className="sp-order__date">{when(o.placedAt)}</span>
+                  <span className={`badge ${PARENT_TONE[o.status] ?? 'badge--pending'}`}>
+                    {PARENT_LABEL[o.status] ?? o.status}
+                  </span>
+                  <span className="sp-order__total money num">{money(o.grandTotalMinorUnits, o.currency)}</span>
                 </span>
-                <span className={`badge ${toneOf(s.status)}`}>{labelOf(s.status)}</span>
-              </li>
-            ))}
-          </ul>
-        </Link>
-      ))}
-    </main>
+                <span className="sp-order__stores">
+                  {o.stores.map((s, i) => (
+                    <span key={i} className="sp-order__store">
+                      <span className="tile-icon sp-tile--sm" aria-hidden>
+                        <Icon name="store" size={14} />
+                      </span>
+                      <span className="sp-order__vendor">
+                        <span className="sp-order__vendor-name">{s.vendor}</span>
+                        <span className="sp-order__items">
+                          {s.items.map((it) => it.productNameSnapshotAr).join('، ')}
+                        </span>
+                      </span>
+                      <span className="sp-order__thumbs" aria-hidden>
+                        {s.items.map((it, k) => {
+                          const src = thumbOf(it.imageKeySnapshot);
+                          return (
+                            <span key={k} className="sp-thumb sp-thumb--sm">
+                              {src ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={src} alt="" loading="lazy" width={34} height={34} />
+                              ) : (
+                                <Icon name="image" size={16} />
+                              )}
+                            </span>
+                          );
+                        })}
+                      </span>
+                      <span className={`badge ${toneOf(s.status)}`}>{labelOf(s.status)}</span>
+                    </span>
+                  ))}
+                </span>
+                <span className="sp-order__foot">
+                  التفاصيل والتتبّع
+                  <Icon name="chev-end" size={14} mirror />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }

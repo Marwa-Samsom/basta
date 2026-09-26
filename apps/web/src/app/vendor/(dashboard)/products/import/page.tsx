@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { api, API_BASE, ApiError, session } from '@/lib/api';
-import { Alert, Card } from '@/components/ui';
+import { Icon } from '@/components/icons';
 import { num } from '@/lib/catalog';
 
 interface RejectedLine {
@@ -24,6 +24,18 @@ interface ImportReport {
   rejected: RejectedLine[];
 }
 
+/** دليل الأعمدة — بأسماء رؤوس القالب كما يقرؤها الخادم (import-plan) */
+const COLUMN_GUIDE: readonly { col: string; desc: string }[] = [
+  {
+    col: 'رمز_المنتج',
+    desc: 'يجمع متغيّرات المنتج الواحد: أسطر بالرمز نفسه تصير منتجاً واحداً بعدّة متغيّرات.',
+  },
+  { col: 'SKU', desc: 'رمز المتغيّر. SKU موجود يُحدَّث سعره وكميته، والجديد يُنشأ مسوّدة.' },
+  { col: 'الفئة', desc: 'بالاسم أو بالرابط (المعرّف النصّي) — مثال fashion.' },
+  { col: 'الخيار_1 · قيمة_الخيار_1', desc: 'الخيارات بأسمائها العربية — مثال «اللون» و«أحمر».' },
+  { col: 'السعر · الكمية', desc: 'أرقام. الكمية إلزامية — اكتب 0 إن لم يتوفّر مخزون.' },
+];
+
 /**
  * VD-09 و VD-10 — الاستيراد الجماعي وتقريره في شاشة واحدة.
  *
@@ -38,13 +50,16 @@ export default function ImportPage() {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [columnFilter, setColumnFilter] = useState('');
+  const [file, setFile] = useState<{ name: string; size: number } | null>(null);
 
-  async function upload(file: File): Promise<void> {
+  async function upload(chosen: File): Promise<void> {
     setBusy(true);
     setError(null);
     setReport(null);
+    setColumnFilter('');
+    setFile({ name: chosen.name, size: chosen.size });
     try {
-      setReport(await api<ImportReport>('/vendor/catalog/import', { method: 'POST', file }));
+      setReport(await api<ImportReport>('/vendor/catalog/import', { method: 'POST', file: chosen }));
     } catch (err) {
       // رفض الملف كله (عمود مجهول مثلاً) يأتي برسالة واحدة تقول ما العمل
       setError(err instanceof ApiError ? err.message : 'تعذّر استيراد الملف.');
@@ -93,9 +108,17 @@ export default function ImportPage() {
     URL.revokeObjectURL(url);
   }
 
+  function reset(): void {
+    setError(null);
+    setFile(null);
+  }
+
   const columns = report
     ? [...new Set(report.rejected.flatMap((r) => r.reasons.map((x) => x.column ?? '—')))]
     : [];
+
+  const columnCount = (c: string): number =>
+    report ? report.rejected.filter((r) => r.reasons.some((x) => (x.column ?? '—') === c)).length : 0;
 
   const visible = report
     ? report.rejected.filter(
@@ -103,84 +126,187 @@ export default function ImportPage() {
       )
     : [];
 
+  const state = busy ? 'running' : error ? 'rejected' : report ? 'done' : 'idle';
+
   return (
-    <>
-      <header className="row row--between">
+    <div className="vp-page vp-import">
+      <div className="page-head">
+        <Link className="btn btn--secondary btn--sm vp-back" href="/vendor/products">
+          <Icon name="back" size={14} mirror />
+          المنتجات
+        </Link>
         <h1>الاستيراد الجماعي</h1>
-        <button type="button" className="btn btn--secondary" onClick={() => void downloadTemplate()}>
-          نزّل القالب
-        </button>
-      </header>
+      </div>
 
-      <Card title="كيف يعمل" hint="CSV أو Excel، حتى 5 ميغابايت و5000 سطر.">
-        <ul className="blockers">
-          <li className="blockers__item">
-            <span aria-hidden>•</span>
-            <span>رمز المنتج يجمع متغيّراته: أسطر بالرمز نفسه تصير منتجاً واحداً بعدّة متغيّرات.</span>
-          </li>
-          <li className="blockers__item">
-            <span aria-hidden>•</span>
-            <span>SKU موجود يُحدَّث سعره وكميته، والجديد يُنشأ مسوّدة.</span>
-          </li>
-          <li className="blockers__item">
-            <span aria-hidden>•</span>
-            <span>الفئة بالاسم أو بالرابط، والخيارات بأسمائها العربية.</span>
-          </li>
-        </ul>
-      </Card>
+      <ol className="vp-steps">
+        <li className="card vp-step">
+          <span className="vp-step__head">
+            <span className="vp-step__n num" aria-hidden>
+              1
+            </span>
+            نزّل القالب
+          </span>
+          <span className="vp-step__body">ملف CSV عربي بأعمدته الجاهزة. استخدم رؤوسه كما هي.</span>
+          <button type="button" className="btn btn--secondary btn--sm vp-step__btn" onClick={() => void downloadTemplate()}>
+            <Icon name="download" size={14} />
+            نزّل القالب
+          </button>
+        </li>
+        <li className="card vp-step">
+          <span className="vp-step__head">
+            <span className="vp-step__n num" aria-hidden>
+              2
+            </span>
+            املأه
+          </span>
+          <span className="vp-step__body">
+            سطر لكل متغيّر. رمز المنتج يجمع متغيّرات المنتج الواحد، والخيارات بأسمائها العربية.
+          </span>
+        </li>
+        <li className="card vp-step">
+          <span className="vp-step__head">
+            <span className="vp-step__n num" aria-hidden data-state={state === 'done' ? 'done' : undefined}>
+              3
+            </span>
+            ارفعه
+          </span>
+          <span className="vp-step__body">CSV أو Excel، حتى 5 ميغابايت و5000 سطر.</span>
+        </li>
+      </ol>
 
-      <div
-        className="dropzone"
-        data-dragging={dragging}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          const file = e.dataTransfer.files[0];
-          if (file) void upload(file);
-        }}
-      >
-        <p className="small">اسحب ملفك إلى هنا أو اختره من جهازك.</p>
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          disabled={busy}
-          onClick={() => input.current?.click()}
-        >
-          {busy ? 'جارٍ الاستيراد…' : 'اختر ملفاً'}
-        </button>
+      <section className="card vp-upload" data-state={state}>
+        {state === 'idle' ? (
+          <button
+            type="button"
+            className="vp-drop"
+            data-dragging={dragging}
+            onClick={() => input.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              const dropped = e.dataTransfer.files[0];
+              if (dropped) void upload(dropped);
+            }}
+          >
+            <Icon name="upload" size={30} className="vp-drop__icon" />
+            <span className="vp-drop__title">اسحب ملفك إلى هنا أو اختر ملفاً</span>
+            <span className="vp-drop__hint">CSV أو XLSX · حتى 5 ميغابايت · 5000 سطر كحد أقصى</span>
+          </button>
+        ) : null}
+
+        {state === 'running' ? (
+          <div className="vp-run" role="status">
+            <span className="vp-run__file">
+              <span className="tile-icon" aria-hidden>
+                <Icon name="file" size={18} />
+              </span>
+              <span className="vp-run__text">
+                <span className="num">{file?.name}</span>
+                {file ? (
+                  <span className="num vp-faint">{(file.size / (1024 * 1024)).toFixed(1)} MB</span>
+                ) : null}
+              </span>
+            </span>
+            <span className="vp-run__bar" aria-hidden>
+              <span />
+            </span>
+            <span className="row small muted">
+              <span className="spinner" aria-hidden />
+              جارٍ الاستيراد…
+            </span>
+          </div>
+        ) : null}
+
+        {state === 'rejected' ? (
+          <div className="stack">
+            <div className="vp-banner vp-banner--danger" role="alert">
+              <span className="vp-banner__icon" aria-hidden>
+                <Icon name="alert" size={18} />
+              </span>
+              <div className="vp-banner__text">
+                <p className="vp-banner__title">رُفض الملف كاملاً — لم يُكتب أي سطر</p>
+                <p>{error}</p>
+              </div>
+            </div>
+            <div className="row">
+              <button type="button" className="btn btn--primary" onClick={() => void downloadTemplate()}>
+                <Icon name="download" size={16} />
+                نزّل القالب
+              </button>
+              <button type="button" className="btn btn--secondary" onClick={reset}>
+                جرّب ملفاً آخر
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {state === 'done' && report ? (
+          <div
+            className={`vp-banner ${report.rejectedCount === 0 ? 'vp-banner--success' : 'vp-banner--warning'}`}
+            role="status"
+          >
+            <span className="vp-banner__icon" aria-hidden>
+              <Icon name={report.rejectedCount === 0 ? 'check' : 'alert'} size={18} />
+            </span>
+            <div className="vp-banner__text">
+              <p className="vp-banner__title">اكتمل الاستيراد</p>
+              <p>
+                استُورد <span className="num">{num(report.imported)}</span> من{' '}
+                <span className="num">{num(report.totalRows)}</span> سطراً ·{' '}
+                <span className="num">{num(report.rejectedCount)}</span> مرفوضاً.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm vp-banner__action"
+              onClick={() => input.current?.click()}
+            >
+              <Icon name="upload" size={14} />
+              ارفع ملفاً آخر
+            </button>
+          </div>
+        ) : null}
+
         <input
           ref={input}
           type="file"
           className="visually-hidden"
+          tabIndex={-1}
+          aria-hidden
           accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void upload(file);
+            const chosen = e.target.files?.[0];
+            if (chosen) void upload(chosen);
             e.target.value = '';
           }}
         />
-      </div>
-
-      {error ? (
-        <Alert tone="danger" title="لم يُكتب شيء من الملف">
-          {error}
-        </Alert>
-      ) : null}
+      </section>
 
       {report ? (
-        <>
-          <Alert tone={report.rejectedCount === 0 ? 'success' : 'warning'} title="تقرير الاستيراد">
-            استُورد <span className="num">{num(report.imported)}</span> من{' '}
-            <span className="num">{num(report.totalRows)}</span> سطراً ·{' '}
-            <span className="num">{num(report.rejectedCount)}</span> مرفوضاً.
-          </Alert>
+        <section className="vp-report" aria-labelledby="vp-report-title">
+          <div className="vp-report__head">
+            <h2 id="vp-report-title">تقرير الاستيراد</h2>
+            <span className="num vp-faint">{report.importId}</span>
+          </div>
 
           <div className="stats">
+            <div className="stat vp-stat--ok">
+              <span className="stat__label">أسطر مستوردة</span>
+              <span className="stat__value num">{num(report.imported)}</span>
+              <span className="stat__note">
+                من <span className="num">{num(report.totalRows)}</span> سطر في الملف
+              </span>
+            </div>
+            <div className="stat vp-stat--bad">
+              <span className="stat__label">أسطر مرفوضة</span>
+              <span className="stat__value num">{num(report.rejectedCount)}</span>
+              <span className="stat__note">لم تُكتب — صحّحها وأعد الرفع</span>
+            </div>
             <div className="stat">
               <span className="stat__label">منتجات أُنشئت</span>
               <span className="stat__value num">{num(report.productsCreated)}</span>
@@ -197,38 +323,49 @@ export default function ImportPage() {
             </div>
           </div>
 
+          <div className="row">
+            {report.rejectedCount > 0 ? (
+              <button type="button" className="btn btn--primary" onClick={downloadRejected}>
+                <Icon name="download" size={16} />
+                نزّل الأسطر المرفوضة للتصحيح
+              </button>
+            ) : null}
+            <Link className="btn btn--secondary" href="/vendor/products?status=draft">
+              <Icon name="package" size={16} />
+              راجع المنتجات المستوردة
+            </Link>
+          </div>
+
           {report.rejectedCount > 0 ? (
-            <Card
-              title="الأسطر المرفوضة"
-              aside={
-                <button type="button" className="btn btn--secondary btn--sm" onClick={downloadRejected}>
-                  نزّلها لتصحيحها
-                </button>
-              }
-            >
-              {columns.length > 1 ? (
-                <div className="row">
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm"
-                    aria-pressed={columnFilter === ''}
-                    onClick={() => setColumnFilter('')}
-                  >
-                    الكل
-                  </button>
-                  {columns.map((c) => (
+            <section className="card card--flush">
+              <div className="card__head">
+                <h2>الأسطر المرفوضة</h2>
+                {columns.length > 1 ? (
+                  <div className="tabs vp-filter" role="group" aria-label="تصفية بالعمود">
                     <button
-                      key={c}
                       type="button"
-                      className="btn btn--secondary btn--sm"
-                      aria-pressed={columnFilter === c}
-                      onClick={() => setColumnFilter(c)}
+                      className="tabs__tab"
+                      aria-pressed={columnFilter === ''}
+                      onClick={() => setColumnFilter('')}
                     >
-                      {c}
+                      الكل
+                      <span className="tabs__count">{num(report.rejected.length)}</span>
                     </button>
-                  ))}
-                </div>
-              ) : null}
+                    {columns.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className="tabs__tab"
+                        aria-pressed={columnFilter === c}
+                        onClick={() => setColumnFilter(c)}
+                      >
+                        {c}
+                        <span className="tabs__count">{num(columnCount(c))}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
 
               <div className="table-wrap">
                 <table className="table">
@@ -244,26 +381,42 @@ export default function ImportPage() {
                     {visible.map((r) =>
                       r.reasons.map((reason, i) => (
                         <tr key={`${r.line}-${i}`}>
-                          <td className="num">{num(r.line)}</td>
-                          <td className="num">{r.sku ?? '—'}</td>
-                          <td>{reason.column ?? '—'}</td>
-                          <td className="wrap">{reason.message}</td>
+                          <td>
+                            سطر <span className="num">{num(r.line)}</span>
+                          </td>
+                          <td className="num" data-label="SKU">
+                            {r.sku ?? '—'}
+                          </td>
+                          <td data-label="العمود">
+                            <span className="badge badge--pending">{reason.column ?? '—'}</span>
+                          </td>
+                          <td className="wrap" data-label="السبب">
+                            {reason.message}
+                          </td>
                         </tr>
                       )),
                     )}
                   </tbody>
                 </table>
               </div>
-            </Card>
+            </section>
           ) : null}
-
-          <div className="row">
-            <Link className="btn btn--primary" href="/vendor/products?status=draft">
-              راجع المنتجات المستوردة
-            </Link>
-          </div>
-        </>
+        </section>
       ) : null}
-    </>
+
+      <section className="card card--flush">
+        <div className="card__head">
+          <h2>دليل الأعمدة</h2>
+        </div>
+        <dl className="vp-guide">
+          {COLUMN_GUIDE.map((c) => (
+            <div key={c.col} className="vp-guide__row">
+              <dt className="vp-guide__col">{c.col}</dt>
+              <dd>{c.desc}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    </div>
   );
 }

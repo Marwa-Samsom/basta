@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Icon } from '@/components/icons';
 import { ProductGrid } from '@/components/product-card';
+import { EmptyState } from '@/components/ui';
 import { getShop, num } from '@/lib/storefront';
 import { JsonLd, SITE_URL, shopJsonLd } from '@/lib/seo';
 
@@ -28,50 +30,109 @@ export default async function ShopPage({ params }: Params) {
   );
 
   return (
-    <div className="stack">
+    <div className="sd-shop">
       {vendor.isSuspended ? null : <JsonLd data={shopJsonLd(shop)} />}
-      <header className="stack stack--tight">
-        <h1>{vendor.nameAr}</h1>
-        <p className="small muted">
-          على بسطة منذ {since}
-          {vendor.ratingCount > 0 ? (
-            <>
-              {' '}· تقييم <span className="num">{vendor.ratingAvg.toFixed(1)}</span> من{' '}
-              <span className="num">{num(vendor.ratingCount)}</span>
-            </>
-          ) : null}
-        </p>
-        {vendor.descriptionAr ? <p>{vendor.descriptionAr}</p> : null}
+      <div className="sd-shop__cover" aria-hidden />
+
+      <header className="sd-shop__head">
+        <span className="sd-shop__logo" aria-hidden>
+          <Icon name="store" size={44} />
+        </span>
+        <div className="sd-shop__id">
+          <div className="sd-shop__name-row">
+            <h1 className="sd-shop__name">{vendor.nameAr}</h1>
+            {vendor.isSuspended ? (
+              <span className="sd-shop__paused">
+                <Icon name="clock" size={15} />
+                لا يستقبل طلبات حالياً
+              </span>
+            ) : null}
+          </div>
+          <div className="sd-shop__meta">
+            {vendor.ratingCount > 0 ? (
+              <span className="sd-rating">
+                <Icon name="star-fill" size={15} className="sd-rating__star" />
+                <span className="num sd-rating__avg">{vendor.ratingAvg.toFixed(1)}</span>
+                <span className="sd-rating__count">
+                  (<span className="num">{num(vendor.ratingCount)}</span> تقييماً)
+                </span>
+              </span>
+            ) : null}
+            <span>على بسطة منذ {since}</span>
+            {vendor.isSuspended ? null : (
+              <span>
+                {total > 0 ? (
+                  <>
+                    <span className="num">{num(total)}</span> منتجاً
+                  </>
+                ) : (
+                  'لا منتجات منشورة'
+                )}
+              </span>
+            )}
+          </div>
+        </div>
       </header>
 
       {vendor.isSuspended ? (
-        <div className="alert alert--warning" role="status">
-          <p className="alert__title">هذا المتجر متوقّف مؤقتاً</p>
-          <p>لا يستقبل طلبات الآن. تصفّح متاجر أخرى في الفئات نفسها.</p>
-          <Link className="btn btn--secondary btn--sm" href="/categories">
-            تصفّح الفئات
+        <section className="sd-shop__paused-card" role="status">
+          <span className="sd-shop__paused-icon" aria-hidden>
+            <Icon name="clock" size={23} />
+          </span>
+          <h2 className="sd-shop__paused-title">هذا المتجر لا يستقبل طلبات حالياً</h2>
+          <p className="sd-shop__paused-body">يمكنك تصفّح متاجر أخرى تبيع منتجات مشابهة في الأقسام نفسها.</p>
+          <Link className="btn btn--secondary" href="/categories">
+            تصفّح الأقسام
           </Link>
-        </div>
+        </section>
       ) : (
         <>
-          <h2>
-            المنتجات <span className="num muted small">({num(total)})</span>
-          </h2>
-          {products.length > 0 ? (
-            <ProductGrid products={products} />
-          ) : (
-            <div className="empty">
-              <p>لا منتجات منشورة في هذا المتجر بعد.</p>
+          {vendor.descriptionAr || vendor.shippingPolicyAr || vendor.returnPolicyAr ? (
+            <div className="sd-shop__about">
+              {vendor.descriptionAr ? (
+                <section className="sd-infocard">
+                  <h2 className="sd-infocard__title">عن المتجر</h2>
+                  <p className="sd-infocard__body">{vendor.descriptionAr}</p>
+                </section>
+              ) : null}
+              {vendor.shippingPolicyAr ? (
+                <section className="sd-infocard">
+                  <h2 className="sd-infocard__title">
+                    <Icon name="truck" size={15} />
+                    سياسة الشحن
+                  </h2>
+                  <p className="sd-infocard__body">{vendor.shippingPolicyAr}</p>
+                </section>
+              ) : null}
+              {vendor.returnPolicyAr ? (
+                <section className="sd-infocard">
+                  <h2 className="sd-infocard__title">
+                    <Icon name="return" size={15} />
+                    سياسة الإرجاع
+                  </h2>
+                  <p className="sd-infocard__body">{vendor.returnPolicyAr}</p>
+                </section>
+              ) : null}
             </div>
-          )}
-
-          {vendor.shippingPolicyAr || vendor.returnPolicyAr ? (
-            <section className="stack stack--tight">
-              <h2>سياسات المتجر</h2>
-              {vendor.shippingPolicyAr ? <p className="small">الشحن: {vendor.shippingPolicyAr}</p> : null}
-              {vendor.returnPolicyAr ? <p className="small">الإرجاع: {vendor.returnPolicyAr}</p> : null}
-            </section>
           ) : null}
+
+          <section className="sd-section" aria-labelledby="sd-shop-products">
+            <div className="sd-section__head">
+              <h2 id="sd-shop-products" className="sd-section__title">
+                منتجات المتجر
+              </h2>
+              <span className="sd-section__note">
+                <span className="num">{num(total)}</span>
+              </span>
+            </div>
+            {products.length > 0 ? (
+              <ProductGrid products={products} />
+            ) : (
+              <EmptyState icon="package" title="لا منتجات بعد">
+                لا منتجات منشورة في هذا المتجر بعد.
+              </EmptyState>
+            )}
+          </section>
         </>
       )}
     </div>

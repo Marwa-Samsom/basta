@@ -1,22 +1,35 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { Alert, Spinner, StatusBadge } from '@/components/ui';
+import { useRouter } from 'next/navigation';
+import { Alert, Spinner } from '@/components/ui';
 import { useOnboarding } from '@/lib/vendor';
 import { NotificationBell } from '@/components/notification-bell';
+import { DashIdent, DashShell, type DashNavGroup } from '@/components/dash-shell';
+import { Icon } from '@/components/icons';
 
-const NAV = [
-  { href: '/vendor', label: 'المؤشرات' },
-  { href: '/vendor/orders', label: 'الطلبات' },
-  { href: '/vendor/disputes', label: 'النزاعات' },
-  { href: '/vendor/finance', label: 'المحفظة' },
-  { href: '/vendor/products', label: 'المنتجات' },
-  { href: '/vendor/inventory', label: 'المخزون' },
-  { href: '/vendor/products/import', label: 'الاستيراد الجماعي' },
-  { href: '/vendor/store', label: 'ملف المتجر' },
-] as const;
+/**
+ * أقسام اللوحة بترتيب ملف التصميم. الاستيراد الجماعي يُفتح من صفحة المنتجات
+ * (VD-07) لا من الشريط، ويُضيء «المنتجات» حين يكون مفتوحاً.
+ */
+const NAV: DashNavGroup[] = [
+  {
+    items: [
+      { href: '/vendor', label: 'الرئيسية', icon: 'chart', exact: true },
+      { href: '/vendor/products', label: 'المنتجات', icon: 'package' },
+      { href: '/vendor/inventory', label: 'المخزون', icon: 'boxes' },
+      { href: '/vendor/orders', label: 'الطلبات', icon: 'truck' },
+      { href: '/vendor/disputes', label: 'المرتجعات والنزاعات', icon: 'return' },
+      { href: '/vendor/finance', label: 'المحفظة', icon: 'wallet' },
+      { href: '/vendor/store', label: 'ملف المتجر', icon: 'store' },
+    ],
+  },
+];
+
+const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
+  approved: { label: 'معتمد', tone: 'success' },
+  suspended: { label: 'معلَّق', tone: 'warning' },
+  banned: { label: 'محظور', tone: 'danger' },
+};
 
 /**
  * قشرة لوحة البائع — §6.2.
@@ -29,9 +42,7 @@ const NAV = [
  */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
   const { data, loading, missing, error } = useOnboarding();
-  const [open, setOpen] = useState(false);
 
   if (missing) {
     router.replace('/vendor/register');
@@ -60,55 +71,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return null;
   }
 
+  const status = STATUS[data.status];
+
   return (
-    <div className="dash" data-density="compact">
-      <header className="dash__bar">
-        <button
-          type="button"
-          className="btn btn--secondary btn--sm dash__menu"
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-        >
-          القائمة
-        </button>
-        <Link href="/vendor" className="dash__brand">
-          بسطة · لوحة البائع
-        </Link>
-        <span className="row">
-          <NotificationBell />
-          <span className="small muted">{data.nameAr}</span>
-          <StatusBadge status={data.status} />
-        </span>
-      </header>
-
-      <div className="dash__body">
-        <nav className="dash__nav" data-open={open} aria-label="أقسام اللوحة">
-          {NAV.map((item) => {
-            const active = item.href === '/vendor' ? pathname === '/vendor' : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="dash__link"
-                data-active={active}
-                {...(active ? { 'aria-current': 'page' as const } : {})}
-                onClick={() => setOpen(false)}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <main className="dash__main">
-          {data.status === 'suspended' ? (
-            <Alert tone="warning" title="متجرك معلَّق">
-              منتجاتك لا تظهر للمشترين ولا تستطيع نشر جديد. راسل الدعم لمعرفة التفاصيل.
-            </Alert>
-          ) : null}
-          {children}
-        </main>
-      </div>
-    </div>
+    <DashShell
+      ident={
+        <DashIdent
+          href="/vendor/store"
+          name={data.nameAr}
+          sub={status?.label ?? data.status}
+          tone={status?.tone}
+          mark={
+            <span className="tile-icon" aria-hidden>
+              <Icon name="store" size={18} />
+            </span>
+          }
+        />
+      }
+      groups={NAV}
+      tools={<NotificationBell />}
+      banner={
+        data.status === 'suspended' ? (
+          <Alert tone="danger" title="متجرك معلَّق مؤقتاً — منتجاتك مخفية عن المشترين">
+            لا تستطيع نشر منتج جديد، وطلباتك القائمة تُكمَل كما هي. راسل الدعم لمعرفة السبب ورفع التعليق.
+          </Alert>
+        ) : null
+      }
+    >
+      {children}
+    </DashShell>
   );
 }

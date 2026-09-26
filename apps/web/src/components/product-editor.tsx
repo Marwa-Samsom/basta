@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { api, ApiError } from '@/lib/api';
-import { Alert, BlockerList, Card, Field, Spinner, TextArea, TextInput } from '@/components/ui';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { api, API_BASE, ApiError } from '@/lib/api';
+import { Alert, Field, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Icon } from '@/components/icons';
 import {
   PRODUCT_STATUS,
   num,
@@ -32,6 +34,19 @@ const emptyVariant = (): VariantDraft => ({
   isActive: true,
 });
 
+/** حدّ الوصف كما يفرضه الخادم (MaxLength في DTO المنتج) */
+const DESCRIPTION_MAX = 5000;
+
+/** قائمة الخيارات تصير حبوباً ما دامت قصيرة؛ الطويلة تبقى قائمة منسدلة */
+const PILL_LIMIT = 12;
+
+const KIND: Record<EffectiveAttribute['inputType'], string> = {
+  select: 'LIST',
+  text: 'TEXT',
+  number: 'NUMBER',
+  boolean: 'BOOL',
+};
+
 /**
  * VD-08 — محرّر المنتج.
  *
@@ -39,7 +54,7 @@ const emptyVariant = (): VariantDraft => ({
  * 1. **تغيير الفئة يغيّر السمات**، فالسمات تُقرأ من الخادم لا تُخمَّن.
  * 2. **السعر والمخزون على المتغيّر** لا على المنتج (ADR-006) — حتى المنتج
  *    البسيط له متغيّر واحد، فالشكل واحد ولا فرعان في الكود.
- * 3. **«أرسل للنشر» يعرض الموانع مجتمعة** كما ترسلها الخدمة، ولا يخمّنها.
+ * 3. **«أرسل للمراجعة» يعرض الموانع مجتمعة** كما ترسلها الخدمة، ولا يخمّنها.
  */
 export function ProductEditor({ productId }: { productId?: string }) {
   const router = useRouter();
@@ -147,6 +162,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
   const axes = attributes.filter((a) => a.isVariantAxis && a.values.length > 0);
   const plain = attributes.filter((a) => !a.isVariantAxis);
+  const categoryName = categories.find((c) => c.id === form.categoryId)?.nameAr ?? null;
+  const canPublish = product && product.status !== 'active' && product.status !== 'pending_review';
 
   // ------------------------------------------------------------- الحفظ
 
@@ -230,258 +247,371 @@ export function ProductEditor({ productId }: { productId?: string }) {
     }
   }
 
+  // ------------------------------------------------------------ الملخّص
+
+  const prices = variants
+    .map((v) => v.price.trim())
+    .filter((p) => p !== '' && Number.isFinite(Number(p)))
+    .sort((a, b) => Number(a) - Number(b));
+  const priceRange =
+    prices.length === 0
+      ? null
+      : prices[0] === prices[prices.length - 1]
+        ? prices[0]
+        : `${prices[0]} – ${prices[prices.length - 1]}`;
+  const totalStock = variants.reduce((sum, v) => sum + Number(v.stock || 0), 0);
+  const descLength = form.descriptionAr.length;
+
   return (
-    <>
-      <header className="row row--between">
-        <h1>{isNew ? 'منتج جديد' : form.nameAr || 'تحرير المنتج'}</h1>
+    <div className="vp-page">
+      <div className="page-head">
+        <Link className="btn btn--secondary btn--sm vp-back" href="/vendor/products">
+          <Icon name="back" size={14} mirror />
+          المنتجات
+        </Link>
+        <h1 className="vp-editor__title">{isNew ? 'منتج جديد' : form.nameAr || 'تحرير المنتج'}</h1>
         {product ? (
           <span className={`badge ${PRODUCT_STATUS[product.status].tone}`}>
             {PRODUCT_STATUS[product.status].label}
           </span>
         ) : null}
-      </header>
+        <span className="page-head__actions">
+          {product?.status === 'active' ? (
+            <Link className="btn btn--secondary" href={`/p/${product.slug}`}>
+              <Icon name="eye" size={16} />
+              عاين
+            </Link>
+          ) : null}
+          <button className="btn btn--secondary" type="button" disabled={busy} onClick={() => void save()}>
+            {busy ? 'جارٍ الحفظ…' : !product || product.status === 'draft' ? 'احفظ كمسودة' : 'احفظ'}
+          </button>
+          {canPublish ? (
+            <button className="btn btn--primary" type="button" disabled={busy} onClick={() => void publish()}>
+              <Icon name="send" size={16} />
+              أرسل للمراجعة
+            </button>
+          ) : null}
+        </span>
+      </div>
 
       {failure ? <Alert tone="danger">{failure}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
       {product?.status === 'rejected' && product.rejectReason ? (
-        <Alert tone="danger" title="سبب الرفض">
-          {product.rejectReason}
-        </Alert>
+        <div className="vp-banner vp-banner--danger">
+          <span className="vp-banner__icon" aria-hidden>
+            <Icon name="alert" size={17} />
+          </span>
+          <div className="vp-banner__text">
+            <p className="vp-banner__title">رُفض المنتج — سبب الإدارة</p>
+            <p>{product.rejectReason}</p>
+          </div>
+        </div>
       ) : null}
 
-      {blockers.length > 0 ? (
-        <BlockerList
-          blockers={blockers.map((message, i) => ({ code: `r${i}`, message, field: '' }))}
-        />
+      {product?.status === 'pending_review' ? (
+        <div className="vp-banner vp-banner--warning">
+          <Icon name="clock" size={18} className="vp-banner__glyph" />
+          <p>
+            <strong>قيد المراجعة</strong> — تراجع الإدارة منتجك قبل أن يظهر في المتجر.
+          </p>
+        </div>
       ) : null}
 
-      <Card title="الأساسيات">
-        <TextInput
-          label="اسم المنتج بالعربية"
-          required
-          value={form.nameAr}
-          onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
-        />
-        <TextInput
-          label="اسم المنتج بالإنجليزية"
-          optional
-          dir="ltr"
-          value={form.nameEn}
-          onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
-        />
-        <Field label="الفئة" hint="تغيير الفئة يغيّر السمات المطلوبة.">
-          {(props) => (
-            <select
-              className="field__control"
-              {...props}
-              value={form.categoryId}
-              onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-            >
-              <option value="">اختر فئة…</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {'— '.repeat(Math.max(c.depth - 1, 0))}
-                  {c.nameAr}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
-        <TextArea
-          label="الوصف"
-          optional
-          value={form.descriptionAr}
-          onChange={(e) => setForm({ ...form, descriptionAr: e.target.value })}
-        />
-      </Card>
+      {product?.status === 'active' ? (
+        <div className="vp-banner vp-banner--info">
+          <Icon name="info" size={16} className="vp-banner__glyph" />
+          <p>تعديل المحتوى (الاسم، الوصف، الفئة، السمات) يعيد المنتج إلى المراجعة. السعر والمخزون لا يعيدانه.</p>
+        </div>
+      ) : null}
 
-      {plain.length > 0 ? (
-        <Card title="سمات الفئة" hint="السمات المعلَّمة بنجمة إلزامية للنشر.">
-          {plain.map((attr) => (
-            <Field
-              key={attr.attributeId}
-              label={`${attr.nameAr}${attr.isRequired ? ' *' : ''}`}
-              optional={!attr.isRequired}
-            >
-              {(props) =>
-                attr.inputType === 'select' ? (
+      <div className="vp-editor">
+        <div className="vp-editor__main">
+          <Section n={1} title="الأساسيات">
+            <div className="vp-grid-2">
+              <TextInput
+                label="الاسم بالعربية *"
+                required
+                value={form.nameAr}
+                onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
+              />
+              <TextInput
+                label="الاسم بالإنجليزية"
+                optional
+                dir="ltr"
+                value={form.nameEn}
+                onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
+              />
+            </div>
+            <div className="vp-grid-2">
+              <Field label="الفئة *" hint="تغيير الفئة يغيّر السمات المطلوبة في القسم 3.">
+                {(props) => (
                   <select
                     className="field__control"
                     {...props}
-                    value={attrValues[attr.attributeId] ?? ''}
-                    onChange={(e) =>
-                      setAttrValues({ ...attrValues, [attr.attributeId]: e.target.value })
-                    }
+                    value={form.categoryId}
+                    onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
                   >
-                    <option value="">—</option>
-                    {attr.values.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.valueAr}
+                    <option value="">اختر فئة…</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {'— '.repeat(Math.max(c.depth - 1, 0))}
+                        {c.nameAr}
                       </option>
                     ))}
                   </select>
-                ) : attr.inputType === 'boolean' ? (
-                  <select
-                    className="field__control"
-                    {...props}
-                    value={attrValues[attr.attributeId] ?? ''}
-                    onChange={(e) =>
-                      setAttrValues({ ...attrValues, [attr.attributeId]: e.target.value })
-                    }
-                  >
-                    <option value="">—</option>
-                    <option value="true">نعم</option>
-                    <option value="false">لا</option>
-                  </select>
-                ) : (
-                  <input
-                    className="field__control"
-                    {...props}
-                    inputMode={attr.inputType === 'number' ? 'numeric' : 'text'}
-                    value={attrValues[attr.attributeId] ?? ''}
-                    onChange={(e) =>
-                      setAttrValues({ ...attrValues, [attr.attributeId]: e.target.value })
-                    }
-                  />
-                )
-              }
-            </Field>
-          ))}
-        </Card>
-      ) : null}
+                )}
+              </Field>
+            </div>
+          </Section>
 
-      <Card
-        title="المتغيّرات"
-        hint="السعر والمخزون على المتغيّر. المنتج البسيط متغيّر واحد بلا خيارات."
-        aside={
-          <button
-            type="button"
-            className="btn btn--secondary btn--sm"
-            onClick={() => setVariants([...variants, emptyVariant()])}
+          <Section
+            n={2}
+            title="الوصف"
+            meta={
+              <span className="vp-sec__count num" data-over={descLength > DESCRIPTION_MAX}>
+                {num(descLength)} / {num(DESCRIPTION_MAX)}
+              </span>
+            }
           >
-            أضف متغيّراً
-          </button>
-        }
-      >
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                {axes.map((a) => (
-                  <th key={a.attributeId} scope="col">
-                    {a.nameAr}
-                  </th>
-                ))}
-                <th scope="col">SKU</th>
-                <th scope="col">السعر</th>
-                <th scope="col">الكمية</th>
-                <th scope="col">حدّ التنبيه</th>
-                <th scope="col" />
-              </tr>
-            </thead>
-            <tbody>
-              {variants.map((v, i) => (
-                <tr key={v.id ?? `new-${i}`}>
-                  {axes.map((a) => (
-                    <td key={a.attributeId}>
-                      <select
-                        className="field__control"
-                        aria-label={`${a.nameAr} للمتغيّر ${num(i + 1)}`}
-                        value={v.options[a.attributeId] ?? ''}
-                        onChange={(e) =>
-                          update(i, { options: { ...v.options, [a.attributeId]: e.target.value } })
-                        }
-                      >
-                        <option value="">—</option>
-                        {a.values.map((val) => (
-                          <option key={val.id} value={val.id}>
-                            {val.valueAr}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                  ))}
-                  <td>
-                    <input
-                      className="field__control num"
-                      dir="ltr"
-                      aria-label={`SKU للمتغيّر ${num(i + 1)}`}
-                      value={v.sku}
-                      onChange={(e) => update(i, { sku: e.target.value.toUpperCase() })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="field__control num"
-                      dir="ltr"
-                      inputMode="decimal"
-                      aria-label={`السعر للمتغيّر ${num(i + 1)}`}
-                      value={v.price}
-                      onChange={(e) => update(i, { price: e.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="field__control num"
-                      dir="ltr"
-                      inputMode="numeric"
-                      aria-label={`الكمية للمتغيّر ${num(i + 1)}`}
-                      value={v.stock}
-                      onChange={(e) => update(i, { stock: e.target.value.replace(/\D/g, '') })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="field__control num"
-                      dir="ltr"
-                      inputMode="numeric"
-                      aria-label={`حدّ التنبيه للمتغيّر ${num(i + 1)}`}
-                      value={v.lowStockThreshold}
-                      onChange={(e) =>
-                        update(i, { lowStockThreshold: e.target.value.replace(/\D/g, '') })
-                      }
-                    />
-                  </td>
-                  <td>
-                    {variants.length > 1 ? (
-                      <button
-                        type="button"
-                        className="btn btn--danger btn--sm"
-                        onClick={() => setVariants(variants.filter((_, j) => j !== i))}
-                      >
-                        حذف
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {product ? (
-          <p className="small muted">
-            السعر بعملة متجرك ({product.currency}). المحجوز للمشترين في الدفع لا يُحسب متاحاً.
-          </p>
-        ) : null}
-      </Card>
+            <TextArea
+              label="الوصف بالعربية"
+              optional
+              rows={5}
+              placeholder="اكتب وصفاً عربياً — المادة، المقاسات، العناية، ومن أين تشحن."
+              value={form.descriptionAr}
+              onChange={(e) => setForm({ ...form, descriptionAr: e.target.value })}
+            />
+          </Section>
 
-      <div className="row row--between">
-        <button className="btn btn--secondary" type="button" onClick={() => router.push('/vendor/products')}>
-          رجوع للقائمة
-        </button>
-        <span className="row">
-          <button className="btn btn--secondary" type="button" disabled={busy} onClick={() => void save()}>
-            {busy ? 'جارٍ الحفظ…' : 'حفظ'}
-          </button>
-          {product && product.status !== 'active' && product.status !== 'pending_review' ? (
-            <button className="btn btn--primary" type="button" disabled={busy} onClick={() => void publish()}>
-              أرسل للنشر
-            </button>
+          {plain.length > 0 ? (
+            <Section
+              n={3}
+              title="سمات الفئة"
+              meta={
+                <span className="vp-sec__meta">
+                  {categoryName ? `من «${categoryName}» — ` : ''}الحقول بعلامة{' '}
+                  <span className="vp-req">*</span> إلزامية للنشر
+                </span>
+              }
+            >
+              <div className="vp-grid-2">
+                {plain.map((attr) => (
+                  <AttrField
+                    key={attr.attributeId}
+                    attr={attr}
+                    value={attrValues[attr.attributeId] ?? ''}
+                    onChange={(value) => setAttrValues({ ...attrValues, [attr.attributeId]: value })}
+                  />
+                ))}
+              </div>
+            </Section>
           ) : null}
-        </span>
+
+          <Section
+            n={plain.length > 0 ? 4 : 3}
+            title="المتغيّرات"
+            meta={
+              <span className="vp-sec__count num">
+                {num(variants.length)} صفّ · حتى 3 محاور
+              </span>
+            }
+          >
+            <p className="card__hint">
+              السعر والمخزون على المتغيّر. المنتج البسيط متغيّر واحد بلا خيارات.
+            </p>
+
+            {axes.length > 0 ? (
+              <div className="vp-axes">
+                <span className="vp-axes__label">المحاور المميّزة</span>
+                {axes.map((a) => (
+                  <span key={a.attributeId} className="vp-axis">
+                    {a.nameAr}
+                    <span className="num">{num(a.values.length)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="table-wrap vp-matrix-wrap">
+              <table className="table vp-matrix">
+                <thead>
+                  <tr>
+                    {axes.map((a) => (
+                      <th key={a.attributeId} scope="col">
+                        {a.nameAr}
+                      </th>
+                    ))}
+                    <th scope="col">SKU</th>
+                    <th scope="col">السعر{product ? ` · ${product.currency}` : ''}</th>
+                    <th scope="col">الكمية</th>
+                    <th scope="col">حدّ التنبيه</th>
+                    <th scope="col">
+                      <span className="visually-hidden">إجراءات</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {variants.map((v, i) => (
+                    <tr key={v.id ?? `new-${i}`}>
+                      {axes.map((a) => (
+                        <td key={a.attributeId} data-label={a.nameAr}>
+                          <select
+                            className="field__control vp-cell"
+                            aria-label={`${a.nameAr} للمتغيّر ${num(i + 1)}`}
+                            value={v.options[a.attributeId] ?? ''}
+                            onChange={(e) =>
+                              update(i, { options: { ...v.options, [a.attributeId]: e.target.value } })
+                            }
+                          >
+                            <option value="">—</option>
+                            {a.values.map((val) => (
+                              <option key={val.id} value={val.id}>
+                                {val.valueAr}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      ))}
+                      <td data-label="SKU">
+                        <input
+                          className="field__control num vp-cell vp-cell--sku"
+                          dir="ltr"
+                          aria-label={`SKU للمتغيّر ${num(i + 1)}`}
+                          value={v.sku}
+                          onChange={(e) => update(i, { sku: e.target.value.toUpperCase() })}
+                        />
+                      </td>
+                      <td data-label="السعر">
+                        <input
+                          className="field__control money num vp-cell vp-cell--price"
+                          dir="ltr"
+                          inputMode="decimal"
+                          aria-label={`السعر للمتغيّر ${num(i + 1)}`}
+                          value={v.price}
+                          onChange={(e) => update(i, { price: e.target.value })}
+                        />
+                      </td>
+                      <td data-label="الكمية">
+                        <input
+                          className="field__control num vp-cell vp-cell--qty"
+                          dir="ltr"
+                          inputMode="numeric"
+                          aria-label={`الكمية للمتغيّر ${num(i + 1)}`}
+                          value={v.stock}
+                          onChange={(e) => update(i, { stock: e.target.value.replace(/\D/g, '') })}
+                        />
+                      </td>
+                      <td data-label="حدّ التنبيه">
+                        <input
+                          className="field__control num vp-cell vp-cell--qty"
+                          dir="ltr"
+                          inputMode="numeric"
+                          aria-label={`حدّ التنبيه للمتغيّر ${num(i + 1)}`}
+                          value={v.lowStockThreshold}
+                          onChange={(e) =>
+                            update(i, { lowStockThreshold: e.target.value.replace(/\D/g, '') })
+                          }
+                        />
+                      </td>
+                      <td data-label="" className="end">
+                        {variants.length > 1 ? (
+                          <button
+                            type="button"
+                            className="btn btn--danger btn--sm"
+                            onClick={() => setVariants(variants.filter((_, j) => j !== i))}
+                          >
+                            <Icon name="trash" size={14} />
+                            حذف
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="row">
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                onClick={() => setVariants([...variants, emptyVariant()])}
+              >
+                <Icon name="plus" size={14} />
+                أضف متغيّراً
+              </button>
+              <span className="vp-faint">بلا محاور يصبح المنتج صفاً واحداً.</span>
+            </div>
+            {product ? (
+              <p className="small muted">
+                السعر بعملة متجرك (<span className="num">{product.currency}</span>). المحجوز للمشترين في
+                الدفع لا يُحسب متاحاً.
+              </p>
+            ) : null}
+          </Section>
+        </div>
+
+        <aside className="vp-editor__side" aria-label="حالة الإرسال والملخّص">
+          {blockers.length > 0 ? (
+            <section className="vp-blockers" role="alert">
+              <header className="vp-blockers__head">
+                <Icon name="alert" size={17} />
+                <h2>لا يمكن الإرسال: {obstacles(blockers.length)}</h2>
+              </header>
+              <ul className="vp-blockers__list">
+                {blockers.map((message, i) => (
+                  <li key={`r${i}`}>
+                    <span className="vp-alert-dot" aria-hidden>
+                      <Icon name="alert" size={12} />
+                    </span>
+                    {message}
+                  </li>
+                ))}
+              </ul>
+              <p className="vp-blockers__hint">كل العوائق تُعرض معاً — أصلحها كلها ثم أعد الإرسال.</p>
+            </section>
+          ) : null}
+
+          <section className="card vp-summary">
+            <h2 className="eyebrow">الملخّص</h2>
+            <dl className="vp-summary__rows">
+              {product ? (
+                <div>
+                  <dt>الحالة</dt>
+                  <dd>{PRODUCT_STATUS[product.status].label}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>الفئة</dt>
+                <dd>{categoryName ?? '—'}</dd>
+              </div>
+              <div>
+                <dt>المتغيّرات</dt>
+                <dd className="num">{num(variants.length)}</dd>
+              </div>
+              <div>
+                <dt>نطاق السعر</dt>
+                <dd>
+                  {priceRange ? (
+                    <span className="money num">
+                      {priceRange}
+                      {product ? ` ${product.currency}` : ''}
+                    </span>
+                  ) : (
+                    '—'
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>المخزون الكلي</dt>
+                <dd className="num">{num(totalStock)}</dd>
+              </div>
+            </dl>
+          </section>
+        </aside>
       </div>
-    </>
+    </div>
   );
 
   function update(index: number, patch: Partial<VariantDraft>): void {
@@ -489,7 +619,160 @@ export function ProductEditor({ productId }: { productId?: string }) {
   }
 }
 
+/** قسم مرقّم من أقسام المحرّر — «1 · الأساسيات» */
+function Section({
+  n,
+  title,
+  meta,
+  children,
+}: {
+  n: number;
+  title: string;
+  meta?: ReactNode;
+  children: ReactNode;
+}) {
+  const id = useId();
+  return (
+    <section className="card vp-sec" aria-labelledby={id}>
+      <header className="vp-sec__head">
+        <h2 id={id}>
+          <span className="num">{n}</span> · {title}
+        </h2>
+        {meta}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * سمة فئة واحدة. القائمة القصيرة حبوب تُضغط، والنعم/لا مفتاح مقسّم —
+ * والضغط على المختار يلغيه، فتبقى السمة الاختيارية قابلة للتفريغ.
+ */
+function AttrField({
+  attr,
+  value,
+  onChange,
+}: {
+  attr: EffectiveAttribute;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = useId();
+  const labelId = `${id}-label`;
+  const label = (
+    <>
+      {attr.nameAr}
+      {attr.isRequired ? <span className="vp-req"> *</span> : null}
+    </>
+  );
+  const pills = attr.inputType === 'select' && attr.values.length <= PILL_LIMIT;
+  const grouped = pills || attr.inputType === 'boolean';
+
+  return (
+    <div className="field vp-attr">
+      <div className="vp-attr__head">
+        {grouped ? (
+          <span className="field__label" id={labelId}>
+            {label}
+          </span>
+        ) : (
+          <label className="field__label" htmlFor={id}>
+            {label}
+          </label>
+        )}
+        <span className="vp-attr__kind">{KIND[attr.inputType]}</span>
+      </div>
+
+      {pills ? (
+        <div className="vp-pills" role="group" aria-labelledby={labelId}>
+          {attr.values.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              className="vp-pill"
+              aria-pressed={value === v.id}
+              onClick={() => onChange(value === v.id ? '' : v.id)}
+            >
+              {v.valueAr}
+            </button>
+          ))}
+        </div>
+      ) : attr.inputType === 'boolean' ? (
+        <div className="seg vp-seg" role="group" aria-labelledby={labelId}>
+          {(
+            [
+              ['true', 'نعم'],
+              ['false', 'لا'],
+            ] as const
+          ).map(([v, text]) => (
+            <button
+              key={v}
+              type="button"
+              className="seg__opt"
+              aria-pressed={value === v}
+              onClick={() => onChange(value === v ? '' : v)}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      ) : attr.inputType === 'select' ? (
+        <select
+          id={id}
+          className="field__control"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="">—</option>
+          {attr.values.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.valueAr}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={id}
+          className={attr.inputType === 'number' ? 'field__control num' : 'field__control'}
+          {...(attr.inputType === 'number' ? { dir: 'ltr' } : {})}
+          inputMode={attr.inputType === 'number' ? 'numeric' : 'text'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** «عائق واحد · عائقان · 3 عوائق · 11 عائقاً» — التمييز يتغيّر بالعدد */
+function obstacles(n: number): string {
+  if (n === 1) return 'عائق واحد';
+  if (n === 2) return 'عائقان';
+  if (n <= 10) return `${num(n)} عوائق`;
+  return `${num(n)} عائقاً`;
+}
+
 /** خانات العملة — الدينار ثلاث والريال اثنتان (ADR-001) */
 function decimalsOf(currency: string): number {
   return ['JOD', 'KWD', 'BHD', 'OMR', 'TND'].includes(currency) ? 3 : 2;
+}
+
+/**
+ * مربّع الصورة المصغّرة لمنتج في قوائم البائع — الصورة الحقيقية إن وُجدت،
+ * وإلا أيقونة: لا صورة بديلة تتظاهر بأنها صورة المنتج.
+ */
+export function ProductThumb({ src, size = 'md' }: { src: string | null; size?: 'sm' | 'md' }) {
+  const url = src ? (/^https?:\/\//.test(src) ? src : `${API_BASE.replace(/\/api\/v1\/?$/, '')}${src}`) : null;
+  return (
+    <span className={`vp-thumb vp-thumb--${size}`} aria-hidden>
+      {url ? (
+        // مصغّرة من خادم الرفع مباشرةً؛ next/image يحتاج إعداد مضيف بعيد لا يلزم محلياً
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" loading="lazy" />
+      ) : (
+        <Icon name="image" size={size === 'sm' ? 15 : 17} />
+      )}
+    </span>
+  );
 }

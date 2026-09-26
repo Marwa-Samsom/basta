@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AdminHeader, Loading, Tabs } from '@/components/admin';
-import { Alert, Card } from '@/components/ui';
+import { AdminHeader, Empty, Loading } from '@/components/admin';
+import { Icon, type IconName } from '@/components/icons';
+import { Alert } from '@/components/ui';
 import { useAdminData } from '@/lib/admin';
 import { money } from '@/lib/orders';
 
@@ -16,12 +17,13 @@ interface Dashboard {
   alerts: { view: string; rows: number }[];
 }
 
-const QUEUES: { key: keyof Dashboard['queues']; label: string; href: string }[] = [
-  { key: 'vendors', label: 'بائعون بانتظار المراجعة', href: '/admin/vendors' },
-  { key: 'products', label: 'منتجات بانتظار المراجعة', href: '/admin/products' },
-  { key: 'payouts', label: 'طلبات سحب', href: '/admin/payouts' },
-  { key: 'disputes', label: 'نزاعات مفتوحة', href: '/admin/disputes' },
-  { key: 'overdueAcceptance', label: 'طلبات قاربت مهلة القبول', href: '/admin/orders?status=processing' },
+/** `hot`: الطابور الذي يتأخّر فيه أحد — يُلوَّن بالتحذير ما دام فيه شيء */
+const QUEUES: { key: keyof Dashboard['queues']; label: string; sub: string; href: string; icon: IconName; hot: boolean }[] = [
+  { key: 'vendors', label: 'متاجر تنتظر الاعتماد', sub: 'الأقدم أولاً', href: '/admin/vendors', icon: 'store', hot: true },
+  { key: 'products', label: 'منتجات تنتظر المراجعة', sub: 'جديدة ومعدَّلة بعد النشر', href: '/admin/products', icon: 'package', hot: true },
+  { key: 'payouts', label: 'طلبات تحويل', sub: 'بانتظار الموافقة أو التحويل', href: '/admin/payouts', icon: 'wallet', hot: false },
+  { key: 'disputes', label: 'نزاعات مفتوحة', sub: 'مفتوحة ومصعَّدة — الرصيد مجمَّد', href: '/admin/disputes', icon: 'scale', hot: true },
+  { key: 'overdueAcceptance', label: 'طلبات فرعية قاربت مهلة القبول', sub: 'أقل من 12 ساعة على انقضاء المهلة', href: '/admin/orders?status=processing', icon: 'clock', hot: true },
 ];
 
 const VIEW_LABELS: Record<string, string> = {
@@ -35,28 +37,41 @@ const VIEW_LABELS: Record<string, string> = {
   audit_paid_without_split: 'مدفوع بلا طلبات فرعية',
 };
 
+/** اسم العملة بجانب رمزها في مبدّل العملة — الرمز وحده إن لم نعرف الاسم */
+const CURRENCY_NAME: Record<string, string> = {
+  SAR: 'الريال',
+  AED: 'الدرهم',
+  JOD: 'الدينار الأردني',
+  KWD: 'الدينار الكويتي',
+  BHD: 'الدينار البحريني',
+  OMR: 'الريال العُماني',
+  QAR: 'الريال القطري',
+  EGP: 'الجنيه',
+  USD: 'الدولار',
+};
+
 /**
  * AD-03 — اللوحة. المؤشرات **مجمّعة بالعملة** ولا تُجمع عملتان في رقم.
- * الطوابير أولاً لأنها ما يُعمل عليه اليوم، والتنبيه الأحمر لأي انحراف
- * في منظرات التدقيق — خلل مالي لا ينتظر تقريراً شهرياً.
+ * الطوابير بطاقات تقود إلى عملها مباشرة، والتنبيه الأحمر لأي انحراف في
+ * منظرات التدقيق — خلل مالي لا ينتظر تقريراً شهرياً.
  */
 export default function AdminDashboard() {
-  const { data, error, forbidden } = useAdminData<Dashboard>('/admin/dashboard');
+  const { data, error, forbidden, reload } = useAdminData<Dashboard>('/admin/dashboard');
   const [currency, setCurrency] = useState<string | null>(null);
 
-  if (!data) return <Loading error={error} forbidden={forbidden} />;
+  if (!data) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
   const currencies = data.sales?.map((s) => s.currency) ?? [];
   const cur = currency ?? currencies[0] ?? null;
   const sales = data.sales?.find((s) => s.currency === cur);
   const ledger = data.ledger?.find((l) => l.currency === cur);
 
   return (
-    <div className="stack stack--loose">
-      <AdminHeader title="اللوحة" hint="آخر 30 يوماً" />
+    <div className="ao-page">
+      <AdminHeader title="لوحة المؤشرات" hint="آخر 30 يوماً" />
 
       {data.alerts.length > 0 ? (
         <Alert tone="danger" title="انحراف في التدقيق — افحصه الآن">
-          <ul>
+          <ul className="ao-alert-list">
             {data.alerts.map((a) => (
               <li key={a.view}>
                 {VIEW_LABELS[a.view] ?? a.view}: <span className="num">{a.rows}</span>
@@ -66,62 +81,89 @@ export default function AdminDashboard() {
         </Alert>
       ) : null}
 
-      <section className="stats">
-        {QUEUES.map((q) => (
-          <Link key={q.key} href={q.href} className="stat" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <span className="stat__label">{q.label}</span>
-            <span className="stat__value num">{data.queues[q.key]}</span>
-          </Link>
-        ))}
-      </section>
-
       {data.sales === null ? (
-        <Card>
-          <p className="muted">الأرقام المالية لمن يملك صلاحية التقارير.</p>
-        </Card>
+        <div className="ao-note" data-tone="info">
+          <Icon name="lock" size={16} />
+          <span>الأرقام المالية لمن يملك صلاحية التقارير.</span>
+        </div>
       ) : currencies.length === 0 ? (
-        <Card>
-          <p className="empty muted">لا مبيعات في الفترة.</p>
-        </Card>
+        <Empty icon="chart" title="لا مبيعات في الفترة">
+          تظهر المؤشرات هنا بمجرّد وجود طلبات مدفوعة في آخر 30 يوماً.
+        </Empty>
       ) : (
-        <Card title="المؤشرات">
-          <div className="stack">
-            <Tabs value={cur ?? ''} options={currencies.map((c) => ({ key: c, label: c }))} onChange={setCurrency} />
-            <div className="stats">
-              <div className="stat">
-                <span className="stat__label">المبيعات</span>
-                <span className="stat__value money">{sales ? money(sales.grossMinorUnits, sales.currency) : '—'}</span>
-                <span className="stat__note">{sales?.orders ?? 0} طلب</span>
-              </div>
-              <div className="stat">
-                <span className="stat__label">متوسط الطلب</span>
-                <span className="stat__value money">{sales ? money(sales.averageOrderMinorUnits, sales.currency) : '—'}</span>
-              </div>
-              <div className="stat">
-                <span className="stat__label">هامش الصرف</span>
-                <span className="stat__value money">{sales ? money(sales.fxSpreadMinorUnits, sales.currency) : '—'}</span>
-                <span className="stat__note">تقدير من الفرعيات بعملة مختلفة</span>
-              </div>
-              <div className="stat">
-                <span className="stat__label">عمولة المنصة (بعملة البائع {cur})</span>
-                <span className="stat__value money">{ledger ? money(ledger.commissionMinorUnits, ledger.currency) : '—'}</span>
-                <span className="stat__note">من دفتر المنصة</span>
-              </div>
-              <div className="stat">
-                <span className="stat__label">بائعون نشطون</span>
-                <span className="stat__value num">{data.activeVendors ?? 0}</span>
-              </div>
-              <div className="stat">
-                <span className="stat__label">معدّل التحويل</span>
-                <span className="stat__value num">{data.conversion?.ratePct === null ? '—' : `${data.conversion?.ratePct}%`}</span>
-                <span className="stat__note">
-                  {data.conversion?.paidOrders ?? 0} طلب من {data.conversion?.carts ?? 0} سلة
-                </span>
-              </div>
+        <section className="ao-dash" aria-label="المؤشرات">
+          <div className="ao-dash__bar">
+            <span className="ao-dash__lead">المؤشرات معروضة بعملة واحدة في كل مرة — لا نجمع عملتين في رقم واحد.</span>
+            <div className="seg ao-cur" role="tablist" aria-label="العملة">
+              {currencies.map((c) => (
+                <button key={c} type="button" role="tab" className="seg__opt" aria-selected={cur === c} onClick={() => setCurrency(c)}>
+                  {CURRENCY_NAME[c] ?? c}
+                  {CURRENCY_NAME[c] ? <span className="ao-cur__code num">{c}</span> : null}
+                </button>
+              ))}
             </div>
           </div>
-        </Card>
+
+          <div className="ao-metrics">
+            <div className="ao-metric ao-metric--money">
+              <span className="ao-metric__label">المبيعات</span>
+              <span className="ao-metric__value money num">{sales ? money(sales.grossMinorUnits, sales.currency) : '—'}</span>
+              <span className="ao-metric__note">
+                <span className="num">{sales?.orders ?? 0}</span> طلب
+              </span>
+            </div>
+            <div className="ao-metric ao-metric--money">
+              <span className="ao-metric__label">عمولة المنصّة</span>
+              <span className="ao-metric__value money num">{ledger ? money(ledger.commissionMinorUnits, ledger.currency) : '—'}</span>
+              <span className="ao-metric__note">من دفتر المنصة · بعملة البائع {cur}</span>
+            </div>
+            <div className="ao-metric ao-metric--money">
+              <span className="ao-metric__label">دخل فرق الصرف</span>
+              <span className="ao-metric__value money num">{sales ? money(sales.fxSpreadMinorUnits, sales.currency) : '—'}</span>
+              <span className="ao-metric__note">تقدير من الفرعيات بعملة مختلفة</span>
+            </div>
+            <div className="ao-metric ao-metric--money">
+              <span className="ao-metric__label">متوسط قيمة الطلب</span>
+              <span className="ao-metric__value money num">{sales ? money(sales.averageOrderMinorUnits, sales.currency) : '—'}</span>
+            </div>
+            <div className="ao-metric">
+              <span className="ao-metric__label">معدّل التحويل</span>
+              <span className="ao-metric__value num">{data.conversion?.ratePct === null ? '—' : `${data.conversion?.ratePct}%`}</span>
+              <span className="ao-metric__note">
+                <span className="num">{data.conversion?.paidOrders ?? 0}</span> طلب من <span className="num">{data.conversion?.carts ?? 0}</span> سلة
+              </span>
+            </div>
+            <div className="ao-metric">
+              <span className="ao-metric__label">متاجر نشطة</span>
+              <span className="ao-metric__value num">{data.activeVendors ?? 0}</span>
+            </div>
+          </div>
+        </section>
       )}
+
+      <section className="ao-dash__queues" aria-labelledby="ao-queues-title">
+        <h2 id="ao-queues-title" className="ao-section-title">
+          طوابير تنتظر إجراءً
+        </h2>
+        <div className="ao-queues">
+          {QUEUES.map((q) => {
+            const n = data.queues[q.key];
+            const hot = q.hot && n > 0;
+            return (
+              <Link key={q.key} href={q.href} className="ao-queue" data-hot={hot} data-zero={n === 0}>
+                <span className="ao-queue__icon" aria-hidden>
+                  <Icon name={q.icon} size={17} />
+                </span>
+                <span className="ao-queue__text">
+                  <span className="ao-queue__label">{q.label}</span>
+                  <span className="ao-queue__sub">{n === 0 ? 'لا شيء ينتظر' : q.sub}</span>
+                </span>
+                <span className="ao-queue__count num">{n}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

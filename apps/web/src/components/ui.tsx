@@ -2,6 +2,7 @@
 
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import { useId } from 'react';
+import { Icon, type IconName } from '@/components/icons';
 
 /**
  * المكوّنات المشتركة — تقابل ورقة المكوّنات في `docs/02-design/screens`.
@@ -251,5 +252,57 @@ export function Spinner({ label = 'جارٍ التحميل' }: { label?: string 
       <span className="spinner" aria-hidden />
       {label}
     </p>
+  );
+}
+
+/**
+ * رأس الصفحة — نمط كل شاشة في التصميم: العنوان، وعدّاد أو وصف قصير بجانبه،
+ * والإجراءات في الطرف المقابل.
+ */
+export function PageHead({
+  title,
+  meta,
+  count,
+  actions,
+}: {
+  title: ReactNode;
+  meta?: ReactNode;
+  count?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="page-head">
+      <h1>{title}</h1>
+      {count !== undefined && count !== null ? <span className="page-head__count">{count}</span> : null}
+      {meta ? <span className="page-head__meta">{meta}</span> : null}
+      {actions ? <span className="page-head__actions">{actions}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * حالة فارغة — مربّع أيقونة وعنوان وجملة تقول ما التالي وإجراؤه،
+ * لا «لا يوجد» وحدها.
+ */
+export function EmptyState({
+  icon = 'package',
+  title,
+  children,
+  actions,
+}: {
+  icon?: IconName;
+  title: string;
+  children?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="empty">
+      <span className="empty__icon" aria-hidden>
+        <Icon name={icon} size={28} />
+      </span>
+      <p className="empty__title">{title}</p>
+      {children ? <p>{children}</p> : null}
+      {actions ? <div className="row">{actions}</div> : null}
+    </div>
   );
 }

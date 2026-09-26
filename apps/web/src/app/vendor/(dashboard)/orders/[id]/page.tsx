@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { use, useEffect, useState } from 'react';
-import { Alert, Card, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Alert, TextArea, TextInput } from '@/components/ui';
+import { Icon, type IconName } from '@/components/icons';
 import { api } from '@/lib/api';
 import {
   ACTION_LABEL,
@@ -35,6 +36,21 @@ interface Waybill {
   trackingNumber: string;
   labelText: string;
 }
+
+/** أيقونة كل انتقال في «الإجراءات المتاحة» — كما في VD-13 */
+const ACTION_ICON: Partial<Record<SubOrderStatus, IconName>> = {
+  accepted: 'check',
+  preparing: 'package',
+  ready_to_ship: 'boxes',
+  shipped: 'truck',
+  delivered: 'check-circle',
+  delivery_failed: 'alert',
+  returned: 'package',
+  canceled_by_customer: 'x',
+};
+
+/** حالات تُرسم في المسار بلون الخطر: خروج عن المسار السعيد */
+const BAD = new Set(['delivery_failed', 'return_requested', 'returned', 'rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded']);
 
 /**
  * VD-13 تفاصيل الطلب · VD-14 البوليصة والشحن · VD-16 الإرجاع.
@@ -110,28 +126,54 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
   };
 
   if (!order) {
-    return error ? <Alert tone="danger">{error}</Alert> : <Spinner label="جارٍ فتح الطلب…" />;
+    return error ? (
+      <div className="vm-page">
+        <Link href="/vendor/orders" className="vm-back">
+          <Icon name="back" size={14} mirror />
+          الطلبات
+        </Link>
+        <div className="empty">
+          <span className="empty__icon vm-error-icon" aria-hidden>
+            <Icon name="alert" size={26} />
+          </span>
+          <p className="empty__title">تعذّر فتح الطلب</p>
+          <Alert tone="danger">{error}</Alert>
+        </div>
+      </div>
+    ) : (
+      <div className="vm-loading vm-loading--page" role="status">
+        <span className="visually-hidden">جارٍ فتح الطلب…</span>
+        <span className="skeleton vm-loading__title" />
+        <span className="skeleton vm-loading__block" />
+        <span className="skeleton vm-loading__panel" />
+      </div>
+    );
   }
 
   const addr = order.shippingAddress;
   const openReturn = order.returns.find((r) => r.status === 'requested');
-  const itemName = (itemId: string) => order.items.find((i) => i.id === itemId)?.productNameSnapshotAr ?? '—';
+  const itemOf = (itemId: string) => order.items.find((i) => i.id === itemId);
   const simple = order.actions.filter((a) => a !== 'rejected_by_vendor' && a !== 'shipped' && a !== 'returned' && !(a === 'delivered' && order.status === 'return_requested'));
+  const f = order.financials;
+  const rate = (f.commissionRateBps / 100).toFixed(1);
+  const address = [addr['street'], addr['building'], addr['area'], addr['city'], addr['region']].filter(Boolean).join('، ');
 
   return (
-    <div className="stack stack--loose">
-      <header className="row row--between">
-        <div className="stack stack--tight">
-          <Link href="/vendor/orders" className="small">
-            → كل الطلبات
-          </Link>
-          <h1 className="num">{order.number}</h1>
-          <span className="small muted">
-            {when(order.placedAt)} · طلب المشتري <span className="num">{order.orderNumber}</span>
-          </span>
-        </div>
-        <span className={`badge ${toneOf(order.status)}`}>{labelOf(order.status)}</span>
-      </header>
+    <div className="vm-page">
+      <div className="vm-detail-head">
+        <Link href="/vendor/orders" className="vm-back">
+          <Icon name="back" size={14} mirror />
+          الطلبات
+        </Link>
+        <h1 className="num">{order.number}</h1>
+        <span className={`badge vm-status ${toneOf(order.status)}`}>
+          <span className="vm-status__dot" aria-hidden />
+          {labelOf(order.status)}
+        </span>
+        <span className="vm-detail-head__meta">
+          أُنشئ {when(order.placedAt)} · طلب المشتري <span className="num">{order.orderNumber}</span>
+        </span>
+      </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
@@ -139,36 +181,239 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
         <Alert tone="warning">اقبل الطلب أو ارفضه خلال 48 ساعة من وصوله، وإلا أُلغي آلياً.</Alert>
       ) : null}
 
-      {/* الإجراءات */}
-      {order.actions.length > 0 ? (
-        <Card title="الإجراء التالي">
-          <div className="stack">
-            <div className="row">
-              {simple.map((to) => (
-                <button key={to} type="button" className={`btn ${to === 'delivery_failed' ? 'btn--secondary' : 'btn--primary'}`} disabled={busy} onClick={() => void move(to)}>
-                  {ACTION_LABEL[to] ?? labelOf(to)}
-                </button>
-              ))}
-              {order.actions.includes('rejected_by_vendor') ? (
-                <button type="button" className="btn btn--danger" disabled={busy} onClick={() => setAsking('reject')}>
-                  رفض الطلب
-                </button>
-              ) : null}
-            </div>
+      {order.status === 'awaiting_vendor' || order.status === 'accepted' ? (
+        <p className="vm-note">
+          <Icon name="info" size={16} />
+          بعد بدء التجهيز لا يستطيع المشتري إلغاء الطلب.
+        </p>
+      ) : null}
 
-            {asking ? (
-              <div className="stack">
-                <TextArea label={asking === 'reject' ? 'سبب الرفض — يُعرض للمشتري كما تكتبه' : 'سبب رفض الإرجاع — يُعرض للمشتري'} value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
+      <div className="vm-detail">
+        <div className="vm-detail__main">
+          {/* VD-16 — طلب الإرجاع */}
+          {openReturn ? (
+            <section className="card vm-return">
+              <div className="vm-return__head">
+                <h2>طلب إرجاع</h2>
+                <span className="badge badge--warning">بانتظار قرارك</span>
+                <span className="vm-return__date">{when(openReturn.requestedAt)}</span>
+              </div>
+              <div className="vm-field">
+                <span className="vm-field__label">سبب المشتري</span>
+                <p className="vm-field__text">
+                  {RETURN_REASONS[openReturn.reasonCode] ?? openReturn.reasonCode}
+                  {openReturn.description ? <> — «{openReturn.description}»</> : null}
+                </p>
+              </div>
+              <div className="vm-field">
+                <span className="vm-field__label">القطع المطلوب إرجاعها</span>
+                <ul className="vm-return__items">
+                  {openReturn.itemsJson.map((i) => {
+                    const item = itemOf(i.orderItemId);
+                    return (
+                      <li key={i.orderItemId}>
+                        <span className="vm-line__main">
+                          <span className="vm-line__name">{item?.productNameSnapshotAr ?? '—'}</span>
+                          {item ? <span className="num vm-line__sku">{item.skuSnapshot}</span> : null}
+                        </span>
+                        <span className="num vm-line__qty">× {i.qty}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <p className="vm-hint">عند الاستلام تعود القطع للمخزون ويُردّ نصيبها للمشتري آلياً. لا يُردّ الشحن في الإرجاع الجزئي.</p>
+              <div className="row">
+                <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void move('returned', { returnRequestId: openReturn.id })}>
+                  <Icon name="package" size={15} />
+                  استلمت المرتجع
+                </button>
+                <button type="button" className="btn btn--danger" disabled={busy} onClick={() => setAsking('deny')}>
+                  <Icon name="x" size={15} />
+                  رفض الإرجاع
+                </button>
+              </div>
+              {asking === 'deny' ? (
+                <div className="vm-subpanel">
+                  <TextArea label="سبب رفض الإرجاع — يُعرض للمشتري" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
+                  <div className="row">
+                    <button type="button" className="btn btn--danger" disabled={busy || reason.trim().length < 5} onClick={() => void denyReturn()}>
+                      <Icon name="x" size={15} />
+                      تأكيد الرفض
+                    </button>
+                    <button type="button" className="btn btn--secondary" onClick={() => setAsking(null)}>
+                      تراجع
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          <section className="card">
+            <h2 className="vm-card-title">بيانات الشحن</h2>
+            <dl className="vm-kv">
+              <div>
+                <dt>المستلم</dt>
+                <dd className="vm-kv__strong">{addr['recipientName'] ?? '—'}</dd>
+              </div>
+              <div>
+                <dt>الجوال</dt>
+                <dd className="num">{addr['phone'] ?? '—'}</dd>
+              </div>
+              <div className="vm-kv__wide">
+                <dt>العنوان</dt>
+                <dd className="vm-kv__body">{address || '—'}</dd>
+              </div>
+              {order.shipment ? (
+                <div>
+                  <dt>الناقل</dt>
+                  <dd className="num">{order.shipment.carrierCode}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>رقم التتبّع</dt>
+                {order.shipment ? (
+                  <dd className="num">{order.shipment.trackingNumber}</dd>
+                ) : (
+                  <dd className="vm-kv__empty">لم يُشحن بعد</dd>
+                )}
+              </div>
+              {order.customerNote ? (
+                <div className="vm-kv__wide">
+                  <dt>ملاحظة المشتري</dt>
+                  <dd className="vm-kv__body">{order.customerNote}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </section>
+
+          <section className="card card--flush">
+            <header className="card__head">
+              <h2>المنتجات</h2>
+              <span className="num vm-count">{order.items.length}</span>
+            </header>
+            <ul className="vm-lines">
+              {order.items.map((i) => (
+                <li key={i.id}>
+                  <span className="vm-line__main">
+                    <span className="vm-line__name">
+                      {i.productNameSnapshotAr}
+                      {i.variantLabelSnapshot ? <span className="vm-line__variant"> · {i.variantLabelSnapshot}</span> : null}
+                    </span>
+                    <span className="num vm-line__sku">{i.skuSnapshot}</span>
+                  </span>
+                  <span className="num vm-line__qty">
+                    × {i.qty}
+                    {i.refundedQty ? <span className="vm-line__refund"> (أُرجع {i.refundedQty})</span> : null}
+                  </span>
+                  <span className="money num vm-line__total">{money(i.lineTotalMinorUnits, order.currency)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="card">
+            <h2 className="vm-card-title">مسار الطلب</h2>
+            <ol className="vm-timeline">
+              {order.history.map((h, i) => {
+                const last = i === order.history.length - 1;
+                const state = BAD.has(h.toStatus) ? 'bad' : last ? 'current' : 'done';
+                return (
+                  <li key={i} className="vm-timeline__step" data-state={state}>
+                    <span className="vm-timeline__rail" aria-hidden>
+                      <span className="vm-timeline__dot">
+                        <Icon name={state === 'bad' ? 'alert' : state === 'current' ? 'clock' : 'check'} size={14} />
+                      </span>
+                      {last ? null : <span className="vm-timeline__line" />}
+                    </span>
+                    <span className="vm-timeline__body">
+                      <span className="vm-timeline__label">{h.toLabel}</span>
+                      <span className="vm-timeline__meta">
+                        <span className="vm-timeline__date">{when(h.createdAt)}</span>
+                        <span>المنفّذ: {h.actorRole ? ROLE_LABEL[h.actorRole] ?? h.actorRole : 'آلي'}</span>
+                      </span>
+                      {h.reason ? <span className="vm-timeline__note">«{h.reason}»</span> : null}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        </div>
+
+        <aside className="vm-detail__side">
+          <section className="card vm-amounts">
+            <h2 className="vm-card-title">تفصيل المبالغ</h2>
+            <dl className="vm-amounts__rows">
+              <div>
+                <dt>المنتجات</dt>
+                <dd className="money num">{money(f.itemsSubtotalMinorUnits, order.currency)}</dd>
+              </div>
+              <div>
+                <dt>الخصم</dt>
+                <dd className="money num">−{money(f.discountMinorUnits, order.currency)}</dd>
+              </div>
+              <div>
+                <dt>عمولة بسطة ({rate}%)</dt>
+                <dd className="money num">−{money(f.commissionMinorUnits, order.currency)}</dd>
+              </div>
+              <div>
+                <dt>الشحن</dt>
+                <dd className="money num">+{money(f.shippingMinorUnits, order.currency)}</dd>
+              </div>
+              <div className="vm-amounts__total">
+                <dt>صافي أرباحك</dt>
+                <dd className="money num">{money(f.netMinorUnits, order.currency)}</dd>
+              </div>
+            </dl>
+            <p className="vm-hint">العمولة {rate}% على القطع لا على الشحن.</p>
+            {order.refunds.length > 0 ? (
+              <ul className="vm-refunds">
+                {order.refunds.map((r) => (
+                  <li key={r.id}>
+                    استرداد للمشتري ({r.reason}) · {r.status === 'succeeded' ? 'تمّ' : 'قيد التنفيذ'}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
+          <section className="card vm-actions">
+            <h2 className="vm-card-title">الإجراءات المتاحة</h2>
+            <p className="vm-hint">
+              {order.actions.length > 0 ? 'الأزرار المعروضة هي المسموحة في هذه الحالة فقط.' : 'لا إجراءات متاحة في هذه الحالة.'}
+            </p>
+
+            {simple.map((to) => (
+              <button
+                key={to}
+                type="button"
+                className={`btn ${to === 'delivery_failed' ? 'btn--danger' : 'btn--primary'}`}
+                disabled={busy}
+                onClick={() => void move(to)}
+              >
+                {ACTION_ICON[to] ? <Icon name={ACTION_ICON[to]} size={16} /> : null}
+                {ACTION_LABEL[to] ?? labelOf(to)}
+              </button>
+            ))}
+
+            {order.actions.includes('rejected_by_vendor') ? (
+              <button type="button" className="btn btn--danger" disabled={busy} onClick={() => setAsking('reject')}>
+                <Icon name="x" size={16} />
+                رفض الطلب
+              </button>
+            ) : null}
+
+            {asking === 'reject' ? (
+              <div className="vm-subpanel">
+                <TextArea label="سبب الرفض — يُعرض للمشتري كما تكتبه" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
                 <div className="row">
-                  <button
-                    type="button"
-                    className="btn btn--danger"
-                    disabled={busy || reason.trim().length < 5}
-                    onClick={() => void (asking === 'reject' ? move('rejected_by_vendor', { reason }) : denyReturn())}
-                  >
+                  <button type="button" className="btn btn--danger" disabled={busy || reason.trim().length < 5} onClick={() => void move('rejected_by_vendor', { reason })}>
+                    <Icon name="x" size={15} />
                     تأكيد الرفض
                   </button>
-                  <button type="button" className="btn btn--ghost" onClick={() => setAsking(null)}>
+                  <button type="button" className="btn btn--secondary" onClick={() => setAsking(null)}>
                     تراجع
                   </button>
                 </div>
@@ -176,130 +421,27 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
             ) : null}
 
             {order.actions.includes('shipped') ? (
-              <div className="stack">
-                <p className="small muted">أصدر بوليصة من شركة الشحن، أو أدخل رقم تتبّع توصيلك الذاتي.</p>
-                <div className="row">
-                  <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void issueWaybill()}>
-                    إصدار بوليصة
-                  </button>
-                </div>
-                {waybill ? <pre className="card small" style={{ whiteSpace: 'pre-wrap' }}>{waybill.labelText}</pre> : null}
-                <TextInput label="رقم التتبّع" value={tracking} onChange={(e) => setTracking(e.target.value)} dir="ltr" />
+              <div className="vm-subpanel">
+                <p className="vm-hint">أصدر بوليصة من شركة الشحن، أو أدخل رقم تتبّع توصيلك الذاتي.</p>
+                <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void issueWaybill()}>
+                  <Icon name="file" size={16} />
+                  إصدار بوليصة
+                </button>
+                {waybill ? <pre className="vm-waybill">{waybill.labelText}</pre> : null}
+                <TextInput label="رقم التتبّع" className="field__control vm-mono" value={tracking} onChange={(e) => setTracking(e.target.value)} dir="ltr" />
                 <button
                   type="button"
                   className="btn btn--primary"
                   disabled={busy || tracking.trim().length < 4}
                   onClick={() => void move('shipped', { tracking, carrierCode: carrier })}
                 >
+                  <Icon name="truck" size={16} />
                   تأكيد الشحن
                 </button>
               </div>
             ) : null}
-          </div>
-        </Card>
-      ) : null}
-
-      {/* VD-16 — طلب الإرجاع */}
-      {openReturn ? (
-        <Card title="طلب إرجاع" hint={`${RETURN_REASONS[openReturn.reasonCode] ?? openReturn.reasonCode} · ${when(openReturn.requestedAt)}`}>
-          <div className="stack">
-            {openReturn.description ? <p>«{openReturn.description}»</p> : null}
-            <ul className="stack stack--tight">
-              {openReturn.itemsJson.map((i) => (
-                <li key={i.orderItemId}>
-                  {itemName(i.orderItemId)} × <span className="num">{i.qty}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="small muted">عند الاستلام تعود القطع للمخزون ويُردّ نصيبها للمشتري آلياً. لا يُردّ الشحن في الإرجاع الجزئي.</p>
-            <div className="row">
-              <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void move('returned', { returnRequestId: openReturn.id })}>
-                استلمت المرتجع
-              </button>
-              <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => setAsking('deny')}>
-                رفض الإرجاع
-              </button>
-            </div>
-          </div>
-        </Card>
-      ) : null}
-
-      <div className="grid-2">
-        <Card title="القطع">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>المنتج</th>
-                  <th>SKU</th>
-                  <th>الكمية</th>
-                  <th>الإجمالي</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.items.map((i) => (
-                  <tr key={i.id}>
-                    <td className="wrap">
-                      {i.productNameSnapshotAr}
-                      {i.variantLabelSnapshot ? <span className="small muted"> · {i.variantLabelSnapshot}</span> : null}
-                    </td>
-                    <td className="num small">{i.skuSnapshot}</td>
-                    <td className="num">
-                      {i.qty}
-                      {i.refundedQty ? <span className="small muted"> (أُرجع {i.refundedQty})</span> : null}
-                    </td>
-                    <td className="money">{money(i.lineTotalMinorUnits, order.currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        <Card title="الحساب" hint={`العمولة ${(order.financials.commissionRateBps / 100).toFixed(1)}% على القطع لا على الشحن`}>
-          <dl className="summary__rows">
-            <div className="row row--between"><dt>القطع</dt><dd className="money">{money(order.financials.itemsSubtotalMinorUnits, order.currency)}</dd></div>
-            <div className="row row--between"><dt>الشحن</dt><dd className="money">{money(order.financials.shippingMinorUnits, order.currency)}</dd></div>
-            <div className="row row--between"><dt>الخصم</dt><dd className="money">−{money(order.financials.discountMinorUnits, order.currency)}</dd></div>
-            <div className="row row--between"><dt>العمولة</dt><dd className="money">−{money(order.financials.commissionMinorUnits, order.currency)}</dd></div>
-            <div className="row row--between summary__total"><dt>صافيك</dt><dd className="money">{money(order.financials.netMinorUnits, order.currency)}</dd></div>
-          </dl>
-          {order.refunds.length > 0 ? (
-            <ul className="stack stack--tight small">
-              {order.refunds.map((r) => (
-                <li key={r.id}>
-                  استرداد للمشتري ({r.reason}) · {r.status === 'succeeded' ? 'تمّ' : 'قيد التنفيذ'}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </Card>
-
-        <Card title="الشحن إلى">
-          <p>{addr['recipientName']}</p>
-          <p className="small">
-            {[addr['street'], addr['building'], addr['area'], addr['city'], addr['region']].filter(Boolean).join('، ')}
-          </p>
-          <p className="num small" dir="ltr">{addr['phone']}</p>
-          {order.customerNote ? <p className="small muted">ملاحظة المشتري: {order.customerNote}</p> : null}
-          {order.shipment ? (
-            <p className="small">
-              التتبّع: <span className="num">{order.shipment.trackingNumber}</span>
-            </p>
-          ) : null}
-        </Card>
-
-        <Card title="السجل">
-          <ol className="stack stack--tight">
-            {order.history.map((h, i) => (
-              <li key={i} className="small">
-                <strong>{h.toLabel}</strong> · {when(h.createdAt)}
-                {h.actorRole ? <span className="muted"> · {ROLE_LABEL[h.actorRole] ?? h.actorRole}</span> : <span className="muted"> · آلي</span>}
-                {h.reason ? <div className="muted">«{h.reason}»</div> : null}
-              </li>
-            ))}
-          </ol>
-        </Card>
+          </section>
+        </aside>
       </div>
     </div>
   );

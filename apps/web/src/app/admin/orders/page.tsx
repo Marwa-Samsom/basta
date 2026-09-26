@@ -1,9 +1,9 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Fragment, Suspense, useState } from 'react';
 import { AdminHeader, Empty, Feedback, Loading, ReasonButton, Tabs } from '@/components/admin';
-import { Card } from '@/components/ui';
+import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { PARENT_STATUS, useAction, useAdminData } from '@/lib/admin';
 import { labelOf, money, toneOf, when, type SubOrderView } from '@/lib/orders';
@@ -29,6 +29,17 @@ interface Detail {
   stores: SubOrderView[];
 }
 
+/** لون حالة الطلب الأب — الفرعيات لها ألوانها في `toneOf` */
+const PARENT_TONE: Record<string, string> = {
+  pending_payment: 'badge--pending',
+  payment_failed: 'badge--danger',
+  processing: 'badge--info',
+  partially_completed: 'badge--warning',
+  completed: 'badge--success',
+  canceled: 'badge--pending',
+  refunded: 'badge--pending',
+};
+
 /** AD-12 — الطلبات: بحث برقم الطلب أو العميل أو المتجر، وتفاصيل كل متجر بمساره، وإلغاء الإدارة قبل الشحن */
 function OrdersInner() {
   const params = useSearchParams();
@@ -39,34 +50,111 @@ function OrdersInner() {
   const { data, error, forbidden, reload } = useAdminData<{ items: Row[]; total: number }>(`/admin/orders?${q}`);
 
   return (
-    <div className="stack stack--loose">
-      <AdminHeader title="الطلبات" hint={data ? `${data.total} طلب` : undefined}>
-        <input className="field__control" placeholder="رقم الطلب، بريد العميل، أو المتجر" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="بحث" />
-      </AdminHeader>
-      <Tabs value={status} onChange={setStatus} options={[{ key: '', label: 'الكل' }, ...['processing', 'partially_completed', 'completed', 'canceled', 'refunded', 'payment_failed'].map((k) => ({ key: k, label: PARENT_STATUS[k]! }))]} />
+    <div className="ao-page">
+      <AdminHeader title="الطلبات" count={data ? `${data.total} طلب` : undefined} />
+      <div className="toolbar">
+        <Tabs
+          value={status}
+          onChange={setStatus}
+          label="حالة الطلب"
+          options={[{ key: '', label: 'الكل' }, ...['processing', 'partially_completed', 'completed', 'canceled', 'refunded', 'payment_failed'].map((k) => ({ key: k, label: PARENT_STATUS[k]! }))]}
+        />
+        <div className="toolbar__end">
+          <span className="input-icon ao-search">
+            <Icon name="search" size={15} />
+            <input className="field__control" type="search" placeholder="رقم الطلب، بريد العميل، أو المتجر" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="بحث" />
+          </span>
+        </div>
+      </div>
       {!data ? (
-        <Loading error={error} forbidden={forbidden} />
+        <Loading error={error} forbidden={forbidden} onRetry={reload} />
       ) : data.items.length === 0 ? (
-        <Card>
-          <Empty>لا طلبات.</Empty>
-        </Card>
-      ) : (
-        <div className="stack">
-          {data.items.map((o) => (
-            <Card key={o.orderNumber}>
-              <button type="button" className="row row--between" style={{ all: 'unset', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', width: '100%' }} onClick={() => setOpenNumber(openNumber === o.orderNumber ? null : o.orderNumber)} aria-expanded={openNumber === o.orderNumber}>
-                <span>
-                  <strong className="num">{o.orderNumber}</strong> · <span className="small muted">{when(o.placedAt)}</span>
-                  <div className="small">{o.customer?.fullName ?? o.guestEmail ?? 'ضيف'} · {o.subOrders.map((s) => s.vendor.nameAr).join('، ')}</div>
-                </span>
-                <span className="stack stack--tight" style={{ alignItems: 'flex-end' }}>
-                  <span className="money">{money(o.grandTotalMinorUnits, o.currency)}</span>
-                  <span className="badge badge--pending">{PARENT_STATUS[o.status] ?? o.status}</span>
-                </span>
+        <Empty
+          icon="truck"
+          title="لا طلبات بهذه التصفية"
+          actions={
+            search.trim() || status ? (
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                onClick={() => {
+                  setSearch('');
+                  setStatus('');
+                }}
+              >
+                أزل التصفية
               </button>
-              {openNumber === o.orderNumber ? <OrderDetail number={o.orderNumber} onChange={reload} /> : null}
-            </Card>
-          ))}
+            ) : undefined
+          }
+        >
+          وسّع التصفية أو ابحث برقم آخر.
+        </Empty>
+      ) : (
+        <div className="table-wrap">
+          <table className="table ao-table">
+            <thead>
+              <tr>
+                <th>الطلب</th>
+                <th>العميل</th>
+                <th>المتاجر</th>
+                <th>الحالة</th>
+                <th className="end">الإجمالي</th>
+                <th>التاريخ</th>
+                <th className="end">
+                  <span className="visually-hidden">الإجراء</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((o) => {
+                const open = openNumber === o.orderNumber;
+                return (
+                  <Fragment key={o.orderNumber}>
+                    <tr data-open={open}>
+                      <td className="num ao-strong">{o.orderNumber}</td>
+                      <td data-label="العميل">
+                        <span className="ao-stack">
+                          <span className="ao-strong">{o.customer?.fullName ?? o.guestEmail ?? 'ضيف'}</span>
+                          <span className="ao-stack__sub">{o.subOrders.map((s) => s.vendor.nameAr).join('، ')}</span>
+                        </span>
+                      </td>
+                      <td data-label="المتاجر" className="num">
+                        {o.subOrders.length}
+                      </td>
+                      <td data-label="الحالة">
+                        <span className={`badge ${PARENT_TONE[o.status] ?? 'badge--pending'}`}>{PARENT_STATUS[o.status] ?? o.status}</span>
+                      </td>
+                      <td data-label="الإجمالي" className="end">
+                        <span className="money num">{money(o.grandTotalMinorUnits, o.currency)}</span>
+                      </td>
+                      <td data-label="التاريخ" className="ao-date">
+                        {when(o.placedAt)}
+                      </td>
+                      <td data-label="" className="end">
+                        <button
+                          type="button"
+                          className="btn btn--secondary btn--sm"
+                          aria-expanded={open}
+                          aria-controls={`order-${o.orderNumber}`}
+                          onClick={() => setOpenNumber(open ? null : o.orderNumber)}
+                        >
+                          {open ? 'أغلق' : 'افتح'}
+                          <Icon name="chev-down" size={14} className={open ? 'ao-flip' : ''} />
+                        </button>
+                      </td>
+                    </tr>
+                    {open ? (
+                      <tr className="ao-detail-row">
+                        <td colSpan={7} id={`order-${o.orderNumber}`}>
+                          <OrderDetail number={o.orderNumber} onChange={reload} />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -76,48 +164,77 @@ function OrdersInner() {
 function OrderDetail({ number, onChange }: { number: string; onChange: () => void }) {
   const { data, error, reload } = useAdminData<Detail>(`/admin/orders/${number}`);
   const act = useAction();
-  if (!data) return <Loading error={error} />;
+  if (!data) return <Loading error={error} inline />;
   return (
-    <div className="stack">
+    <div className="ao-order">
       <Feedback error={act.error} notice={act.notice} />
-      <p className="small muted">الدفع: {data.paymentStatus ?? '—'}</p>
-      {data.stores.map((s) => (
-        <div key={s.id} className="card stack stack--tight">
-          <div className="row row--between">
-            <span>
-              {s.vendor.nameAr} · <span className="num small">{s.number}</span>
-            </span>
-            <span className={`badge ${toneOf(s.status)}`}>{labelOf(s.status)}</span>
-          </div>
-          <ol className="small stack stack--tight">
-            {s.history.map((h, i) => (
-              <li key={i}>
-                {h.toLabel} · {when(h.createdAt)} {h.reason ? <span className="muted">«{h.reason}»</span> : null}
-              </li>
-            ))}
-          </ol>
-          {s.shipment ? <p className="small">التتبّع: <span className="num">{s.shipment.trackingNumber}</span></p> : null}
-          {s.refunds.length ? (
-            <p className="small">
-              استردادات: {s.refunds.map((r) => `${money(r.amountMinorUnits, data.currency)} (${r.status})`).join('، ')}
-            </p>
-          ) : null}
-          {s.actions.includes('canceled_by_admin') ? (
-            <ReasonButton
-              label="إلغاء هذا المتجر ورد المبلغ"
-              presets={['نفاد المخزون لدى البائع', 'احتيال مشتبه في الطلب', 'البائع لا يستجيب']}
-              disabled={act.busy}
-              onSubmit={(r) =>
-                act.run(async () => {
-                  await api(`/admin/orders/stores/${s.id}/cancel`, { method: 'POST', body: { reason: r } });
-                  reload();
-                  onChange();
-                }, 'أُلغي ويُردّ المبلغ للمشتري.')
-              }
-            />
-          ) : null}
-        </div>
-      ))}
+      <p className="ao-order__pay">
+        <Icon name="card" size={14} />
+        الدفع: {data.paymentStatus ?? '—'}
+      </p>
+      <div className="ao-subs">
+        {data.stores.map((s) => (
+          <section key={s.id} className="ao-sub">
+            <header className="ao-sub__head">
+              <span className="ao-shop">
+                <span className="ao-tile" aria-hidden>
+                  <Icon name="store" size={15} />
+                </span>
+                <span className="ao-shop__text">
+                  <span className="ao-shop__name">{s.vendor.nameAr}</span>
+                  <span className="ao-shop__sub num">{s.number}</span>
+                </span>
+              </span>
+              <span className={`badge ${toneOf(s.status)}`}>{labelOf(s.status)}</span>
+            </header>
+            <ol className="ao-timeline">
+              {s.history.map((h, i) => (
+                <li key={i}>
+                  <span className="ao-timeline__what">{h.toLabel}</span>
+                  <span className="ao-timeline__when">{when(h.createdAt)}</span>
+                  {h.reason ? <span className="ao-timeline__why">«{h.reason}»</span> : null}
+                </li>
+              ))}
+            </ol>
+            {s.shipment ? (
+              <p className="ao-sub__line">
+                <Icon name="truck" size={14} />
+                التتبّع: <span className="num">{s.shipment.trackingNumber}</span>
+              </p>
+            ) : null}
+            {s.refunds.length ? (
+              <p className="ao-sub__line">
+                <Icon name="return" size={14} />
+                <span>
+                  استردادات:{' '}
+                  {s.refunds.map((r, i) => (
+                    <Fragment key={i}>
+                      {i ? '، ' : ''}
+                      <span className="money num">{money(r.amountMinorUnits, data.currency)}</span> ({r.status})
+                    </Fragment>
+                  ))}
+                </span>
+              </p>
+            ) : null}
+            {s.actions.includes('canceled_by_admin') ? (
+              <div className="ao-sub__actions">
+                <ReasonButton
+                  label="إلغاء هذا المتجر ورد المبلغ"
+                  presets={['نفاد المخزون لدى البائع', 'احتيال مشتبه في الطلب', 'البائع لا يستجيب']}
+                  disabled={act.busy}
+                  onSubmit={(r) =>
+                    act.run(async () => {
+                      await api(`/admin/orders/stores/${s.id}/cancel`, { method: 'POST', body: { reason: r } });
+                      reload();
+                      onChange();
+                    }, 'أُلغي ويُردّ المبلغ للمشتري.')
+                  }
+                />
+              </div>
+            ) : null}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

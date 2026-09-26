@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { api, session } from '@/lib/api';
 import { when } from '@/lib/orders';
+import { Icon } from '@/components/icons';
 
 interface Inbox {
   unread: number;
@@ -48,19 +49,20 @@ export function NotificationBell() {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="bell">
       <button
         type="button"
-        className="btn btn--ghost btn--sm"
+        className="icon-btn"
         aria-expanded={open}
         aria-label={`الإشعارات${inbox?.unread ? ` — ${inbox.unread} غير مقروء` : ''}`}
         onClick={() => setOpen((o) => !o)}
       >
-        الإشعارات{inbox?.unread ? <span className="badge badge--warning num"> {inbox.unread}</span> : null}
+        <Icon name="bell" size={18} />
+        {inbox?.unread ? <span className="icon-btn__dot" aria-hidden /> : null}
       </button>
       {open ? (
-        <div className="card stack stack--tight" style={{ position: 'absolute', insetInlineEnd: 0, insetBlockStart: '110%', width: 'min(22rem, 90vw)', zIndex: 20, maxHeight: '60vh', overflowY: 'auto' }}>
-          <div className="row row--between">
+        <div className="bell__panel">
+          <div className="bell__head">
             <strong>الإشعارات</strong>
             {inbox?.unread ? (
               <button type="button" className="btn btn--ghost btn--sm" onClick={() => void readAll()}>
@@ -68,17 +70,17 @@ export function NotificationBell() {
               </button>
             ) : null}
           </div>
-          {!inbox || inbox.items.length === 0 ? <p className="small muted">لا إشعارات.</p> : null}
+          {!inbox || inbox.items.length === 0 ? <p className="bell__empty">لا إشعارات.</p> : null}
           {inbox?.items.map((n) => (
-            <div key={n.id} className="small" style={{ fontWeight: n.readAt ? 'normal' : 'bold' }}>
+            <div key={n.id} className="bell__item" data-unread={!n.readAt}>
               {n.link ? (
                 <Link href={n.link} onClick={() => setOpen(false)}>
                   {n.body}
                 </Link>
               ) : (
-                n.body
+                <span>{n.body}</span>
               )}
-              <div className="muted">{when(n.createdAt)}</div>
+              <span className="bell__when">{when(n.createdAt)}</span>
             </div>
           ))}
         </div>

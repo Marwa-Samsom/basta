@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading } from '@/components/admin';
-import { Card } from '@/components/ui';
+import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { Icon } from '@/components/icons';
+import { EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { minorUnitDigits } from '@/lib/money';
@@ -34,6 +35,30 @@ const toMinor = (v: string, c: string) => (v ? String(Math.round(Number(v) * 10 
 
 const EMPTY = { code: '', type: 'percent' as Coupon['type'], percent: '10', amount: '', maxDiscount: '', minOrder: '', currency: 'SAR', limitTotal: '', limitPerUser: '1', startsAt: '', endsAt: '' };
 
+type State = 'active' | 'ending' | 'expired' | 'off';
+const STATE: Record<State, { label: string; tone: string }> = {
+  active: { label: 'فعّال', tone: 'badge--success' },
+  ending: { label: 'قارب النفاد', tone: 'badge--warning' },
+  expired: { label: 'منتهٍ', tone: 'badge--pending' },
+  off: { label: 'موقوف', tone: 'badge--pending' },
+};
+
+/** الحالة كما يراها المدير: الموقوف يدوياً، ثم المنتهي بتاريخه أو باستعماله، ثم ما قارب النفاد */
+const stateOf = (c: Coupon, now: number): State => {
+  if (!c.isActive) return 'off';
+  if ((c.endsAt && new Date(c.endsAt).getTime() < now) || (c.usageLimitTotal !== null && c.usedCount >= c.usageLimitTotal)) return 'expired';
+  if (c.usageLimitTotal && c.usedCount / c.usageLimitTotal > 0.9) return 'ending';
+  return 'active';
+};
+
+const FILTERS: { key: 'all' | State; label: string }[] = [
+  { key: 'all', label: 'الكل' },
+  { key: 'active', label: 'فعّال' },
+  { key: 'ending', label: 'قارب النفاد' },
+  { key: 'expired', label: 'منتهٍ' },
+  { key: 'off', label: 'موقوف' },
+];
+
 /**
  * AD-16 — كوبونات المنصة. تموّلها المنصة دائماً (Q-06) — تحميل خصم على متجر
  * يحتاج موافقته فلا يُنشأ من هنا. المستعمل لا يُحذف: يُوقف.
@@ -42,6 +67,10 @@ export default function AdminCouponsPage() {
   const { data, error, forbidden, reload } = useAdminData<Coupon[]>('/admin/coupons');
   const act = useAction();
   const [f, setF] = useState(EMPTY);
+  const [showNew, setShowNew] = useState(false);
+  const [filter, setFilter] = useState<'all' | State>('all');
+  const [q, setQ] = useState('');
+  const [now] = useState(() => Date.now());
   if (!data) return <Loading error={error} forbidden={forbidden} />;
 
   const body = {
@@ -75,17 +104,45 @@ export default function AdminCouponsPage() {
       reload();
     }, c.isActive ? 'أُوقف الكوبون.' : 'فُعِّل الكوبون.');
 
+  const rows = data.map((c) => ({ c, state: stateOf(c, now) }));
+  const term = q.trim().toUpperCase();
+  const shown = rows.filter((r) => filter === 'all' || r.state === filter).filter((r) => !term || r.c.code.includes(term) || (r.c.vendor?.nameAr ?? '').includes(q.trim()));
+
   return (
-    <div className="stack stack--loose">
+    <div className="ac2-page">
       <AdminHeader title="الكوبونات" hint="كوبونات المنصة تموّلها المنصة — لا تُنقص صافي أي بائع." />
+
+      <div className="toolbar">
+        <div className="tabs" role="tablist" aria-label="تصفية الكوبونات">
+          {FILTERS.map((x) => (
+            <button key={x.key} type="button" role="tab" className="tabs__tab" aria-selected={filter === x.key} onClick={() => setFilter(x.key)}>
+              {x.label}
+              <span className="tabs__count">{x.key === 'all' ? rows.length : rows.filter((r) => r.state === x.key).length}</span>
+            </button>
+          ))}
+        </div>
+        <div className="toolbar__end">
+          <label className="input-icon ac2-search">
+            <Icon name="search" size={15} />
+            <input type="search" className="field__control" placeholder="ابحث برمز الكوبون" aria-label="ابحث برمز الكوبون" value={q} onChange={(e) => setQ(e.target.value)} />
+          </label>
+          <button type="button" className="btn btn--primary" aria-expanded={showNew} onClick={() => setShowNew((v) => !v)}>
+            <Icon name="plus" size={15} />
+            كوبون جديد
+          </button>
+        </div>
+      </div>
+
       <Feedback error={act.error} notice={act.notice} />
 
-      <Card title="كوبون جديد">
-        <div className="stack">
-          <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      {showNew ? (
+        <section className="card" aria-label="كوبون جديد">
+          <h2 className="ac2-title">كوبون جديد</h2>
+          <p className="ac2-hint">النوع والقيمة والحد الأقصى للخصم وشروط التطبيق. تموّله المنصة.</p>
+          <div className="ac2-form">
             <label className="field">
               <span className="field__label">الرمز</span>
-              <input className="field__control" dir="ltr" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} />
+              <input className="field__control num" dir="ltr" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} />
             </label>
             <label className="field">
               <span className="field__label">النوع</span>
@@ -100,13 +157,13 @@ export default function AdminCouponsPage() {
             {f.type === 'percent' ? (
               <label className="field">
                 <span className="field__label">النسبة %</span>
-                <input className="field__control" dir="ltr" inputMode="decimal" value={f.percent} onChange={(e) => setF({ ...f, percent: e.target.value })} />
+                <input className="field__control num" dir="ltr" inputMode="decimal" value={f.percent} onChange={(e) => setF({ ...f, percent: e.target.value })} />
               </label>
             ) : null}
             {f.type === 'fixed' ? (
               <label className="field">
                 <span className="field__label">المبلغ</span>
-                <input className="field__control" dir="ltr" inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
+                <input className="field__control num" dir="ltr" inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
               </label>
             ) : null}
             <label className="field">
@@ -119,19 +176,19 @@ export default function AdminCouponsPage() {
             </label>
             <label className="field">
               <span className="field__label">أقصى خصم</span>
-              <input className="field__control" dir="ltr" inputMode="decimal" value={f.maxDiscount} onChange={(e) => setF({ ...f, maxDiscount: e.target.value })} />
+              <input className="field__control num" dir="ltr" inputMode="decimal" value={f.maxDiscount} onChange={(e) => setF({ ...f, maxDiscount: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">حدّ أدنى للطلب</span>
-              <input className="field__control" dir="ltr" inputMode="decimal" value={f.minOrder} onChange={(e) => setF({ ...f, minOrder: e.target.value })} />
+              <input className="field__control num" dir="ltr" inputMode="decimal" value={f.minOrder} onChange={(e) => setF({ ...f, minOrder: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">استعمالات كلية</span>
-              <input className="field__control" dir="ltr" inputMode="numeric" value={f.limitTotal} onChange={(e) => setF({ ...f, limitTotal: e.target.value })} />
+              <input className="field__control num" dir="ltr" inputMode="numeric" value={f.limitTotal} onChange={(e) => setF({ ...f, limitTotal: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">لكل مستخدم</span>
-              <input className="field__control" dir="ltr" inputMode="numeric" value={f.limitPerUser} onChange={(e) => setF({ ...f, limitPerUser: e.target.value })} />
+              <input className="field__control num" dir="ltr" inputMode="numeric" value={f.limitPerUser} onChange={(e) => setF({ ...f, limitPerUser: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">يبدأ</span>
@@ -142,62 +199,120 @@ export default function AdminCouponsPage() {
               <input type="datetime-local" className="field__control" value={f.endsAt} onChange={(e) => setF({ ...f, endsAt: e.target.value })} />
             </label>
           </div>
-          {example ? <p className="small muted">مثال: {example}</p> : null}
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={act.busy || f.code.length < 3}
-            onClick={() =>
-              void act.run(async () => {
-                await api('/admin/coupons', { method: 'POST', body });
-                setF(EMPTY);
-                reload();
-              }, 'أُنشئ الكوبون.')
-            }
-          >
-            إنشاء
-          </button>
-        </div>
-      </Card>
+          {example ? (
+            <div className="alert alert--info ac2-callout ac2-callout--sm">
+              <Icon name="info" size={14} />
+              <span>مثال: {example}</span>
+            </div>
+          ) : null}
+          <div className="ac2-form__actions">
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={act.busy || f.code.length < 3}
+              onClick={() =>
+                void act.run(async () => {
+                  await api('/admin/coupons', { method: 'POST', body });
+                  setF(EMPTY);
+                  reload();
+                }, 'أُنشئ الكوبون.')
+              }
+            >
+              أنشئ الكوبون
+            </button>
+          </div>
+        </section>
+      ) : null}
 
-      {data.length === 0 ? (
-        <Card>
-          <Empty>لا كوبونات.</Empty>
-        </Card>
+      {shown.length === 0 ? (
+        <EmptyState
+          icon="star"
+          title={data.length === 0 ? 'لا كوبونات بعد' : 'لا كوبونات بهذه التصفية'}
+          actions={
+            data.length === 0 ? (
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => setShowNew(true)}>
+                <Icon name="plus" size={14} />
+                كوبون جديد
+              </button>
+            ) : (
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => (setFilter('all'), setQ(''))}>
+                أزل التصفية
+              </button>
+            )
+          }
+        >
+          {data.length === 0 ? 'أنشئ أول كوبون للمنصة — يظهر هنا باستعماله وصلاحيته.' : 'جرّب تصفية أخرى أو أنشئ كوبوناً.'}
+        </EmptyState>
       ) : (
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th>الرمز</th>
-                <th>النطاق</th>
-                <th>القيمة</th>
-                <th>الاستعمال</th>
-                <th>الصلاحية</th>
-                <th>الحالة</th>
+                <th scope="col">الرمز</th>
+                <th scope="col">النطاق</th>
+                <th scope="col">النوع</th>
+                <th scope="col">القيمة</th>
+                <th scope="col">الاستعمال</th>
+                <th scope="col">الصلاحية</th>
+                <th scope="col">التمويل</th>
+                <th scope="col">الحالة</th>
+                <th scope="col" className="end">
+                  <span className="visually-hidden">إجراء</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {data.map((c) => (
-                <tr key={c.id}>
-                  <td className="num">{c.code}</td>
-                  <td className="small">{c.scope === 'platform' ? 'المنصة' : (c.vendor?.nameAr ?? 'متجر')}</td>
-                  <td className="small">
-                    {TYPES[c.type]} · {c.type === 'percent' ? pct(c.valueBps) : c.type === 'fixed' && c.valueMinorUnits && c.currency ? money(c.valueMinorUnits, c.currency) : ''}
-                  </td>
-                  <td className="num">
-                    {c.usedCount} / {c.usageLimitTotal ?? '∞'}
-                  </td>
-                  <td className="small">
-                    {c.startsAt ? when(c.startsAt) : 'الآن'} ← {c.endsAt ? when(c.endsAt) : 'مفتوح'}
-                  </td>
-                  <td>
-                    <button type="button" className="btn btn--ghost btn--sm" disabled={act.busy} onClick={() => void toggle(c)}>
-                      {c.isActive ? 'فعّال — إيقاف' : 'موقوف — تفعيل'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {shown.map(({ c, state }) => {
+                const ratio = c.usageLimitTotal ? Math.min(1, c.usedCount / c.usageLimitTotal) : null;
+                return (
+                  <tr key={c.id}>
+                    <td>
+                      <span className="num ac2-code">{c.code}</span>
+                    </td>
+                    <td className="ac2-muted-cell" data-label="النطاق">
+                      {c.scope === 'platform' ? 'المنصّة' : (c.vendor?.nameAr ?? 'متجر')}
+                    </td>
+                    <td className="ac2-muted-cell" data-label="النوع">
+                      {TYPES[c.type]}
+                    </td>
+                    <td data-label="القيمة">
+                      {c.type === 'percent' ? (
+                        <span className="num ac2-code">{pct(c.valueBps)}</span>
+                      ) : c.type === 'fixed' && c.valueMinorUnits && c.currency ? (
+                        <span className="money num">{money(c.valueMinorUnits, c.currency)}</span>
+                      ) : (
+                        <span className="ac2-muted-cell">—</span>
+                      )}
+                    </td>
+                    <td data-label="الاستعمال">
+                      <span className="ac2-usage">
+                        <span className="num">
+                          {c.usedCount} / {c.usageLimitTotal ?? '∞'}
+                        </span>
+                        {ratio !== null ? (
+                          <span className="ac2-bar" aria-hidden>
+                            <span className="ac2-bar__fill" data-tone={ratio > 0.9 ? 'warning' : undefined} style={{ inlineSize: `${ratio * 100}%` }} />
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td className="ac2-muted-cell" data-label="الصلاحية">
+                      {c.startsAt ? when(c.startsAt) : 'الآن'} — {c.endsAt ? when(c.endsAt) : 'مفتوح'}
+                    </td>
+                    <td data-label="التمويل">
+                      <span className={`badge ${c.fundedBy === 'platform' ? 'badge--info' : 'badge--pending'}`}>{c.fundedBy === 'platform' ? 'المنصّة' : 'المتجر'}</span>
+                    </td>
+                    <td data-label="الحالة">
+                      <span className={`badge ${STATE[state].tone}`}>{STATE[state].label}</span>
+                    </td>
+                    <td className="end" data-label="">
+                      <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => void toggle(c)}>
+                        {c.isActive ? 'إيقاف' : 'تفعيل'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

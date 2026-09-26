@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
-import { Card, TextArea, TextInput } from '@/components/ui';
+import { Icon, type IconName } from '@/components/icons';
+import { TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -22,6 +23,14 @@ interface Matrix {
   events: { code: string; labelAr: string; audience: string; variables: string[]; sample: Record<string, string>; templates: Template[] }[];
 }
 
+/** حالة الخانة في المصفوفة — لونها ونصّها وأيقونتها */
+const CELL: Record<'empty' | 'off' | 'reviewed' | 'unreviewed', { label: string; icon: IconName }> = {
+  empty: { label: 'أضف', icon: 'plus' },
+  off: { label: 'موقوف', icon: 'minus' },
+  reviewed: { label: 'مراجَع', icon: 'check' },
+  unreviewed: { label: 'بلا مراجعة', icon: 'alert' },
+};
+
 /**
  * AD-20 — قوالب الإشعارات: حدث × قناة. المحرّر بمتغيّرات تُدرج بالنقر،
  * ومعاينة ببيانات عيّنة، و«أرسل تجربة» تصل حسابك فعلاً. التعديل يُسقط
@@ -35,40 +44,61 @@ export default function AdminNotificationsPage() {
   const unreviewed = data.events.flatMap((e) => e.templates).filter((t) => !t.reviewedAt).length;
 
   return (
-    <div className="stack stack--loose">
+    <div className="ac2-page">
       <AdminHeader title="قوالب الإشعارات" hint={unreviewed ? `${unreviewed} قالب بلا مراجعة لغوية` : 'كل القوالب مراجَعة'} />
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>الحدث</th>
-              {data.channels.map((c) => (
-                <th key={c.code}>{c.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.events.map((e) => (
-              <tr key={e.code}>
-                <td>
-                  {e.labelAr}
-                  <div className="small muted">{e.audience === 'vendor' ? 'للبائع' : 'للمشتري'}</div>
-                </td>
-                {data.channels.map((c) => {
-                  const t = e.templates.find((x) => x.channel === c.code);
-                  return (
-                    <td key={c.code}>
-                      <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSel({ code: e.code, channel: c.code })} aria-pressed={sel?.code === e.code && sel.channel === c.code}>
-                        {!t ? '＋' : !t.isEnabled ? 'موقوف' : t.reviewedAt ? '✓ مراجَع' : '⚠ بلا مراجعة'}
-                      </button>
-                    </td>
-                  );
-                })}
+      <section className="card card--flush" aria-label="مصفوفة الحدث × القناة">
+        <header className="card__head">
+          <h2 className="ac2-title">مصفوفة الحدث × القناة</h2>
+          <span className="ac2-hint">اضغط خانة لتحرير قالبها.</span>
+          <span className="ac2-end">{unreviewed ? <span className="badge badge--warning">{unreviewed} بلا مراجعة</span> : <span className="badge badge--success">كلها مراجَعة</span>}</span>
+        </header>
+        <div className="table-wrap">
+          <table className="table ac2-matrix">
+            <thead>
+              <tr>
+                <th scope="col">الحدث</th>
+                {data.channels.map((c) => (
+                  <th key={c.code} scope="col">
+                    {c.label}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {data.events.map((e) => (
+                <tr key={e.code}>
+                  <td>
+                    <span className="ac2-cell">
+                      <span className="ac2-cell__main">{e.labelAr}</span>
+                      <span className="ac2-cell__sub">{e.audience === 'vendor' ? 'للبائع' : 'للمشتري'}</span>
+                    </span>
+                  </td>
+                  {data.channels.map((c) => {
+                    const t = e.templates.find((x) => x.channel === c.code);
+                    const state = !t ? 'empty' : !t.isEnabled ? 'off' : t.reviewedAt ? 'reviewed' : 'unreviewed';
+                    const pressed = sel?.code === e.code && sel.channel === c.code;
+                    return (
+                      <td key={c.code} data-label={c.label}>
+                        <button
+                          type="button"
+                          className="ac2-cellbtn"
+                          data-state={state}
+                          aria-pressed={pressed}
+                          aria-label={`${e.labelAr} · ${c.label}: ${CELL[state].label}`}
+                          onClick={() => setSel({ code: e.code, channel: c.code })}
+                        >
+                          <Icon name={CELL[state].icon} size={12} />
+                          {pressed ? 'محدّد' : CELL[state].label}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
       {sel ? (
         <Editor
           key={`${sel.code}:${sel.channel}`}
@@ -101,42 +131,54 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
   };
   const dirty = body !== (template?.body ?? '') || subject !== (template?.subject ?? '') || enabled !== (template?.isEnabled ?? true);
 
+  // المعاينة مقاطع: المتغيّر المعروف يُستبدل بقيمة العيّنة مميَّزاً، والمجهول يبقى كما كُتب بلون الخطر
+  const segments = body.split(/(\{\{[^}]*\}\})/).filter(Boolean).map((part) => {
+    const m = /^\{\{\s*([^}]*?)\s*\}\}$/.exec(part);
+    if (!m) return { text: part, token: false, unknown: false };
+    const value = event.sample[m[1]!];
+    return value !== undefined ? { text: value, token: true, unknown: false } : { text: part, token: true, unknown: true };
+  });
+  const unknown = segments.filter((s) => s.unknown).length;
+  const bodyId = `tpl-body-${event.code}-${channel.code}`;
+
   return (
-    <Card title={`${event.labelAr} · ${channel.label}`}>
-      <div className="stack">
+    <div className="ac2-split ac2-split--half">
+      <section className="card ac2-editor" aria-label={`قالب ${event.labelAr} · ${channel.label}`}>
+        <div className="ac2-inline">
+          <h2 className="ac2-title">{event.labelAr}</h2>
+          <span className="badge badge--pending">{channel.label}</span>
+          {template ? template.reviewedAt ? <span className="badge badge--success">مراجَع</span> : <span className="badge badge--warning">بلا مراجعة</span> : <span className="badge">جديد</span>}
+        </div>
         <Feedback error={act.error} notice={act.notice} />
-        <div className="chips" aria-label="المتغيّرات">
+        <div className="ac2-vars" role="group" aria-label="المتغيّرات">
           {event.variables.map((v) => (
-            <button key={v} type="button" className="chip" onClick={() => insert(v)}>
+            <button key={v} type="button" className="ac2-var" onClick={() => insert(v)}>
               {`{{${v}}}`}
             </button>
           ))}
         </div>
-        <div className="grid-2">
-          <div className="stack">
-            {channel.code === 'email' || channel.code === 'push' ? <TextInput label={channel.code === 'email' ? 'العنوان' : 'العنوان (اختياري)'} value={subject} onChange={(e) => setSubject(e.target.value)} /> : null}
-            <label className="field">
-              <span className="field__label">النص</span>
-              <textarea ref={bodyRef} className="field__control" rows={channel.code === 'email' ? 10 : 4} value={body} onChange={(e) => setBody(e.target.value)} />
-              {channel.code === 'sms' ? <span className="field__hint">{render(body).length} حرفاً — الرسالة النصية الواحدة نحو 70 حرفاً عربياً.</span> : null}
+        {channel.code === 'email' || channel.code === 'push' ? <TextInput label={channel.code === 'email' ? 'العنوان' : 'العنوان (اختياري)'} value={subject} onChange={(e) => setSubject(e.target.value)} /> : null}
+        <div className="field">
+          <span className="ac2-labelrow">
+            <label className="field__label" htmlFor={bodyId}>
+              النص
             </label>
-            <label className="row small">
-              <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> مفعّل
-            </label>
-          </div>
-          <div className="stack">
-            <span className="small muted">معاينة ببيانات عيّنة</span>
-            <div className="card" style={{ whiteSpace: 'pre-wrap' }}>
-              {subject ? <strong>{render(subject)}</strong> : null}
-              {subject ? '\n\n' : ''}
-              {render(body)}
-            </div>
-          </div>
+            <span className="ac2-counter">{render(body).length}</span>
+          </span>
+          <textarea id={bodyId} ref={bodyRef} className="field__control" rows={channel.code === 'email' ? 10 : 6} value={body} onChange={(e) => setBody(e.target.value)} />
+          {channel.code === 'sms' ? <span className="field__hint">{render(body).length} حرفاً — الرسالة النصية الواحدة نحو 70 حرفاً عربياً.</span> : null}
         </div>
-        <div className="row" style={{ flexWrap: 'wrap' }}>
+        <div className="ac2-setting__row">
+          <span className="ac2-setting__label">
+            <span className="field__label">مفعّل</span>
+            <span className="ac2-fine">الموقوف لا يُرسل على هذه القناة.</span>
+          </span>
+          <button type="button" role="switch" className="ac2-switch" aria-checked={enabled} aria-label="مفعّل" onClick={() => setEnabled(!enabled)} />
+        </div>
+        <div className="ac2-form__actions">
           <button
             type="button"
-            className="btn btn--primary btn--sm"
+            className="btn btn--primary"
             disabled={act.busy || !dirty || body.trim().length < 5}
             onClick={() =>
               void act.run(async () => {
@@ -145,11 +187,11 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
               }, 'حُفظ القالب — يحتاج مراجعة لغوية قبل اعتماده.')
             }
           >
-            حفظ
+            احفظ القالب
           </button>
           <button
             type="button"
-            className="btn btn--secondary btn--sm"
+            className="btn btn--secondary"
             disabled={act.busy || !template || dirty}
             onClick={() =>
               void act.run(async () => {
@@ -157,22 +199,22 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
               })
             }
           >
+            <Icon name="send" size={15} />
             أرسل تجربة لي
           </button>
         </div>
         {sent ? (
-          <p className="small">
-            {sent.status === 'sent' ? `وصلت إلى ${sent.recipient} — ${sent.deliveryRef}` : `لم تُرسل: ${sent.error}`}
-          </p>
+          <div className={`alert ac2-callout ac2-callout--sm ${sent.status === 'sent' ? 'alert--success' : 'alert--danger'}`} role="status">
+            <Icon name={sent.status === 'sent' ? 'check-circle' : 'alert'} size={14} />
+            <span>{sent.status === 'sent' ? `وصلت إلى ${sent.recipient} — ${sent.deliveryRef}` : `لم تُرسل: ${sent.error}`}</span>
+          </div>
         ) : null}
         {template ? (
-          <div className="stack stack--tight">
-            <span className="small muted">
-              {template.reviewedAt ? `راجعه لغوياً: ${template.reviewedBy} · ${when(template.reviewedAt)}` : 'لم يُراجَع لغوياً بعد.'}
-            </span>
+          <div className="ac2-divider">
+            <span className="ac2-fine">{template.reviewedAt ? `راجعه لغوياً: ${template.reviewedBy} · ${when(template.reviewedAt)}` : 'لم يُراجَع لغوياً بعد.'}</span>
             {!template.reviewedAt ? (
-              <div className="row">
-                <TextArea label="اسم المراجِع" rows={1} value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
+              <div className="ac2-inline">
+                <input className="field__control" aria-label="اسم المراجِع" placeholder="اسم المراجِع" value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
                 <button
                   type="button"
                   className="btn btn--secondary btn--sm"
@@ -184,13 +226,34 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
                     }, 'سُجّلت المراجعة.')
                   }
                 >
+                  <Icon name="check" size={14} />
                   راجعتُ النص لغوياً
                 </button>
               </div>
             ) : null}
           </div>
         ) : null}
-      </div>
-    </Card>
+      </section>
+
+      <section className="card ac2-sticky" aria-label="معاينة">
+        <span className="ac2-eyebrow">معاينة · ببيانات مثال</span>
+        <div className="ac2-preview">
+          {subject ? <span className="ac2-preview__subject">{render(subject)}</span> : null}
+          <div className="ac2-preview__body">
+            {segments.length === 0 ? <span className="ac2-faint">النص فارغ.</span> : null}
+            {segments.map((s, i) =>
+              s.token ? (
+                <span key={i} className="ac2-token" data-unknown={s.unknown}>
+                  {s.text}
+                </span>
+              ) : (
+                <span key={i}>{s.text}</span>
+              ),
+            )}
+          </div>
+        </div>
+        <p className={unknown ? 'ac2-fine ac2-note-danger' : 'ac2-fine'}>{unknown ? `${unknown} متغيّر مجهول لن يُستبدل عند الإرسال.` : 'كل المتغيّرات معروفة وستُستبدل ببيانات الطلب.'}</p>
+      </section>
+    </div>
   );
 }

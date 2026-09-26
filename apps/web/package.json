@@ -13,6 +13,9 @@
     "serve:probe": "dotenv -e ../../.env -v NODE_ENV=production -v NEXT_DIST_DIR=.next-prod -- next start -p 3100"
   },
   "dependencies": {
+    "@fontsource/almarai": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans-arabic": "^5.3.0",
     "@sentry/nextjs": "^10.74.0",
     "@tanstack/react-query": "^5.62.11",
     "next": "^16.3.5",
@@ -25,8 +28,8 @@
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "dotenv-cli": "^7.4.4",
     "eslint-config-next": "^16.3.5",
-    "typescript": "^5.7.2",
-    "dotenv-cli": "^7.4.4"
+    "typescript": "^5.7.2"
   }
 }

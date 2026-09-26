@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { AdminHeader, Empty, Feedback, Loading } from '@/components/admin';
-import { Card } from '@/components/ui';
+import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { TONE, useAction, useAdminData } from '@/lib/admin';
 import { labelOf, money, RETURN_REASONS, when } from '@/lib/orders';
@@ -32,6 +33,9 @@ interface Data {
 
 const RETURN_STATUS: Record<string, string> = { requested: 'بانتظار البائع', received: 'استُلم', rejected: 'رُفض' };
 
+/** ثلاثة أيام بلا ردّ من المتجر — يظهر العمر بالأحمر ويصير التدخّل الإجراء الأوّل */
+const STALL_MS = 3 * 24 * 3_600_000;
+
 /**
  * AD-15 — المرتجعات والاستردادات. الإدارة تتدخّل حين يتعثّر متجر: تستلم
  * المرتجع بدلاً منه (الانتقال نفسه بفاعل admin)، والاسترداد يظهر بمرجع
@@ -40,7 +44,9 @@ const RETURN_STATUS: Record<string, string> = { requested: 'بانتظار ال�
 export default function AdminReturnsPage() {
   const { data, error, forbidden, reload } = useAdminData<Data>('/admin/returns');
   const act = useAction();
-  if (!data) return <Loading error={error} forbidden={forbidden} />;
+  // لحظة فتح الصفحة — يُقاس بها عمر الطلب، ولا تتغيّر بين رسم ورسم
+  const [now] = useState(() => Date.now());
+  if (!data) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
 
   const receive = (subOrderId: string, returnRequestId: string) =>
     act.run(async () => {
@@ -49,68 +55,95 @@ export default function AdminReturnsPage() {
     }, 'سُجّل الاستلام: عادت القطع للمخزون ويُردّ نصيبها للمشتري.');
 
   return (
-    <div className="stack stack--loose">
-      <AdminHeader title="المرتجعات والاستردادات" />
+    <div className="ao-page">
+      <AdminHeader title="المرتجعات والمبالغ المعادة" />
       <Feedback error={act.error} notice={act.notice} />
 
-      <Card title="طلبات الإرجاع">
+      <section className="card card--flush">
+        <header className="card__head">
+          <h2>طلبات الإرجاع</h2>
+          <span className="ao-card-count num">{data.requests.length}</span>
+        </header>
         {data.requests.length === 0 ? (
-          <Empty>لا طلبات إرجاع.</Empty>
+          <Empty icon="return" title="لا طلبات إرجاع">
+            تظهر هنا طلبات الإرجاع حين يفتحها المشترون.
+          </Empty>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table ao-table">
               <thead>
                 <tr>
                   <th>الطلب</th>
                   <th>المتجر</th>
                   <th>السبب</th>
-                  <th>القطع</th>
+                  <th className="end">القطع</th>
                   <th>منذ</th>
                   <th>الحالة</th>
-                  <th />
+                  <th className="end">
+                    <span className="visually-hidden">الإجراء</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {data.requests.map((r) => (
-                  <tr key={r.id}>
-                    <td className="num small">{r.subOrder.subOrderNumber}</td>
-                    <td className="small">{r.subOrder.vendor.nameAr}</td>
-                    <td className="wrap small">
-                      {RETURN_REASONS[r.reasonCode] ?? r.reasonCode}
-                      {r.description ? <div className="muted">«{r.description}»</div> : null}
-                    </td>
-                    <td className="num">{r.itemsJson.reduce((a, i) => a + i.qty, 0)}</td>
-                    <td className="small">{when(r.requestedAt)}</td>
-                    <td>
-                      <span className={`badge ${TONE[r.status] ?? 'badge--warning'}`}>{RETURN_STATUS[r.status] ?? r.status}</span>
-                      <div className="small muted">{labelOf(r.subOrder.status)}</div>
-                    </td>
-                    <td>
-                      {r.status === 'requested' ? (
-                        <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => void receive(r.subOrder.id, r.id)}>
-                          تسجيل الاستلام بدل المتجر
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
+                {data.requests.map((r) => {
+                  const stalled = r.status === 'requested' && now - new Date(r.requestedAt).getTime() >= STALL_MS;
+                  return (
+                    <tr key={r.id}>
+                      <td className="num ao-strong">{r.subOrder.subOrderNumber}</td>
+                      <td data-label="المتجر" className="ao-strong">
+                        {r.subOrder.vendor.nameAr}
+                      </td>
+                      <td data-label="السبب" className="wrap">
+                        <span className="ao-stack">
+                          <span>{RETURN_REASONS[r.reasonCode] ?? r.reasonCode}</span>
+                          {r.description ? <span className="ao-stack__sub">«{r.description}»</span> : null}
+                        </span>
+                      </td>
+                      <td data-label="القطع" className="end num">
+                        {r.itemsJson.reduce((a, i) => a + i.qty, 0)}
+                      </td>
+                      <td data-label="منذ" className="ao-date" data-late={stalled}>
+                        {when(r.requestedAt)}
+                      </td>
+                      <td data-label="الحالة">
+                        <span className="ao-stack">
+                          <span className={`badge ${TONE[r.status] ?? 'badge--warning'}`}>{RETURN_STATUS[r.status] ?? r.status}</span>
+                          <span className="ao-stack__sub">{labelOf(r.subOrder.status)}</span>
+                        </span>
+                      </td>
+                      <td data-label="" className="end">
+                        {r.status === 'requested' ? (
+                          <button type="button" className={`btn btn--sm ${stalled ? 'btn--primary' : 'btn--secondary'}`} disabled={act.busy} onClick={() => void receive(r.subOrder.id, r.id)}>
+                            تسجيل الاستلام بدل المتجر
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
-      </Card>
+      </section>
 
-      <Card title="الاستردادات">
+      <section className="card card--flush">
+        <header className="card__head">
+          <h2>المبالغ المعادة</h2>
+          <span className="ao-card-count num">{data.refunds.length}</span>
+        </header>
         {data.refunds.length === 0 ? (
-          <Empty>لا استردادات.</Empty>
+          <Empty icon="wallet" title="لا استردادات">
+            تظهر هنا المبالغ المعادة للمشترين بمرجع البوابة.
+          </Empty>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table ao-table">
               <thead>
                 <tr>
                   <th>الطلب</th>
-                  <th>للمشتري</th>
-                  <th>على البائع</th>
+                  <th className="end">للمشتري</th>
+                  <th className="end">على البائع</th>
                   <th>السبب</th>
                   <th>الحالة</th>
                   <th>مرجع البوابة</th>
@@ -118,28 +151,45 @@ export default function AdminReturnsPage() {
               </thead>
               <tbody>
                 {data.refunds.map((r) => (
-                  <tr key={r.id}>
-                    <td className="num small">
-                      {r.subOrder.subOrderNumber}
-                      <div className="muted">{when(r.createdAt)}</div>
-                    </td>
-                    <td className="money">{money(r.amountMinorUnits, r.currency)}</td>
-                    <td className="money">
-                      {r.vendorAmountMinorUnits ? money(r.vendorAmountMinorUnits, r.subOrder.settlementCurrency) : '—'}
-                      {r.vendorNegative ? <div className="small" style={{ color: 'var(--danger-text)' }}>رصيد {r.subOrder.vendor.nameAr} سالب: {money(r.vendorNegative, r.subOrder.settlementCurrency)}</div> : null}
-                    </td>
-                    <td className="small">{r.reason}</td>
+                  <tr key={r.id} data-late={Boolean(r.vendorNegative)}>
                     <td>
+                      <span className="ao-stack">
+                        <span className="num ao-strong">{r.subOrder.subOrderNumber}</span>
+                        <span className="ao-stack__sub">{when(r.createdAt)}</span>
+                      </span>
+                    </td>
+                    <td data-label="للمشتري" className="end">
+                      <span className="money num">{money(r.amountMinorUnits, r.currency)}</span>
+                    </td>
+                    <td data-label="على البائع" className="end">
+                      <span className="ao-stack ao-stack--end">
+                        {r.vendorAmountMinorUnits ? <span className="money num">{money(r.vendorAmountMinorUnits, r.subOrder.settlementCurrency)}</span> : '—'}
+                        {r.vendorNegative ? (
+                          <span className="ao-rownote">
+                            <Icon name="alert" size={13} />
+                            <span>
+                              رصيد {r.subOrder.vendor.nameAr} سالب: <span className="num">{money(r.vendorNegative, r.subOrder.settlementCurrency)}</span>
+                            </span>
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td data-label="السبب" className="wrap">
+                      {r.reason}
+                    </td>
+                    <td data-label="الحالة">
                       <span className={`badge ${r.status === 'succeeded' ? 'badge--approved' : 'badge--warning'}`}>{r.status === 'succeeded' ? 'تمّ' : 'قيد التنفيذ'}</span>
                     </td>
-                    <td className="num small">{r.providerRefundId ?? '—'}</td>
+                    <td data-label="مرجع البوابة" className="num">
+                      {r.providerRefundId ?? '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </Card>
+      </section>
     </div>
   );
 }
