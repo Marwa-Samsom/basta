@@ -137,32 +137,6 @@ export function Card({
   );
 }
 
-const STEPS = ['الحساب', 'المتجر', 'الوثائق', 'المراجعة'] as const;
-export type StepName = (typeof STEPS)[number];
-
-/** شريط الخطوات في VD-01 → VD-03. الخطوة الحالية وحدها ملوّنة بالعلامة. */
-export function Stepper({ current }: { current: StepName }) {
-  const index = STEPS.indexOf(current);
-  return (
-    <ol className="stepper" aria-label="خطوات التسجيل">
-      {STEPS.map((step, i) => (
-        <li
-          key={step}
-          className="stepper__item"
-          data-state={i < index ? 'done' : i === index ? 'current' : 'todo'}
-          {...(i === index ? { 'aria-current': 'step' as const } : {})}
-        >
-          <span className="stepper__dot" aria-hidden>
-            {i < index ? '✓' : i + 1}
-          </span>
-          {step}
-          {i < STEPS.length - 1 ? <span className="stepper__sep" aria-hidden /> : null}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 const STATUS_TONE: Record<string, string> = {
   pending: 'badge--pending',
   in_review: 'badge--review',
@@ -210,40 +184,6 @@ export interface Blocker {
   code: string;
   message: string;
   field: string;
-}
-
-/**
- * قائمة الموانع مجتمعة — لا مانعاً واحداً في كل محاولة.
- * كل سطر يقود إلى حقله، وإلا صارت القائمة تقريراً لا أداة إصلاح.
- */
-export function BlockerList({
-  blockers,
-  onGo,
-}: {
-  blockers: readonly Blocker[];
-  onGo?: (field: string) => void;
-}) {
-  if (blockers.length === 0) return null;
-  return (
-    // العدد لا يُدمج في الجملة: تمييز العدد في العربية يتغيّر بتغيّره
-    // (عنصر واحد · عنصران · 4 عناصر · 11 عنصراً)، وجملة واحدة لا تصحّ لكلها.
-    <Alert tone="warning" title="ما زال ينقص طلبك">
-      <ul className="blockers">
-        {blockers.map((b) => (
-          <li key={b.code} className="blockers__item">
-            <span aria-hidden>•</span>
-            {onGo ? (
-              <button type="button" className="blockers__link" onClick={() => onGo(b.field)}>
-                {b.message}
-              </button>
-            ) : (
-              <span>{b.message}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </Alert>
-  );
 }
 
 export function Spinner({ label = 'جارٍ التحميل' }: { label?: string }) {

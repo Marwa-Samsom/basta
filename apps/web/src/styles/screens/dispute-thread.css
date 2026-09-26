@@ -1,0 +1,101 @@
+/* dispute-thread — خيط النزاع (ST-21). يستورده المكوّن نفسه: يُعرض في حساب
+   المشتري وفي لوحة البائع، فلا يرتبط بأنماط قسم واحد. */
+
+/* رابط الرجوع ومربّع أيقونة المتجر — نسختهما في storefront-purchase أيضاً */
+.sp-tile { inline-size: 30px; block-size: 30px; }
+.sp-tile--sm { inline-size: 28px; block-size: 28px; }
+
+.sp-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  inline-size: fit-content;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.sp-back:hover { color: var(--brand-text); }
+
+/* ------------------------------------------------------------ ST-21 النزاع */
+
+.sp-dispute { display: grid; gap: var(--density-gap); min-width: 0; }
+.sp-dispute__meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm); color: var(--text-muted); }
+
+.sp-thread {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sp-thread__head {
+  padding: var(--density-pad-y) var(--density-pad-x);
+  border-block-end: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+.sp-thread__who { display: grid; gap: 2px; min-width: 0; }
+.sp-thread__shop { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--text-strong); }
+.sp-thread__ctx { font-size: var(--text-2xs); color: var(--text-muted); }
+.sp-thread__head .badge { margin-inline-start: auto; }
+.sp-thread__list {
+  margin: 0;
+  padding: var(--density-card-pad);
+  list-style: none;
+  display: grid;
+  gap: var(--density-gap);
+  background: var(--surface-sunken);
+}
+.sp-msg { display: flex; justify-content: flex-start; }
+.sp-msg--mine { justify-content: flex-end; }
+.sp-msg__box { max-inline-size: 78%; min-width: 0; display: grid; gap: 5px; }
+.sp-msg__meta { display: flex; align-items: center; gap: 7px; }
+.sp-msg__role {
+  min-block-size: 18px;
+  padding-inline: 7px;
+  border-radius: var(--radius-full);
+  background: var(--surface-page);
+  color: var(--text-body);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--text-2xs);
+  display: inline-flex;
+  align-items: center;
+}
+.sp-msg--mine .sp-msg__role { background: var(--brand-subtle); color: var(--brand-text); border-color: transparent; }
+.sp-msg--admin .sp-msg__role { background: var(--info-subtle); color: var(--info-text); border-color: transparent; }
+.sp-msg__time { font-size: var(--text-2xs); color: var(--text-faint); }
+.sp-msg__body {
+  padding: 11px 13px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sp-msg--mine .sp-msg__body { background: var(--brand-subtle); border-color: var(--brand); }
+.sp-msg--admin .sp-msg__body { background: var(--info-subtle); border-color: var(--info); }
+.sp-thread__empty { font-size: var(--text-sm); color: var(--text-muted); text-align: center; padding: var(--space-4); }
+
+.sp-composer {
+  padding: var(--density-pad-y) var(--density-pad-x);
+  border-block-start: 1px solid var(--border-subtle);
+  display: grid;
+  gap: 9px;
+}
+.sp-composer textarea { resize: vertical; line-height: 1.7; }
+.sp-composer__actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.sp-composer__send { margin-inline-start: auto; }
+
+@media (max-width: 640px) {
+  .sp-msg__box { max-inline-size: 92%; }
+}
+
+/* قائمة النزاعات */
+.sp-dlist td .sp-dlist__vendor { font-size: var(--text-xs); color: var(--text-muted); }

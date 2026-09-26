@@ -1,5 +1,6 @@
 'use client';
 
+import '@/styles/screens/dispute-thread.css';
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { Icon } from '@/components/icons';

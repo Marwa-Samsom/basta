@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import '@/styles/screens/storefront-discovery.css';
+import '@/styles/screens/storefront-purchase.css';
 import { Icon } from '@/components/icons';
 import { NotificationBell } from '@/components/notification-bell';
 import { SearchBox } from '@/components/search-box';

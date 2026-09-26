@@ -76,7 +76,7 @@
   color: var(--text-on-brand);
 }
 
-.vm-table th { letter-spacing: 0.06em; }
+/* رؤوس الأعمدة عربية — بلا تباعد حروف */
 .vm-table td { padding-block: 11px; }
 .vm-table .money { font-size: var(--text-sm); }
 

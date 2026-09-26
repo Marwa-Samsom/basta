@@ -2,6 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import '@/styles/screens/vendor-products.css';
+import '@/styles/screens/vendor-orders-money.css';
+// ملف المتجر (VD-05) داخل اللوحة يشارك أنماط التأهيل
+import '@/styles/screens/vendor-onboarding.css';
 import { Alert, Spinner } from '@/components/ui';
 import { useOnboarding } from '@/lib/vendor';
 import { NotificationBell } from '@/components/notification-bell';

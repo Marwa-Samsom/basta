@@ -100,6 +100,23 @@ export class SearchService {
   }
 
   /**
+   * ينتظر حتى تفرغ مهام الفهرس المعلّقة. الكتابة في Meilisearch طابور غير
+   * متزامن: `reindex` يمسح ثم يضيف، وعدّ الوثائق قبل أن يجري المسح يعطي العدد
+   * القديم — فينجح الانتظار بالعدّ والفهرس لم يُبنَ بعد (هكذا تقلّب اختبار البحث).
+   * يعيد false إن انقضت المهلة، ولا يرمي: المتّصل يقرّر.
+   */
+  async idle(timeoutMs = 30_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    const path = `/tasks?indexUids=${encodeURIComponent(this.meili.index)}&statuses=enqueued,processing&limit=1`;
+    while (Date.now() < deadline) {
+      const { total } = await this.meili.request<{ total: number }>('GET', path, undefined, 1000);
+      if (total === 0) return true;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return false;
+  }
+
+  /**
    * «حيّ» تُقرأ من فحص الصحّة لا من إحصاء الفهرس: محرّك شغّال بلا فهرس بعد
    * (أول إقلاع، أو بعد مسح) كان يُقرأ «متوقّفاً» فتُتخطّى الفهرسة الأولى
    * التي كانت ستُنشئه — حلقة لا تنكسر وحدها.

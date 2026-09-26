@@ -1,26 +1,20 @@
 import type { Metadata, Viewport } from 'next';
 // الخطوط مستضافة ذاتياً: سياسة المحتوى لا تسمح بخطوط من أصل آخر، والمشروع محلي
-// بلا اعتماد على شبكة خارجية. الأوزان هي التي يستعملها التصميم وحدها.
-import '@fontsource/almarai/400.css';
-import '@fontsource/almarai/700.css';
+// بلا اعتماد على شبكة خارجية.
+//
+// الأوزان أقلّ ما يحفظ الشكل — كل وزن ملفّ يتسابق مع صورة المنتج على شبكة الجوال
+// (قيس LCP بعد تطبيق التصميم: الخطوط 299 كيلوبايت، ضعف السكربتات). الوزن الغائب
+// يأخذه المتصفّح من أقرب وزن بلا تسميك مصطنع: Almarai 700 ← 800، و 500 ← 400.
 import '@fontsource/almarai/800.css';
 import '@fontsource/ibm-plex-sans-arabic/400.css';
-import '@fontsource/ibm-plex-sans-arabic/500.css';
 import '@fontsource/ibm-plex-sans-arabic/600.css';
 import '@fontsource/ibm-plex-sans-arabic/700.css';
 import '@fontsource/ibm-plex-mono/400.css';
-import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './globals.css';
-// أنماط الشاشات بحسب ملفات التصميم — بعد الأساس لتبني عليه
-import '@/styles/screens/storefront-discovery.css';
-import '@/styles/screens/storefront-purchase.css';
+// أنماط الحساب والصفحات المشتركة (الدخول، التسجيل، بلا اتصال، الخطأ) — تظهر خارج
+// الأقسام كلها. أنماط كل قسم تُستورد في قشرته وحدها: المشتري لا ينزّل أنماط اللوحات.
 import '@/styles/screens/account-shared.css';
-import '@/styles/screens/vendor-onboarding.css';
-import '@/styles/screens/vendor-products.css';
-import '@/styles/screens/vendor-orders-money.css';
-import '@/styles/screens/admin-operations.css';
-import '@/styles/screens/admin-catalog-system.css';
 import { IconSprite } from '@/components/icons';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import { SITE_URL } from '@/lib/seo';

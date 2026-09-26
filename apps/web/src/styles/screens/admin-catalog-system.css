@@ -39,9 +39,9 @@
 .ac2-fine { font-size: var(--text-2xs); color: var(--text-muted); line-height: var(--leading-normal); }
 .ac2-end { margin-inline-start: auto; display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
 .ac2-eyebrow {
-  font-family: var(--font-mono);
+  /* عربية: لا خطّ أحادي ولا تباعد حروف */
   font-size: var(--text-2xs);
-  letter-spacing: var(--tracking-label);
+  font-weight: var(--weight-semi);
   color: var(--text-faint);
 }
 

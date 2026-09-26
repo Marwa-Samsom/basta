@@ -134,12 +134,9 @@ beforeAll(async () => {
 
   if (meiliUp) {
     await storefront.reindexAll();
-    // الفهرسة في Meilisearch غير متزامنة: ننتظر ظهور الوثائق
-    for (let i = 0; i < 40; i++) {
-      const stats = await search.stats();
-      if (stats.documents >= productIds.length) break;
-      await new Promise((r) => setTimeout(r, 250));
-    }
+    // الفهرسة غير متزامنة، والفهرس فيه منتجات القاعدة كلها لا منتجاتنا وحدها:
+    // عدّ الوثائق يرضى بالعدد القديم قبل أن يجري المسح. ننتظر فراغ الطابور نفسه.
+    expect(await search.idle(), 'طابور الفهرسة لم يفرغ خلال المهلة').toBe(true);
   }
 }, 120_000);
 
@@ -180,7 +177,7 @@ describe('بوابة 07 · البحث العربي', () => {
     if (!dbUp || !meiliUp) return;
     await publishProduct(vendorId, 'بنطال جينز', 35_000n, 4);
     await storefront.reindexAll();
-    await new Promise((r) => setTimeout(r, 1200));
+    expect(await search.idle()).toBe(true);
     const res = await app.inject({ method: 'GET', ...api('/storefront/products?q=بنطلون') });
     expect(res.json().items.map((i: { nameAr: string }) => i.nameAr)).toContain('بنطال جينز');
   });

@@ -132,9 +132,9 @@
   color: var(--text-on-brand);
 }
 .sd-hero__kicker {
-  font-family: var(--font-mono);
+  /* عربية: لا خطّ أحادي ولا تباعد حروف — كلاهما يفكّك الوصل */
   font-size: var(--text-2xs);
-  letter-spacing: 0.14em;
+  font-weight: var(--weight-semi);
   opacity: 0.85;
 }
 .sd-hero__title {

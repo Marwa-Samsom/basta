@@ -2,6 +2,8 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import '@/styles/screens/admin-operations.css';
+import '@/styles/screens/admin-catalog-system.css';
 import { DashIdent, DashShell, type DashNavGroup } from '@/components/dash-shell';
 import type { IconName } from '@/components/icons';
 import { Alert, Spinner } from '@/components/ui';

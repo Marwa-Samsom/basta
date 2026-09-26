@@ -1,5 +1,7 @@
 'use client';
 
+// أنماط التأهيل تُستورد مع إطاره: صفحاته خارج قشرة اللوحة
+import '@/styles/screens/vendor-onboarding.css';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Icon } from '@/components/icons';
