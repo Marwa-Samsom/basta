@@ -4,7 +4,7 @@ import type { Actor } from '../../../common/security/actor';
 import { AuthService } from '../application/auth.service';
 import { AllowLimited, CurrentActor, Public } from '../../../common/security/decorators';
 import { AuthLimited } from '../../../common/security/throttle';
-import { LoginDto, RefreshDto, RegisterDto, TotpConfirmDto } from './dto/auth.dto';
+import { LoginDto, RefreshDto, RegisterDto, TotpCodeDto, TotpConfirmDto, TotpDisableDto } from './dto/auth.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/account.dto';
 import { RecoveryService } from '../application/recovery.service';
 
@@ -116,17 +116,31 @@ export class AuthController {
   @AllowLimited()
   @AuthLimited()
   @Post('totp/confirm')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'تأكيد التهيئة — يُبطل الجلسات المحدودة' })
-  async confirmTotp(@CurrentActor() actor: Actor, @Body() dto: TotpConfirmDto): Promise<void> {
-    await this.auth.confirmTotpSetup(actor.userId, dto.token);
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'تأكيد التهيئة — يُعيد رموز الاستعادة مرة واحدة ويُبطل الجلسات السابقة' })
+  confirmTotp(@CurrentActor() actor: Actor, @Body() dto: TotpConfirmDto): Promise<{ recoveryCodes: string[] }> {
+    return this.auth.confirmTotpSetup(actor.userId, dto.token);
   }
 
   @ApiBearerAuth()
+  @AuthLimited()
+  @Post('totp/recovery-codes')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'رموز استعادة جديدة تُبطل القديمة — بإثبات ثانٍ' })
+  regenerateRecoveryCodes(
+    @CurrentActor() actor: Actor,
+    @Body() dto: TotpCodeDto,
+    @Req() req: RawReq,
+  ): Promise<{ recoveryCodes: string[] }> {
+    return this.auth.regenerateRecoveryCodes(actor.userId, dto.code, AuthController.meta(req));
+  }
+
+  @ApiBearerAuth()
+  @AuthLimited()
   @Post('totp/disable')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'تعطيل التحقق الثنائي — ممنوع على الإدارة' })
-  async disableTotp(@CurrentActor() actor: Actor): Promise<void> {
-    await this.auth.disableTotp(actor.userId);
+  @ApiOperation({ summary: 'تعطيل التحقق الثنائي بكلمة المرور ورمز — ممنوع على الإدارة' })
+  async disableTotp(@CurrentActor() actor: Actor, @Body() dto: TotpDisableDto, @Req() req: RawReq): Promise<void> {
+    await this.auth.disableTotp(actor.userId, { password: dto.password, code: dto.code }, AuthController.meta(req));
   }
 }

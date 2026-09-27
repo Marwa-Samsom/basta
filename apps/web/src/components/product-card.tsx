@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Icon } from '@/components/icons';
+import { WishHeart } from '@/components/wish-heart';
 import { imageUrl, type ProductCard as Card } from '@/lib/storefront';
 
 /**
@@ -39,10 +40,14 @@ export function ProductCard({ product }: { product: Card }) {
           <Icon name="store" size={12} />
           {product.vendor.nameAr}
         </Link>
-        <p className="pcard__price">
-          <span className="money num">{product.price.formatted}</span>
-          {discounted && product.compareAtPrice ? <s className="num">{product.compareAtPrice.formatted}</s> : null}
-        </p>
+        <div className="pcard__foot">
+          <p className="pcard__price">
+            <span className="money num">{product.price.formatted}</span>
+            {discounted && product.compareAtPrice ? <s className="num">{product.compareAtPrice.formatted}</s> : null}
+          </p>
+          {/* جزيرة عميل صغيرة — البطاقة نفسها تبقى مكوّن خادم، والمعرّفات تُجلب مرة للصفحة */}
+          <WishHeart productId={product.id} name={product.nameAr} variant="card" />
+        </div>
         {!product.isSoldOut && product.available > 0 && product.available <= 3 ? (
           <span className="pcard__stock">بقي {product.available} فقط</span>
         ) : null}

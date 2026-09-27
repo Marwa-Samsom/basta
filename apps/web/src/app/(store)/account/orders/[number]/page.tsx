@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
+import { AskShop } from '@/components/ask-shop';
 import { Icon } from '@/components/icons';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
 import { api, session } from '@/lib/api';
@@ -423,6 +424,19 @@ function StoreCard({
               لديّ مشكلة
             </button>
           ) : null}
+          {/* رسالة إلى المتجر عن شحنته من هذا الطلب — تُكمل المحادثة نفسها إن وُجدت */}
+          <AskShop
+            context={{ orderNumber: s.number }}
+            shopName={s.vendor.nameAr}
+            subjectName={s.vendor.nameAr}
+            subjectSub={`طلب ${s.number}`}
+            triggerLabel="راسل المتجر"
+            triggerClassName="btn btn--ghost btn--sm"
+            title="راسل المتجر"
+            fieldLabel="رسالتك"
+            iconSize={14}
+            placeholder="اكتب رسالتك للمتجر عن هذا الطلب…"
+          />
         </div>
 
         {mode === 'return' ? (

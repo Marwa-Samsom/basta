@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import '@/styles/screens/storefront-extra.css';
+import { AskShop } from '@/components/ask-shop';
 import { CompareBar, CompareToggle } from '@/components/compare';
 import { Icon } from '@/components/icons';
 import { RecordView } from '@/components/recent';
@@ -8,6 +9,7 @@ import { Crumbs } from '@/components/listing';
 import { ProductGrid } from '@/components/product-card';
 import { getProduct, getShop, imageUrl, num } from '@/lib/storefront';
 import { ProductGallery, VariantPicker, type GalleryImage } from '@/components/variant-picker';
+import { WishHeart } from '@/components/wish-heart';
 import { JsonLd, SITE_URL, breadcrumbJsonLd, productJsonLd } from '@/lib/seo';
 
 type Params = { params: Promise<{ slug: string }> };
@@ -122,16 +124,19 @@ export default async function ProductPage({ params }: Params) {
           <VariantPicker
             variants={product.variants}
             actions={
-              <CompareToggle
-                item={{
-                  slug: product.slug,
-                  nameAr: product.nameAr,
-                  thumb,
-                  categoryId: product.category.id,
-                  categorySlug: product.category.slug,
-                  categoryNameAr: product.category.nameAr,
-                }}
-              />
+              <>
+                <WishHeart productId={product.id} name={product.nameAr} variant="pdp" />
+                <CompareToggle
+                  item={{
+                    slug: product.slug,
+                    nameAr: product.nameAr,
+                    thumb,
+                    categoryId: product.category.id,
+                    categorySlug: product.category.slug,
+                    categoryNameAr: product.category.nameAr,
+                  }}
+                />
+              </>
             }
           />
 
@@ -145,6 +150,16 @@ export default async function ProductPage({ params }: Params) {
               <p>{product.vendor.returnPolicyAr ?? 'سياسة الإرجاع العامة في بسطة تسري.'}</p>
             </div>
           </section>
+
+          {/* ST-09 — السؤال يُرسل إلى «رسائلي» مرفقاً بالمنتج */}
+          <AskShop
+            context={{ productId: product.id }}
+            shopName={product.vendor.nameAr}
+            subjectName={product.nameAr}
+            subjectSub={`من ${product.vendor.nameAr}`}
+            thumb={imageUrl(thumb)}
+            triggerLabel="اسأل المتجر عن هذا المنتج"
+          />
         </div>
       </div>
 

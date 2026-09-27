@@ -20,6 +20,9 @@ interface Row {
 
 interface Profile extends Omit<Row, 'orders'> {
   disputes: number;
+  totpEnabled: boolean;
+  /** مفعَّل وليس حساب مدير — الوحيد الذي يُعاد ضبطه من هنا */
+  totpResettable: boolean;
   orders: { orderNumber: string; status: string; currency: string; grandTotalMinorUnits: string; placedAt: string }[];
 }
 
@@ -186,6 +189,22 @@ function CustomerProfile({ id, onChange }: { id: string; onChange: () => void })
             إعادة التفعيل
           </button>
         )}
+        {/* الطريق الأخير لمن أضاع هاتفه ورموز استعادته — لا يظهر لحساب مدير (الخادم يرفضه أصلاً) */}
+        {data.totpResettable ? (
+          <ReasonButton
+            label="أعد ضبط التحقق بخطوتين"
+            icon="shield"
+            min={10}
+            disabled={act.busy}
+            hint="يُمحى ربط تطبيق المصادقة ورموز الاستعادة، وتُنهى كل جلساته، ويصله بريد بذلك. اكتب كيف تحقّقت من هويته — يُحفظ في سجل التدقيق."
+            onSubmit={(r) =>
+              act.run(async () => {
+                await api(`/admin/customers/${id}/reset-2fa`, { method: 'POST', body: { reason: r } });
+                done();
+              }, 'أُعيد ضبط التحقق بخطوتين.')
+            }
+          />
+        ) : null}
       </div>
     </div>
   );

@@ -113,6 +113,28 @@
 
 .sd-home { display: grid; gap: 28px; }
 
+/* حملة جارية (AD-17) — عنوانها وموعد انتهائها ورقاقة الكوبون، ثم شبكة البطاقات نفسها.
+   الكوبون ليس مالاً فلا يأخذ الفيروزي؛ الرقاقة بلون العلامة الخافت وحدّ متقطّع كالقسيمة */
+.sd-campaign__coupon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding-inline: 10px;
+  border: 1px dashed var(--brand);
+  border-radius: var(--radius-full);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semi);
+  max-inline-size: 100%;
+}
+.sd-campaign__code {
+  font-weight: var(--weight-bold);
+  unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+}
+
 .sd-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1074,4 +1096,14 @@
   .sd-404 { padding: var(--space-12) var(--space-4); }
   .sd-404__code { font-size: var(--text-3xl); }
   .sd-404__title { font-size: var(--text-xl); }
+}
+
+/* ST-23: القلب زرّ رابع في صفّ الشراء، وعرض 400 لا يتّسع لأربعة في سطر
+   («أضف إلى السلة» كان سيفيض من زرّه). على الهاتف: الكمية والقلب والمقارنة
+   سطراً، و«أضف إلى السلة» سطراً كاملاً تحتها. */
+@media (max-width: 640px) {
+  .sd-buy__row { flex-wrap: wrap; }
+  .sd-buy__add { order: 1; flex-basis: 100%; }
+  .sd-buy__row .wish-heart { margin-inline-start: auto; }
+  .store:has(.sd-buy) .store__foot { padding-block-end: 180px; }
 }

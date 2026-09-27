@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/public';
 import { PERMISSION_CODES, SETTINGS_SPEC } from '../domain/permissions';
 
 const PAGE = 50;
@@ -12,7 +13,10 @@ const PAGE = 50;
  */
 @Injectable()
 export class OperationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private audit(actorUserId: string, action: string, entityType: string, entityId: string, before?: unknown, after?: unknown) {
     return this.prisma.auditLog.create({
@@ -120,12 +124,21 @@ export class OperationsService {
       where: { id },
       select: {
         id: true, fullName: true, email: true, phone: true, status: true, createdAt: true, lastLoginAt: true,
+        totpEnabledAt: true, roles: { select: { role: true } },
         orders: { orderBy: { placedAt: 'desc' }, take: 20, select: { orderNumber: true, status: true, currency: true, grandTotalMinorUnits: true, placedAt: true } },
       },
     });
     if (!u) throw new NotFoundError('العميل غير موجود.', { id });
     const disputes = await this.prisma.dispute.count({ where: { openedByUserId: id } });
-    return { ...u, disputes, orders: u.orders.map((o) => ({ ...o, grandTotalMinorUnits: o.grandTotalMinorUnits.toString() })) };
+    const { totpEnabledAt, roles, ...rest } = u;
+    return {
+      ...rest,
+      totpEnabled: totpEnabledAt !== null,
+      // المدير لا يُعاد ضبط تحققه من هنا — الواجهة تُخفي الزرّ، والخادم يرفض
+      totpResettable: totpEnabledAt !== null && !roles.some((r) => r.role === 'admin'),
+      disputes,
+      orders: u.orders.map((o) => ({ ...o, grandTotalMinorUnits: o.grandTotalMinorUnits.toString() })),
+    };
   }
 
   /** التعليق يُنهي الجلسات فوراً — الدخول يرفض الحساب غير النشط */
@@ -137,6 +150,39 @@ export class OperationsService {
       await this.prisma.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
     }
     await this.audit(actorId, status === 'suspended' ? 'customer.suspend' : 'customer.reinstate', 'User', id, null, { reason });
+  }
+
+  /**
+   * طريق الدعم الأخير لمن أضاع جهاز المصادقة **ورموز الاستعادة معاً**: يُمسح
+   * السرّ والرموز، وتُنهى كل الجلسات، ويُبلَّغ صاحب الحساب. السبب إلزامي لأنه
+   * يُثبت في التدقيق — إعادة ضبط بلا سبب مكتوب لا تُراجَع.
+   *
+   * حساب الإدارة مستثنى: تحققه الثنائي إلزامي ولا يُنزع من هنا (SRS A-07).
+   * الشرط داخل جملة التحديث نفسها، فلا يمرّ مدير ولا حساب بلا تحقق مفعَّل.
+   */
+  async resetCustomerTotp(actorId: string, id: string, reason: string): Promise<void> {
+    const why = reason.trim();
+    if (why.length < 10) throw new InvalidInputError('اكتب سبباً واضحاً — كيف تحقّقت من هوية صاحب الحساب.');
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.user.updateMany({
+        where: { id, deletedAt: null, totpEnabledAt: { not: null }, roles: { none: { role: 'admin' } } },
+        data: { totpSecretEnc: null, totpEnabledAt: null },
+      });
+      if (count === 0) throw new NotFoundError('لا حساب عميل بتحقق ثنائي مفعَّل بهذا المعرّف.', { id });
+      await tx.totpRecoveryCode.deleteMany({ where: { userId: id } });
+      await tx.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await tx.auditLog.create({
+        data: {
+          actorUserId: actorId,
+          actorRole: 'admin',
+          action: 'customer.totp_reset',
+          entityType: 'User',
+          entityId: id,
+          afterJson: { reason: why } as Prisma.InputJsonValue,
+        },
+      });
+      await this.notifications.enqueue({ code: 'totp_reset_by_admin', userId: id, vars: { reason: why } }, tx);
+    });
   }
 
   // ------------------------------------------------------------ AD-24 التدقيق

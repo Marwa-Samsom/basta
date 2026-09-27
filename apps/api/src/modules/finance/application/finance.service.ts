@@ -159,8 +159,8 @@ export class FinanceService {
   async requestPayout(vendorId: string, userId: string, input: { currency: string; amountMinorUnits: bigint }) {
     if (input.amountMinorUnits <= 0n) throw new InvalidInputError('مبلغ السحب موجب.');
     const bank = await this.prisma.vendorBankAccount.findFirst({
-      where: { vendorId },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+      // الافتراضي وحده وجهة التحويل — حساب أُضيف ولم يُوثَّق لا يُحوَّل إليه أبداً (VD-20)
+      where: { vendorId, isDefault: true, archivedAt: null },
     });
     if (!bank) throw new ConflictError('أضف حساباً بنكياً قبل السحب.');
 

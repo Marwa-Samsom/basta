@@ -6,7 +6,7 @@ import { InstallPrompt } from '@/components/install-prompt';
 import { ProductGrid } from '@/components/product-card';
 import { RecentSection } from '@/components/recent';
 import { EmptyState } from '@/components/ui';
-import { getBanners, getCategories, getFeatured, imageUrl, listProducts, type ProductCard } from '@/lib/storefront';
+import { getBanners, getCampaigns, getCategories, getFeatured, imageUrl, listProducts, type Campaign, type ProductCard } from '@/lib/storefront';
 
 /**
  * يُصيَّر عند الطلب لا وقت البناء: البناء لا يعتمد على خادم API حيّ (المرحلة 12).
@@ -26,16 +26,49 @@ function shopsOf(products: ProductCard[]): ProductCard['vendor'][] {
   return [...seen.values()].slice(0, SHOP_CARDS);
 }
 
+const endDate = (iso: string) => new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long' }).format(new Date(iso));
+
+/**
+ * حملة جارية (AD-17): اسمها وموعد انتهائها، والكوبون المُعلَن إن كان صالحاً
+ * الآن، ومنتجاتها بترتيب الإدارة بالبطاقة نفسها — بلا صورة إضافية تثقل الرسم.
+ */
+function CampaignSection({ campaign }: { campaign: Campaign }) {
+  const titleId = `sd-campaign-${campaign.id}`;
+  return (
+    <section className="sd-section sd-campaign" aria-labelledby={titleId}>
+      <div className="sd-section__head">
+        <h2 id={titleId} className="sd-section__title">
+          {campaign.nameAr}
+        </h2>
+        <span className="sd-section__note">
+          حتى <time dateTime={campaign.endsAt}>{endDate(campaign.endsAt)}</time>
+        </span>
+        {campaign.couponCode ? (
+          <span className="sd-campaign__coupon">
+            <Icon name="star" size={14} />
+            استعمل الرمز
+            <span className="sd-campaign__code num" dir="ltr">
+              {campaign.couponCode}
+            </span>
+          </span>
+        ) : null}
+      </div>
+      <ProductGrid products={campaign.products} />
+    </section>
+  );
+}
+
 /**
  * ST-01 — الرئيسية. البانرات والمميّز من لوحة الإدارة (AD-19)؛ ما لم تُضف
  * الإدارة شيئاً يبقى ما هو حقيقي: الفئات وأحدث المنشور — لا صور مصطنعة.
  */
 export default async function HomePage() {
-  const [categories, latest, banners, featured] = await Promise.all([
+  const [categories, latest, banners, featured, campaigns] = await Promise.all([
     getCategories(),
     listProducts({ sort: 'newest', pageSize: '12' }),
     getBanners('home_hero'),
     getFeatured(),
+    getCampaigns(),
   ]);
 
   const banner = banners[0];
@@ -43,6 +76,8 @@ export default async function HomePage() {
   const isEmpty = latest.items.length === 0;
   const tiles = categories.slice(0, CATEGORY_TILES);
   const shops = shopsOf([...featured, ...latest.items]);
+  const topCampaigns = campaigns.filter((c) => c.placement === 'home_top');
+  const middleCampaigns = campaigns.filter((c) => c.placement === 'home_middle');
 
   return (
     <div className="sd-home">
@@ -102,6 +137,10 @@ export default async function HomePage() {
         </section>
       ) : null}
 
+      {topCampaigns.map((c) => (
+        <CampaignSection key={c.id} campaign={c} />
+      ))}
+
       {featured.length > 0 ? (
         <section className="sd-section" aria-labelledby="sd-featured-title">
           <div className="sd-section__head">
@@ -115,6 +154,10 @@ export default async function HomePage() {
 
       {/* ST-24 — من تخزين هذا الجهاز، يُرسم في المتصفّح ولا يظهر إن لم يُشاهَد شيء */}
       <RecentSection />
+
+      {middleCampaigns.map((c) => (
+        <CampaignSection key={c.id} campaign={c} />
+      ))}
 
       <section className="sd-section" aria-labelledby="sd-latest-title">
         <div className="sd-section__head">

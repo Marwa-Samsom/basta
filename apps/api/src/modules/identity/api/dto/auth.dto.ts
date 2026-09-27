@@ -2,6 +2,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password';
 
+/** رمز التطبيق (ستة أرقام)، أو رمز الاستعادة بشرطة أو بدونها وبأي حالة أحرف */
+const SECOND_FACTOR = /^(\d{6}|[A-Za-z0-9]{5}-?[A-Za-z0-9]{5})$/;
+
 export class RegisterDto {
   @ApiProperty({ example: 'noor@example.com' })
   @IsEmail({}, { message: 'صيغة البريد غير صحيحة.' })
@@ -35,10 +38,23 @@ export class LoginDto {
   @MaxLength(200)
   password!: string;
 
-  @ApiPropertyOptional({ description: 'رمز التحقق الثنائي — إلزامي للإدارة' })
+  @ApiPropertyOptional({ description: 'رمز التحقق الثنائي (ستة أرقام) أو رمز استعادة — لمن فعّل التحقق بخطوتين' })
   @IsOptional()
-  @Matches(/^\d{6}$/, { message: 'رمز التحقق ستة أرقام.' })
+  @Matches(SECOND_FACTOR, { message: 'رمز التحقق ستة أرقام، أو رمز استعادة من عشرة محارف.' })
   totp?: string;
+}
+
+export class TotpCodeDto {
+  @ApiProperty({ description: 'رمز التطبيق أو رمز استعادة' })
+  @Matches(SECOND_FACTOR, { message: 'رمز التحقق ستة أرقام، أو رمز استعادة من عشرة محارف.' })
+  code!: string;
+}
+
+export class TotpDisableDto extends TotpCodeDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(200)
+  password!: string;
 }
 
 export class RefreshDto {

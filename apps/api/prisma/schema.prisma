@@ -55,19 +55,26 @@ model User {
   /// آخر خطوة TOTP استُعملت — يُرفض ما لا يتجاوزها (مقاومة إعادة التشغيل)
   totpLastStep  Int?
 
+  /// VD-20 — فئات أُطفئ بريدها: {"order": false, …}. الإشعار داخل الموقع يبقى دائماً
+  notificationPrefs Json @default("{}")
+
   lastLoginAt DateTime? @db.Timestamptz
   deletedAt   DateTime? @db.Timestamptz
   createdAt   DateTime  @default(now()) @db.Timestamptz
   updatedAt   DateTime  @updatedAt @db.Timestamptz
 
-  roles         UserRole[]
-  permissions   AdminPermission[]
-  refreshTokens RefreshToken[]
-  addresses     Address[]
-  vendors       Vendor[]
-  orders        Order[]
-  reviews       Review[]
-  auditLogs     AuditLog[]
+  roles                UserRole[]
+  permissions          AdminPermission[]
+  refreshTokens        RefreshToken[]
+  addresses            Address[]
+  recoveryCodes        TotpRecoveryCode[]
+  vendors              Vendor[]
+  orders               Order[]
+  reviews              Review[]
+  auditLogs            AuditLog[]
+  conversations        Conversation[]
+  conversationMessages ConversationMessage[]
+  wishlistItems        WishlistItem[]
 
   @@index([status])
   @@map("users")
@@ -95,6 +102,21 @@ model AdminPermission {
 
   @@id([userId, permission])
   @@map("admin_permissions")
+}
+
+/// رموز استعادة التحقق الثنائي — عشرة تُعطى مرة عند التفعيل، كلٌّ لدخول واحد.
+/// مجزّأة بـ argon2 (تعيش سنوات)، و usedAt يُكتب بشرط IS NULL فلا يُستعمل رمز مرتين.
+model TotpRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  codeHash  String
+  usedAt    DateTime? @db.Timestamptz
+  createdAt DateTime  @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("totp_recovery_codes")
 }
 
 model RefreshToken {
@@ -268,6 +290,7 @@ model Vendor {
   payouts         PayoutRequest[]
   commissionRules CommissionRule[]
   coupons         Coupon[]
+  conversations   Conversation[]
 
   @@index([status])
   @@index([settlementCurrency])
@@ -306,7 +329,11 @@ model VendorBankAccount {
   bankName   String
   swift      String?
   isDefault  Boolean   @default(false)
+  /// حساب أُضيف بعد الاعتماد لا يصير افتراضياً قبل أن يوثّقه مدير
   verifiedAt DateTime? @db.Timestamptz
+  verifiedBy String?   @db.Uuid
+  /// لا يُحذف: قد يكون وجهة تحويل سابق — يُؤرشف
+  archivedAt DateTime? @db.Timestamptz
   createdAt  DateTime  @default(now()) @db.Timestamptz
 
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -435,14 +462,17 @@ model Product {
   createdAt     DateTime      @default(now()) @db.Timestamptz
   updatedAt     DateTime      @updatedAt @db.Timestamptz
 
-  vendor     Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  category   Category                @relation(fields: [categoryId], references: [id])
-  brand      Brand?                  @relation(fields: [brandId], references: [id])
-  variants   ProductVariant[]
-  images     ProductImage[]
-  attrValues ProductAttributeValue[]
-  reviews    Review[]
-  orderItems OrderItem[]
+  vendor           Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category         Category                @relation(fields: [categoryId], references: [id])
+  brand            Brand?                  @relation(fields: [brandId], references: [id])
+  variants         ProductVariant[]
+  images           ProductImage[]
+  attrValues       ProductAttributeValue[]
+  reviews          Review[]
+  orderItems       OrderItem[]
+  conversations    Conversation[]
+  wishlistItems    WishlistItem[]
+  campaignProducts CampaignProduct[]
 
   /// هدف المفتاح الأجنبي المركّب من المتغيّر — يضمن أن متغيّر المنتج لا يحمل بائعاً غير بائعه
   @@unique([id, vendorId])
@@ -803,6 +833,7 @@ model SubOrder {
   refunds         Refund[]
   ledgerEntries   LedgerEntry[]
   platformEntries PlatformLedgerEntry[]
+  conversations   Conversation[]
 
   @@index([orderId])
   @@index([vendorId, status, placedAt(sort: Desc)])
@@ -976,6 +1007,7 @@ model Coupon {
   vendor      Vendor?            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   conditions  CouponCondition[]
   redemptions CouponRedemption[]
+  campaigns   Campaign[]
 
   @@index([isActive, startsAt, endsAt])
   @@map("coupons")
@@ -1436,4 +1468,110 @@ model Banner {
 
   @@index([placement, isActive])
   @@map("banners")
+}
+
+// ============================================================================
+// 14 · الرسائل والمفضّلة والحملات — الشاشات الست الأخيرة (27 سبتمبر 2026)
+// ============================================================================
+
+/// محادثة غير فورية بين مشترٍ ومتجر — ST-09 و ST-28 و VD-15.
+/// واحدة لكل (مشترٍ، متجر، سياق): السؤال الثاني عن المنتج نفسه يُكمل
+/// المحادثة الأولى بدل أن يفتح خيطاً جديداً يضيع فيه الردّ.
+model Conversation {
+  id         String  @id @default(uuid()) @db.Uuid
+  customerId String  @db.Uuid
+  vendorId   String  @db.Uuid
+  /// `product:<uuid>` · `order:<uuid>` · `general` — مفتاح التفرّد، لأن
+  /// PostgreSQL يعدّ كل NULL مختلفاً فلا يحرس (productId, subOrderId) شيئاً
+  contextKey String
+  productId  String? @db.Uuid
+  subOrderId String? @db.Uuid
+
+  lastMessageAt  DateTime  @default(now()) @db.Timestamptz
+  /// أول 140 حرفاً من آخر رسالة — القائمة لا تجلب الرسائل
+  lastPreview    String
+  lastSenderSide String // customer | vendor
+  customerReadAt DateTime? @db.Timestamptz
+  vendorReadAt   DateTime? @db.Timestamptz
+  createdAt      DateTime  @default(now()) @db.Timestamptz
+
+  customer User                  @relation(fields: [customerId], references: [id])
+  vendor   Vendor                @relation(fields: [vendorId], references: [id])
+  product  Product?              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  subOrder SubOrder?             @relation(fields: [subOrderId], references: [id], onDelete: Restrict)
+  messages ConversationMessage[]
+
+  @@unique([customerId, vendorId, contextKey])
+  @@index([customerId, lastMessageAt(sort: Desc)])
+  @@index([vendorId, lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+/// للإضافة فقط: لا تعديل ولا حذف — الرسالة قد تصير دليلاً في نزاع
+model ConversationMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  senderUserId   String   @db.Uuid
+  senderSide     String // customer | vendor
+  body           String
+  createdAt      DateTime @default(now()) @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  sender       User         @relation(fields: [senderUserId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_messages")
+}
+
+/// ST-23 — المفضّلة. السعر لحظة الحفظ يُحفظ ليُقال «انخفض 13.00 منذ حفظه».
+model WishlistItem {
+  userId               String   @db.Uuid
+  productId            String   @db.Uuid
+  /// أرخص متغيّر نشط لحظة الحفظ، بعملة البائع
+  savedPriceMinorUnits BigInt
+  currency             String   @db.Char(3)
+  createdAt            DateTime @default(now()) @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("wishlist_items")
+}
+
+/// AD-17 — حملة: مدة، ومنتجات مميّزة مرتّبة يدوياً، وموضع في الواجهة،
+/// وكوبون اختياري يُعلَن معها (الكوبون يعمل بشروطه هو، لا بالحملة).
+model Campaign {
+  id        String   @id @default(uuid()) @db.Uuid
+  nameAr    String
+  /// home_top | home_middle
+  placement String
+  couponId  String?  @db.Uuid
+  startsAt  DateTime @db.Timestamptz
+  endsAt    DateTime @db.Timestamptz
+  /// إيقاف يدوي قبل موعد الانتهاء
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  updatedBy String?  @db.Uuid
+
+  coupon Coupon?           @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items  CampaignProduct[]
+
+  @@index([placement, startsAt, endsAt])
+  @@map("campaigns")
+}
+
+model CampaignProduct {
+  campaignId String @db.Uuid
+  productId  String @db.Uuid
+  sort       Int
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, productId])
+  @@index([campaignId, sort])
+  @@map("campaign_products")
 }

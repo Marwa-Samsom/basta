@@ -1,0 +1,310 @@
+/* messages — الرسائل بين المشتري والمتجر: ST-28 «رسائلي» و VD-15 «رسائل البائع»
+   ونافذة ST-09 «اسأل المتجر». يستوردها المكوّنان نفساهما (components/messages.tsx
+   و components/ask-shop.tsx): تُعرض في الحساب ولوحة البائع وصفحة المنتج،
+   فلا ترتبط بأنماط قسم واحد (الدرس 19). الأرقام وحدها بالخط الأحادي. */
+
+/* ============================================================ صندوق الرسائل */
+
+.ms-page { display: grid; gap: var(--space-4); min-width: 0; }
+.ms-page .page-head h1 { font-family: var(--font-display); font-weight: var(--weight-black); }
+
+.ms-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+/* القائمة 300 في الحساب و 330 في اللوحة كما في ملفي التصميم */
+.ms-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.ms-layout--vendor { grid-template-columns: 330px minmax(0, 1fr); }
+
+/* ------------------------------------------------------------------ القائمة */
+
+.ms-list { overflow: hidden; }
+.ms-list__items { margin: 0; padding: 0; list-style: none; max-block-size: 640px; overflow-y: auto; }
+
+.ms-row {
+  inline-size: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px;
+  border-block-end: 1px solid var(--border-subtle);
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+.ms-list__items li:last-child .ms-row { border-block-end: 0; }
+.ms-row:hover { background: var(--surface-sunken); }
+.ms-row[aria-current='true'] { background: var(--brand-subtle); }
+.ms-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+.ms-row__tile { inline-size: 36px; block-size: 36px; }
+/* الحرف الأول من اسم المشتري — دائرة العلامة في VD-15 */
+.ms-row__initial {
+  inline-size: 28px;
+  block-size: 28px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--brand-subtle);
+  color: var(--brand-text);
+  display: grid;
+  place-items: center;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+.ms-row__text { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.ms-row__top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.ms-row__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ms-row[data-unread='true'] .ms-row__name { font-weight: var(--weight-bold); }
+.ms-row__dot { inline-size: 8px; block-size: 8px; flex: none; border-radius: var(--radius-full); background: var(--brand); }
+.ms-row__time { font-size: var(--text-2xs); color: var(--text-faint); flex: none; }
+.ms-layout--vendor .ms-row__time { margin-inline-start: auto; }
+.ms-row__about,
+.ms-row__preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-row__about { font-size: var(--text-2xs); color: var(--brand-text); }
+.ms-row__preview { font-size: var(--text-2xs); color: var(--text-muted); }
+.ms-layout--vendor .ms-row { display: grid; gap: 5px; padding: 12px 14px; }
+.ms-layout--vendor .ms-row__preview { font-size: var(--text-xs); }
+
+/* ------------------------------------------------------------------- الخيط */
+
+.ms-thread { display: flex; flex-direction: column; min-block-size: 520px; }
+.ms-layout--vendor .ms-thread { min-block-size: 0; }
+
+.ms-thread__head {
+  padding: 13px var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+.ms-thread__who { display: grid; gap: 2px; min-width: 0; }
+.ms-thread__shop { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--text-strong); }
+.ms-thread__customer { font-size: var(--text-md); font-weight: var(--weight-bold); color: var(--text-strong); }
+.ms-thread__ctx { font-size: var(--text-2xs); color: var(--text-muted); overflow-wrap: anywhere; }
+.ms-thread__ctx-link { font-size: var(--text-xs); color: var(--brand-text); overflow-wrap: anywhere; }
+.ms-thread__open { margin-inline-start: auto; }
+/* زرّ «رجوع إلى المحادثات» للجوال وحده — على الشاشة العريضة القائمة ظاهرة بجانبه */
+.ms-thread__back { display: none; }
+
+.ms-thread__scroll {
+  flex: 1;
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  overflow-y: auto;
+  max-block-size: 520px;
+}
+.ms-layout--vendor .ms-thread__scroll { padding: 14px var(--space-4); max-block-size: 380px; }
+.ms-thread__scroll:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.ms-thread__list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.ms-thread__note { font-size: var(--text-sm); color: var(--text-muted); text-align: center; padding: var(--space-6) var(--space-4); }
+
+.ms-msg { display: flex; justify-content: flex-start; }
+.ms-msg--mine { justify-content: flex-end; }
+.ms-msg__box { max-inline-size: 78%; min-width: 0; display: grid; gap: 5px; }
+.ms-msg__meta { display: flex; align-items: center; gap: 7px; }
+.ms-msg__role {
+  min-block-size: 18px;
+  padding-inline: 7px;
+  border-radius: var(--radius-full);
+  background: var(--surface-page);
+  color: var(--text-body);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--text-2xs);
+  display: inline-flex;
+  align-items: center;
+}
+.ms-msg--mine .ms-msg__role { background: var(--brand-subtle); color: var(--brand-text); border-color: transparent; }
+.ms-msg__time { font-size: var(--text-2xs); color: var(--text-faint); }
+.ms-msg__body {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ms-layout--vendor .ms-msg__body { padding: 10px 12px; }
+.ms-msg--mine .ms-msg__body { background: var(--brand-subtle); border-color: var(--brand); }
+
+/* ------------------------------------------------------------------ المحرّر */
+
+.ms-composer {
+  padding: 12px var(--space-4);
+  border-block-start: 1px solid var(--border-subtle);
+  display: grid;
+  gap: 9px;
+}
+.ms-composer textarea { resize: none; line-height: 1.7; font-size: var(--text-base); }
+.ms-composer__bar { display: flex; align-items: center; gap: 9px; }
+.ms-composer__count { font-size: var(--text-2xs); color: var(--text-faint); }
+.ms-composer__count[data-near='true'] { color: var(--warning-text); }
+.ms-composer__send { margin-inline-start: auto; }
+
+/* ردود جاهزة — VD-15 */
+.ms-quick { display: flex; gap: 7px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
+.ms-quick li { min-width: 0; max-inline-size: 100%; }
+.ms-chip {
+  min-block-size: 28px;
+  max-inline-size: 24ch;
+  padding-inline: 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-body);
+  font-size: var(--text-2xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-chip:hover { background: var(--brand-subtle); color: var(--brand-text); border-color: var(--brand); }
+
+/* ----------------------------------------------------------- الهيكل والحالات */
+
+.ms-skel__list { block-size: 280px; }
+.ms-skel__thread { block-size: 420px; }
+
+/* الجوال: القائمة وحدها، ثم الخيط وحده بزرّ رجوع — لا عمودان ولا فيض أفقي */
+@media (max-width: 760px) {
+  .ms-layout,
+  .ms-layout--vendor { grid-template-columns: minmax(0, 1fr); }
+  .ms-layout[data-view='list'] .ms-thread { display: none; }
+  .ms-layout[data-view='thread'] .ms-list { display: none; }
+  .ms-thread__back { display: inline-flex; }
+  .ms-thread { min-block-size: 0; }
+  .ms-thread__scroll { max-block-size: 60vh; }
+  .ms-msg__box { max-inline-size: 92%; }
+  .ms-list__items { max-block-size: none; }
+}
+
+/* ======================================================== ST-09 اسأل المتجر */
+
+.ms-ask-trigger { inline-size: 100%; min-block-size: 44px; }
+
+.ms-dialog {
+  inline-size: min(540px, calc(100% - 2 * var(--space-4)));
+  max-block-size: min(86vh, 620px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+  color: var(--text-body);
+}
+.ms-dialog[open] { display: flex; flex-direction: column; }
+.ms-dialog::backdrop { background: color-mix(in srgb, var(--surface-inverse) 55%, transparent); }
+
+.ms-dialog__head {
+  flex: none;
+  padding: 17px var(--space-5);
+  border-block-end: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ms-dialog__title { margin: 0; font-size: var(--text-md); font-weight: var(--weight-bold); color: var(--text-strong); }
+.ms-dialog__body { flex: 1; min-block-size: 0; overflow-y: auto; padding: 18px var(--space-5); display: grid; gap: 14px; }
+.ms-dialog__foot {
+  flex: none;
+  padding: 14px var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ما يُرفق بالسؤال تلقائياً — المنتج أو الطلب */
+.ms-subject {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  min-width: 0;
+}
+.ms-subject__thumb {
+  inline-size: 44px;
+  block-size: 52px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-faint);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.ms-subject__thumb img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.ms-subject__text { display: grid; gap: 3px; min-width: 0; }
+.ms-subject__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semi);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-subject__sub { font-size: var(--text-2xs); color: var(--text-muted); }
+.ms-subject .badge { margin-inline-start: auto; flex: none; }
+
+.ms-guest {
+  padding: 13px;
+  border: 1px solid var(--info);
+  border-radius: var(--radius-sm);
+  background: var(--info-subtle);
+  display: grid;
+  gap: 9px;
+}
+.ms-guest__text { display: flex; align-items: flex-start; gap: 9px; margin: 0; font-size: var(--text-sm); color: var(--info-text); line-height: 1.7; }
+.ms-guest__text .icon { flex: none; margin-block-start: 2px; }
+.ms-guest .btn { inline-size: fit-content; }
+
+.ms-ask__field { display: grid; gap: 7px; }
+.ms-ask__label { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--text-strong); }
+.ms-ask__field textarea { resize: vertical; line-height: 1.8; font-size: var(--text-base); padding-block: 11px; }
+.ms-ask__hint { display: flex; align-items: center; gap: 9px; }
+.ms-ask__msg { font-size: var(--text-xs); color: var(--text-muted); }
+.ms-ask__msg[data-tone='ok'] { color: var(--success-text); }
+.ms-ask__msg[data-tone='bad'] { color: var(--danger-text); }
+.ms-ask__count { margin-inline-start: auto; font-size: var(--text-2xs); color: var(--text-faint); }
+.ms-ask__count[data-near='true'] { color: var(--warning-text); }
+.ms-ask__note { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--text-xs); color: var(--text-muted); }
+.ms-ask__note .icon { flex: none; }
+
+.ms-ask__done { display: grid; gap: 10px; justify-items: start; }
+.ms-ask__done-title { margin: 0; font-size: var(--text-md); font-weight: var(--weight-bold); color: var(--text-strong); }
+.ms-ask__done-title:focus:not(:focus-visible) { outline: none; }
+
+@media (max-width: 480px) {
+  .ms-dialog__foot { flex-direction: column-reverse; }
+  .ms-dialog__foot .btn { inline-size: 100%; }
+  .ms-subject .badge { display: none; }
+}

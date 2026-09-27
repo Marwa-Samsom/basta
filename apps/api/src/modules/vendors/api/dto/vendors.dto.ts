@@ -187,3 +187,20 @@ export class DocumentDecisionDto {
   @Length(5, 500)
   reason?: string;
 }
+
+/**
+ * حساب بنكي بعد الاعتماد — VD-20. كلمة المرور (والرمز إن كان التحقق بخطوتين
+ * مفعَّلاً) في الطلب نفسه: جلسة مسروقة وحدها لا تضيف وجهة تحويل.
+ */
+export class AddBankAccountDto extends BankAccountDto {
+  @ApiProperty()
+  @IsString()
+  @Length(1, 200)
+  password!: string;
+
+  @ApiPropertyOptional({ description: 'رمز التطبيق أو رمز استعادة — إن كان التحقق بخطوتين مفعَّلاً' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(11)
+  code?: string;
+}

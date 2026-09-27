@@ -24,6 +24,7 @@ const NAV: { href: string; label: string; icon: IconName; perm?: string; group: 
   { href: '/admin/reviews', label: 'التقييمات', icon: 'star', perm: 'content.manage', group: 'التشغيل' },
   { href: '/admin/categories', label: 'التصنيفات والخصائص', icon: 'package', perm: 'catalog.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/coupons', label: 'الكوبونات', icon: 'star', perm: 'coupons.manage', group: 'الكتالوج والمحتوى' },
+  { href: '/admin/campaigns', label: 'الحملات', icon: 'chart', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/storefront', label: 'الواجهة واللافتات', icon: 'image', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/pages', label: 'صفحات المحتوى', icon: 'file', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/notifications', label: 'قوالب الإشعارات', icon: 'msg', perm: 'content.manage', group: 'الكتالوج والمحتوى' },

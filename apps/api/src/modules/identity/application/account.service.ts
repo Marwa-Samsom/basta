@@ -17,6 +17,8 @@ export interface Profile {
   emailVerifiedAt: Date | null;
   phoneVerifiedAt: Date | null;
   totpEnabled: boolean;
+  /** رموز الاستعادة التي لم تُستعمل بعد — صفر حين التحقق غير مفعَّل */
+  recoveryCodesLeft: number;
   isAdmin: boolean;
   createdAt: Date;
 }
@@ -33,7 +35,10 @@ export class AccountService {
   constructor(private readonly prisma: PrismaService) {}
 
   async profile(userId: string): Promise<Profile> {
-    const u = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { roles: true } });
+    const u = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      include: { roles: true, _count: { select: { recoveryCodes: { where: { usedAt: null } } } } },
+    });
     return {
       id: u.id,
       email: u.email,
@@ -42,6 +47,7 @@ export class AccountService {
       emailVerifiedAt: u.emailVerifiedAt,
       phoneVerifiedAt: u.phoneVerifiedAt,
       totpEnabled: u.totpEnabledAt !== null,
+      recoveryCodesLeft: u.totpEnabledAt ? u._count.recoveryCodes : 0,
       isAdmin: u.roles.some((r) => r.role === 'admin'),
       createdAt: u.createdAt,
     };

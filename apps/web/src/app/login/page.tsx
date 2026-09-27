@@ -71,6 +71,7 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [totp, setTotp] = useState('');
   const [needsTotp, setNeedsTotp] = useState(false);
+  const [useRecovery, setUseRecovery] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -88,7 +89,7 @@ function LoginForm() {
       router.push(res.requiresTotpSetup ? '/account/2fa' : next);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'تعذّر تسجيل الدخول.';
-      // الخادم يطلب رمز التحقق الثنائي للإدارة — الحقل يظهر عندها لا قبلها.
+      // الخادم يطلب رمز التحقق الثنائي ممّن فعّله — الحقل يظهر عندها لا قبلها.
       // أول طلب للرمز ليس خطأً بل خطوة: يشرحها شريط المعلومات لا تنبيه أحمر.
       if (err instanceof ApiError && /التحقق|رمز/.test(message)) {
         const firstAsk = !needsTotp;
@@ -104,6 +105,7 @@ function LoginForm() {
 
   function back(): void {
     setNeedsTotp(false);
+    setUseRecovery(false);
     setTotp('');
     setError(null);
   }
@@ -143,20 +145,49 @@ function LoginForm() {
             <>
               <div className="alert alert--info ac-note" role="status">
                 <Icon name="shield" size={16} />
-                <span>رمز التحقّق بخطوتين إلزامي لحسابات الإدارة</span>
+                <span>
+                  {isAdmin ? 'رمز التحقّق بخطوتين إلزامي لحسابات الإدارة' : 'حسابك محمي بالتحقّق بخطوتين'}
+                </span>
               </div>
-              <TextInput
-                label="رمز التحقق الثنائي"
-                hint="ستة أرقام من تطبيق المصادقة."
-                className="field__control ac-otp"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                dir="ltr"
-                placeholder="000000"
-                maxLength={6}
-                value={totp}
-                onChange={(e) => setTotp(e.target.value.replace(/\D/g, ''))}
-              />
+              {useRecovery ? (
+                <TextInput
+                  label="رمز الاستعادة"
+                  hint="أحد الرموز العشرة التي حفظتها عند التفعيل — كلٌّ يُستعمل مرة واحدة."
+                  className="field__control ac-otp"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  dir="ltr"
+                  placeholder="XXXXX-XXXXX"
+                  maxLength={11}
+                  value={totp}
+                  onChange={(e) => setTotp(e.target.value.trim())}
+                />
+              ) : (
+                <TextInput
+                  label="رمز التحقق الثنائي"
+                  hint="ستة أرقام من تطبيق المصادقة."
+                  className="field__control ac-otp"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  dir="ltr"
+                  placeholder="000000"
+                  maxLength={6}
+                  value={totp}
+                  onChange={(e) => setTotp(e.target.value.replace(/\D/g, ''))}
+                />
+              )}
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm ac-fit"
+                onClick={() => {
+                  setUseRecovery((v) => !v);
+                  setTotp('');
+                  setError(null);
+                }}
+              >
+                {useRecovery ? 'استعمل رمز التطبيق' : 'أضعت هاتفك؟ استعمل رمز استعادة'}
+              </button>
             </>
           ) : (
             <>

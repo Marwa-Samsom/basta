@@ -35,7 +35,6 @@ interface Vendor {
   shippingPolicyAr: string | null;
   returnPolicyAr: string | null;
   documents: Doc[];
-  bank: { holderName: string; iban: string; bankName: string; swift: string | null } | null;
 }
 
 const DOC_STATUS: Record<string, string> = { missing: 'لم تُرفع', pending: 'بانتظار المراجعة', accepted: 'مقبولة', rejected: 'مرفوضة' };
@@ -230,35 +229,7 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
               </div>
             </dl>
           </section>
-          <section className="card">
-            <h2 className="ao-card-title">الحساب البنكي</h2>
-            {v.bank ? (
-              <dl className="ao-kv">
-                <div>
-                  <dt>صاحب الحساب</dt>
-                  <dd>{v.bank.holderName}</dd>
-                </div>
-                <div>
-                  <dt>البنك</dt>
-                  <dd>{v.bank.bankName}</dd>
-                </div>
-                <div>
-                  <dt>الآيبان</dt>
-                  <dd className="num" dir="ltr">
-                    {v.bank.iban}
-                  </dd>
-                </div>
-                {v.bank.swift ? (
-                  <div>
-                    <dt>SWIFT</dt>
-                    <dd className="num">{v.bank.swift}</dd>
-                  </div>
-                ) : null}
-              </dl>
-            ) : (
-              <p className="muted small">لم يُضف بعد.</p>
-            )}
-          </section>
+          <BankAccounts vendorId={id} />
           <section className="card ao-infogrid__wide">
             <h2 className="ao-card-title">السياسات</h2>
             <p className="ao-prose">{v.descriptionAr ?? '—'}</p>
@@ -276,5 +247,88 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
     </div>
+  );
+}
+
+interface Bank {
+  id: string;
+  holderName: string;
+  bankName: string;
+  iban: string;
+  swift: string | null;
+  isDefault: boolean;
+  verified: boolean;
+  createdAt: string;
+}
+
+/**
+ * الحسابات البنكية الحيّة. حساب التسجيل يوثّقه الاعتماد نفسه؛ ما أضافه البائع
+ * بعده (VD-20) لا يُحوَّل إليه شيء قبل أن يطابقه المراجع هنا — الآيبان كاملاً
+ * واسم صاحبه مقابل اسم النشاط.
+ */
+function BankAccounts({ vendorId }: { vendorId: string }) {
+  const { data, error, reload } = useAdminData<{ items: Bank[] }>(`/admin/vendors/${vendorId}/bank-accounts`);
+  const act = useAction();
+  return (
+    <section className="card">
+      <h2 className="ao-card-title">الحسابات البنكية</h2>
+      <Feedback error={act.error} notice={act.notice} />
+      {!data ? (
+        <Loading error={error} inline />
+      ) : data.items.length === 0 ? (
+        <p className="muted small">لم يُضف بعد.</p>
+      ) : (
+        data.items.map((b) => (
+          <dl key={b.id} className="ao-kv">
+            <div>
+              <dt>البنك</dt>
+              <dd>
+                {b.bankName}{' '}
+                {b.isDefault ? <span className="badge badge--brand">الافتراضي</span> : null}{' '}
+                <span className={`badge ${b.verified ? 'badge--success' : 'badge--warning'}`}>{b.verified ? 'موثّق' : 'قيد التوثيق'}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>صاحب الحساب</dt>
+              <dd>{b.holderName}</dd>
+            </div>
+            <div>
+              <dt>الآيبان</dt>
+              <dd className="num" dir="ltr">
+                {b.iban}
+              </dd>
+            </div>
+            {b.swift ? (
+              <div>
+                <dt>SWIFT</dt>
+                <dd className="num">{b.swift}</dd>
+              </div>
+            ) : null}
+            {b.verified ? null : (
+              <div>
+                <dt>أُضيف</dt>
+                <dd>
+                  {when(b.createdAt)}{' '}
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm"
+                    disabled={act.busy}
+                    onClick={() =>
+                      void act.run(async () => {
+                        await api(`/admin/vendors/${vendorId}/bank-accounts/${b.id}/verify`, { method: 'POST' });
+                        reload();
+                      }, 'وُثّق الحساب وأُبلغ البائع.')
+                    }
+                  >
+                    <Icon name="check" size={14} />
+                    وثّق — الاسم يطابق النشاط
+                  </button>
+                </dd>
+              </div>
+            )}
+          </dl>
+        ))
+      )}
+    </section>
   );
 }

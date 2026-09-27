@@ -1,5 +1,5 @@
-import { Injectable, SetMetadata } from '@nestjs/common';
-import { ThrottlerGuard, type ThrottlerRequest } from '@nestjs/throttler';
+import { Injectable, SetMetadata, type ExecutionContext } from '@nestjs/common';
+import { ThrottlerGuard, type ThrottlerLimitDetail, type ThrottlerRequest } from '@nestjs/throttler';
 
 /**
  * تحديد المعدّل — المرحلة 12، OWASP A04/A07.
@@ -32,5 +32,17 @@ export class BastaThrottlerGuard extends ThrottlerGuard {
       if (!limited) return true;
     }
     return super.handleRequest(props);
+  }
+
+  /**
+   * الرسالة تصل الشاشة كما هي — كانت «ThrottlerException: Too Many Requests»
+   * بالإنجليزية في صفحة الدخول. تقول الآن كم ينتظر صاحبها.
+   */
+  protected override async getErrorMessage(_context: ExecutionContext, detail: ThrottlerLimitDetail): Promise<string> {
+    const seconds = Math.max(1, Math.ceil(detail.timeToBlockExpire || detail.timeToExpire || 60));
+    const wait = seconds < 90 ? 'دقيقة' : `${Math.ceil(seconds / 60)} دقيقة`;
+    return detail.key.includes('auth') || detail.ttl === THROTTLE.authTtl
+      ? `محاولات كثيرة من هذا الجهاز. انتظر ${wait} ثم حاول من جديد.`
+      : `طلبات كثيرة في وقت قصير. انتظر ${wait} ثم أعد المحاولة.`;
   }
 }

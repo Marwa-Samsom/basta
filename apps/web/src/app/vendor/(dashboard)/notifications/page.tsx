@@ -36,6 +36,11 @@ const EVENTS: Record<string, { title: string; icon: IconName; tone: Tone; kind: 
   payout_rejected: { title: 'رُفض طلب سحب', icon: 'wallet', tone: 'danger', kind: 'payout' },
   vendor_approved: { title: 'اعتُمد متجرك', icon: 'check-circle', tone: 'success', kind: 'store' },
   vendor_rejected: { title: 'طلب انضمامك يحتاج تعديلاً', icon: 'store', tone: 'warning', kind: 'store' },
+  message_to_vendor: { title: 'رسالة من مشترٍ', icon: 'msg', tone: 'brand', kind: 'order' },
+  bank_account_added: { title: 'أُضيف حساب بنكي', icon: 'shield', tone: 'warning', kind: 'payout' },
+  bank_account_verified: { title: 'وُثّق حسابك البنكي', icon: 'check-circle', tone: 'success', kind: 'payout' },
+  recovery_code_used: { title: 'استُعمل رمز استعادة', icon: 'shield', tone: 'warning', kind: 'store' },
+  totp_reset_by_admin: { title: 'أُعيد ضبط التحقّق بخطوتين', icon: 'shield', tone: 'danger', kind: 'store' },
 };
 const eventOf = (code: string) => EVENTS[code] ?? { title: 'إشعار', icon: 'bell' as IconName, tone: 'info' as Tone, kind: null };
 

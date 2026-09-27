@@ -189,6 +189,19 @@ export const getBanners = (placement: string): Promise<Banner[]> =>
 
 export const getFeatured = (): Promise<ProductCard[]> => get<ProductCard[]>('/storefront/featured', 60).catch(() => []);
 
+/** حملة جارية في الرئيسية (AD-17) — بطاقاتها بمخطّط المميّز نفسه */
+export interface Campaign {
+  id: string;
+  nameAr: string;
+  placement: 'home_top' | 'home_middle';
+  endsAt: string;
+  couponCode: string | null;
+  products: ProductCard[];
+}
+
+/** الخطأ يعني «لا حملات» لا صفحة ساقطة — والبناء لا يحتاج خادماً حيّاً */
+export const getCampaigns = (): Promise<Campaign[]> => get<Campaign[]>('/storefront/campaigns', 60).catch(() => []);
+
 export const getPage = (slug: string): Promise<ContentPage> => get(`/pages/${slugPath(slug)}`, 300);
 
 export function listProducts(params: Record<string, string | undefined>): Promise<ListResult> {

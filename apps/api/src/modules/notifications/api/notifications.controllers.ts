@@ -57,6 +57,12 @@ export class InboxQueryDto {
   unread?: string;
 }
 
+/** { orders: false, … } — المفاتيح تُفحص في الخدمة مقابل قائمة الفئات */
+export class PrefsDto {
+  @IsObject()
+  prefs!: Record<string, boolean>;
+}
+
 export class PushDto {
   @IsUrl({ require_tld: false })
   endpoint!: string;
@@ -78,6 +84,17 @@ export class MyNotificationsController {
       ...(q.limit ? { limit: q.limit } : {}),
       ...(q.unread ? { unreadOnly: true } : {}),
     });
+  }
+
+  /** VD-20 — تفضيلات البريد لكل فئة */
+  @Get('prefs')
+  prefs(@CurrentActor() a: Actor) {
+    return this.notifications.preferences(a.userId);
+  }
+
+  @Put('prefs')
+  setPrefs(@CurrentActor() a: Actor, @Body() dto: PrefsDto) {
+    return this.notifications.setPreferences(a.userId, dto.prefs);
   }
 
   @Post('read')

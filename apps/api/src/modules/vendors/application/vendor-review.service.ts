@@ -160,6 +160,13 @@ export class VendorReviewService {
       data: { status: 'accepted', reviewedBy: actor.userId, reviewedAt: new Date() },
     });
 
+    // حساب التسجيل البنكي وثّقته المراجعة نفسها (وثيقة bank_proof) — بعد
+    // الاعتماد لا يصير حساب افتراضياً إلا موثَّقاً (VD-20)
+    await this.prisma.vendorBankAccount.updateMany({
+      where: { vendorId, archivedAt: null, verifiedAt: null },
+      data: { verifiedAt: new Date(), verifiedBy: actor.userId },
+    });
+
     await this.audit.record({
       actorUserId: actor.userId,
       actorRole: 'admin',

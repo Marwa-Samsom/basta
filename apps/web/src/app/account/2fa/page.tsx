@@ -1,35 +1,59 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
+import { RecoveryCodes } from '@/components/recovery-codes';
 import { Alert, Field, Spinner } from '@/components/ui';
-import { api, session } from '@/lib/api';
+import { api, ApiError, session } from '@/lib/api';
+
+const still = () => () => undefined;
+
+/** مسار داخلي في الحساب أو لوحة البائع وحده — لا إعادة توجيه مفتوحة إلى موقع آخر */
+function backFromUrl(): string {
+  const next = new URLSearchParams(window.location.search).get('next');
+  return next && /^\/(account|vendor)(\/[\w\-/?=&]*)?$/.test(next) ? next : '/account';
+}
 
 /**
- * AD-02 — التحقق الثنائي الإلزامي للإدارة.
+ * تفعيل التحقق بخطوتين — AD-02 للإدارة (إلزامي، بلا «تخطٍّ»)، واختياري
+ * لغيرها من صفحة الحساب.
  *
- * الرمز المحدود لا يفتح إلا هذه الصفحة. بعد التأكيد تُبطَل الجلسة المحدودة،
- * فيدخل المدير من جديد بكلمة المرور والرمز معاً. **لا زرّ «تخطٍّ»**.
+ * بعد التأكيد تُعرض رموز الاستعادة مرة واحدة، ثم تُبطَل الجلسات كلها فيدخل
+ * صاحب الحساب من جديد بكلمة المرور والرمز معاً — فيرى أن الحماية تعمل.
  */
 export default function TwoFactorSetupPage() {
   const router = useRouter();
   const [setup, setSetup] = useState<{ secret: string; uri: string } | null>(null);
+  const [admin, setAdmin] = useState(false);
+  const [alreadyOn, setAlreadyOn] = useState(false);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+  const [codes, setCodes] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  /** العودة لغير الإدارة: الحساب افتراضياً، أو إعدادات البائع إن جاء منها */
+  const back = useSyncExternalStore(still, backFromUrl, () => '/account');
 
   useEffect(() => {
     if (!session.read()) {
-      router.replace('/login?next=/admin');
+      router.replace('/login?next=/account/2fa');
       return;
     }
     let alive = true;
     api<{ secret: string; uri: string }>('/auth/totp/setup', { method: 'POST' })
-      .then((s) => alive && setSetup(s))
-      .catch((e: Error) => alive && setError(e.message));
+      .then((s) => {
+        if (!alive) return;
+        setAdmin(session.roles().includes('admin'));
+        setSetup(s);
+      })
+      .catch((e: Error) => {
+        if (!alive) return;
+        setAdmin(session.roles().includes('admin'));
+        if (e instanceof ApiError && e.status === 409) setAlreadyOn(true);
+        else setError(e.message);
+      });
     return () => {
       alive = false;
     };
@@ -39,14 +63,22 @@ export default function TwoFactorSetupPage() {
     setBusy(true);
     setError(null);
     try {
-      await api('/auth/totp/confirm', { method: 'POST', body: { token: code.trim() } });
-      session.clear();
-      setDone(true);
+      const res = await api<{ recoveryCodes: string[] }>('/auth/totp/confirm', {
+        method: 'POST',
+        body: { token: code.trim() },
+      });
+      setCodes(res.recoveryCodes);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
+  };
+
+  // الخادم أبطل الجلسات عند التأكيد — الدخول من جديد يُثبت أن الرمز صار مطلوباً
+  const finish = () => {
+    session.clear();
+    router.replace(`/login?next=${encodeURIComponent(admin ? '/admin' : back)}`);
   };
 
   const copy = (secret: string) => {
@@ -63,28 +95,43 @@ export default function TwoFactorSetupPage() {
           <h1 className="ac-auth__title">تفعيل التحقّق بخطوتين</h1>
         </header>
 
-        {done ? (
+        {codes ? (
           <section className="ac-auth__card">
-            <Alert tone="success" title="فُعِّل التحقق الثنائي">
-              ادخل الآن بكلمة المرور ورمز التطبيق معاً.
+            <h2 className="ac-section-title">فُعِّل التحقّق بخطوتين</h2>
+            <RecoveryCodes codes={codes} onDone={finish} doneLabel="تابع إلى تسجيل الدخول" />
+          </section>
+        ) : alreadyOn ? (
+          <section className="ac-auth__card">
+            <Alert tone="success" title="التحقّق بخطوتين مفعَّل على حسابك">
+              لتغيير الجهاز عطّله أولاً من صفحة الأمان بكلمة المرور ورمز التحقق، ثم فعّله من جديد.
             </Alert>
-            <button
-              type="button"
-              className="btn btn--primary btn--block ac-auth__cta"
-              onClick={() => router.replace('/login?next=/admin')}
-            >
-              تسجيل الدخول
-            </button>
+            <Link href={admin ? '/admin' : back} className="btn btn--secondary btn--block ac-auth__cta">
+              {admin ? 'عُد إلى لوحة الإدارة' : back.startsWith('/vendor') ? 'عُد إلى الإعدادات' : 'عُد إلى حسابي'}
+            </Link>
           </section>
         ) : (
           <>
-            <div className="alert alert--warning ac-note">
-              <Icon name="lock" size={19} />
-              <span className="ac-note__text">
-                <span className="ac-note__title">فعّل التحقّق بخطوتين أولاً — إلزامي لحسابات الإدارة</span>
-                <span className="ac-note__body">لا يمكنك الوصول إلى أي شاشة قبل التفعيل. لا يوجد تخطٍّ.</span>
-              </span>
-            </div>
+            {setup ? (
+              admin ? (
+                <div className="alert alert--warning ac-note">
+                  <Icon name="lock" size={19} />
+                  <span className="ac-note__text">
+                    <span className="ac-note__title">فعّل التحقّق بخطوتين أولاً — إلزامي لحسابات الإدارة</span>
+                    <span className="ac-note__body">لا يمكنك الوصول إلى أي شاشة قبل التفعيل. لا يوجد تخطٍّ.</span>
+                  </span>
+                </div>
+              ) : (
+                <div className="alert alert--info ac-note">
+                  <Icon name="shield" size={19} />
+                  <span className="ac-note__text">
+                    <span className="ac-note__title">طبقة حماية ثانية لحسابك</span>
+                    <span className="ac-note__body">
+                      بعد التفعيل يطلب الدخول رمزاً من هاتفك مع كلمة المرور، فلا تكفي كلمة مرور مسروقة وحدها.
+                    </span>
+                  </span>
+                </div>
+              )
+            ) : null}
 
             {!setup ? (
               error ? (
@@ -151,6 +198,12 @@ export default function TwoFactorSetupPage() {
                     </div>
                   )}
                 </Field>
+
+                {admin ? null : (
+                  <Link href={back} className="ac-help">
+                    {back.startsWith('/vendor') ? 'ليس الآن — عُد إلى الإعدادات' : 'ليس الآن — عُد إلى حسابي'}
+                  </Link>
+                )}
               </section>
             )}
           </>

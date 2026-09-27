@@ -139,7 +139,81 @@ export const EVENTS: readonly EventDef[] = [
     variables: ['name', 'code', 'minutes'],
     sample: { name: 'سارة', code: '482913', minutes: '10' },
   },
+  /**
+   * تنبيهات أمن الحساب — تصل صاحبه أياً كان من فعلها: رمز استعادة استُعمل
+   * أو تحقق أُعيد ضبطه ولم يفعله هو = حسابه في خطر، وعليه أن يعرف فوراً.
+   */
+  {
+    code: 'recovery_code_used',
+    labelAr: 'استُعمل رمز استعادة',
+    audience: 'customer',
+    variables: ['left'],
+    sample: { left: '9' },
+  },
+  {
+    code: 'totp_reset_by_admin',
+    labelAr: 'أعاد الدعم ضبط التحقق بخطوتين',
+    audience: 'customer',
+    variables: ['reason'],
+    sample: { reason: 'فقد صاحب الحساب هاتفه ورموز الاستعادة، وتحقّقنا من هويته.' },
+  },
+  /**
+   * الرسائل — ST-28 و VD-15. تنبيه واحد لكل دفعة غير مقروءة لا لكل رسالة:
+   * من يكتب خمس رسائل متتالية لا يُغرق بريد الطرف الآخر بخمس.
+   */
+  {
+    code: 'message_to_vendor',
+    labelAr: 'رسالة من مشترٍ',
+    audience: 'vendor',
+    variables: ['store_name', 'customer_name', 'context', 'preview', 'link'],
+    sample: { store_name: 'متجر الورد', customer_name: 'سعد', context: 'منتج: عباءة صوف مطرّزة', preview: 'هل يتوفّر مقاس XL خلال الأسبوع؟', link: '/vendor/messages' },
+  },
+  {
+    code: 'message_to_customer',
+    labelAr: 'ردّ من متجر',
+    audience: 'customer',
+    variables: ['store_name', 'context', 'preview', 'link'],
+    sample: { store_name: 'متجر الورد', context: 'منتج: عباءة صوف مطرّزة', preview: 'نعم، متوفّر ونشحنه غداً.', link: '/account/messages' },
+  },
+  /**
+   * أمن مال البائع — لا يُطفأ من التفضيلات: حساب بنكي أُضيف ولم يضفه صاحب
+   * المتجر يعني أن أحداً يحاول تحويل رصيده إلى جيبه.
+   */
+  {
+    code: 'bank_account_added',
+    labelAr: 'أُضيف حساب بنكي',
+    audience: 'vendor',
+    variables: ['store_name', 'bank', 'iban_tail', 'link'],
+    sample: { store_name: 'متجر الورد', bank: 'مصرف الراجحي', iban_tail: '1180', link: '/vendor/settings' },
+  },
+  {
+    code: 'bank_account_verified',
+    labelAr: 'وُثّق حساب بنكي',
+    audience: 'vendor',
+    variables: ['store_name', 'bank', 'iban_tail', 'link'],
+    sample: { store_name: 'متجر الورد', bank: 'مصرف الراجحي', iban_tail: '1180', link: '/vendor/settings' },
+  },
 ];
+
+/**
+ * فئات تفضيلات البريد — VD-20. الإطفاء يوقف البريد والرسائل النصية وواتساب
+ * وإشعار المتصفّح لأحداث الفئة؛ الإشعار داخل الموقع يبقى دائماً، فلا يضيع
+ * شيء — يصل فقط أهدأ. ما ليس هنا (الأمن والهوية) لا يُطفأ.
+ */
+export const PREF_CATEGORIES = [
+  { key: 'orders', labelAr: 'طلب جديد', noteAr: 'عند كل طلب فرعي جديد', codes: ['vendor_new_order'] },
+  { key: 'products', labelAr: 'قرار مراجعة منتج', noteAr: 'رفض منتج مع السبب', codes: ['product_rejected'] },
+  { key: 'stock', labelAr: 'مخزون منخفض', noteAr: 'عند بلوغ حدّ التنبيه', codes: ['low_stock'] },
+  { key: 'returns', labelAr: 'مرتجع أو نزاع', noteAr: 'طلب إرجاع جديد أو رسالة في نزاع', codes: ['return_requested', 'dispute_message'] },
+  { key: 'payouts', labelAr: 'حالة التحويلات', noteAr: 'التحويل والرفض', codes: ['payout_paid', 'payout_rejected'] },
+  { key: 'messages', labelAr: 'رسائل المشترين', noteAr: 'أول رسالة غير مقروءة في كل محادثة', codes: ['message_to_vendor'] },
+] as const;
+
+export type PrefCategory = (typeof PREF_CATEGORIES)[number]['key'];
+
+/** فئة الحدث إن كان قابلاً للإطفاء — وإلا undefined */
+export const prefCategoryOf = (code: string): PrefCategory | undefined =>
+  PREF_CATEGORIES.find((c) => (c.codes as readonly string[]).includes(code))?.key;
 
 export interface TemplateSeed {
   readonly code: string;
@@ -190,6 +264,17 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'مرحباً {{name}}،\n\nطلب أحدهم إعادة تعيين كلمة مرور حسابك في بسطة. رمز الاستعادة: {{code}}\n\nاكتبه في صفحة إعادة التعيين مع كلمتك الجديدة. صالح {{minutes}} دقائق ولمرة واحدة، وعند استعماله تُنهى كل جلساتك المفتوحة.\n\nإن لم تطلبه فتجاهل الرسالة؛ كلمة مرورك لم تتغيّر.\n\nبسطة',
     'رمز استعادة كلمة المرور'),
 
+  // العدد يُكتب بعد النقطتين لا داخل الجملة: تمييز العدد في العربية يتغيّر بتغيّره
+  t('recovery_code_used', 'email',
+    'استُعمل للتوّ أحد رموز الاستعادة لدخول حسابك في بسطة بدل رمز تطبيق المصادقة. الرموز الباقية: {{left}}.\n\nإن كنت أنت فلا شيء عليك؛ أنشئ رموزاً جديدة من صفحة الأمان إن قاربت على النفاد.\n\nإن لم تكن أنت فغيّر كلمة مرورك فوراً وأنهِ الجلسات الأخرى من صفحة حسابك.\n\nبسطة',
+    'استُعمل رمز استعادة لدخول حسابك'),
+  t('recovery_code_used', 'in_app', 'استُعمل رمز استعادة لدخول حسابك. الرموز الباقية: {{left}}.'),
+
+  t('totp_reset_by_admin', 'email',
+    'أعاد فريق الدعم ضبط التحقق بخطوتين على حسابك في بسطة، وأُنهيت كل جلساتك. السبب: {{reason}}\n\nحسابك الآن يُفتح بكلمة المرور وحدها — فعّل التحقق بخطوتين من جديد من صفحة الأمان.\n\nإن لم تطلب ذلك فراسلنا فوراً.\n\nبسطة',
+    'أُعيد ضبط التحقق بخطوتين على حسابك'),
+  t('totp_reset_by_admin', 'in_app', 'أعاد الدعم ضبط التحقق بخطوتين على حسابك. فعّله من جديد من صفحة الأمان.'),
+
   // ----------------------------------------------------------------- البائع
   t('vendor_new_order', 'email',
     'فريق {{store_name}}،\n\nوصلكم طلب جديد رقم {{order_number}} بقيمة {{amount}}. اقبلوه أو ارفضوه خلال {{deadline_hours}} ساعة، وإلا أُلغي آلياً ورُدّ المبلغ للمشتري.\n\n{{link}}\n\nبسطة',
@@ -231,6 +316,27 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'فريق {{store_name}}،\n\nقارب مخزون هذه المنتجات على النفاد: {{items}}.\n\nزيدوا الكمية قبل أن تنفد فيتوقّف بيعها: {{link}}\n\nبسطة',
     'مخزون قارب النفاد في {{store_name}}'),
   t('low_stock', 'in_app', 'مخزون قارب النفاد: {{items}}.'),
+
+  t('message_to_vendor', 'email',
+    'فريق {{store_name}}،\n\nكتب لكم {{customer_name}} بخصوص {{context}}:\n\n«{{preview}}»\n\nالردّ خلال يوم عمل يُبقي المشتري معكم: {{link}}\n\nبسطة',
+    'رسالة من {{customer_name}} — {{context}}'),
+  t('message_to_vendor', 'in_app', 'رسالة من {{customer_name}} بخصوص {{context}}: {{preview}}'),
+
+  t('bank_account_added', 'email',
+    'فريق {{store_name}}،\n\nأُضيف إلى متجركم حساب بنكي جديد في {{bank}} ينتهي بـ {{iban_tail}}. لا تُحوَّل إليه أموال قبل أن يوثّقه فريق بسطة.\n\nإن لم تضيفوه أنتم فغيّروا كلمة المرور فوراً، وأنهوا الجلسات الأخرى، وراسلونا: {{link}}\n\nبسطة',
+    'أُضيف حساب بنكي إلى متجركم'),
+  t('bank_account_added', 'in_app', 'أُضيف حساب بنكي في {{bank}} ينتهي بـ {{iban_tail}} — بانتظار التوثيق.'),
+
+  t('bank_account_verified', 'email',
+    'فريق {{store_name}}،\n\nوثّقنا حسابكم في {{bank}} المنتهي بـ {{iban_tail}}. يمكنكم الآن جعله الحساب الافتراضي للتحويلات: {{link}}\n\nبسطة',
+    'وُثّق حسابكم البنكي'),
+  t('bank_account_verified', 'in_app', 'وُثّق حسابكم في {{bank}} المنتهي بـ {{iban_tail}}.'),
+
+  // --------------------------------------------------------------- المشتري
+  t('message_to_customer', 'email',
+    'ردّ {{store_name}} على رسالتك بخصوص {{context}}:\n\n«{{preview}}»\n\nتقرأ المحادثة كاملة وتردّ من هنا: {{link}}\n\nبسطة',
+    'ردّ من {{store_name}}'),
+  t('message_to_customer', 'in_app', 'ردّ {{store_name}} بخصوص {{context}}: {{preview}}'),
 ];
 
 const VAR = /\{\{\s*([a-z_]+)\s*\}\}/g;

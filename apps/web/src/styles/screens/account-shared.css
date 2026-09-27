@@ -346,3 +346,40 @@
   .ac-page__article { padding: 18px; }
   .ac-page__title { font-size: var(--text-xl); }
 }
+
+/* ------------------------------------------------ رموز استعادة التحقق بخطوتين */
+/* تظهر في صفحة التفعيل وفي صفحة الحساب — فأنماطها هنا في الملف المشترك */
+.rc { display: grid; gap: var(--space-4); }
+.rc__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4);
+  list-style: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.rc__code {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semi);
+  color: var(--text-strong);
+  text-align: center;
+  padding-block: var(--space-1);
+}
+.rc__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.rc__confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+.rc__confirm input { inline-size: 18px; block-size: 18px; accent-color: var(--brand); }
+@media (max-width: 400px) {
+  .rc__list { grid-template-columns: minmax(0, 1fr); }
+}
+/* رابط ثانوي بعرض نصّه — «أضعت هاتفك؟ استعمل رمز استعادة» */
+.ac-fit { justify-self: start; inline-size: fit-content; }

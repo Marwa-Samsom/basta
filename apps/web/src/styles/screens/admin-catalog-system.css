@@ -429,3 +429,47 @@ fieldset.ac2-divider > legend { float: inline-start; inline-size: 100%; padding:
   white-space: nowrap;
 }
 .ac2-setting__select { inline-size: 150px; flex: none; }
+
+/* ------------------------------------------------------------ AD-17 الحملات */
+
+/* رمز الكوبون المُعلَن — لاتيني أحادي بلون نصّ العلامة كما في التصميم */
+.ac2-campaign-code { color: var(--brand-text); font-weight: var(--weight-semi); font-size: var(--text-xs); }
+
+.ac2-order__head { flex-wrap: wrap; }
+.ac2-order__item { background: var(--surface-card); flex-wrap: wrap; }
+.ac2-order__item[data-dragging] { opacity: 0.55; }
+.ac2-order__grip { flex: none; color: var(--text-faint); cursor: grab; }
+.ac2-order__thumb {
+  inline-size: 36px;
+  block-size: 36px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--surface-sunken);
+  object-fit: cover;
+}
+.ac2-order__name { flex: 1 1 160px; }
+.ac2-order__name .ac2-cell__main,
+.ac2-order__name .ac2-cell__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac2-order__btns { display: inline-flex; align-items: center; gap: var(--space-1); margin-inline-start: auto; }
+.ac2-order__add { display: grid; gap: var(--space-3); }
+.ac2-order__search { inline-size: 360px; max-inline-size: 100%; }
+.ac2-order__search .field__control { inline-size: 100%; }
+.ac2-order__results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  max-block-size: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.ac2-order__result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px var(--space-3);
+  border-block-end: 1px solid var(--border-subtle);
+}
+.ac2-order__result:last-child { border-block-end: 0; }

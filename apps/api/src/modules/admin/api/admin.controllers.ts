@@ -339,6 +339,13 @@ export class AdminOperationsController {
     return this.ops.setCustomerStatus(a.userId, id, 'suspended', dto.reason ?? '');
   }
 
+  @Post('customers/:id/reset-2fa')
+  @RequirePermission('customers.manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  resetTotp(@CurrentActor() a: Actor, @Param('id', uuidParam) id: string, @Body() dto: ReasonDto) {
+    return this.ops.resetCustomerTotp(a.userId, id, dto.reason ?? '');
+  }
+
   @Post('customers/:id/reinstate')
   @RequirePermission('customers.manage')
   @HttpCode(HttpStatus.NO_CONTENT)

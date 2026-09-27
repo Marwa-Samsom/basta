@@ -1,0 +1,111 @@
+/* vendor-settings — VD-20 من «Basta Vendor Orders & Money.dc.html»: عمود تبويبات
+   220px ولوحة بجانبه، وعلى الجوال شريط أقراص فوق اللوحة. رموز فقط، خصائص منطقية فقط.
+   البطاقات والمفتاح من vendor-extra.css، ولوحتا الأمان والجلسات من identity.css. */
+
+.vs-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; align-items: start; max-inline-size: 1100px; }
+
+.vs-tabs {
+  display: grid;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.vs-tab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-block-size: 40px;
+  padding-inline: 14px;
+  border: 0;
+  border-block-end: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.vs-tab:last-child { border-block-end: 0; }
+.vs-tab:hover { background: var(--surface-sunken); }
+.vs-tab[aria-selected='true'] { background: var(--brand-subtle); color: var(--brand-text); font-weight: var(--weight-bold); }
+.vs-tab .icon { flex: none; }
+
+.vs-panel { display: grid; gap: 14px; min-width: 0; }
+
+/* ------------------------------------------------------------ الحسابات البنكية */
+
+.vs-banks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.vs-bank {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 13px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.vs-bank--default { border-color: var(--brand); background: var(--brand-subtle); }
+.vs-bank__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 36px;
+  block-size: 36px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-muted);
+}
+.vs-bank__main { display: grid; gap: 3px; flex: 1; min-width: 12rem; }
+.vs-bank__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--text-strong); }
+.vs-bank__iban { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); unicode-bidi: isolate; }
+.vs-bank__holder { font-size: var(--text-2xs); color: var(--text-muted); }
+.vs-bank__actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+.vs-form { display: grid; gap: 12px; padding-block-start: var(--space-3); border-block-start: 1px solid var(--border-subtle); }
+.vs-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.vs-form__proof { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--surface-sunken); }
+.vs-form__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.vs-confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; inline-size: 100%; font-size: var(--text-xs); color: var(--text-body); }
+
+/* ----------------------------------------------------------------- التفضيلات */
+
+.vs-prefs { list-style: none; margin: 0; padding: 0; display: grid; }
+.vs-pref { display: flex; align-items: center; gap: 12px; padding-block: 11px; border-block-end: 1px solid var(--border-subtle); }
+.vs-pref:last-child { border-block-end: 0; }
+.vs-pref__text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.vs-pref__label { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--text-strong); }
+.vs-pref__note { font-size: var(--text-2xs); color: var(--text-muted); }
+
+/* -------------------------------------------------------------------- العملة */
+
+.vs-currency {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 13px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.vs-currency__main { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.vs-currency__name { font-size: var(--text-md); font-weight: var(--weight-bold); color: var(--text-strong); }
+.vs-currency__code { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* ------------------------------------------------------------------ الجوال */
+
+@media (max-width: 900px) {
+  .vs-layout { grid-template-columns: minmax(0, 1fr); }
+  .vs-tabs { display: flex; overflow-x: auto; }
+  .vs-tab { flex: none; border-block-end: 0; border-inline-end: 1px solid var(--border-subtle); }
+  .vs-tab:last-child { border-inline-end: 0; }
+}
+
+@media (max-width: 560px) {
+  .vs-form__grid { grid-template-columns: minmax(0, 1fr); }
+}

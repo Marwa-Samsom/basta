@@ -41,6 +41,22 @@ export const session = {
     window.localStorage.removeItem(ACCESS_KEY);
     window.localStorage.removeItem(REFRESH_KEY);
   },
+  /**
+   * أدوار الرمز الحالي — قراءة بلا تحقق من التوقيع، لقرارات العرض وحدها
+   * (أيّ نصّ وأيّ وجهة). الخادم يفحص كل صلاحية بنفسه في كل طلب.
+   */
+  roles(): string[] {
+    const access = session.read()?.accessToken;
+    if (!access) return [];
+    try {
+      const payload = access.split('.')[1] ?? '';
+      const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+      const roles = (JSON.parse(json) as { roles?: unknown }).roles;
+      return Array.isArray(roles) ? roles.filter((r): r is string => typeof r === 'string') : [];
+    } catch {
+      return [];
+    }
+  },
 };
 
 /** خطأ يحمل ما قاله الخادم: الرسالة والرمز والتفاصيل (ومنها قائمة الموانع). */

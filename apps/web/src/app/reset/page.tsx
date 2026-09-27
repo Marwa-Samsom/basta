@@ -78,7 +78,8 @@ export default function ResetPage() {
       session.write(login.tokens);
       router.push(login.requiresTotpSetup ? '/account/2fa' : '/account');
     } catch {
-      // الإدارة: الدخول يحتاج رمز التطبيق — الكلمة حُدّثت، والدخول من صفحته
+      // من فعّل التحقق بخطوتين يحتاج رمزه ليدخل — الكلمة حُدّثت، والدخول من صفحته.
+      // الاستعادة لا تتخطّى التحقق الثنائي: كلمة المرور وحدها لا تكفي بعدها أيضاً.
       setDone(true);
       setBusy(false);
     }

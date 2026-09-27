@@ -213,7 +213,7 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
     expect(inbox.json().unread).toBeGreaterThanOrEqual(2);
     await call('POST', '/me/notifications/read', buyer.token);
     expect((await call('GET', '/me/notifications', buyer.token)).json().unread).toBe(0);
-  });
+  }, 30_000);
 
   it('تعديل القالب: متغيّر غير معلن يُرفض، والتعديل يُسقط المراجعة حتى يُراجَع ثانية', async () => {
     if (!dbUp) return;

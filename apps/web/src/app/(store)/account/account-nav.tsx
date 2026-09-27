@@ -15,10 +15,12 @@ interface NavItem {
   exact?: boolean;
 }
 
-/** الصفحات الموجودة وحدها — لا رابط إلى شاشة لم تُبنَ (قائمة الرغبات، الرسائل) */
+/** ترتيب ملف التصميم: الطلبات، ثم المفضّلة والرسائل، ثم الباقي */
 const NAV: readonly NavItem[] = [
   { href: '/account', label: 'حسابي', icon: 'user', exact: true },
   { href: '/account/orders', label: 'طلباتي', icon: 'package' },
+  { href: '/account/wishlist', label: 'المفضّلة', icon: 'heart' },
+  { href: '/account/messages', label: 'رسائلي', icon: 'msg' },
   { href: '/account/addresses', label: 'العناوين', icon: 'pin' },
   { href: '/account/notifications', label: 'الإشعارات', icon: 'bell' },
   { href: '/account/recent', label: 'شوهد مؤخراً', icon: 'history' },

@@ -44,6 +44,12 @@ const KINDS: Record<string, { title: string; icon: IconName; tone: Tone }> = {
   vendor_rejected: { title: 'لم يُقبل متجرك', icon: 'store', tone: 'danger' },
   product_rejected: { title: 'أُعيد منتج إليك للتعديل', icon: 'alert', tone: 'warning' },
   low_stock: { title: 'مخزون منخفض', icon: 'boxes', tone: 'warning' },
+  message_to_customer: { title: 'ردّ من متجر', icon: 'msg', tone: 'brand' },
+  message_to_vendor: { title: 'رسالة من مشترٍ', icon: 'msg', tone: 'brand' },
+  bank_account_added: { title: 'أُضيف حساب بنكي', icon: 'shield', tone: 'warning' },
+  bank_account_verified: { title: 'وُثّق حساب بنكي', icon: 'check-circle', tone: 'success' },
+  recovery_code_used: { title: 'استُعمل رمز استعادة', icon: 'shield', tone: 'warning' },
+  totp_reset_by_admin: { title: 'أُعيد ضبط التحقّق بخطوتين', icon: 'shield', tone: 'danger' },
 };
 const FALLBACK = { title: '', icon: 'bell' as IconName, tone: 'neutral' as Tone };
 

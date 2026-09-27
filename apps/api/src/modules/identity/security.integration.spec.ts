@@ -76,12 +76,17 @@ describe('A07 · التخمين وسرقة الجلسة', () => {
   it('المحاولة الحادية عشرة من العنوان نفسه تُرفض 429 — وعنوان آخر لا يتأثر', async () => {
     if (!dbUp) return;
     const codes: number[] = [];
+    let last = '';
     for (let i = 0; i < 11; i++) {
       const r = await call('POST', '/auth/login', { ip: '10.0.0.66', body: { email: `nobody${i}@basta.test`, password: 'wrong-password-123' } });
       codes.push(r.statusCode);
+      last = r.body;
     }
     expect(codes.slice(0, 10).every((c) => c === 401)).toBe(true);
     expect(codes[10]).toBe(429);
+    // الرسالة تصل صفحة الدخول كما هي: عربية وتقول كم ينتظر، لا «ThrottlerException»
+    expect(last).toMatch(/محاولات كثيرة من هذا الجهاز. انتظر 15 دقيقة/);
+    expect(last).not.toMatch(/Throttler/);
     const other = await call('POST', '/auth/login', { ip: '10.0.0.67', body: { email: 'x@basta.test', password: 'wrong-password-123' } });
     expect(other.statusCode).toBe(401);
   });

@@ -8,6 +8,8 @@ import {
   DEFAULT_TEMPLATES,
   EVENTS,
   eventOf,
+  PREF_CATEGORIES,
+  prefCategoryOf,
   render,
   usedVariables,
   type Channel,
@@ -15,6 +17,12 @@ import {
 import { deliver } from '../infrastructure/channels';
 
 type Db = Prisma.TransactionClient | PrismaService;
+
+/** JSON المخزَّن كما هو — ما ليس قيمة منطقية يُهمَل */
+function prefsOf(raw: Prisma.JsonValue | undefined): Record<string, boolean> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'));
+}
 
 const EVERY_FIVE_SECONDS = 5_000;
 const MAX_ATTEMPTS = 5;
@@ -74,10 +82,16 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     db: Db = this.prisma,
   ): Promise<number> {
     if (!input.userId) return 0;
-    const templates = await db.notificationTemplate.findMany({
+    let templates = await db.notificationTemplate.findMany({
       where: { code: input.code, locale: 'ar', isEnabled: true },
       select: { channel: true },
     });
+    // فئة أطفأها صاحبها: داخل الموقع وحده — لا يضيع شيء، يصل أهدأ فقط
+    const category = prefCategoryOf(input.code);
+    if (category) {
+      const u = await db.user.findUnique({ where: { id: input.userId }, select: { notificationPrefs: true } });
+      if (prefsOf(u?.notificationPrefs)[category] === false) templates = templates.filter((t) => t.channel === 'in_app');
+    }
     if (templates.length === 0) return 0;
     await db.notification.createMany({
       data: templates.map((t) => ({
@@ -88,6 +102,31 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
       })),
     });
     return templates.length;
+  }
+
+  // ------------------------------------------------------ التفضيلات
+
+  /** VD-20 — كل الفئات مع حالتها؛ الغائب من المخزَّن مُشغَّل */
+  async preferences(userId: string) {
+    const u = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { notificationPrefs: true } });
+    const stored = prefsOf(u.notificationPrefs);
+    return {
+      items: PREF_CATEGORIES.map((c) => ({ key: c.key, labelAr: c.labelAr, noteAr: c.noteAr, email: stored[c.key] !== false })),
+    };
+  }
+
+  async setPreferences(userId: string, patch: Record<string, boolean>) {
+    const known = new Set<string>(PREF_CATEGORIES.map((c) => c.key));
+    const unknown = Object.keys(patch).filter((k) => !known.has(k));
+    if (unknown.length) throw new InvalidInputError('فئة إشعار غير معروفة.', { unknown });
+    if (Object.values(patch).some((v) => typeof v !== 'boolean')) throw new InvalidInputError('قيمة التفضيل تشغيل أو إطفاء.');
+    await this.prisma.$transaction(async (tx) => {
+      // قفل الصف: مفتاحان من تبويبين في اللحظة نفسها لا يمحو أحدهما الآخر
+      await tx.$queryRaw`SELECT 1 FROM "users" WHERE "id" = ${userId}::uuid FOR UPDATE`;
+      const u = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { notificationPrefs: true } });
+      await tx.user.update({ where: { id: userId }, data: { notificationPrefs: { ...prefsOf(u.notificationPrefs), ...patch } } });
+    });
+    return this.preferences(userId);
   }
 
   /** لكل أصحاب متجر ومديريه — إشعار البائع يصل مالكه */

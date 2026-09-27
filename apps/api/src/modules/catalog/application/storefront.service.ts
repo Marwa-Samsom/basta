@@ -197,8 +197,16 @@ export class StorefrontService {
   async featured(): Promise<StorefrontProductCard[]> {
     const row = await this.prisma.setting.findUnique({ where: { key: 'home_featured_product_ids' } });
     const ids = Array.isArray(row?.valueJson) ? (row.valueJson as string[]) : [];
+    return this.cardsByIds(ids);
+  }
+
+  /**
+   * بطاقات منتجات بترتيب المعرّفات المعطاة، بقاعدة الرؤية نفسها — للمميّز
+   * ولحملات الرئيسية (AD-17): ما صار مخفياً يسقط بصمت ولا يظهر مكسوراً.
+   */
+  async cardsByIds(ids: readonly string[]): Promise<StorefrontProductCard[]> {
     if (ids.length === 0) return [];
-    const rows = await this.prisma.product.findMany({ where: { ...VISIBLE, id: { in: ids } }, include: CARD_INCLUDE });
+    const rows = await this.prisma.product.findMany({ where: { ...VISIBLE, id: { in: [...ids] } }, include: CARD_INCLUDE });
     const byId = new Map(rows.map((r) => [r.id, r]));
     return this.cards(ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])));
   }
