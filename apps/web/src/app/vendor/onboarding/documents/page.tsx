@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
@@ -47,7 +48,8 @@ export default function DocumentsPage() {
     );
   }
 
-  const frozen = data.status === 'in_review';
+  // المسوّدة والمرفوض وحدهما يُعدَّلان — والخادم يرفض ما عداهما
+  const frozen = data.status !== 'pending' && data.status !== 'rejected';
 
   /** اسم وجهة المانع كما يقرؤه البائع — لا مسار الحقل التقني */
   function targetLabel(field: string): string {
@@ -69,9 +71,18 @@ export default function DocumentsPage() {
         {data.nameAr} · <span className="num">basta.com/s/{data.slug}</span>
       </p>
 
-      {frozen ? (
+      {data.status === 'in_review' ? (
         <Alert tone="info" title="طلبك قيد المراجعة">
           لا يقبل التعديل الآن. تصلك النتيجة على بريدك، وتستطيع متابعة الحالة في أي وقت.
+        </Alert>
+      ) : data.status === 'approved' ? (
+        <Alert tone="info" title="متجرك معتمد">
+          المستندات مثبّتة كما رُوجعت، ولتغييرها راسل الدعم. الحساب البنكي يُضاف من{' '}
+          <Link href="/vendor/settings">الإعدادات</Link> بتأكيد كلمة المرور وتوثيق من فريق بسطة.
+        </Alert>
+      ) : frozen ? (
+        <Alert tone="warning" title="حساب المتجر موقوف">
+          لا يقبل التعديل. راسل الدعم.
         </Alert>
       ) : null}
 

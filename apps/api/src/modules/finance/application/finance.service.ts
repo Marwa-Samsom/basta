@@ -158,14 +158,22 @@ export class FinanceService {
 
   async requestPayout(vendorId: string, userId: string, input: { currency: string; amountMinorUnits: bigint }) {
     if (input.amountMinorUnits <= 0n) throw new InvalidInputError('مبلغ السحب موجب.');
-    const bank = await this.prisma.vendorBankAccount.findFirst({
-      // الافتراضي وحده وجهة التحويل — حساب أُضيف ولم يُوثَّق لا يُحوَّل إليه أبداً (VD-20)
-      where: { vendorId, isDefault: true, archivedAt: null },
-    });
-    if (!bank) throw new ConflictError('أضف حساباً بنكياً قبل السحب.');
 
     return this.prisma.$transaction(async (tx) => {
+      // الموقوف لا يسحب: الإيقاف يجمّد المال حتى يُحسم سببه (نزاع، احتيال، KYC)
+      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true } });
+      if (vendor?.status !== 'approved') {
+        throw new ConflictError('حساب المتجر موقوف، والسحب متوقّف معه. راسل الدعم.', { status: vendor?.status ?? null });
+      }
       const wallet = await this.ledger.lockWallet(tx, vendorId, input.currency);
+      // بعد قفل المحفظة لا قبله: تبديل الافتراضي بين الفحص والسحب لا يمرّ.
+      // الافتراضي الموثَّق وحده وجهة التحويل — كان الفحص على «افتراضي» فقط، وآيبان
+      // كُتب فوقه من مسار التسجيل (verifiedAt = null) يبقى افتراضياً فتُحوَّل إليه الأرباح
+      const bank = await tx.vendorBankAccount.findFirst({ where: { vendorId, isDefault: true, archivedAt: null } });
+      if (!bank) throw new ConflictError('أضف حساباً بنكياً قبل السحب.');
+      if (!bank.verifiedAt) {
+        throw new ConflictError('حسابك البنكي الافتراضي لم يوثّقه فريق بسطة بعد، ولا يُحوَّل إليه شيء قبل التوثيق.');
+      }
       // القراءة بعد القفل: السحب المتزامن ينتظر هنا ثم يرى الرصيد بعد الأول
       if (wallet.available < input.amountMinorUnits) {
         throw new ConflictError('المبلغ أكبر من رصيدك المتاح.', {
