@@ -11,18 +11,19 @@
     "test": "dotenv -e ../../.env -- vitest run",
     "test:watch": "vitest",
     "db:generate": "dotenv -e ../../.env -- prisma generate",
-    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
-    "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
-    "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev && npm run db:app-role",
+    "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy && npm run db:app-role",
+    "db:seed": "npm run db:app-role && dotenv -e ../../.env -- tsx prisma/seed.ts",
     "db:studio": "dotenv -e ../../.env -- prisma studio",
-    "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
+    "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force && npm run db:app-role",
     "admin:grant": "dotenv -e ../../.env -- tsx scripts/grant-admin.ts",
     "demo:seed": "dotenv -e ../../.env -- tsx scripts/seed-demo.ts",
     "images:backfill": "dotenv -e ../../.env -- tsx scripts/backfill-medium.ts",
-    "probe:load": "dotenv -e ../../.env -- tsx scripts/load-probe.ts"
+    "probe:load": "dotenv -e ../../.env -- tsx scripts/load-probe.ts",
+    "db:app-role": "dotenv -e ../../.env -- tsx scripts/db-app-role.ts"
   },
   "prisma": {
-    "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts"
+    "seed": "npm run db:app-role && dotenv -e ../../.env -- tsx prisma/seed.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.1",

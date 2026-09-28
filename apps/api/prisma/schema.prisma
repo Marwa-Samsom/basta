@@ -17,8 +17,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  /// التطبيق: مستخدم تشغيل لا يملك الجداول — لا يغيّر المخطط ولا يعطّل الحرّاس،
+  /// ولا UPDATE/DELETE له على جداول الإضافة فقط (ADR-005). يهيّئه db:app-role
+  url       = env("DATABASE_URL")
+  /// المهاجرات وحدها: مالك المخطط. لا تُعطى للتطبيق أبداً
+  directUrl = env("DATABASE_MIGRATE_URL")
 }
 
 // ============================================================================
