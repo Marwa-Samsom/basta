@@ -22,11 +22,24 @@ import type {
  * الحالة في الذاكرة: تكفي لإثبات المصالحة داخل عملية واحدة، والبوابة الحقيقية
  * تحفظها عندها لا عندنا.
  */
-export const FAKE_WEBHOOK_SECRET = process.env['FAKE_PAYMENTS_SECRET'] ?? 'basta-fake-webhook-secret';
+const DEV_WEBHOOK_SECRET = 'basta-fake-webhook-secret';
+
+/** يُقرأ عند كل توقيع لا عند التحميل، ليرى الاختبار الذي يبدّل البيئة قيمتَه */
+function webhookSecret(): string {
+  return process.env['PAYMENT_WEBHOOK_SECRET'] || DEV_WEBHOOK_SECRET;
+}
 
 @Injectable()
 export class FakePaymentProvider implements PaymentProvider {
   readonly name = 'fake';
+
+  constructor() {
+    // خط الدفاع الثاني بعد loadEnv: أي إقلاع في الإنتاج — ولو من سكربت أو عامل
+    // لا يمرّ بـ main.ts — يسقط هنا قبل أن يُقبل «tok_success» طلباً مدفوعاً
+    if (process.env['NODE_ENV'] === 'production') {
+      throw new Error('المزوّد الوهمي للدفع ممنوع في الإنتاج — صِل بوابة حقيقية (ADR-012).');
+    }
+  }
 
   /** ما «يعرفه» المزوّد عن كل تفويض — مصدر الحقيقة الذي تسأله المصالحة */
   private readonly intents = new Map<string, ChargeOutcome>();
@@ -119,7 +132,7 @@ export class FakePaymentProvider implements PaymentProvider {
 
   /** يوقّع إشعاراً كما توقّعه البوابة — للاختبار ولمحاكاة 3-D Secure */
   static sign(body: string): string {
-    return createHmac('sha256', FAKE_WEBHOOK_SECRET).update(body).digest('hex');
+    return createHmac('sha256', webhookSecret()).update(body).digest('hex');
   }
 
   parseWebhook(rawBody: string, signature: string | undefined): ProviderEvent {
