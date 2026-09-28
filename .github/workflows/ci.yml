@@ -116,6 +116,11 @@ jobs:
     name: البناء
     runs-on: ubuntu-latest
     needs: [quality, guards]
+    env:
+      # بناء الإنتاج يرفض الغياب: العنوان يُخبَز في الحزمة. منفذ 9 مغلق عمداً (كما
+      # في verify-local.sh) — صفحة تجلب من الـ API وقت البناء تُسقطه فتنكشف
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:9/api/v1
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
