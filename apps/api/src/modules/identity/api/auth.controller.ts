@@ -4,7 +4,7 @@ import type { Actor } from '../../../common/security/actor';
 import { AuthService } from '../application/auth.service';
 import { AllowLimited, CurrentActor, Public } from '../../../common/security/decorators';
 import { AuthLimited } from '../../../common/security/throttle';
-import { LoginDto, RefreshDto, RegisterDto, TotpCodeDto, TotpConfirmDto, TotpDisableDto } from './dto/auth.dto';
+import { LoginDto, RefreshDto, RegisterDto, TotpCodeDto, TotpConfirmDto, TotpDisableDto, TotpSetupDto } from './dto/auth.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/account.dto';
 import { RecoveryService } from '../application/recovery.service';
 
@@ -106,10 +106,15 @@ export class AuthController {
    */
   @ApiBearerAuth()
   @AllowLimited()
+  @AuthLimited()
   @Post('totp/setup')
-  @ApiOperation({ summary: 'بدء تهيئة التحقق الثنائي' })
-  beginTotp(@CurrentActor() actor: Actor) {
-    return this.auth.beginTotpSetup(actor.userId);
+  @ApiOperation({ summary: 'بدء تهيئة التحقق الثنائي — أو تغيير الجهاز بكلمة المرور ورمز حالي' })
+  beginTotp(@CurrentActor() actor: Actor, @Body() dto: TotpSetupDto, @Req() req: RawReq) {
+    return this.auth.beginTotpSetup(
+      actor.userId,
+      { password: dto?.password, code: dto?.code },
+      AuthController.meta(req),
+    );
   }
 
   @ApiBearerAuth()
@@ -118,8 +123,12 @@ export class AuthController {
   @Post('totp/confirm')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'تأكيد التهيئة — يُعيد رموز الاستعادة مرة واحدة ويُبطل الجلسات السابقة' })
-  confirmTotp(@CurrentActor() actor: Actor, @Body() dto: TotpConfirmDto): Promise<{ recoveryCodes: string[] }> {
-    return this.auth.confirmTotpSetup(actor.userId, dto.token);
+  confirmTotp(
+    @CurrentActor() actor: Actor,
+    @Body() dto: TotpConfirmDto,
+    @Req() req: RawReq,
+  ): Promise<{ recoveryCodes: string[] }> {
+    return this.auth.confirmTotpSetup(actor.userId, dto.token, AuthController.meta(req));
   }
 
   @ApiBearerAuth()

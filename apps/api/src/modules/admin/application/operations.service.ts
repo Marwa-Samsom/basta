@@ -166,7 +166,7 @@ export class OperationsService {
     await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.user.updateMany({
         where: { id, deletedAt: null, totpEnabledAt: { not: null }, roles: { none: { role: 'admin' } } },
-        data: { totpSecretEnc: null, totpEnabledAt: null },
+        data: { totpSecretEnc: null, totpPendingSecretEnc: null, totpEnabledAt: null },
       });
       if (count === 0) throw new NotFoundError('لا حساب عميل بتحقق ثنائي مفعَّل بهذا المعرّف.', { id });
       await tx.totpRecoveryCode.deleteMany({ where: { userId: id } });

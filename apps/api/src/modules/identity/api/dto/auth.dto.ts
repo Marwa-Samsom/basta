@@ -50,6 +50,20 @@ export class TotpCodeDto {
   code!: string;
 }
 
+/** فارغ لأول تهيئة؛ وعلى تحقق مفعَّل (تغيير الجهاز) كلمة المرور ورمز من الجهاز الحالي معاً */
+export class TotpSetupDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  password?: string;
+
+  @ApiPropertyOptional({ description: 'رمز الجهاز الحالي أو رمز استعادة' })
+  @IsOptional()
+  @Matches(SECOND_FACTOR, { message: 'رمز التحقق ستة أرقام، أو رمز استعادة من عشرة محارف.' })
+  code?: string;
+}
+
 export class TotpDisableDto extends TotpCodeDto {
   @ApiProperty()
   @IsString()

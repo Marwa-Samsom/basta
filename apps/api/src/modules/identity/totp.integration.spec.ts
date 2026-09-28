@@ -207,6 +207,86 @@ describe('التحقق بخطوتين لغير المدير', () => {
   });
 });
 
+describe('تغيير الجهاز — السرّ الجديد منتظِر حتى يُؤكَّد', () => {
+  it('مدير مفعَّل يفتح الصفحة: لا يُعطَّل تحققه ولا يدخل بكلمة المرور وحدها', async () => {
+    if (!dbUp) return;
+    const id = await register('adm2fa');
+    await prisma.userRole.create({ data: { userId: id, role: 'admin' } });
+    const secret = 'JBSWY3DPEHPK3PXP'.padEnd(32, 'B');
+    await prisma.user.update({ where: { id }, data: { totpSecretEnc: secret, totpEnabledAt: new Date() } });
+    const token = await login('adm2fa', totpOf(secret));
+
+    // ما تفعله الصفحة عند فتحها — بلا كلمة مرور ولا رمز
+    expect((await call('POST', '/auth/totp/setup', { token })).statusCode).toBe(409);
+    // وبكلمة مرور صحيحة ورمز خاطئ، أو العكس
+    const noCode = await call('POST', '/auth/totp/setup', { token, body: { password: PASSWORD, code: '000000' } });
+    expect(noCode.statusCode).toBe(403);
+    await freshStep(id);
+    const noPass = await call('POST', '/auth/totp/setup', { token, body: { password: 'خطأ-خطأ-خطأ', code: totpOf(secret) } });
+    expect(noPass.statusCode).toBe(403);
+
+    const u = await prisma.user.findUniqueOrThrow({ where: { id } });
+    expect(u.totpEnabledAt).not.toBeNull();
+    expect(u.totpSecretEnc).toBe(secret);
+    expect(u.totpPendingSecretEnc).toBeNull();
+    const bare = await loginRaw('adm2fa');
+    expect(bare.statusCode).toBe(401);
+    expect(bare.json().message).toMatch(/رمز التحقق الثنائي/);
+  });
+
+  it('تهيئة بُدئت ولم تُؤكَّد لا تمسّ السرّ الساري', async () => {
+    if (!dbUp) return;
+    const userId = await register('abandon');
+    const { secret } = await enable('abandon', userId);
+    const token = await login('abandon', totpOf(secret));
+    await freshStep(userId);
+
+    const begun = await call('POST', '/auth/totp/setup', { token, body: { password: PASSWORD, code: totpOf(secret) } });
+    expect(begun.statusCode, begun.body).toBe(201);
+    const u = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(u.totpSecretEnc).toBe(secret);
+    expect(u.totpPendingSecretEnc).toBe(begun.json().secret);
+    expect(u.totpEnabledAt).not.toBeNull();
+
+    expect((await loginRaw('abandon')).statusCode).toBe(401);
+    await freshStep(userId);
+    await login('abandon', totpOf(secret));
+  });
+
+  it('بعد التأكيد: السرّ الجديد وحده يفتح، والرموز القديمة تُبطل، ويُدقَّق ويُبلَّغ', async () => {
+    if (!dbUp) return;
+    const userId = await register('rotate');
+    const { secret: oldSecret, codes: oldCodes } = await enable('rotate', userId);
+    const token = await login('rotate', totpOf(oldSecret));
+    await freshStep(userId);
+
+    const begun = await call('POST', '/auth/totp/setup', { token, body: { password: PASSWORD, code: totpOf(oldSecret) } });
+    expect(begun.statusCode, begun.body).toBe(201);
+    const newSecret: string = begun.json().secret;
+    expect(newSecret).not.toBe(oldSecret);
+
+    const wrong = await call('POST', '/auth/totp/confirm', { token, body: { token: totpOf(oldSecret) } });
+    expect(wrong.statusCode).toBe(401);
+    const ok = await call('POST', '/auth/totp/confirm', { token, body: { token: totpOf(newSecret) } });
+    expect(ok.statusCode, ok.body).toBe(200);
+    const newCodes: string[] = ok.json().recoveryCodes;
+    expect(newCodes).toHaveLength(10);
+
+    const u = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(u.totpSecretEnc).toBe(newSecret);
+    expect(u.totpPendingSecretEnc).toBeNull();
+    expect(u.totpEnabledAt).not.toBeNull();
+
+    await freshStep(userId);
+    expect((await loginRaw('rotate', totpOf(oldSecret))).statusCode).toBe(401);
+    expect((await loginRaw('rotate', oldCodes[0])).statusCode).toBe(401);
+    await login('rotate', totpOf(newSecret));
+
+    expect(await prisma.auditLog.count({ where: { entityId: userId, action: 'auth.totp_rotated' } })).toBe(1);
+    expect(await prisma.notification.count({ where: { userId, templateCode: 'totp_rotated' } })).toBeGreaterThan(0);
+  });
+});
+
 describe('إعادة الضبط من الإدارة', () => {
   /** مدير كامل التحقق — بصلاحيات تُمرَّر — كما تفعل اختبارات الإدارة */
   async function admin(tag: string, permissions: string[]): Promise<string> {

@@ -187,6 +187,10 @@ export function TwoFactorCard({
                 <Icon name="refresh" size={16} />
                 أنشئ رموز استعادة جديدة
               </button>
+              <Link href={`/account/2fa?next=${encodeURIComponent(returnTo)}`} className="btn btn--secondary">
+                <Icon name="shield" size={16} />
+                غيّر الجهاز
+              </Link>
               {isAdmin ? null : (
                 <button type="button" className="btn btn--danger" onClick={() => reset('disable')}>
                   عطّل التحقّق بخطوتين
