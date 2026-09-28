@@ -6,8 +6,17 @@ import { fileURLToPath } from 'node:url';
  * والصور والطلبات من الموقع وخادم الـ API وحده. 'unsafe-inline' للسكربت لأن
  * Next يحقن بيانات التهيئة سطرياً، و 'unsafe-eval' في التطوير وحده.
  */
-const api = new URL(process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000/api/v1').origin;
 const dev = process.env.NODE_ENV !== 'production';
+
+/**
+ * عنوان الـ API يُخبَز في حزمة المتصفّح وقت البناء لا وقت التشغيل. بناء إنتاج
+ * بلا عنوان كان يسقط صامتاً إلى 127.0.0.1 — فيرسل موقع الإنتاج طلباته إلى جهاز
+ * الزائر نفسه. الغياب يُسقط البناء بدل ذلك.
+ */
+if (!dev && !process.env.NEXT_PUBLIC_API_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL مطلوب لبناء الإنتاج — يُخبَز في الحزمة وقت البناء.');
+}
+const api = new URL(process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000/api/v1').origin;
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
@@ -28,6 +37,9 @@ const nextConfig = {
   // بناء الفحص (npm run verify) يكتب في مجلد منفصل: البناء في .next نفسه الذي
   // يستعمله خادم التطوير الشغّال يُفسد حالته فيرجع 500 — وقع مرة فعلاً
   distDir: process.env.NEXT_DIST_DIR || '.next',
+  // صورة Docker تشغّل الخادم المستقل (.next/standalone/apps/web/server.js) بلا
+  // node_modules كاملة؛ محلياً يبقى `next start` — والمستقل يُطلب صراحةً من الـ Dockerfile
+  ...(process.env.NEXT_OUTPUT === 'standalone' ? { output: 'standalone' } : {}),
   reactStrictMode: true,
   poweredByHeader: false,
   // tokens.css يعيش خارج apps/web عمداً — مصدر حقيقة واحد يشاركه التصميم والتنفيذ
