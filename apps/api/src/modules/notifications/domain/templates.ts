@@ -26,6 +26,16 @@ export interface EventDef {
   readonly audience: 'customer' | 'vendor';
   readonly variables: readonly string[];
   readonly sample: Readonly<Record<string, string>>;
+  /**
+   * نصّه وقنواته من الكود وحده — لا تحرير ولا إيقاف ولا قناة جديدة من الإدارة.
+   * لقوالب الرموز: من يملك `content.manage` كان يكتب `{{code}}` في العنوان،
+   * ويطلب استعادة لحساب غيره، ويقرأ الرمز من السجل، فيستولي على الحساب.
+   */
+  readonly locked?: true;
+  /** تنبيه أمن: يُحرَّر نصّه ولا يُوقف — إيقافه يُخفي عن الضحية أن حسابها يُسرق */
+  readonly mandatory?: true;
+  /** متغيّرات سرّية: تُمحى من الإشعار المخزَّن بعد الإرسال، فلا يقرأها السجل */
+  readonly secret?: readonly string[];
 }
 
 export const EVENTS: readonly EventDef[] = [
@@ -131,6 +141,8 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['name', 'code', 'minutes'],
     sample: { name: 'سارة', code: '482913', minutes: '10' },
+    locked: true,
+    secret: ['code'],
   },
   {
     code: 'password_reset_code',
@@ -138,6 +150,8 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['name', 'code', 'minutes'],
     sample: { name: 'سارة', code: '482913', minutes: '10' },
+    locked: true,
+    secret: ['code'],
   },
   /**
    * تنبيهات أمن الحساب — تصل صاحبه أياً كان من فعلها: رمز استعادة استُعمل
@@ -149,6 +163,7 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['left'],
     sample: { left: '9' },
+    mandatory: true,
   },
   {
     code: 'totp_rotated',
@@ -156,6 +171,7 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: [],
     sample: {},
+    mandatory: true,
   },
   {
     code: 'totp_reset_by_admin',
@@ -163,6 +179,7 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['reason'],
     sample: { reason: 'فقد صاحب الحساب هاتفه ورموز الاستعادة، وتحقّقنا من هويته.' },
+    mandatory: true,
   },
   /**
    * الرسائل — ST-28 و VD-15. تنبيه واحد لكل دفعة غير مقروءة لا لكل رسالة:
@@ -192,6 +209,7 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'vendor',
     variables: ['store_name', 'bank', 'iban_tail', 'link'],
     sample: { store_name: 'متجر الورد', bank: 'مصرف الراجحي', iban_tail: '1180', link: '/vendor/settings' },
+    mandatory: true,
   },
   {
     code: 'bank_account_verified',
@@ -371,3 +389,16 @@ export function render(text: string, vars: Readonly<Record<string, string>>): st
 }
 
 export const eventOf = (code: string): EventDef | undefined => EVENTS.find((e) => e.code === code);
+
+/** ما يحلّ محلّ المتغيّر السرّي في كل ما يُخزَّن بعد الإرسال */
+export const REDACTED = '••••••';
+
+/** نسخة من المتغيّرات بلا أسرار الحدث — لما يبقى في القاعدة ويقرؤه السجل */
+export function redactVars(code: string, vars: Readonly<Record<string, string>>): Record<string, string> {
+  const secret = eventOf(code)?.secret ?? [];
+  return Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, secret.includes(k) ? REDACTED : v]));
+}
+
+/** القالب كما في الكود — مصدر القوالب المقفولة الوحيد، ولو عُبث بصفّها في القاعدة */
+export const defaultTemplate = (code: string, channel: Channel): TemplateSeed | undefined =>
+  DEFAULT_TEMPLATES.find((t) => t.code === code && t.channel === channel);

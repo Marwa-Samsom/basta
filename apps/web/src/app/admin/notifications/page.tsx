@@ -20,15 +20,27 @@ interface Template {
 
 interface Matrix {
   channels: { code: string; label: string }[];
-  events: { code: string; labelAr: string; audience: string; variables: string[]; sample: Record<string, string>; templates: Template[] }[];
+  events: {
+    code: string;
+    labelAr: string;
+    audience: string;
+    variables: string[];
+    sample: Record<string, string>;
+    /** قالب رمز أمان: نصّه وقنواته من الكود — يُعرض ولا يُحرَّر */
+    locked?: boolean;
+    /** تنبيه أمن: يُحرَّر نصّه ولا يُوقف */
+    mandatory?: boolean;
+    templates: Template[];
+  }[];
 }
 
 /** حالة الخانة في المصفوفة — لونها ونصّها وأيقونتها */
-const CELL: Record<'empty' | 'off' | 'reviewed' | 'unreviewed', { label: string; icon: IconName }> = {
+const CELL: Record<'empty' | 'off' | 'reviewed' | 'unreviewed' | 'locked', { label: string; icon: IconName }> = {
   empty: { label: 'أضف', icon: 'plus' },
   off: { label: 'موقوف', icon: 'minus' },
   reviewed: { label: 'مراجَع', icon: 'check' },
   unreviewed: { label: 'بلا مراجعة', icon: 'alert' },
+  locked: { label: 'مقفول', icon: 'lock' },
 };
 
 /**
@@ -75,7 +87,17 @@ export default function AdminNotificationsPage() {
                   </td>
                   {data.channels.map((c) => {
                     const t = e.templates.find((x) => x.channel === c.code);
-                    const state = !t ? 'empty' : !t.isEnabled ? 'off' : t.reviewedAt ? 'reviewed' : 'unreviewed';
+                    // قالب مقفول بلا هذه القناة: لا خانة تُضاف — القنوات من الكود
+                    if (e.locked && !t) {
+                      return (
+                        <td key={c.code} data-label={c.label}>
+                          <span className="ac2-faint" aria-label={`${e.labelAr} · ${c.label}: غير متاح`}>
+                            —
+                          </span>
+                        </td>
+                      );
+                    }
+                    const state = e.locked ? 'locked' : !t ? 'empty' : !t.isEnabled ? 'off' : t.reviewedAt ? 'reviewed' : 'unreviewed';
                     const pressed = sel?.code === e.code && sel.channel === c.code;
                     return (
                       <td key={c.code} data-label={c.label}>
@@ -114,6 +136,7 @@ export default function AdminNotificationsPage() {
 
 function Editor({ event, channel, template, onSaved }: { event: Matrix['events'][number]; channel: { code: string; label: string }; template: Template | null; onSaved: () => void }) {
   const act = useAction();
+  const locked = event.locked === true;
   const [subject, setSubject] = useState(template?.subject ?? '');
   const [body, setBody] = useState(template?.body ?? '');
   const [enabled, setEnabled] = useState(template?.isEnabled ?? true);
@@ -150,14 +173,21 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
           {template ? template.reviewedAt ? <span className="badge badge--success">مراجَع</span> : <span className="badge badge--warning">بلا مراجعة</span> : <span className="badge">جديد</span>}
         </div>
         <Feedback error={act.error} notice={act.notice} />
-        <div className="ac2-vars" role="group" aria-label="المتغيّرات">
-          {event.variables.map((v) => (
-            <button key={v} type="button" className="ac2-var" onClick={() => insert(v)}>
-              {`{{${v}}}`}
-            </button>
-          ))}
-        </div>
-        {channel.code === 'email' || channel.code === 'push' ? <TextInput label={channel.code === 'email' ? 'العنوان' : 'العنوان (اختياري)'} value={subject} onChange={(e) => setSubject(e.target.value)} /> : null}
+        {locked ? (
+          <div className="alert alert--info ac2-callout ac2-callout--sm" role="note">
+            <Icon name="lock" size={14} />
+            <span>قالب رمز أمان: نصّه وقنواته مثبّتة في الكود ولا تُحرَّر من اللوحة، والرمز يُمحى من السجل بعد الإرسال — فلا يقرؤه أحد غير صاحب الحساب.</span>
+          </div>
+        ) : (
+          <div className="ac2-vars" role="group" aria-label="المتغيّرات">
+            {event.variables.map((v) => (
+              <button key={v} type="button" className="ac2-var" onClick={() => insert(v)}>
+                {`{{${v}}}`}
+              </button>
+            ))}
+          </div>
+        )}
+        {channel.code === 'email' || channel.code === 'push' ? <TextInput label={channel.code === 'email' ? 'العنوان' : 'العنوان (اختياري)'} value={subject} readOnly={locked} onChange={(e) => setSubject(e.target.value)} /> : null}
         <div className="field">
           <span className="ac2-labelrow">
             <label className="field__label" htmlFor={bodyId}>
@@ -165,30 +195,34 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
             </label>
             <span className="ac2-counter">{render(body).length}</span>
           </span>
-          <textarea id={bodyId} ref={bodyRef} className="field__control" rows={channel.code === 'email' ? 10 : 6} value={body} onChange={(e) => setBody(e.target.value)} />
+          <textarea id={bodyId} ref={bodyRef} className="field__control" rows={channel.code === 'email' ? 10 : 6} value={body} readOnly={locked} onChange={(e) => setBody(e.target.value)} />
           {channel.code === 'sms' ? <span className="field__hint">{render(body).length} حرفاً — الرسالة النصية الواحدة نحو 70 حرفاً عربياً.</span> : null}
         </div>
-        <div className="ac2-setting__row">
-          <span className="ac2-setting__label">
-            <span className="field__label">مفعّل</span>
-            <span className="ac2-fine">الموقوف لا يُرسل على هذه القناة.</span>
-          </span>
-          <button type="button" role="switch" className="ac2-switch" aria-checked={enabled} aria-label="مفعّل" onClick={() => setEnabled(!enabled)} />
-        </div>
+        {locked ? null : (
+          <div className="ac2-setting__row">
+            <span className="ac2-setting__label">
+              <span className="field__label">مفعّل</span>
+              <span className="ac2-fine">{event.mandatory ? 'تنبيه أمن إلزامي — يُحرَّر نصّه ولا يُوقف، فإيقافه يُخفي عن صاحب الحساب أن حسابه في خطر.' : 'الموقوف لا يُرسل على هذه القناة.'}</span>
+            </span>
+            <button type="button" role="switch" className="ac2-switch" aria-checked={enabled} aria-label="مفعّل" disabled={event.mandatory} onClick={() => setEnabled(!enabled)} />
+          </div>
+        )}
         <div className="ac2-form__actions">
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={act.busy || !dirty || body.trim().length < 5}
-            onClick={() =>
-              void act.run(async () => {
-                await api(`/admin/notifications/templates/${event.code}/${channel.code}`, { method: 'PUT', body: { subject: subject || undefined, body, isEnabled: enabled } });
-                onSaved();
-              }, 'حُفظ القالب — يحتاج مراجعة لغوية قبل اعتماده.')
-            }
-          >
-            احفظ القالب
-          </button>
+          {locked ? null : (
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={act.busy || !dirty || body.trim().length < 5}
+              onClick={() =>
+                void act.run(async () => {
+                  await api(`/admin/notifications/templates/${event.code}/${channel.code}`, { method: 'PUT', body: { subject: subject || undefined, body, isEnabled: enabled } });
+                  onSaved();
+                }, 'حُفظ القالب — يحتاج مراجعة لغوية قبل اعتماده.')
+              }
+            >
+              احفظ القالب
+            </button>
+          )}
           <button
             type="button"
             className="btn btn--secondary"

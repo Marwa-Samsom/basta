@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
-import { DEFAULT_TEMPLATES, NotificationsService } from '../notifications/public';
+import { DEFAULT_TEMPLATES, NotificationsService, REDACTED, eventOf } from '../notifications/public';
 import { PERMISSION_CODES } from './public';
 
 const prisma = new PrismaClient();
@@ -169,14 +169,20 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
       if (t.channel === 'in_app') {
         expect(n.deliveryRef).toBe('in_app');
       } else {
-        // وصل فعلاً: الملف في الصندوق المحلي بالنص نفسه
+        // وصل فعلاً: الملف في الصندوق المحلي بالنص نفسه — والسرّ وصل صاحبه ولم يبقَ في الصف
         const file = await readFile(n.deliveryRef, 'utf8');
+        const ev = eventOf(t.code)!;
+        let delivered: string = n.body;
+        for (const s of ev.secret ?? []) {
+          expect(n.body).not.toContain(ev.sample[s]!);
+          delivered = delivered.replaceAll(REDACTED, ev.sample[s]!);
+        }
         if (t.channel === 'email') {
           expect(file).toContain(`Message-ID: <${n.id}@basta.local>`);
           const b64 = file.split('\r\n\r\n')[1]!.replace(/\r\n/g, '');
-          expect(Buffer.from(b64, 'base64').toString('utf8')).toBe(n.body);
+          expect(Buffer.from(b64, 'base64').toString('utf8')).toBe(delivered);
         } else {
-          expect(JSON.parse(file).text).toBe(n.body);
+          expect(JSON.parse(file).text).toBe(delivered);
         }
       }
     }
@@ -227,6 +233,56 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
     expect(row.reviewedBy).toBe('مدقّق اللغة');
     const preview = await call('POST', '/admin/notifications/templates/refund_issued/preview', admin.token, { body: row.body });
     expect(preview.json().body).toContain('BST-260921-A1B2C3');
+  });
+
+  it('صلاحية المحتوى لا تستولي على حساب: قوالب الرموز مقفولة، والرمز لا يبقى في السجل', async () => {
+    if (!dbUp) return;
+    const editor = await makeAdmin('tpl-editor', ['content.manage']);
+    const key = (code: string, channel: string) => ({ code_channel_locale: { code, channel, locale: 'ar' } });
+
+    // ١. الطريق المباشر مسدود: لا تحرير، ولا قناة جديدة، ولا إيقاف
+    const subj = await call('PUT', '/admin/notifications/templates/password_reset_code/email', editor.token, { subject: '{{code}}', body: 'رمزك {{code}} يا {{name}}' });
+    expect(subj.statusCode).toBe(409);
+    const inApp = await call('PUT', '/admin/notifications/templates/password_reset_code/in_app', editor.token, { body: 'رمز الاستعادة: {{code}}' });
+    expect(inApp.statusCode).toBe(409);
+    const off = await call('PUT', '/admin/notifications/templates/email_verify_code/email', editor.token, { subject: 'رمز', body: 'رمزك {{code}}', isEnabled: false });
+    expect(off.statusCode).toBe(409);
+    expect(await prisma.notificationTemplate.count({ where: { code: 'password_reset_code', channel: 'in_app' } })).toBe(0);
+    // تنبيه الأمن يُحرَّر نصّه ولا يُوقف
+    const hush = await call('PUT', '/admin/notifications/templates/recovery_code_used/email', editor.token, { subject: 'تنبيه', body: 'استُعمل رمز استعادة. الباقي: {{left}}.', isEnabled: false });
+    expect(hush.statusCode).toBe(409);
+
+    // ٢. عبث سابق في القاعدة لا يُرسَل: المقفول يُرسل بنصّ الكود، والإقلاع يعيده ويحذف المضاف
+    await prisma.notificationTemplate.update({ where: key('password_reset_code', 'email'), data: { subject: 'رمزك {{code}}' } });
+    await prisma.notificationTemplate.create({ data: { code: 'password_reset_code', channel: 'in_app', locale: 'ar', body: '{{code}}' } });
+    await prisma.notificationTemplate.update({ where: key('recovery_code_used', 'email'), data: { isEnabled: false } });
+
+    const forgot = await call('POST', '/auth/password/forgot', undefined, { email: buyer.email });
+    expect(forgot.statusCode).toBe(200);
+    await notifications.dispatch(500);
+
+    const rows = await prisma.notification.findMany({ where: { userId: buyer.userId, templateCode: 'password_reset_code' } });
+    expect(rows.map((r) => r.channel)).toEqual(['email']);
+    const sent = rows[0]!;
+    expect(sent.status).toBe('sent');
+    // الرمز وصل صاحبه — في بريده
+    const mail = await readFile(sent.deliveryRef!, 'utf8');
+    const mailBody = Buffer.from(mail.split('\r\n\r\n')[1]!.replace(/\r\n/g, ''), 'base64').toString('utf8');
+    const code = /\d{6}/.exec(mailBody)![0];
+    // ولم يبقَ في الصف ولا في عنوانه ولا في السجل الذي يقرؤه المدير
+    expect((sent.payloadJson as Record<string, string>)['code']).toBe(REDACTED);
+    expect(sent.body).not.toContain(code);
+    expect(sent.subject).not.toContain(code);
+    const log = await call('GET', '/admin/notifications/log', editor.token);
+    expect(log.statusCode).toBe(200);
+    expect(log.body).not.toContain(code);
+
+    await notifications.ensureDefaults();
+    const email = await prisma.notificationTemplate.findUniqueOrThrow({ where: key('password_reset_code', 'email') });
+    const seed = DEFAULT_TEMPLATES.find((t) => t.code === 'password_reset_code' && t.channel === 'email')!;
+    expect(email.subject).toBe(seed.subject);
+    expect(await prisma.notificationTemplate.count({ where: { code: 'password_reset_code', channel: 'in_app' } })).toBe(0);
+    expect((await prisma.notificationTemplate.findUniqueOrThrow({ where: key('recovery_code_used', 'email') })).isEnabled).toBe(true);
   });
 
   it('إشعار معطوب لا يُسقط الحدث: متغيّر ناقص يُختم failed بسببه', async () => {
