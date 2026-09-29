@@ -8,14 +8,22 @@ loadEnv();
 initSentry();
 
 import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { configureApp } from './app.setup';
+import { configureApp, createHttpAdapter } from './app.setup';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  const { trustProxy } = loadEnv();
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, createHttpAdapter(trustProxy));
+  if (trustProxy === false && process.env['NODE_ENV'] === 'production') {
+    // لا يُرفض: خادم مكشوف مباشرةً بلا وسيط صحيح هكذا. لكن خلف وسيط يشترك كل الزوار في عنوانه
+    Logger.warn(
+      'TRUST_PROXY غير مضبوط: كل عنوان يُقرأ من الاتصال نفسه. إن كان أمام الخادم وسيط عكسي فكل الزوار عنوان واحد لحدّ المعدّل والتدقيق — اضبطه بعدد الوسطاء أو عناوينهم.',
+      'Bootstrap',
+    );
+  }
 
   await configureApp(app);
 

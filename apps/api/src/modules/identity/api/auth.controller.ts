@@ -25,8 +25,9 @@ export class AuthController {
   static meta(req: RawReq) {
     return {
       userAgent: req.headers['user-agent'],
-      // خلف وسيط عكسي، العنوان الحقيقي في X-Forwarded-For لا في ip
-      ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() ?? req.ip,
+      // req.ip يحسبه Fastify من X-Forwarded-For عبر الوسطاء الموثوقين وحدهم (TRUST_PROXY).
+      // قراءة الترويسة باليد كانت تسجّل في التدقيق أي عنوان يكتبه الطالب
+      ip: req.ip,
     };
   }
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { EnvError, loadEnv, resetEnvCache } from './env';
+import { EnvError, loadEnv, parseTrustProxy, resetEnvCache } from './env';
 
 const LONG = 'x'.repeat(32);
 
@@ -56,5 +56,19 @@ describe('بوابة الدفع في الإنتاج', () => {
   it('خارج الإنتاج يبقى الوهمي متاحاً للتطوير والاختبار', () => {
     production({ NODE_ENV: 'development', PAYMENT_PROVIDER: 'fake', PAYMENT_WEBHOOK_SECRET: undefined });
     expect(loadEnv().paymentProvider).toBe('fake');
+  });
+});
+
+describe('TRUST_PROXY — من يُصدَّق في X-Forwarded-For', () => {
+  it('عدد أو عناوين أو نطاقات — وtrue والعنوان الفاسد مرفوضان', () => {
+    expect(parseTrustProxy(undefined)).toBe(false);
+    expect(parseTrustProxy('')).toBe(false);
+    expect(parseTrustProxy('false')).toBe(false);
+    expect(parseTrustProxy('1')).toBe(1);
+    expect(parseTrustProxy('10.0.0.0/8, 127.0.0.1,::1')).toEqual(['10.0.0.0/8', '127.0.0.1', '::1']);
+    expect(parseTrustProxy('loopback,uniquelocal')).toEqual(['loopback', 'uniquelocal']);
+    expect(() => parseTrustProxy('true')).toThrow(/من أي أحد/);
+    expect(() => parseTrustProxy('10.0.0.0/40')).toThrow(/غير صالح/);
+    expect(() => parseTrustProxy('proxy.example.com')).toThrow(/غير صالح/);
   });
 });

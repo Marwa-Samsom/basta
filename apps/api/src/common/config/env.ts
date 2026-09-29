@@ -1,3 +1,5 @@
+import { isIP } from 'node:net';
+
 /**
  * التحقق من المتغيّرات عند الإقلاع — لا أثناء أول طلب.
  *
@@ -25,8 +27,43 @@ const REQUIRED = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as 
 export const PAYMENT_PROVIDERS = ['fake'] as const;
 export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
+/**
+ * من يُصدَّق في X-Forwarded-For — يُمرَّر إلى Fastify فيحسب `req.ip` منه.
+ *
+ * بلا ضبط لا يُصدَّق أحد: `req.ip` عنوان الاتصال نفسه. خلف وسيط عكسي هذا
+ * عنوان الوسيط لكل الزوار، فيشتركون في حدّ التخمين (عشر محاولات لسكربت واحد
+ * تقفل الدخول عن الموقع كله) ويُسجَّل عنوان واحد في التدقيق. `true` ممنوعة:
+ * تصدّق الترويسة من أي أحد، فيكتب المهاجم العنوان الذي يشاء ويتهرّب من الحدّ.
+ *
+ *   TRUST_PROXY=1                     عدد الوسطاء أمام الخادم
+ *   TRUST_PROXY=10.0.0.0/8,127.0.0.1  عناوين الوسطاء أو نطاقاتهم
+ *   TRUST_PROXY=loopback              كلمات proxy-addr: loopback · linklocal · uniquelocal
+ */
+export type TrustProxy = false | number | string[];
+
+const PROXY_KEYWORDS = new Set(['loopback', 'linklocal', 'uniquelocal']);
+
+export function parseTrustProxy(raw: string | undefined): TrustProxy {
+  const value = (raw ?? '').trim();
+  if (!value || value === 'false' || value === '0') return false;
+  if (value === 'true') {
+    throw new EnvError(['TRUST_PROXY (true تصدّق X-Forwarded-For من أي أحد — اكتب عدد الوسطاء أو عناوينهم)']);
+  }
+  if (/^\d+$/.test(value)) return Number(value);
+  const entries = value.split(',').map((s) => s.trim()).filter(Boolean);
+  for (const e of entries) {
+    const [addr, prefix, extra] = e.split('/');
+    const validPrefix = prefix === undefined || (/^\d{1,3}$/.test(prefix) && Number(prefix) <= (isIP(addr ?? '') === 6 ? 128 : 32));
+    if (!PROXY_KEYWORDS.has(e) && (extra !== undefined || !isIP(addr ?? '') || !validPrefix)) {
+      throw new EnvError([`TRUST_PROXY (عنوان أو نطاق غير صالح: ${e})`]);
+    }
+  }
+  return entries;
+}
+
 export interface Env {
   databaseUrl: string;
+  trustProxy: TrustProxy;
   jwtAccessSecret: string;
   jwtRefreshSecret: string;
   jwtAccessTtl: string;
@@ -68,6 +105,7 @@ export function loadEnv(): Env {
 
   cached = {
     databaseUrl: process.env['DATABASE_URL'] as string,
+    trustProxy: parseTrustProxy(process.env['TRUST_PROXY']),
     jwtAccessSecret: process.env['JWT_ACCESS_SECRET'] as string,
     jwtRefreshSecret: process.env['JWT_REFRESH_SECRET'] as string,
     jwtAccessTtl: process.env['JWT_ACCESS_TTL'] ?? '15m',

@@ -1,10 +1,21 @@
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { ValidationPipe } from '@nestjs/common';
-import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { mkdirSync } from 'node:fs';
+import { loadEnv, type TrustProxy } from './common/config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { IMAGE_MAX_BYTES, UPLOADS_ROOT, UPLOADS_URL_PREFIX } from './modules/catalog/public';
+
+/**
+ * محوّل HTTP بالوسطاء الموثوقين (TRUST_PROXY): منه وحده يُحسب `req.ip` الذي
+ * يُعدّ به حدّ المعدّل ويُسجَّل في التدقيق. لا يقرأ أحد X-Forwarded-For بيده.
+ */
+export function createHttpAdapter(trustProxy: TrustProxy = loadEnv().trustProxy): FastifyAdapter {
+  // عدد الوسطاء دالة بمعنى Fastify نفسه (يُصدَّق أقرب n) — أنواع محوّل Nest لا تقبل الرقم
+  const trust = typeof trustProxy === 'number' ? (_addr: string, hop: number) => hop < trustProxy : trustProxy;
+  return new FastifyAdapter({ trustProxy: trust });
+}
 
 /**
  * تهيئة التطبيق المشتركة بين الإقلاع واختبارات الواجهة البرمجية.

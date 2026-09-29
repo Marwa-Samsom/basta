@@ -7,8 +7,9 @@ import { VendorBankService } from '../application/vendor-bank.service';
 import { AddBankAccountDto } from './dto/vendors.dto';
 import { scopeOf, uuidParam } from './scope';
 
+/** req.ip من الوسطاء الموثوقين وحدهم (TRUST_PROXY) — لا ترويسة يكتبها الطالب */
 const meta = (req: FastifyRequest) => ({
-  ip: (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ?? req.ip,
+  ip: req.ip,
   userAgent: req.headers['user-agent'],
 });
 
