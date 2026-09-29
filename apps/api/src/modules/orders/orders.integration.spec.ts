@@ -403,11 +403,13 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     if (!dbUp) return;
     const { a, b } = await placeOrder([1, 1]);
     await vendorMove(1, b.id, 'accepted');
-    // قاعدة التطوير تحمل طلبات قديمة من تشغيلات سابقة: المهمة تعالج الأقدم أولاً
+    // يُعمَّر طلب هذا الاختبار وحده (49 ساعة) بدل تقديم الساعة للجميع: المهمة بساعة
+    // مقدَّمة كانت تلغي طلبات ملفات الاختبار الأخرى الجارية معاً في القاعدة نفسها.
+    // وقاعدة التطوير تحمل طلبات قديمة من تشغيلات سابقة: المهمة تعالج الأقدم أولاً
     // مئةً مئة، فتُدار حتى يصل دور طلب هذا الاختبار — كما تفعل دوراتها المتتالية
-    const future = new Date(Date.now() + 49 * 3_600_000);
+    await prisma.subOrder.update({ where: { id: a.id }, data: { placedAt: new Date(Date.now() - 49 * 3_600_000) } });
     for (let i = 0; i < 50 && (await statusOf(a.id)) !== 'refunded'; i++) {
-      if ((await scheduler.cancelUnaccepted(future)) === 0) break;
+      if ((await scheduler.cancelUnaccepted(new Date())) === 0) break;
     }
     expect(await statusOf(a.id)).toBe('refunded');
     expect(await statusOf(b.id)).toBe('accepted');

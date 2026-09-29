@@ -472,15 +472,22 @@ describe('مراجعة المنتجات قبل النشر — Q-15', () => {
     expect((await prisma.product.findUniqueOrThrow({ where: { id: draft.id } })).status).toBe('draft');
 
     await as('a').post(`/vendor/products/${draft.id}/publish`);
-    const queue = await service.adminList({ status: 'pending_review', pageSize: 100 });
-    expect(queue.items.some((p) => p.id === draft.id)).toBe(true);
-    expect(queue.items.every((p) => p.status === 'pending_review')).toBe(true);
-    expect(queue.items.find((p) => p.id === draft.id)?.vendor.nameAr).toBe('متجر a');
+    // الطابور بالأقدم أولاً، وقاعدة التطوير تتراكم فيها منتجات تنتظر من تشغيلات سابقة:
+    // يُتصفَّح صفحةً صفحة حتى يظهر — لا يُفترض أن الصفحة الأولى تكفي
+    const seen: { id: string; status: string; vendor: { nameAr: string } }[] = [];
+    for (let page = 1; page <= 50 && !seen.some((p) => p.id === draft.id); page++) {
+      const queue = await service.adminList({ status: 'pending_review', pageSize: 100, page });
+      seen.push(...queue.items);
+      if (queue.items.length < 100) break;
+    }
+    expect(seen.some((p) => p.id === draft.id)).toBe(true);
+    expect(seen.every((p) => p.status === 'pending_review')).toBe(true);
+    expect(seen.find((p) => p.id === draft.id)?.vendor.nameAr).toBe('متجر a');
 
     // سحب الإرسال يعيده مسودة ويخرجه من الطابور
     expect((await as('a').post(`/vendor/products/${draft.id}/unpublish`)).json().status).toBe('draft');
-    const after = await service.adminList({ status: 'pending_review', pageSize: 100 });
-    expect(after.items.some((p) => p.id === draft.id)).toBe(false);
+    // الطابور هو ما حالته pending_review — والصفحة الأولى وحدها قد لا تحويه أصلاً فتنجح كذباً
+    expect(await prisma.product.count({ where: { id: draft.id, status: 'pending_review', deletedAt: null } })).toBe(0);
   });
 });
 

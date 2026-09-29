@@ -266,9 +266,17 @@ describe('قاعدة الرؤية — تُكتب مرة وتسري على كل �
     for (const id of beforeIds.filter((p) => ownIds.has(p))) {
       expect(afterIds).not.toContain(id);
     }
-    // …ومنتجات غيره تبقى: الإخفاء على البائع لا على المتجر كله
-    for (const id of beforeIds.filter((p) => !ownIds.has(p))) {
-      expect(afterIds).toContain(id);
+    // …ومنتجات غيره تبقى: الإخفاء على البائع لا على المتجر كله. تُفحص صفحةُ كلٍّ منها لا
+    // الصفحة الأولى من القائمة: ملفات الاختبار الأخرى تنشر في القاعدة نفسها معاً فتزيح
+    // ترتيبها، وقد تعلّق بائعيها هي — فيُفحص ما بقي بائعه معتمداً ومنتجه فعّالاً فقط
+    const others = await prisma.product.findMany({
+      where: { id: { in: beforeIds.filter((p) => !ownIds.has(p)) }, status: 'active', deletedAt: null, vendor: { status: 'approved' } },
+      select: { slug: true },
+    });
+    expect(others.length).toBeGreaterThan(0);
+    for (const o of others) {
+      const r = await app.inject({ method: 'GET', ...api(`/storefront/products/${o.slug}`) });
+      expect(r.statusCode, o.slug).toBe(200);
     }
 
     // وحالة المنتج نفسها لم تتغيّر: الإخفاء من شرط البائع لا من نسخة محفوظة

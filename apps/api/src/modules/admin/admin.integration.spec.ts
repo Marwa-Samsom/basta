@@ -68,6 +68,18 @@ async function makeAdmin(tag: string, permissions: readonly string[]) {
   return { userId: u.id, token: await login(email, secret) };
 }
 
+/**
+ * الصندوق الصادر مشترك بين ملفات الاختبار الجارية معاً: dispatch يرسل الأقدم أولاً
+ * بدفعات، فإشعارات هذا الملف قد تتأخّر عن دفعة واحدة. يُدار حتى تُرسل إشعارات هؤلاء.
+ */
+async function drain(...userIds: string[]): Promise<void> {
+  for (let i = 0; i < 20; i++) {
+    await notifications.dispatch(500);
+    const left = await prisma.notification.count({ where: { userId: { in: userIds }, status: { in: ['queued', 'sending'] } } });
+    if (left === 0) return;
+  }
+}
+
 async function placeOrder(qty = 2) {
   const cart = await call('POST', '/cart', undefined, { currency: 'SAR' });
   const token = cart.json().token as string;
@@ -191,7 +203,7 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
   it('أحداث حقيقية: طلب مدفوع يصل المشتري والبائع، وشحنه يصل المشتري', async () => {
     if (!dbUp) return;
     const order = await placeOrder();
-    await notifications.dispatch(500);
+    await drain(buyer.userId, vendor.userId);
     const mine = await prisma.notification.findMany({ where: { userId: buyer.userId, templateCode: 'order_placed' } });
     expect(mine.map((n) => n.channel).sort()).toEqual(['email', 'in_app', 'sms']);
     expect(mine.every((n) => n.status === 'sent')).toBe(true);
@@ -209,7 +221,7 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
       expect((await call('POST', `/vendor/orders/${sub.id}/transition`, vendor.token, { to })).statusCode).toBe(200);
     }
     expect((await call('POST', `/vendor/orders/${sub.id}/transition`, vendor.token, { to: 'shipped', tracking: 'SELF-1234' })).statusCode).toBe(200);
-    await notifications.dispatch(500);
+    await drain(buyer.userId);
     const shipped = await prisma.notification.findMany({ where: { userId: buyer.userId, templateCode: 'order_status_changed' } });
     expect(shipped.some((n) => n.channel === 'in_app' && n.body?.includes('تم الشحن'))).toBe(true);
     // المشتري بلا اشتراك متصفّح: القناة تُتخطّى بسببها، لا تفشل ولا تُسقط شيئاً
@@ -259,7 +271,7 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
 
     const forgot = await call('POST', '/auth/password/forgot', undefined, { email: buyer.email });
     expect(forgot.statusCode).toBe(200);
-    await notifications.dispatch(500);
+    await drain(buyer.userId);
 
     const rows = await prisma.notification.findMany({ where: { userId: buyer.userId, templateCode: 'password_reset_code' } });
     expect(rows.map((r) => r.channel)).toEqual(['email']);
@@ -283,12 +295,12 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
     expect(email.subject).toBe(seed.subject);
     expect(await prisma.notificationTemplate.count({ where: { code: 'password_reset_code', channel: 'in_app' } })).toBe(0);
     expect((await prisma.notificationTemplate.findUniqueOrThrow({ where: key('recovery_code_used', 'email') })).isEnabled).toBe(true);
-  });
+  }, 30_000);
 
   it('إشعار معطوب لا يُسقط الحدث: متغيّر ناقص يُختم failed بسببه', async () => {
     if (!dbUp) return;
     await notifications.enqueue({ code: 'refund_issued', userId: buyer.userId, vars: { name: 'ليلى' } });
-    await notifications.dispatch(500);
+    await drain(buyer.userId);
     const failed = await prisma.notification.findFirst({ where: { userId: buyer.userId, templateCode: 'refund_issued', status: 'failed' } });
     expect(failed?.error).toMatch(/متغيّر ناقص/);
   });

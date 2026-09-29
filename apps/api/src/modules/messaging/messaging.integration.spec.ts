@@ -379,8 +379,11 @@ describe('ST-28 · VD-15 · المقروء والتنبيه', () => {
     expect(await customerSets(carol.userId, id)).toBe(2);
 
     // التنبيه يحمل سياق المحادثة ونصّها
+    // الأول بالترتيب: للمتجر تنبيهان على المحادثة (السؤال الأول ثم الثالث بعد قراءته)،
+    // وبلا ترتيب تعيد القاعدة أيّهما شاءت
     const n = await prisma.notification.findFirstOrThrow({
       where: { templateCode: 'message_to_vendor', userId: x.ownerId, payloadJson: { path: ['link'], equals: `/vendor/messages?c=${id}` } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
     expect(n.payloadJson).toMatchObject({ customer_name: 'مشترٍ carol', context: 'منتج: عباءة x', preview: 'السؤال الأول', store_name: x.nameAr });
   });
