@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
+import { InventoryService } from '../inventory/public';
 import { FakePaymentProvider } from '../payments/public';
 import { CheckoutService } from './public';
 
@@ -447,5 +448,93 @@ describe('دفع يصل بعد إغلاق الطلب — يُردّ ولا يُ�
     await checkout.settleLateRefunds(later);
     expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
     expect((await prisma.payment.findUniqueOrThrow({ where: { orderId } })).status).toBe('refunded');
+  });
+});
+
+describe('دفع بعد انتهاء الحجز — إشعاران متزامنان لا يردّان مالاً عن طلب مدفوع', () => {
+  let n = 0;
+  /** منتج بقطعة واحدة لدى البائع الأول — القطعة الأخيرة هي ما يُتسابق عليه */
+  async function oneUnit(): Promise<string> {
+    n++;
+    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
+    const product = await prisma.product.create({
+      data: { vendorId: vendorIds[0]!, categoryId: category.id, slug: `last-${n}-${SUFFIX}`, nameAr: `القطعة الأخيرة ${n}`, status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendorIds[0]!, sku: `LAST-${n}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 9_900n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 1, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 1, reason: 'import' } });
+    return variant.id;
+  }
+
+  /** طلب بانتظار التحقق، ثم انقضى حجزه — البوابة ستؤكّد الخصم بعد المهلة */
+  async function expiredPending(variantId: string) {
+    const res = await pay(await cartWith([{ variantId, qty: 1 }]), 'tok_3ds');
+    expect(res.json().outcome).toBe('requires_action');
+    const orderId = res.json().orderId as string;
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    // الحجز لم يعد نشطاً — كما يتركه منظّف الحجوز المنتهية (بلا لمس حجوز الاختبارات الأخرى)
+    await app.get(InventoryService).release(order.reservationIds);
+    const webhook = () => {
+      const body = fake.eventFor(order.payment!.providerIntentId!, orderId, order.payment!.amountMinorUnits, order.payment!.currency);
+      return app.inject({
+        method: 'POST',
+        url: '/api/v1/payments/webhook/fake',
+        headers: { 'x-signature': FakePaymentProvider.sign(body), 'content-type': 'application/json' },
+        payload: body,
+      });
+    };
+    return { orderId, payment: order.payment!, webhook };
+  }
+
+  it('المخزون متاح: يُعاد الحجز ويُكمل الطلب — بلا ردّ', async () => {
+    if (!dbUp) return;
+    const variantId = await oneUnit();
+    const { orderId, payment, webhook } = await expiredPending(variantId);
+    expect((await webhook()).statusCode).toBe(200);
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(order.status).toBe('processing');
+    expect(order.payment!.status).toBe('captured');
+    expect(await prisma.subOrder.count({ where: { orderId } })).toBe(1);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([]);
+    expect(await stockOf(variantId)).toEqual({ onHand: 0, reserved: 0 });
+  });
+
+  it('إشعاران معاً على القطعة الأخيرة: يُكمل الطلب مرة، ولا يُردّ ماله ولا يُختم مردوداً', async () => {
+    if (!dbUp) return;
+    const variantId = await oneUnit();
+    const { orderId, payment, webhook } = await expiredPending(variantId);
+    const [a, b] = await Promise.all([webhook(), webhook()]);
+    expect([a.statusCode, b.statusCode], `${a.body}\n${b.body}`).toEqual([200, 200]);
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(order.status).toBe('processing');
+    expect(order.payment!.status).toBe('captured');
+    expect(order.payment!.lateCaptureAt).toBeNull();
+    expect(await prisma.subOrder.count({ where: { orderId } })).toBe(1);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([]);
+    expect(await stockOf(variantId)).toEqual({ onHand: 0, reserved: 0 });
+  });
+
+  it('نفد المخزون فعلاً: يُلغى الطلب ويُردّ المال مرة واحدة ولو وصل الإشعار مرتين', async () => {
+    if (!dbUp) return;
+    const variantId = await oneUnit();
+    const { orderId, payment, webhook } = await expiredPending(variantId);
+    // مشترٍ آخر اشترى القطعة الأخيرة بعد انقضاء الحجز
+    expect((await pay(await cartWith([{ variantId, qty: 1 }]), 'tok_success')).json().outcome).toBe('paid');
+
+    const [a, b] = await Promise.all([webhook(), webhook()]);
+    expect([a.statusCode, b.statusCode], `${a.body}\n${b.body}`).toEqual([200, 200]);
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(order.status).toBe('canceled');
+    expect(order.paidAt).toBeNull();
+    expect(order.payment!.status).toBe('refunded');
+    expect(order.payment!.lateRefundId).toBeTruthy();
+    expect(await prisma.subOrder.count({ where: { orderId } })).toBe(0);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
+    // القطعة بيعت مرة واحدة — للمشتري الآخر
+    expect(await stockOf(variantId)).toEqual({ onHand: 0, reserved: 0 });
   });
 });
