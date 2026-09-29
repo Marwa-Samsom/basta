@@ -108,13 +108,11 @@ export class FakePaymentProvider implements PaymentProvider {
   /** عدم التكرار عند المزوّد: المفتاح نفسه يعيد الردّ الأول ولا يردّ المال مرتين */
   private readonly refundByKey = new Map<string, { refundId: string }>();
 
-  async refund(intentId: string, amountMinor: bigint, idempotencyKey?: string): Promise<{ refundId: string }> {
-    if (idempotencyKey) {
-      const seen = this.refundByKey.get(idempotencyKey);
-      if (seen) return seen;
-    }
+  async refund(intentId: string, amountMinor: bigint, idempotencyKey: string): Promise<{ refundId: string }> {
+    const seen = this.refundByKey.get(idempotencyKey);
+    if (seen) return seen;
     const result = await this.refundOnce(intentId, amountMinor);
-    if (idempotencyKey) this.refundByKey.set(idempotencyKey, result);
+    this.refundByKey.set(idempotencyKey, result);
     return result;
   }
 

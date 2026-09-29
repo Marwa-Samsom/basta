@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
+import { NotificationsService } from '../notifications/public';
 import { FakePaymentProvider } from '../payments/public';
 import { TrackingService } from '../shipping/public';
 import { toCharge } from './domain/refunds';
@@ -513,5 +514,44 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     const list = await call('GET', `/products/${item.productId}/reviews`);
     expect(list.json().count).toBeGreaterThanOrEqual(1);
     expect(list.json().items[0].verified).toBe(true);
+  });
+});
+
+describe('الاسترداد يُعاد بلا دفع مرتين', () => {
+  it('نجحت البوابة ثم سقطت معاملتنا: الإعادة تكمل التسجيل ولا تردّ المال ثانيةً', async () => {
+    if (!dbUp) return;
+    const { a, order } = await placeOrder([1, 1]);
+    const notifications = app.get(NotificationsService);
+    const original = notifications.enqueue.bind(notifications);
+    let broken = true;
+    // سقوط بعد البوابة وقبل الالتزام — إشعار «رُدّ مالك» داخل معاملة التسجيل
+    notifications.enqueue = (async (input, db) => {
+      if (broken && input.code === 'refund_issued') {
+        broken = false;
+        throw new Error('انقطع الاتصال بالقاعدة');
+      }
+      return original(input, db);
+    }) as typeof notifications.enqueue;
+    try {
+      const cancel = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/cancel`, buyer.token, {});
+      expect(cancel.statusCode, cancel.body).toBe(200);
+    } finally {
+      notifications.enqueue = original;
+    }
+
+    const refund = await prisma.refund.findFirstOrThrow({ where: { subOrderId: a.id } });
+    // عاد معلّقاً لتعيده المهمة — لكن أثر المال الخارج مسجَّل
+    expect(refund.status).toBe('pending');
+    expect(refund.providerRefundId).toBeTruthy();
+    const intent = order.payment!.providerIntentId!;
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+
+    expect(await lifecycle.executeRefund(refund.id)).toBe(true);
+    const done = await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } });
+    expect(done.status).toBe('succeeded');
+    expect(done.providerRefundId).toBe(refund.providerRefundId);
+    // البوابة ردّت مرة واحدة — الإعادة سمعت الردّ الأول بالمفتاح نفسه
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+    expect(await statusOf(a.id)).toBe('refunded');
   });
 });

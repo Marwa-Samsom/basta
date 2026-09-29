@@ -348,6 +348,12 @@ export class OrderLifecycleService {
   /**
    * ينفّذ استرداداً معلّقاً عند البوابة. عديم الأثر عند التكرار: الشرط على
    * status = 'pending' داخل الكتابة. فشل البوابة يُبقيه معلّقاً فتعيده المهمة.
+   *
+   * **والإعادة لا تدفع مرتين.** البوابة قد تنجح ثم تسقط معاملتنا بعدها (خطأ
+   * قاعدة، انتقال مرفوض، إشعار معطوب) فيعود الاسترداد معلّقاً وتعيده المهمة —
+   * وكان يُرسَل بلا مفتاح فيُردّ المال مرة ثانية. المفتاح الآن معرّف الاسترداد
+   * نفسه: كل إعادة له تسمع من البوابة الردّ الأول. ومعرّف ردّ البوابة يُكتب فور
+   * نجاحها، قبل المعاملة، فيبقى أثر المال الخارج ولو سقط ما بعده.
    */
   async executeRefund(refundId: string): Promise<boolean> {
     const refund = await this.prisma.refund.findUnique({
@@ -365,8 +371,12 @@ export class OrderLifecycleService {
     try {
       const result =
         refund.amountMinorUnits > 0n && refund.payment.providerIntentId
-          ? await this.provider.refund(refund.payment.providerIntentId, refund.amountMinorUnits)
+          ? await this.provider.refund(refund.payment.providerIntentId, refund.amountMinorUnits, `refund:${refundId}`)
           : { refundId: 'none' };
+      await this.prisma.refund.updateMany({
+        where: { id: refundId, status: 'processing' },
+        data: { providerRefundId: result.refundId },
+      });
 
       await this.prisma.$transaction(async (tx) => {
         await tx.refund.update({
