@@ -19,7 +19,7 @@ import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
-import { InvalidInputError, InvalidStateTransitionError } from '../../common/errors/domain-error';
+import { ConflictError, InvalidInputError, InvalidStateTransitionError } from '../../common/errors/domain-error';
 import { hashPassword } from '../identity/public';
 import { CategoryService, ProductService, UPLOADS_ROOT, type EffectiveAttribute } from './public';
 
@@ -125,6 +125,10 @@ const dbIt: typeof it = ((name: string, fn: never, timeout?: number) =>
   )) as never;
 
 // ---------------------------------------------------------------------------- أدوات
+
+/** نسخة المحتوى الحالية — ما يراه المراجِع حين يفتح المنتج */
+const revOf = async (id: string): Promise<number> =>
+  (await prisma.product.findUniqueOrThrow({ where: { id }, select: { contentRevision: true } })).contentRevision;
 
 function as(tag: Tag) {
   const headers = { authorization: `Bearer ${vendors[tag].token}` };
@@ -295,7 +299,7 @@ describe('بوابة 05 · البند الأول — دورة حياة منتج 
     const submitted = await A.post(`/vendor/products/${product.id}/publish`);
     expect(submitted.statusCode).toBe(200);
     expect(submitted.json().status).toBe('pending_review');
-    await app.get(ProductService).approve(product.id);
+    await app.get(ProductService).approve(product.id, await revOf(product.id));
     expect((await A.get(`/vendor/products/${product.id}`)).json().status).toBe('active');
     const stripped = await A.patch(`/vendor/products/${product.id}`, { attributes: [] });
     expect(stripped.statusCode).toBe(400);
@@ -454,20 +458,70 @@ describe('مراجعة المنتجات قبل النشر — Q-15', () => {
       status: 'pending_review',
       rejectReason: null,
     });
-    await service.approve(product.id);
+    await service.approve(product.id, await revOf(product.id));
     const approved = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
     expect(approved.status).toBe('active');
     expect(approved.publishedAt).not.toBeNull();
 
     // الاعتماد مرتين انتقال غير مسموح
-    await expect(service.approve(product.id)).rejects.toBeInstanceOf(InvalidStateTransitionError);
+    await expect(service.approve(product.id, await revOf(product.id))).rejects.toBeInstanceOf(InvalidStateTransitionError);
+  });
+
+  dbIt('البائع يعدّل بعد أن فتح المراجِع المنتج: الاعتماد يُردّ ولا يُنشر ما لم يُقرأ', async () => {
+    const A = as('a');
+    const service = app.get(ProductService);
+    const product = await simpleProduct('a', `REREAD-${SUFFIX}`);
+    await A.post(`/vendor/products/${product.id}/publish`);
+
+    // المراجِع يفتحه: النسخة في تفاصيله
+    const opened = await service.adminGet({ userId: vendors.a.userId, roles: ['admin'] } as never, product.id);
+    expect(opened.status).toBe('pending_review');
+
+    // والبائع يغيّر الاسم والوصف قبل الاعتماد
+    const edited = await A.patch(`/vendor/products/${product.id}`, { nameAr: 'اسم آخر لم يقرأه أحد', descriptionAr: 'وصف جديد' });
+    expect(edited.statusCode, edited.body).toBe(200);
+    expect(edited.json().contentRevision).toBe(opened.contentRevision + 1);
+
+    const stale = await service.approve(product.id, opened.contentRevision).catch((e: unknown) => e);
+    expect(stale).toBeInstanceOf(ConflictError);
+    expect((stale as ConflictError).details).toEqual({ reason: 'CONTENT_CHANGED', contentRevision: opened.contentRevision + 1 });
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('pending_review');
+
+    // يعيد الفتح فيقرأ الجديد ويعتمده
+    await service.approve(product.id, opened.contentRevision + 1);
+    expect(await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).toMatchObject({ status: 'active', nameAr: 'اسم آخر لم يقرأه أحد' });
+  });
+
+  dbIt('إضافة صورة أو حذفها نسخة جديدة، والسعر لا', async () => {
+    const A = as('a');
+    const service = app.get(ProductService);
+    const sku = `REV-IMG-${SUFFIX}`;
+    const product = await simpleProduct('a', sku);
+    const variantId = product.variants[0]?.id as string;
+    await A.post(`/vendor/products/${product.id}/publish`);
+    const r0 = await revOf(product.id);
+
+    // السعر تشغيل لا محتوى (Q-16) — الاعتماد بالنسخة المفتوحة يمرّ بعده
+    expect((await A.patch(`/vendor/products/${product.id}`, { variants: [{ id: variantId, sku, price: '15.00', stock: 4 }] })).statusCode).toBe(200);
+    expect(await revOf(product.id)).toBe(r0);
+
+    const png = await sharp({ create: { width: 900, height: 900, channels: 3, background: { r: 20, g: 90, b: 140 } } }).png().toBuffer();
+    const up = await A.upload(`/vendor/products/${product.id}/images`, { name: 'p.png', type: 'image/png', data: png });
+    expect(up.statusCode, up.body).toBe(201);
+    expect(await revOf(product.id)).toBe(r0 + 1);
+    await expect(service.approve(product.id, r0)).rejects.toBeInstanceOf(ConflictError);
+
+    expect((await A.delete(`/vendor/products/${product.id}/images/${up.json().id}`)).statusCode).toBeLessThan(300);
+    expect(await revOf(product.id)).toBe(r0 + 2);
+    await service.approve(product.id, r0 + 2);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('active');
   });
 
   dbIt('المسودة لم تُرسل فلا تُعتمد ولا تُرفض، والطابور لا يحوي إلا ما ينتظر', async () => {
     const service = app.get(ProductService);
     const draft = await simpleProduct('a', `DRAFT-${SUFFIX}`);
 
-    await expect(service.approve(draft.id)).rejects.toBeInstanceOf(InvalidStateTransitionError);
+    await expect(service.approve(draft.id, await revOf(draft.id))).rejects.toBeInstanceOf(InvalidStateTransitionError);
     await expect(service.reject(draft.id, 'سبب كافٍ للرفض')).rejects.toBeInstanceOf(InvalidStateTransitionError);
     expect((await prisma.product.findUniqueOrThrow({ where: { id: draft.id } })).status).toBe('draft');
 
@@ -502,7 +556,7 @@ describe('تعديل المنشور — Q-16', () => {
     const status = async () => (await A.get(`/vendor/products/${product.id}`)).json().status;
     const publish = async () => {
       await A.post(`/vendor/products/${product.id}/publish`);
-      await service.approve(product.id);
+      await service.approve(product.id, await revOf(product.id));
       expect(await status()).toBe('active');
     };
     await publish();

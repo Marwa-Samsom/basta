@@ -47,12 +47,12 @@ export async function makeVendor(t: string) {
   return { email, userId, vendorId: vendor.id, productSlug: product.slug, productName: product.nameAr, variantId: variant.id };
 }
 
-export async function makeAdmin(t: string) {
+export async function makeAdmin(t: string, permissions: readonly string[] = ['payouts.approve', 'reports.view']) {
   const email = `admin.${t}@basta.test`;
   const userId = await register(email, `مدير ${t}`);
   const secret = generateSecret();
   await prisma.userRole.create({ data: { userId, role: 'admin' } });
-  await prisma.adminPermission.createMany({ data: ['payouts.approve', 'reports.view'].map((permission) => ({ userId, permission })) });
+  await prisma.adminPermission.createMany({ data: permissions.map((permission) => ({ userId, permission })) });
   await prisma.user.update({ where: { id: userId }, data: { totpSecretEnc: secret, totpEnabledAt: new Date() } });
   return { email, totp: () => generateSync({ strategy: 'totp', secret, crypto, base32 }) };
 }

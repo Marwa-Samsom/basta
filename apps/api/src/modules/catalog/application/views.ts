@@ -77,6 +77,8 @@ export interface ProductDetailView {
   readonly slug: string;
   readonly status: string;
   readonly rejectReason: string | null;
+  /** نسخة المحتوى — يرسلها المراجِع مع الاعتماد، فلا يُعتمد غير ما قرأه */
+  readonly contentRevision: number;
   readonly nameAr: string;
   readonly nameEn: string | null;
   readonly descriptionAr: string | null;

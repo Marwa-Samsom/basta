@@ -461,6 +461,8 @@ model Product {
   descriptionEn String?
   status        ProductStatus @default(draft)
   rejectReason  String?
+  /// يزيد مع كل تعديل محتوى — الاعتماد يشترط النسخة التي راجعها المدير
+  contentRevision Int         @default(0)
   hasVariants   Boolean       @default(false)
   ratingAvg     Decimal       @default(0) @db.Decimal(3, 2)
   ratingCount   Int           @default(0)

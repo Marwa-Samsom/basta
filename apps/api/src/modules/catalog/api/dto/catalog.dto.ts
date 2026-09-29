@@ -419,6 +419,15 @@ export class ListProductsQueryDto {
   pageSize?: number;
 }
 
+export class ApproveProductDto {
+  /** نسخة المحتوى التي فتحها المراجِع (contentRevision في تفاصيل المنتج) */
+  @ApiProperty({ example: 3 })
+  @Type(() => Number)
+  @IsInt({ message: 'أرسل نسخة المحتوى التي راجعتها.' })
+  @Min(0)
+  contentRevision!: number;
+}
+
 export class RejectProductDto {
   @ApiProperty({ example: 'الصور لا تطابق المنتج الموصوف.' })
   @IsString()
