@@ -1,3 +1,4 @@
+import { hkdfSync } from 'node:crypto';
 import { isIP } from 'node:net';
 
 /**
@@ -80,6 +81,8 @@ export interface Env {
   nodeEnv: string;
   paymentProvider: PaymentProviderName;
   shippingCarrier: ShippingCarrierName;
+  /** مفتاح تشفير أسرار التحقق الثنائي — 32 بايتاً (identity/infrastructure/secret-box) */
+  totpKey: Buffer;
   /** محرّك البحث — اختياري: غيابه يُسقط البحث إلى قاعدة البيانات لا يُسقط المتجر (ADR-014) */
   meiliUrl: string;
   meiliKey: string;
@@ -119,6 +122,8 @@ export function loadEnv(): Env {
   } else if (production && shippingCarrier === 'fake') {
     problems.push('SHIPPING_CARRIER (شركة الشحن الوهمية ممنوعة في الإنتاج — تعلّم كل شحنة مستلمة فتحرّر مال البائع)');
   }
+  const totpKey = totpKeyOf(production);
+  if (typeof totpKey === 'string') problems.push(totpKey);
   if (problems.length > 0) throw new EnvError(problems);
 
   cached = {
@@ -131,11 +136,31 @@ export function loadEnv(): Env {
     nodeEnv: process.env['NODE_ENV'] ?? 'development',
     paymentProvider: paymentProvider as PaymentProviderName,
     shippingCarrier: shippingCarrier as ShippingCarrierName,
+    totpKey: totpKey as Buffer,
     meiliUrl: process.env['MEILI_URL'] ?? 'http://127.0.0.1:7701',
     meiliKey: process.env['MEILI_KEY'] ?? '',
     meiliIndex: process.env['MEILI_INDEX'] ?? 'products',
   };
   return cached;
+}
+
+/**
+ * مفتاح أسرار التحقق الثنائي. السرّ يولّد رموز الدخول: قراءته من القاعدة (نسخة
+ * احتياطية مسرّبة، حقن SQL، مشغّل قاعدة) كانت تعطي رموز كل مدير — فيُخزَّن مشفّراً
+ * بمفتاح لا يعيش في القاعدة.
+ *
+ * الإنتاج: TOTP_ENCRYPTION_KEY إلزامي، 32 بايتاً بترميز base64 (openssl rand -base64 32).
+ * خارجه: يُشتقّ من JWT_ACCESS_SECRET إن غاب — كي لا تنكسر بيئات التطوير القائمة.
+ * يعيد رسالة المشكلة بدل المفتاح إن وُجدت.
+ */
+function totpKeyOf(production: boolean): Buffer | string {
+  const raw = process.env['TOTP_ENCRYPTION_KEY'];
+  if (raw) {
+    const key = Buffer.from(raw, 'base64');
+    return key.length === 32 ? key : 'TOTP_ENCRYPTION_KEY (32 بايتاً بترميز base64 — openssl rand -base64 32)';
+  }
+  if (production) return 'TOTP_ENCRYPTION_KEY (مفتاح تشفير أسرار التحقق الثنائي — openssl rand -base64 32)';
+  return Buffer.from(hkdfSync('sha256', process.env['JWT_ACCESS_SECRET'] as string, 'basta', 'totp-secret-box/dev', 32));
 }
 
 /** للاختبارات التي تبدّل البيئة بين الحالات. */

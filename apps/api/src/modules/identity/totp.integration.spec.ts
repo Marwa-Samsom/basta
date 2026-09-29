@@ -12,6 +12,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { PrismaClient } from '@prisma/client';
 import { NobleCryptoPlugin, ScureBase32Plugin, generateSync } from 'otplib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { openTotpSecret } from './infrastructure/secret-box';
 
 const prisma = new PrismaClient();
 let app: NestFastifyApplication;
@@ -60,6 +61,9 @@ async function login(tag: string, totp?: string): Promise<string> {
   expect(r.statusCode, r.body).toBe(200);
   return r.json().tokens.accessToken;
 }
+
+/** السرّ مخزَّن مشفّراً (secret-box) — يُفكّ للمقارنة بما عُرض لصاحبه */
+const plainOf = (stored: string | null, userId: string): string | null => (stored ? openTotpSecret(stored, userId) : null);
 
 /** رمز التطبيق لا يُقبل ثانيةً داخل نافذته — الاختبار يصفّر الخطوة ليستعمل رمزاً جديداً */
 const freshStep = (userId: string) => prisma.user.update({ where: { id: userId }, data: { totpLastStep: null } });
@@ -123,13 +127,13 @@ describe('التحقق بخطوتين لغير المدير', () => {
     expect(refreshed.statusCode).toBe(401);
 
     // الثغرة المغلقة: جلسة (ولو مسروقة) لا تبدأ تهيئة جديدة تصفّر التحقق المفعَّل
-    const { secret } = { secret: (await prisma.user.findUniqueOrThrow({ where: { id: userId } })).totpSecretEnc! };
+    const { secret } = { secret: plainOf((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).totpSecretEnc, userId)! };
     const token = await login('enable', totpOf(secret));
     const again = await call('POST', '/auth/totp/setup', { token });
     expect(again.statusCode).toBe(409);
     const u = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
     expect(u.totpEnabledAt).not.toBeNull();
-    expect(u.totpSecretEnc).toBe(secret);
+    expect(plainOf(u.totpSecretEnc, u.id)).toBe(secret);
   });
 
   it('الدخول يطلب الرمز: بلا رمز أو برمز خاطئ يُرفض، وبرمز التطبيق يُقبل', async () => {
@@ -239,7 +243,7 @@ describe('تغيير الجهاز — السرّ الجديد منتظِر حت�
 
     const u = await prisma.user.findUniqueOrThrow({ where: { id } });
     expect(u.totpEnabledAt).not.toBeNull();
-    expect(u.totpSecretEnc).toBe(secret);
+    expect(plainOf(u.totpSecretEnc, u.id)).toBe(secret);
     expect(u.totpPendingSecretEnc).toBeNull();
     const bare = await loginRaw('adm2fa');
     expect(bare.statusCode).toBe(401);
@@ -256,8 +260,8 @@ describe('تغيير الجهاز — السرّ الجديد منتظِر حت�
     const begun = await call('POST', '/auth/totp/setup', { token, body: { password: PASSWORD, code: totpOf(secret) } });
     expect(begun.statusCode, begun.body).toBe(201);
     const u = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    expect(u.totpSecretEnc).toBe(secret);
-    expect(u.totpPendingSecretEnc).toBe(begun.json().secret);
+    expect(plainOf(u.totpSecretEnc, u.id)).toBe(secret);
+    expect(plainOf(u.totpPendingSecretEnc, u.id)).toBe(begun.json().secret);
     expect(u.totpEnabledAt).not.toBeNull();
 
     expect((await loginRaw('abandon')).statusCode).toBe(401);
@@ -285,7 +289,7 @@ describe('تغيير الجهاز — السرّ الجديد منتظِر حت�
     expect(newCodes).toHaveLength(10);
 
     const u = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    expect(u.totpSecretEnc).toBe(newSecret);
+    expect(plainOf(u.totpSecretEnc, u.id)).toBe(newSecret);
     expect(u.totpPendingSecretEnc).toBeNull();
     expect(u.totpEnabledAt).not.toBeNull();
 
@@ -345,5 +349,40 @@ describe('إعادة الضبط من الإدارة', () => {
     const onAdmin = await call('POST', `/admin/customers/${adminId}/reset-2fa`, { token: support, body: { reason } });
     expect(onAdmin.statusCode).toBe(404);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: adminId } })).totpEnabledAt).not.toBeNull();
+  });
+});
+
+describe('سرّ التحقق الثنائي لا يُقرأ من القاعدة', () => {
+  it('التهيئة والتأكيد يخزّنان السرّ مشفّراً، والدخول يعمل به', async () => {
+    if (!dbUp) return;
+    const userId = await register('sealed');
+    const token = await login('sealed');
+    const setup = await call('POST', '/auth/totp/setup', { token });
+    const { secret } = setup.json();
+    // المنتظر مشفّر قبل التأكيد…
+    const pending = (await prisma.user.findUniqueOrThrow({ where: { id: userId } })).totpPendingSecretEnc!;
+    expect(pending).toMatch(/^v1\./);
+    expect(pending).not.toContain(secret);
+
+    expect((await call('POST', '/auth/totp/confirm', { token, body: { token: totpOf(secret) } })).statusCode).toBe(200);
+    // …والساري بعده
+    const stored = (await prisma.user.findUniqueOrThrow({ where: { id: userId } })).totpSecretEnc!;
+    expect(stored).toMatch(/^v1\./);
+    expect(stored).not.toContain(secret);
+
+    await freshStep(userId);
+    expect((await loginRaw('sealed', totpOf(secret))).statusCode).toBe(200);
+  });
+
+  it('سرّ قديم مكتوب نصّاً يعمل ويُشفَّر عند أول دخول ناجح', async () => {
+    if (!dbUp) return;
+    const userId = await register('legacy');
+    const { secret } = await enable('legacy', userId);
+    await prisma.user.update({ where: { id: userId }, data: { totpSecretEnc: secret, totpLastStep: null } });
+
+    expect((await loginRaw('legacy', totpOf(secret))).statusCode).toBe(200);
+    const stored = (await prisma.user.findUniqueOrThrow({ where: { id: userId } })).totpSecretEnc!;
+    expect(stored).toMatch(/^v1\./);
+    expect(stored).not.toContain(secret);
   });
 });

@@ -105,3 +105,35 @@ describe('TRUST_PROXY — من يُصدَّق في X-Forwarded-For', () => {
     expect(() => parseTrustProxy('proxy.example.com')).toThrow(/غير صالح/);
   });
 });
+
+describe('مفتاح أسرار التحقق الثنائي', () => {
+  let saved: NodeJS.ProcessEnv;
+  beforeEach(() => {
+    saved = { ...process.env };
+    resetEnvCache();
+  });
+  afterEach(() => {
+    process.env = saved;
+    resetEnvCache();
+  });
+
+  it('إلزامي في الإنتاج، وبطول 32 بايتاً', () => {
+    production({ TOTP_ENCRYPTION_KEY: undefined });
+    expect(() => loadEnv()).toThrow(/TOTP_ENCRYPTION_KEY/);
+    resetEnvCache();
+    production({ TOTP_ENCRYPTION_KEY: Buffer.alloc(16, 1).toString('base64') });
+    expect(() => loadEnv()).toThrow(/TOTP_ENCRYPTION_KEY \(32 بايتاً/);
+    resetEnvCache();
+    // مفتاح سليم: لا يُذكر بين مشاكل الإقلاع (الدفع والشحن الوهميان ما زالا يوقفانه)
+    production({ TOTP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') });
+    expect(() => loadEnv()).not.toThrow(/TOTP_ENCRYPTION_KEY/);
+  });
+
+  it('خارج الإنتاج يُشتقّ من سرّ الوصول إن غاب — ثابتاً بين الإقلاعات', () => {
+    production({ NODE_ENV: 'development', TOTP_ENCRYPTION_KEY: undefined, PAYMENT_WEBHOOK_SECRET: undefined });
+    const first = loadEnv().totpKey;
+    resetEnvCache();
+    expect(first).toHaveLength(32);
+    expect(loadEnv().totpKey.equals(first)).toBe(true);
+  });
+});

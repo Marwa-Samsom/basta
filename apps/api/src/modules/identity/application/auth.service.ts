@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Role } from '../../../common/security/actor';
 import { NotificationsService } from '../../notifications/public';
+import { isLegacyPlain, openTotpSecret, sealTotpSecret } from '../infrastructure/secret-box';
 import { AuditService } from '../infrastructure/audit.service';
 import { hashPassword, verifyPassword } from '../domain/password';
 import { generateRecoveryCodes, looksLikeRecoveryCode, normalizeRecoveryCode } from '../domain/recovery-codes';
@@ -252,12 +253,17 @@ export class AuthService {
       }
       return;
     }
-    const step = verifyTotpStep(submitted, user.totpSecretEnc, user.totpLastStep);
+    const secret = openTotpSecret(user.totpSecretEnc, user.id);
+    const step = verifyTotpStep(submitted, secret, user.totpLastStep);
     if (step === null) throw new UnauthorizedException('رمز التحقق الثنائي مطلوب وصحيح.');
     // الحجز شرطيّ: دخولان متزامنان بالرمز نفسه لا ينجحان معاً (المرحلة 12)
     const claimed = await this.prisma.user.updateMany({
       where: { id: user.id, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] },
-      data: { totpLastStep: step },
+      data: {
+        totpLastStep: step,
+        // سرّ قديم كُتب نصّاً يُشفَّر عند أول استعمال ناجح (وسكربت totp:seal لما بقي)
+        ...(isLegacyPlain(user.totpSecretEnc) ? { totpSecretEnc: sealTotpSecret(secret, user.id) } : {}),
+      },
     });
     if (claimed.count === 0) throw new UnauthorizedException('رمز التحقق الثنائي استُعمل. انتظر الرمز التالي.');
   }
@@ -338,7 +344,8 @@ export class AuthService {
       await this.reauthenticate(userId, { password: proof.password, code: proof.code }, meta);
     }
     const secret = generateTotpSecret();
-    await this.prisma.user.update({ where: { id: userId }, data: { totpPendingSecretEnc: secret } });
+    // يُعرض لصاحبه مرة هنا، ولا يُخزَّن إلا مشفّراً
+    await this.prisma.user.update({ where: { id: userId }, data: { totpPendingSecretEnc: sealTotpSecret(secret, userId) } });
     return { secret, uri: totpUri(secret, user.email ?? user.id) };
   }
 
@@ -352,7 +359,7 @@ export class AuthService {
     const pending = user.totpPendingSecretEnc;
     if (!pending) throw new ConflictException('لا تهيئة قيد الانتظار. ابدأ التهيئة أولاً.');
     // السرّ جديد فلا خطوة سابقة له — خطوة السرّ القديم لا تحجب رمز الجهاز الجديد
-    const step = verifyTotpStep(token, pending);
+    const step = verifyTotpStep(token, openTotpSecret(pending, userId));
     if (step === null) {
       throw new UnauthorizedException('الرمز غير صحيح. تأكد من وقت جهازك وأعد المحاولة.');
     }
