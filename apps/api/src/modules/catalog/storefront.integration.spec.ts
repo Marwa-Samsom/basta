@@ -251,52 +251,40 @@ describe('قاعدة الرؤية — تُكتب مرة وتسري على كل �
 
   it('بوابة 06 · البند 2: تعليق البائع يُخفي منتجاته فوراً بلا لمس صفوفها', async () => {
     if (!dbUp) return;
-    const before = await app.inject({ method: 'GET', ...api('/storefront/products?pageSize=48') });
-    const beforeIds: string[] = before.json().items.map((i: { id: string }) => i.id);
-    expect(beforeIds).toContain(productIds[0]);
+    /**
+     * يُفحص بمنتجات هذا الملف لا بالصفحة الأولى من المتجر كله: ملفات الاختبار الأخرى
+     * تنشر في القاعدة نفسها معاً فتزيح منتجاتنا عن الصفحة الأولى — وحين يسقط الاختبار
+     * في منتصفه كان المتجر يبقى معلَّقاً فيُسقط ما بعده.
+     */
+    const own = await prisma.product.findMany({ where: { vendorId, status: 'active', deletedAt: null }, select: { id: true, slug: true } });
+    const other = await prisma.product.findFirstOrThrow({ where: { vendorId: secondVendorId, status: 'active', deletedAt: null }, select: { slug: true } });
+    const page = async (slug: string) => (await app.inject({ method: 'GET', ...api(`/storefront/products/${slug}`) })).statusCode;
+    const listed = async () =>
+      (await app.inject({ method: 'GET', ...api(`/storefront/products?vendorId=${vendorId}&pageSize=48`) })).json().items.map((i: { id: string }) => i.id) as string[];
 
-    await prisma.vendor.update({
-      where: { id: vendorId },
-      data: { status: 'suspended', suspendedAt: new Date() },
-    });
+    expect(await listed()).toContain(productIds[0]);
+    for (const p of own) expect(await page(p.slug), p.slug).toBe(200);
 
-    const after = await app.inject({ method: 'GET', ...api('/storefront/products?pageSize=48') });
-    const afterIds: string[] = after.json().items.map((i: { id: string }) => i.id);
+    await prisma.vendor.update({ where: { id: vendorId }, data: { status: 'suspended', suspendedAt: new Date() } });
+    try {
+      // منتجات المعلَّق كلها تختفي من القائمة ومن صفحاتها…
+      expect(await listed()).toEqual([]);
+      for (const p of own) expect(await page(p.slug), p.slug).toBe(404);
+      // …ومنتج بائع آخر يبقى: الإخفاء على البائع لا على المتجر كله
+      expect(await page(other.slug)).toBe(200);
 
-    const own = await prisma.product.findMany({ where: { vendorId }, select: { id: true } });
-    const ownIds = new Set(own.map((p) => p.id));
-    // منتجات المعلَّق كلها تختفي…
-    for (const id of beforeIds.filter((p) => ownIds.has(p))) {
-      expect(afterIds).not.toContain(id);
+      // وحالة المنتج نفسها لم تتغيّر: الإخفاء من شرط البائع لا من نسخة محفوظة
+      expect((await prisma.product.findUniqueOrThrow({ where: { id: productIds[0]! } })).status).toBe('active');
+
+      // وصفحة متجره تُعرض بحالتها لا 404 — ST-12، فلا ينكسر رابط مفهرس
+      const vendor = await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } });
+      const shop = await app.inject({ method: 'GET', ...api(`/storefront/shops/${vendor.slug}`) });
+      expect(shop.statusCode).toBe(200);
+      expect(shop.json().vendor.isSuspended).toBe(true);
+      expect(shop.json().products).toHaveLength(0);
+    } finally {
+      await prisma.vendor.update({ where: { id: vendorId }, data: { status: 'approved', suspendedAt: null } });
     }
-    // …ومنتجات غيره تبقى: الإخفاء على البائع لا على المتجر كله. تُفحص صفحةُ كلٍّ منها لا
-    // الصفحة الأولى من القائمة: ملفات الاختبار الأخرى تنشر في القاعدة نفسها معاً فتزيح
-    // ترتيبها، وقد تعلّق بائعيها هي — فيُفحص ما بقي بائعه معتمداً ومنتجه فعّالاً فقط
-    const others = await prisma.product.findMany({
-      where: { id: { in: beforeIds.filter((p) => !ownIds.has(p)) }, status: 'active', deletedAt: null, vendor: { status: 'approved' } },
-      select: { slug: true },
-    });
-    expect(others.length).toBeGreaterThan(0);
-    for (const o of others) {
-      const r = await app.inject({ method: 'GET', ...api(`/storefront/products/${o.slug}`) });
-      expect(r.statusCode, o.slug).toBe(200);
-    }
-
-    // وحالة المنتج نفسها لم تتغيّر: الإخفاء من شرط البائع لا من نسخة محفوظة
-    const row = await prisma.product.findUniqueOrThrow({ where: { id: productIds[0]! } });
-    expect(row.status).toBe('active');
-
-    // وصفحة متجره تُعرض بحالتها لا 404 — ST-12، فلا ينكسر رابط مفهرس
-    const vendor = await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } });
-    const shop = await app.inject({ method: 'GET', ...api(`/storefront/shops/${vendor.slug}`) });
-    expect(shop.statusCode).toBe(200);
-    expect(shop.json().vendor.isSuspended).toBe(true);
-    expect(shop.json().products).toHaveLength(0);
-
-    await prisma.vendor.update({
-      where: { id: vendorId },
-      data: { status: 'approved', suspendedAt: null },
-    });
   });
 
   it('صفحة البائع المعتمد تعرض منتجاته وحدها', async () => {
