@@ -273,6 +273,9 @@ export class LedgerService {
       select: { direction: true, amountMinorUnits: true },
     });
     const pending = net(rows.map((r) => ({ direction: r.direction, amount: r.amountMinorUnits })));
+    // يُحسم في الحالتين: فرعي مسترَدّ كله (صافيه صفر) كان يبقى مستحقاً إلى الأبد
+    // فيعود في كل دورة، حتى تحتلّ أمثاله دفعة المهمة كلها ويتوقّف التحرير للجميع
+    await tx.subOrder.update({ where: { id: subOrderId }, data: { holdSettledAt: new Date() } });
     if (pending <= 0n) return 0n;
     await this.appendVendor(
       tx,

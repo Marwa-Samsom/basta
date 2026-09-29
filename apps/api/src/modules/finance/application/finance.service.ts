@@ -56,7 +56,8 @@ export class FinanceService {
     const [wallets, holds] = await Promise.all([
       this.prisma.wallet.findMany({ where: { vendorId }, orderBy: { currency: 'asc' } }),
       this.prisma.subOrder.findMany({
-        where: { vendorId, holdReleaseAt: { not: null }, ledgerEntries: { none: { entryType: 'hold_release_out' } } },
+        // ما لم يُحسم تحريره — المسترَدّ كله يُحسم بلا نقل، فلا يُعرض موعداً لا مال فيه
+        where: { vendorId, holdReleaseAt: { not: null }, holdSettledAt: null },
         select: { settlementCurrency: true, holdReleaseAt: true },
         orderBy: { holdReleaseAt: 'asc' },
       }),

@@ -827,6 +827,8 @@ model SubOrder {
   deliveredAt   DateTime? @db.Timestamptz
   /// ADR-007: deliveredAt + settings.hold_period_days
   holdReleaseAt DateTime? @db.Timestamptz
+  /// حُسم تحرير المعلّق — نُقل، أو لم يبقَ ما يُنقل (مسترَدّ كله). لا يعود إلى طابور التحرير
+  holdSettledAt DateTime? @db.Timestamptz
   completedAt   DateTime? @db.Timestamptz
   canceledAt    DateTime? @db.Timestamptz
   cancelReason  String?
