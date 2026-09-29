@@ -24,7 +24,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const res = ctx.getResponse<{ status: (c: number) => { send: (b: unknown) => void } }>();
+    const reply = ctx.getResponse<{ status: (c: number) => { header: (k: string, v: string) => { send: (b: unknown) => void } } }>();
+    /**
+     * الخطأ JSON دائماً، ولو كان المسار يعلن نوعاً آخر: @Header('content-type', 'text/csv')
+     * يُضبط قبل المعالج، فكان خطأ مسار تصدير (فترة مرفوضة مثلاً) يُرسَل كائناً بنوع
+     * CSV فيرفضه Fastify — ويصل 500 بدل الرسالة.
+     */
+    const res = { status: (c: number) => ({ send: (b: unknown) => reply.status(c).header('content-type', 'application/json; charset=utf-8').send(b) }) };
     const req = ctx.getRequest<{ url?: string; method?: string; id?: string }>();
 
     if (exception instanceof DomainError) {

@@ -461,6 +461,10 @@ describe('بوابة 10 · البند 5 — كشف الحساب يطابق ال�
 
     // مدة أطول من سنة تُرفض، ومؤشّر بائع آخر لا يُقبل
     expect((await call('GET', `/vendor/finance/statement?currency=${v.currency}&from=2024-01-01&to=2026-01-01`, v.token)).statusCode).toBe(400);
+    // والتصدير كذلك — رسالة JSON لا 500 مع أن المسار يعلن CSV
+    const longCsv = await call('GET', `/vendor/finance/statement.csv?currency=${v.currency}&from=2024-01-01&to=2026-01-01`, v.token);
+    expect(longCsv.statusCode, longCsv.body).toBe(400);
+    expect(longCsv.headers['content-type']).toContain('application/json');
     const foreign = await prisma.ledgerEntry.findFirstOrThrow({ where: { vendorId: { not: v.vendorId } }, select: { id: true } });
     expect((await call('GET', `/vendor/finance/statement?currency=${v.currency}&cursor=${foreign.id}`, v.token)).statusCode).toBe(400);
   });

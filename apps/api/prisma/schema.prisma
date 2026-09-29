@@ -674,6 +674,7 @@ model Cart {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([createdAt])
   @@map("carts")
 }
 
@@ -795,6 +796,7 @@ model Order {
 
   @@index([customerUserId, placedAt(sort: Desc)])
   @@index([status])
+  @@index([paidAt])
   @@map("orders")
 }
 
@@ -853,6 +855,7 @@ model SubOrder {
   @@index([vendorId, status, placedAt(sort: Desc)])
   // فهرس جزئي في المهاجرة لمهمة التحرير اليومية
   @@index([holdReleaseAt])
+  @@index([placedAt])
   @@map("sub_orders")
 }
 
@@ -1152,6 +1155,7 @@ model Refund {
   payment  Payment  @relation(fields: [paymentId], references: [id])
 
   @@index([subOrderId])
+  @@index([createdAt])
   @@map("refunds")
 }
 
@@ -1250,6 +1254,7 @@ model LedgerEntry {
   @@index([vendorId, currency, createdAt(sort: Desc)])
   @@index([walletId, bucket])
   @@index([refType, refId])
+  @@index([createdAt])
   @@map("ledger_entries")
 }
 
@@ -1274,6 +1279,7 @@ model PlatformLedgerEntry {
 
   @@index([subOrderId])
   @@index([currency, createdAt])
+  @@index([createdAt])
   @@map("platform_ledger_entries")
 }
 
@@ -1309,6 +1315,7 @@ model PayoutRequest {
 
   @@index([vendorId, status])
   @@index([status, requestedAt])
+  @@index([paidAt])
   @@map("payout_requests")
 }
 

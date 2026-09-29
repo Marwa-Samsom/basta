@@ -55,8 +55,16 @@ function rangeOf(from?: string, to?: string): Range {
   const toDate = !to ? new Date() : INSTANT.test(to) ? new Date(to) : new Date(new Date(`${to}T00:00:00.000Z`).getTime() + 86_400_000);
   const fromDate = !from ? new Date(toDate.getTime() - 30 * 86_400_000) : INSTANT.test(from) ? new Date(from) : new Date(`${from}T00:00:00.000Z`);
   if (fromDate >= toDate) throw new InvalidInputError('بداية الفترة قبل نهايتها.');
+  // كل تقرير يجمع سبعة جداول على الفترة: فترة بلا سقف (من 2000 مثلاً) تمسح القاعدة كلها
+  // في طلب واحد، والتصدير يكرّرها. السنة تكفي للمقارنة السنوية
+  if (toDate.getTime() - fromDate.getTime() > MAX_REPORT_DAYS * 86_400_000) {
+    throw new InvalidInputError(`الفترة ${MAX_REPORT_DAYS} يوماً على الأكثر — للأطول صدّر سنة بسنة.`);
+  }
   return { from: fromDate, to: toDate };
 }
+
+/** أطول فترة لتقرير أو لوحة أو تصدير */
+const MAX_REPORT_DAYS = 366;
 
 export class GrantDto {
   @NormalizeEmail()

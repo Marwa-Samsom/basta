@@ -320,19 +320,21 @@ describe('بوابة 11 · البند 2 — التقرير المالي يطاب
     // إلغاء لينتج استرداد وعكس قيود
     await call('POST', `/me/orders/${order.orderNumber}/stores/${order.subOrders[0]!.id}/cancel`, buyer.token, {});
 
-    const from = '2020-01-01';
     // نافذة مغلقة تنتهي قبل خمس ثوانٍ: ملفات الاختبار الأخرى تكتب في الدفتر بالتوازي،
     // والمطابقة تكون على ماضٍ لا يتغيّر بين قراءة التقرير وقراءة الجداول
     await new Promise((r) => setTimeout(r, 5_200)); // ليدخل طلب هذا الاختبار نفسه النافذة
     const cut = new Date(Date.now() - 5_000);
     const to = cut.toISOString();
+    // سنة تنتهي عند القطع — أطول فترة يقبلها التقرير، والمجاميع المستقلة على النافذة نفسها
+    const since = new Date(cut.getTime() - 365 * 86_400_000);
+    const from = since.toISOString();
     const res = await call('GET', `/admin/reports/financial?from=${from}&to=${to}`, admin.token);
     expect(res.statusCode, res.body).toBe(200);
     const report = res.json();
 
     const sign = (d: string, a: bigint) => (d === 'credit' ? a : -a);
-    const platform = await prisma.platformLedgerEntry.findMany({ where: { createdAt: { lt: cut } } });
-    const ledger = await prisma.ledgerEntry.findMany({ where: { createdAt: { lt: cut } } });
+    const platform = await prisma.platformLedgerEntry.findMany({ where: { createdAt: { gte: since, lt: cut } } });
+    const ledger = await prisma.ledgerEntry.findMany({ where: { createdAt: { gte: since, lt: cut } } });
     for (const row of report.ledger) {
       const c = row.currency as string;
       const p = (t?: string) => platform.filter((e) => e.currency === c && (!t || e.entryType === t)).reduce((a, e) => a + sign(e.direction, e.amountMinorUnits), 0n);
@@ -343,7 +345,7 @@ describe('بوابة 11 · البند 2 — التقرير المالي يطاب
       expect(BigInt(row.vendorSalesMinorUnits)).toBe(l('sale_credit') + l('shipping_credit'));
       expect(BigInt(row.vendorRefundsMinorUnits)).toBe(-l('refund_debit'));
     }
-    const orders = await prisma.order.findMany({ where: { paidAt: { not: null, lt: cut } } });
+    const orders = await prisma.order.findMany({ where: { paidAt: { not: null, gte: since, lt: cut } } });
     for (const row of report.sales) {
       const mine = orders.filter((o) => o.currency === row.currency);
       expect(row.orders).toBe(mine.length);
@@ -372,6 +374,13 @@ describe('بوابة 11 · البند 2 — التقرير المالي يطاب
   it('التقرير المالي يحتاج reports.view — مدير المحتوى يُمنع', async () => {
     if (!dbUp) return;
     expect((await call('GET', '/admin/reports/financial', limited.token)).statusCode).toBe(403);
+    // الفترة لها سقف: سنة تمرّ، وأطول منها يُرفض قبل أن يُمسح شيء — في التقرير والتصدير
+    expect((await call('GET', '/admin/reports/financial?from=2025-01-01&to=2025-12-31', admin.token)).statusCode).toBe(200);
+    for (const path of ['/admin/reports/financial', '/admin/reports/financial.csv', '/admin/reports/financial.xlsx']) {
+      const long = await call('GET', `${path}?from=2000-01-01&to=2026-01-01`, admin.token);
+      expect(long.statusCode, path).toBe(400);
+      expect(long.json().message).toMatch(/366 يوماً على الأكثر/);
+    }
     expect((await call('GET', '/admin/finance/payouts', limited.token)).statusCode).toBe(403);
     const board = await call('GET', '/admin/dashboard', limited.token);
     expect(board.statusCode).toBe(200);
