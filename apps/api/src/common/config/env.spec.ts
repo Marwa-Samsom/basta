@@ -59,6 +59,39 @@ describe('بوابة الدفع في الإنتاج', () => {
   });
 });
 
+describe('شركة الشحن في الإنتاج', () => {
+  let saved: NodeJS.ProcessEnv;
+  beforeEach(() => {
+    saved = { ...process.env };
+    resetEnvCache();
+  });
+  afterEach(() => {
+    process.env = saved;
+    resetEnvCache();
+  });
+
+  it('يرفض الإقلاع بالشركة الوهمية — صراحةً أو بغياب المتغيّر', () => {
+    for (const SHIPPING_CARRIER of ['fake', undefined]) {
+      resetEnvCache();
+      production({ SHIPPING_CARRIER });
+      expect(() => loadEnv()).toThrow(/شركة الشحن الوهمية ممنوعة في الإنتاج/);
+    }
+  });
+
+  it('يذكر الدفع والشحن معاً في رسالة واحدة', () => {
+    production({ PAYMENT_PROVIDER: 'fake', SHIPPING_CARRIER: 'fake' });
+    expect(() => loadEnv()).toThrow(/PAYMENT_PROVIDER.*SHIPPING_CARRIER/);
+  });
+
+  it('يرفض شركة لا يعرفها، ويُبقي الوهمية خارج الإنتاج', () => {
+    production({ NODE_ENV: 'development', SHIPPING_CARRIER: 'aramex' });
+    expect(() => loadEnv()).toThrow(/شركة غير معروفة/);
+    resetEnvCache();
+    production({ NODE_ENV: 'development', SHIPPING_CARRIER: undefined, PAYMENT_WEBHOOK_SECRET: undefined });
+    expect(loadEnv().shippingCarrier).toBe('fake');
+  });
+});
+
 describe('TRUST_PROXY — من يُصدَّق في X-Forwarded-For', () => {
   it('عدد أو عناوين أو نطاقات — وtrue والعنوان الفاسد مرفوضان', () => {
     expect(parseTrustProxy(undefined)).toBe(false);

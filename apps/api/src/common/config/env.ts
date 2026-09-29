@@ -28,6 +28,15 @@ export const PAYMENT_PROVIDERS = ['fake'] as const;
 export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
 /**
+ * شركات الشحن التي يعرف الخادم وصلها. الوهمية وحدها، وهي **ممنوعة في الإنتاج**
+ * كالدفع الوهمي: مهمتها تقدّم كل شحنة خطوة كل عشر دقائق حتى «سُلّم» (نحو أربعين
+ * دقيقة)، والتسليم يبدأ فترة الإرجاع ثم يحرّر مال البائع — تسليم لم يحدث يحرّر
+ * مالاً عن بضاعة لم تصل.
+ */
+export const SHIPPING_CARRIERS = ['fake'] as const;
+export type ShippingCarrierName = (typeof SHIPPING_CARRIERS)[number];
+
+/**
  * من يُصدَّق في X-Forwarded-For — يُمرَّر إلى Fastify فيحسب `req.ip` منه.
  *
  * بلا ضبط لا يُصدَّق أحد: `req.ip` عنوان الاتصال نفسه. خلف وسيط عكسي هذا
@@ -70,6 +79,7 @@ export interface Env {
   jwtRefreshTtl: string;
   nodeEnv: string;
   paymentProvider: PaymentProviderName;
+  shippingCarrier: ShippingCarrierName;
   /** محرّك البحث — اختياري: غيابه يُسقط البحث إلى قاعدة البيانات لا يُسقط المتجر (ADR-014) */
   meiliUrl: string;
   meiliKey: string;
@@ -95,13 +105,21 @@ export function loadEnv(): Env {
     }
   }
 
+  // المزوّدان الوهميان يُفحصان معاً: إقلاع إنتاج يرى كل ما ينقصه في رسالة واحدة
+  const problems: string[] = [];
   const paymentProvider = process.env['PAYMENT_PROVIDER'] || 'fake';
   if (!(PAYMENT_PROVIDERS as readonly string[]).includes(paymentProvider)) {
-    throw new EnvError([`PAYMENT_PROVIDER (مزوّد غير معروف: ${paymentProvider})`]);
+    problems.push(`PAYMENT_PROVIDER (مزوّد غير معروف: ${paymentProvider})`);
+  } else if (production && paymentProvider === 'fake') {
+    problems.push('PAYMENT_PROVIDER (المزوّد الوهمي ممنوع في الإنتاج — يقبل الدفع بلا خصم)');
   }
-  if (production && paymentProvider === 'fake') {
-    throw new EnvError(['PAYMENT_PROVIDER (المزوّد الوهمي ممنوع في الإنتاج — يقبل الدفع بلا خصم)']);
+  const shippingCarrier = process.env['SHIPPING_CARRIER'] || 'fake';
+  if (!(SHIPPING_CARRIERS as readonly string[]).includes(shippingCarrier)) {
+    problems.push(`SHIPPING_CARRIER (شركة غير معروفة: ${shippingCarrier})`);
+  } else if (production && shippingCarrier === 'fake') {
+    problems.push('SHIPPING_CARRIER (شركة الشحن الوهمية ممنوعة في الإنتاج — تعلّم كل شحنة مستلمة فتحرّر مال البائع)');
   }
+  if (problems.length > 0) throw new EnvError(problems);
 
   cached = {
     databaseUrl: process.env['DATABASE_URL'] as string,
@@ -112,6 +130,7 @@ export function loadEnv(): Env {
     jwtRefreshTtl: process.env['JWT_REFRESH_TTL'] ?? '30d',
     nodeEnv: process.env['NODE_ENV'] ?? 'development',
     paymentProvider: paymentProvider as PaymentProviderName,
+    shippingCarrier: shippingCarrier as ShippingCarrierName,
     meiliUrl: process.env['MEILI_URL'] ?? 'http://127.0.0.1:7701',
     meiliKey: process.env['MEILI_KEY'] ?? '',
     meiliIndex: process.env['MEILI_INDEX'] ?? 'products',
