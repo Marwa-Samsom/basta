@@ -447,6 +447,12 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     const up = multipart(png, 'banner.png', 'image/png');
     const img = await app.inject({ method: 'POST', url: '/api/v1/admin/banners/image', headers: { authorization: `Bearer ${limited.token}`, ...up.headers }, payload: up.payload });
     expect(img.statusCode, img.body).toBe(201);
+    // رابط لموقع آخر يلبس ثوب المسار: يُرفض عند الحفظ، ولا يُكتب صفّ
+    for (const linkUrl of ['//evil.com', '/\\evil.com', '/\t/evil.com']) {
+      const bad = await call('POST', '/admin/banners', limited.token, { placement: 'home_hero', imageKey: img.json().imageKey, linkUrl, titleAr: `خبيث ${SUFFIX}`, isActive: true });
+      expect(bad.statusCode, `${JSON.stringify(linkUrl)} ${bad.body}`).toBe(400);
+    }
+    expect(await prisma.banner.count({ where: { titleAr: `خبيث ${SUFFIX}` } })).toBe(0);
     const banner = await call('POST', '/admin/banners', limited.token, { placement: 'home_hero', imageKey: img.json().imageKey, linkUrl: '/categories', titleAr: `تخفيضات ${SUFFIX}`, isActive: true });
     expect(banner.statusCode, banner.body).toBe(201);
     const live = (await call('GET', '/storefront/banners?placement=home_hero')).json();

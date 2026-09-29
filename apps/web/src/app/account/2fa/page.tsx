@@ -7,13 +7,14 @@ import { Icon } from '@/components/icons';
 import { RecoveryCodes } from '@/components/recovery-codes';
 import { Alert, Field, Spinner, TextInput } from '@/components/ui';
 import { api, ApiError, session } from '@/lib/api';
+import { internalPath } from '@/lib/safe-path';
 
 const still = () => () => undefined;
 
 /** مسار داخلي في الحساب أو لوحة البائع وحده — لا إعادة توجيه مفتوحة إلى موقع آخر */
 function backFromUrl(): string {
-  const next = new URLSearchParams(window.location.search).get('next');
-  return next && /^\/(account|vendor)(\/[\w\-/?=&]*)?$/.test(next) ? next : '/account';
+  const next = internalPath(new URLSearchParams(window.location.search).get('next'));
+  return next && /^\/(account|vendor)([/?]|$)/.test(next) ? next : '/account';
 }
 
 /**

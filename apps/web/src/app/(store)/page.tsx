@@ -6,6 +6,7 @@ import { InstallPrompt } from '@/components/install-prompt';
 import { ProductGrid } from '@/components/product-card';
 import { RecentSection } from '@/components/recent';
 import { EmptyState } from '@/components/ui';
+import { internalPath } from '@/lib/safe-path';
 import { getBanners, getCampaigns, getCategories, getFeatured, imageUrl, listProducts, type Campaign, type ProductCard } from '@/lib/storefront';
 
 /**
@@ -73,6 +74,8 @@ export default async function HomePage() {
 
   const banner = banners[0];
   const bannerSrc = banner ? imageUrl(banner.imageUrl) : null;
+  // رابط محفوظ قبل تشديد التحقق قد يكون `//موقع-آخر` — يُعاد فحصه عند العرض
+  const bannerHref = internalPath(banner?.linkUrl);
   const isEmpty = latest.items.length === 0;
   const tiles = categories.slice(0, CATEGORY_TILES);
   const shops = shopsOf([...featured, ...latest.items]);
@@ -93,8 +96,8 @@ export default async function HomePage() {
               ? 'أول المتاجر تنضم هذه الأيام. تصفّح الأقسام لترى ما وصل، وسجّل متجرك إن كنت تاجراً.'
               : 'اشترِ من بائعين حقيقيين، بعملة بلدك، وتابع كل طلب من متجره.'}
           </p>
-          {banner?.linkUrl ? (
-            <Link href={banner.linkUrl} className="btn btn--on-brand btn--lg sd-hero__cta">
+          {bannerHref ? (
+            <Link href={bannerHref} className="btn btn--on-brand btn--lg sd-hero__cta">
               تسوّق الآن
               <Icon name="next" size={17} mirror />
             </Link>
