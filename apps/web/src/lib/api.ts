@@ -225,6 +225,25 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   return (await res.json()) as T;
 }
 
+/**
+ * الخروج — الخادم أولاً: يُبطل رمز التحديث ويمسح كوكيه، فيسقط رمز الوصول معه
+ * في الطلب التالي (يُفحص مع القاعدة). المسح المحلي وحده كان يُخفي الجلسة عن
+ * الواجهة ويتركها حيّة ثلاثين يوماً على جهاز قد يكون مشتركاً.
+ *
+ * تعذّر الطلب يُرمى ولا يُمسح شيء: جهاز يظنّ صاحبه أنه خرج وجلسته حيّة أسوأ
+ * من رسالة تقول «حاول مرة أخرى».
+ */
+export async function logout(): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${sessionBase()}/auth/logout`, { method: 'POST', credentials: 'include' });
+  } catch {
+    throw new ApiError(0, 'تعذّر الخروج — لا اتصال بالخادم. تحقّق من الشبكة وحاول مرة أخرى.');
+  }
+  if (!res.ok) throw await ApiError.from(res);
+  session.clear();
+}
+
 /** ملف من الخادم بجلسة المستخدم — كشف الحساب CSV. التنزيل يبقى في المتصفّح */
 export async function apiBlob(path: string): Promise<Blob> {
   const before = session.read();

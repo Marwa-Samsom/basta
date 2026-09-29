@@ -9,6 +9,7 @@ import '@/styles/screens/vendor-onboarding.css';
 import { Alert, Spinner } from '@/components/ui';
 import { useOnboarding } from '@/lib/vendor';
 import { NotificationBell } from '@/components/notification-bell';
+import { LogoutButton } from '@/components/logout-button';
 import { DashIdent, DashShell, type DashNavGroup } from '@/components/dash-shell';
 import { Icon } from '@/components/icons';
 
@@ -106,6 +107,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
       groups={NAV}
       tools={<NotificationBell />}
+      sideFoot={
+        <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login">
+          خروج
+        </LogoutButton>
+      }
       banner={
         data.status === 'in_review' ? (
           <Alert tone="info" title="متجرك قيد المراجعة">
