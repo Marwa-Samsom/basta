@@ -1,6 +1,12 @@
 /**
  * بذور بسطة — القيم المؤسِّسة التي حسمتها المرحلة 01.
  * عديمة الأثر عند التكرار: تشغيلها مرتين لا يضاعف شيئاً.
+ *
+ * **تُنشئ ما غاب ولا تكتب فوق ما وُجد.** كل ما هنا تحرّره الإدارة بعد الإطلاق —
+ * الإعدادات والعملات وأسماء الفئات والسمات وإلزاميتها. كانت upsert تكتب القيمة
+ * المؤسِّسة فوق الحيّة، فتشغيل البذور في الإنتاج (خطوة في قائمة الإطلاق) يعيد
+ * العمولة وفترة التعليق والحدّ الأدنى للسحب إلى افتراضها بصمت. تغيير قيمة قائمة
+ * مكانه اللوحة أو مهاجرة صريحة، لا البذور.
  */
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -108,7 +114,7 @@ const CATEGORY_ATTRIBUTES: readonly (readonly [slug: string, code: string, isReq
 async function main() {
   console.log('▸ العملات');
   for (const c of CURRENCIES) {
-    await prisma.currency.upsert({ where: { code: c.code }, update: c, create: c });
+    await prisma.currency.upsert({ where: { code: c.code }, update: {}, create: c });
   }
 
   /**
@@ -139,7 +145,7 @@ async function main() {
   for (const [key, value] of SETTINGS) {
     await prisma.setting.upsert({
       where: { key },
-      update: { valueJson: value as never },
+      update: {},
       create: { key, valueJson: value as never },
     });
   }
@@ -158,7 +164,7 @@ async function main() {
   for (const [i, c] of CATEGORIES.entries()) {
     const cat = await prisma.category.upsert({
       where: { slug: c.slug },
-      update: { nameAr: c.nameAr },
+      update: {},
       create: { slug: c.slug, nameAr: c.nameAr, path: `/${i + 1}/`, depth: 0, sort: i },
     });
     const rule = await prisma.commissionRule.findFirst({
@@ -189,10 +195,7 @@ async function main() {
   for (const [i, c] of SUBCATEGORIES.entries()) {
     const parent = await prisma.category.findUniqueOrThrow({ where: { slug: c.parent } });
     const existing = await prisma.category.findUnique({ where: { slug: c.slug } });
-    if (existing) {
-      await prisma.category.update({ where: { id: existing.id }, data: { nameAr: c.nameAr, nameEn: c.nameEn } });
-      continue;
-    }
+    if (existing) continue;
     const id = randomUUID();
     await prisma.category.create({
       data: {
@@ -205,7 +208,7 @@ async function main() {
   console.log('▸ السمات وقيمها');
   for (const a of ATTRIBUTES) {
     const { values, ...fields } = a;
-    const attribute = await prisma.attribute.upsert({ where: { code: a.code }, update: fields, create: fields });
+    const attribute = await prisma.attribute.upsert({ where: { code: a.code }, update: {}, create: fields });
     const known = new Set(
       (await prisma.attributeValue.findMany({ where: { attributeId: attribute.id }, select: { valueAr: true } }))
         .map((v) => v.valueAr),
@@ -224,7 +227,7 @@ async function main() {
     const attribute = await prisma.attribute.findUniqueOrThrow({ where: { code } });
     await prisma.categoryAttribute.upsert({
       where: { categoryId_attributeId: { categoryId: category.id, attributeId: attribute.id } },
-      update: { isRequired },
+      update: {},
       create: { categoryId: category.id, attributeId: attribute.id, isRequired },
     });
   }
