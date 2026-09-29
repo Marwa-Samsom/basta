@@ -197,8 +197,11 @@ describe('بوابة 07 · البحث العربي', () => {
 
   it('أوجه البحث تعدّ المطابقات لا المتجر كله', async () => {
     if (!dbUp || !meiliUp) return;
-    const res = await app.inject({ method: 'GET', ...api('/storefront/products?q=قمييص') });
+    // مقصورة على متجر الاختبار: قاعدة التطوير تتراكم فيها متاجر كل تشغيل، والمحرّك يعيد
+    // مئة قيمة لكل وجه على الأكثر — فبحث عام يتجاوزها ويعدّ ما لا تُظهره الأوجه
+    const res = await app.inject({ method: 'GET', ...api(`/storefront/products?q=قمييص&vendorId=${vendorId}`) });
     const body = res.json() as { total: number; facets: { vendors: { count: number }[] } };
+    expect(body.total).toBeGreaterThan(0);
     const counted = body.facets.vendors.reduce((sum, v) => sum + v.count, 0);
     // كل منتج لبائع واحد: مجموع عدّاد البائعين هو عدد المطابقات بالضبط
     expect(counted).toBe(body.total);
@@ -333,8 +336,14 @@ describe('الأوجه والتصفية', () => {
     const res = await app.inject({ method: 'GET', ...api(`/storefront/products?vendorId=${vendorId}&minPrice=20000&maxPrice=50000`) });
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json().engine).toBe('db');
-    // قميص 19,900 تحت الأدنى، وعطر 120,000 فوق الأعلى — تبقى السمّاعة وحدها
-    expect(res.json().items.map((i: { nameAr: string }) => i.nameAr)).toEqual(['سمّاعة لاسلكية']);
+    // قميص 19,900 تحت الأدنى، وعطر 120,000 فوق الأعلى، والسمّاعة 45,000 بينهما. اختبارات
+    // البحث في الملف تنشر للمتجر نفسه منتجات أخرى — يُفحص الشرط لا القائمة بعينها
+    const items = res.json().items as { nameAr: string; price: { minorUnits: string } }[];
+    expect(items.map((i) => i.nameAr)).toContain('سمّاعة لاسلكية');
+    expect(items.map((i) => i.nameAr)).not.toContain('قميص قطني أزرق');
+    expect(items.map((i) => i.nameAr)).not.toContain('عطر أحمد الملكي');
+    for (const i of items) expect(Number(i.price.minorUnits)).toBeGreaterThanOrEqual(20_000);
+    for (const i of items) expect(Number(i.price.minorUnits)).toBeLessThanOrEqual(50_000);
   });
 
   it('الفهرس يسقط إلى قاعدة البيانات لا إلى صفحة خطأ', async () => {
