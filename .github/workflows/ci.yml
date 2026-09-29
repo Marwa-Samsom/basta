@@ -4,6 +4,11 @@ on:
   push: { branches: [main] }
   pull_request: { branches: [main] }
 
+# أقلّ صلاحية للرمز GITHUB_TOKEN: الفحوص تقرأ الكود ولا تكتب شيئاً. الافتراضي في
+# المستودعات القديمة قراءة وكتابة لكل شيء — خطوة أو اعتماد مخترَق يدفع إلى الفروع
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -12,13 +17,16 @@ env:
   NODE_VERSION: '22'
   TZ: UTC
 
+# الإجراءات مثبّتة على commit لا على وسم: الوسم (v7) يُنقل، فمن يملك مستودع الإجراء أو
+# يخترقه يغيّر ما يعمل هنا بلا أثر في هذا الملف. Dependabot يقترح التحديث (.github/dependabot.yml)
 jobs:
   quality:
     name: فحص الأنواع والنمط والحدود
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: '22', cache: npm }
       - run: npm ci
       - run: npm run db:generate
@@ -30,7 +38,8 @@ jobs:
     name: حرّاس الرموز والاتجاه
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
 
       # نظام التصميم: كل لون يأتي من رمز، ولا قيمة صريحة في مكوّن
       - name: لا قيم لون صريحة خارج tokens.css
@@ -58,6 +67,14 @@ jobs:
           if grep -rIn 'outline:\s*none' --include='*.css' --include='*.tsx' \
                apps/web/src src/styles 2>/dev/null | grep -v 'focus-visible'; then
             echo "::error::إلغاء التركيز بلا بديل مرئي"
+            exit 1
+          fi
+
+      # سلسلة التوريد: إجراء بوسم (v7) أو فرع يتغيّر تحتنا — كل uses مثبّت على commit
+      - name: كل إجراء مثبّت على commit
+        run: |
+          if grep -rhnE '^\s*-?\s*uses:' .github/workflows | grep -vE 'uses:\s*\./|@[0-9a-f]{40}(\s|$)'; then
+            echo "::error::إجراء غير مثبّت على SHA — ثبّته وضع وسمه في تعليق بجانبه"
             exit 1
           fi
 
@@ -100,8 +117,9 @@ jobs:
       JWT_REFRESH_SECRET: ci_refresh_secret_not_for_production_00
       NODE_ENV: test
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: '22', cache: npm }
       - run: npm ci
       - run: npm run db:generate
@@ -122,8 +140,9 @@ jobs:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:9/api/v1
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: '22', cache: npm }
       - run: npm ci
       - run: npm run db:generate
