@@ -1,5 +1,6 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import type { Prisma } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { decideRotation } from '../domain/token-family';
@@ -18,6 +19,9 @@ export interface AccessClaims {
    */
   sid?: string;
 }
+
+/** الحجز الشرطي لم يطابق صفاً: طلب متزامن دوّر الرمز قبلنا. يُرجع المعاملة */
+class LostRotationRace extends Error {}
 
 export interface TokenPair {
   accessToken: string;
@@ -49,6 +53,16 @@ export class TokenService {
     // النوع صريح: `randomUUID` يُرجع نوعاً حرفياً يضيّق المعامل بلا داعٍ
     familyId: string = randomUUID(),
   ): Promise<TokenPair> {
+    return (await this.issueIn(this.prisma, claims, meta, familyId)).pair;
+  }
+
+  /** الإصدار داخل معاملة المستدعي — ويعيد معرّف صف رمز التحديث ليُربط بسلفه */
+  private async issueIn(
+    db: Prisma.TransactionClient,
+    claims: AccessClaims,
+    meta: { userAgent?: string | undefined; ip?: string | undefined },
+    familyId: string,
+  ): Promise<{ pair: TokenPair; id: string }> {
     const env = loadEnv();
     const accessToken = await this.jwt.signAsync({ ...claims, sid: familyId }, {
       secret: env.jwtAccessSecret,
@@ -56,7 +70,7 @@ export class TokenService {
     });
 
     const refreshToken = randomBytes(48).toString('base64url');
-    await this.prisma.refreshToken.create({
+    const row = await db.refreshToken.create({
       data: {
         userId: claims.sub,
         tokenHash: TokenService.hash(refreshToken),
@@ -65,9 +79,10 @@ export class TokenService {
         userAgent: meta.userAgent ?? null,
         ip: meta.ip ?? null,
       },
+      select: { id: true },
     });
 
-    return { accessToken, refreshToken, expiresIn: 900 };
+    return { pair: { accessToken, refreshToken, expiresIn: 900 }, id: row.id };
   }
 
   /**
@@ -75,17 +90,41 @@ export class TokenService {
    *
    * وصول رمز مُبطَل يعني يقيناً أن نسخة منه بيد طرفين. عندها تُبطَل
    * العائلة كلها ويُطرد الاثنان — تسجيل خروج مزعج مرة، أفضل من حساب
-   * مسروق بصمت.
+   * مسروق بصمت. إلا تبويباً ثانياً من الجهاز نفسه جاء في اللحظة نفسها
+   * (token-family): يسمع 409 بلا رموز، ويقرأ ما كتبه أخوه.
+   *
+   * الحجز والإصدار معاملة واحدة، والحجز كتابة شرطية على `revokedAt IS NULL`:
+   * طلبان متزامنان بالرمز نفسه يفوز أحدهما، ويرى الآخر صفاً محجوزاً فيُعامَل
+   * بقاعدة الرمز المُبطَل — لا جلستان صالحتان من رمز واحد. وفشل الإصدار
+   * يُرجع الحجز، فلا يضيع الرمز القديم بلا بديل.
    */
   async rotate(
     presented: string,
     meta: { userAgent?: string | undefined; ip?: string | undefined },
     buildClaims: (userId: string) => Promise<AccessClaims>,
+    attempt = 0,
   ): Promise<TokenPair> {
     const tokenHash = TokenService.hash(presented);
     const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
-    const outcome = decideRotation(stored, new Date());
 
+    let sameClient = false;
+    if (stored?.revokedAt && stored.replacedById) {
+      const successor = await this.prisma.refreshToken.findUnique({
+        where: { id: stored.replacedById },
+        select: { userAgent: true, ip: true },
+      });
+      sameClient =
+        !!successor && successor.userAgent === (meta.userAgent ?? null) && successor.ip === (meta.ip ?? null);
+    }
+    const outcome = decideRotation(stored, new Date(), sameClient);
+
+    if (outcome.kind === 'concurrent') {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'REFRESH_ROTATED',
+        message: 'جُدّدت جلستك للتوّ من نافذة أخرى. استعمل الرمز الجديد.',
+      });
+    }
     if (outcome.kind === 'reuse_detected') {
       await this.revokeFamily(outcome.familyId);
       throw new UnauthorizedException(
@@ -97,15 +136,23 @@ export class TokenService {
     }
 
     const claims = await buildClaims(stored.userId);
-    const pair = await this.issue(claims, meta, outcome.familyId);
-
-    // الإبطال بعد الإصدار: لو فشل الإصدار بقي الرمز القديم صالحاً
-    await this.prisma.refreshToken.update({
-      where: { id: outcome.previousTokenId },
-      data: { revokedAt: new Date() },
+    const won = await this.prisma.$transaction(async (tx) => {
+      const next = await this.issueIn(tx, claims, meta, outcome.familyId);
+      const { count } = await tx.refreshToken.updateMany({
+        where: { id: outcome.previousTokenId, revokedAt: null },
+        data: { revokedAt: new Date(), replacedById: next.id },
+      });
+      if (count === 0) throw new LostRotationRace();
+      return next.pair;
+    }).catch((err: unknown) => {
+      if (err instanceof LostRotationRace) return null;
+      throw err;
     });
+    if (won) return won;
 
-    return pair;
+    // سبقه طلب متزامن بالرمز نفسه — يُعاد الحكم على الرمز وقد صار محجوزاً (مرة واحدة)
+    if (attempt > 0) throw new UnauthorizedException('انتهت جلستك. سجّل الدخول من جديد.');
+    return this.rotate(presented, meta, buildClaims, attempt + 1);
   }
 
   async revokeFamily(familyId: string): Promise<void> {

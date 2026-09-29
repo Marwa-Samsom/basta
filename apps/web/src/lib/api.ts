@@ -133,17 +133,46 @@ async function raw(path: string, options: RequestOptions, token: string | null):
  */
 let inFlight: Promise<Tokens | null> | null = null;
 
-function refresh(): Promise<Tokens | null> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * والتبويبات تتشارك الرمز في localStorage، فوعد التبويب الواحد لا يكفي: قفل
+ * باسم واحد (Web Locks) يسلسل التجديد بينها. من يدخل القفل ثانياً يجد أن
+ * الرمز تغيّر عمّا رآه حين فشل طلبه — جدّده أخوه — فيأخذه ولا يجدّد ثانيةً.
+ * ومتصفّح بلا Web Locks يسمع من الخادم 409 «جُدّد للتوّ» فينتظر ما يكتبه أخوه.
+ */
+function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  // نوع lib.dom يلفّ ردّ الدالة غير المتزامنة بوعد ثانٍ؛ القفل يعيد قيمتها المنتظَرة فعلاً
+  return locks ? (locks.request('basta.refresh', fn) as unknown as Promise<T>) : fn();
+}
+
+function refresh(seen: string | null): Promise<Tokens | null> {
   if (inFlight) return inFlight;
 
-  inFlight = (async () => {
+  inFlight = withRefreshLock(async () => {
     const current = session.read();
     if (!current) return null;
+    // تبويب آخر جدّد بعد أن فشل طلبنا وقبل أن ندخل القفل
+    if (seen && current.refreshToken !== seen) return current;
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ refreshToken: current.refreshToken }),
     });
+    if (res.status === 409) {
+      // دوّره تبويب آخر في اللحظة نفسها — الجلسة سليمة، وخلفه يُكتب الآن
+      for (let i = 0; i < 20; i++) {
+        const now = session.read();
+        if (!now) return null;
+        if (now.refreshToken !== current.refreshToken) return now;
+        await sleep(100);
+      }
+      // لم يكتب أحد خلفاً: ضاع ردّ التجديد الأول في الطريق (انقطاع، إغلاق، إعادة
+      // تحميل) والخادم دوّر الرمز. البقاء على رمز ميت أسوأ من دخول جديد
+      session.clear();
+      return null;
+    }
     if (!res.ok) {
       session.clear();
       return null;
@@ -152,7 +181,7 @@ function refresh(): Promise<Tokens | null> {
     const tokens = data.tokens ?? (data as Tokens);
     session.write(tokens);
     return tokens;
-  })().finally(() => {
+  }).finally(() => {
     inFlight = null;
   });
 
@@ -161,12 +190,13 @@ function refresh(): Promise<Tokens | null> {
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const needsAuth = options.auth !== false;
-  let token = needsAuth ? (session.read()?.accessToken ?? null) : null;
+  const before = needsAuth ? session.read() : null;
+  let token = before?.accessToken ?? null;
 
   let res = await raw(path, options, token);
 
   if (res.status === 401 && needsAuth) {
-    const renewed = await refresh();
+    const renewed = await refresh(before?.refreshToken ?? null);
     if (renewed) {
       token = renewed.accessToken;
       res = await raw(path, options, token);
@@ -180,10 +210,11 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 
 /** ملف من الخادم بجلسة المستخدم — كشف الحساب CSV. التنزيل يبقى في المتصفّح */
 export async function apiBlob(path: string): Promise<Blob> {
-  let token = session.read()?.accessToken ?? null;
+  const before = session.read();
+  let token = before?.accessToken ?? null;
   let res = await raw(path, {}, token);
   if (res.status === 401) {
-    const renewed = await refresh();
+    const renewed = await refresh(before?.refreshToken ?? null);
     if (renewed) {
       token = renewed.accessToken;
       res = await raw(path, {}, token);

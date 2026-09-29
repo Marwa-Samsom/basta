@@ -21,7 +21,7 @@ import {
   verifyPassword,
   WeakPasswordError,
 } from './domain/password';
-import { decideRotation, type StoredToken } from './domain/token-family';
+import { CONCURRENT_REFRESH_GRACE_MS, decideRotation, type StoredToken } from './domain/token-family';
 
 // ---------- فاعلون للاختبار ----------
 const VENDOR_A = 'vendor-aaa';
@@ -287,5 +287,31 @@ describe('تدوير رموز التحديث', () => {
   it('الرمز المنتهي في هذه اللحظة بالضبط يُرفض', () => {
     const exact = { ...base, expiresAt: now };
     expect(decideRotation(exact, now).kind).toBe('expired');
+  });
+
+  describe('مهلة التزامن — تبويبان من الجهاز نفسه', () => {
+    const rotated = (msAgo: number) => ({
+      ...base,
+      revokedAt: new Date(now.getTime() - msAgo),
+      replacedById: 't2',
+    });
+
+    it('دُوِّر للتوّ وعاد من الجهاز الذي أخذ خلفه: تزامن لا سرقة', () => {
+      expect(decideRotation(rotated(2_000), now, true).kind).toBe('concurrent');
+      expect(decideRotation(rotated(CONCURRENT_REFRESH_GRACE_MS), now, true).kind).toBe('concurrent');
+    });
+
+    it('من جهاز آخر ولو في المهلة: سرقة', () => {
+      expect(decideRotation(rotated(2_000), now, false).kind).toBe('reuse_detected');
+    });
+
+    it('بعد المهلة ولو من الجهاز نفسه: سرقة', () => {
+      expect(decideRotation(rotated(CONCURRENT_REFRESH_GRACE_MS + 1), now, true).kind).toBe('reuse_detected');
+    });
+
+    it('أُبطل بخروج لا بتدوير (بلا خلف): سرقة ولو للتوّ ومن الجهاز نفسه', () => {
+      const loggedOut = { ...base, revokedAt: new Date(now.getTime() - 1_000), replacedById: null };
+      expect(decideRotation(loggedOut, now, true).kind).toBe('reuse_detected');
+    });
   });
 });

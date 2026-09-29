@@ -133,6 +133,8 @@ model RefreshToken {
   familyId  String    @db.Uuid
   expiresAt DateTime  @db.Timestamptz
   revokedAt DateTime? @db.Timestamptz
+  /// من حلّ محلّه بالتدوير — يميّز «دُوِّر» عن «أُبطل»، ويعرّف جهاز الخلف لمهلة التزامن
+  replacedById String? @db.Uuid
   userAgent String?
   ip        String?
   createdAt DateTime  @default(now()) @db.Timestamptz

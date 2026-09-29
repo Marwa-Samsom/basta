@@ -320,3 +320,62 @@ describe('ST-25 · الملف وكلمة المرور والجلسات', () => {
     await login('chpw', NEW);
   });
 });
+
+describe('تدوير رمز التحديث تحت التزامن', () => {
+  const refresh = (refreshToken: string, ua = 'vitest-agent') => call('POST', '/auth/refresh', { body: { refreshToken }, ua });
+
+  it('خمسة تجديدات متزامنة بالرمز نفسه: جلسة واحدة لا خمس، والبقية 409 بلا إنهاء الجلسة', async () => {
+    if (!dbUp) return;
+    const userId = await register('rot-race');
+    const s = await login('rot-race');
+
+    const results = await Promise.all(Array.from({ length: 5 }, () => refresh(s.refreshToken)));
+    const ok = results.filter((r) => r.statusCode === 200);
+    expect(ok, results.map((r) => `${r.statusCode} ${r.body}`).join('\n')).toHaveLength(1);
+    expect(results.filter((r) => r.statusCode === 409)).toHaveLength(4);
+    expect(results.find((r) => r.statusCode === 409)!.json().code).toBe('REFRESH_ROTATED');
+
+    // رمز واحد حيّ في العائلة — خلف الفائز — والجلسة لم تُنهَ
+    const live = await prisma.refreshToken.findMany({ where: { userId, revokedAt: null } });
+    expect(live).toHaveLength(1);
+    const next = ok[0]!.json().refreshToken as string;
+    expect((await refresh(next)).statusCode).toBe(200);
+  });
+
+  it('الرمز المدوَّر من جهاز آخر — ولو في المهلة — سرقة: تُنهى العائلة', async () => {
+    if (!dbUp) return;
+    const userId = await register('rot-thief');
+    const s = await login('rot-thief');
+    const first = await refresh(s.refreshToken);
+    expect(first.statusCode).toBe(200);
+
+    const thief = await refresh(s.refreshToken, 'curl/8.0 attacker');
+    expect(thief.statusCode).toBe(401);
+    expect(thief.json().message).toMatch(/استعمال مكرّر/);
+    expect(await prisma.refreshToken.count({ where: { userId, revokedAt: null } })).toBe(0);
+    expect((await refresh(first.json().refreshToken)).statusCode).toBe(401);
+  });
+
+  it('بعد المهلة ولو من الجهاز نفسه: سرقة', async () => {
+    if (!dbUp) return;
+    const userId = await register('rot-late');
+    const s = await login('rot-late');
+    expect((await refresh(s.refreshToken)).statusCode).toBe(200);
+    // التدوير «حدث» قبل دقيقة
+    await prisma.refreshToken.updateMany({
+      where: { userId, replacedById: { not: null } },
+      data: { revokedAt: new Date(Date.now() - 60_000) },
+    });
+    const late = await refresh(s.refreshToken);
+    expect(late.statusCode).toBe(401);
+    expect(await prisma.refreshToken.count({ where: { userId, revokedAt: null } })).toBe(0);
+  });
+
+  it('رمز خرج صاحبه به لا يُعدّ تزامناً ولو للتوّ', async () => {
+    if (!dbUp) return;
+    await register('rot-logout');
+    const s = await login('rot-logout');
+    expect((await call('POST', '/auth/logout', { token: s.accessToken, body: { refreshToken: s.refreshToken } })).statusCode).toBeLessThan(300);
+    expect((await refresh(s.refreshToken)).statusCode).toBe(401);
+  });
+});
