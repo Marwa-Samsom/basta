@@ -377,7 +377,7 @@ describe('سقف خصم النسبة — للطلب كله، بعملة الكو
     const vendors = new Map([['j', vendor('j', 'JOD')], ['u', vendor('u', 'USD')]]);
     const shipping = new Map([['j', ship(0n)], ['u', ship(0n)]]);
     const cart = priceCart({
-      lines: [line('j', 100_000n, 1), line('u', 30_000n, 1)], // 100 دينار و 300 دولار
+      lines: [line('j', 100_000n, 1), line('u', 30_000n, 1)], // مئة دينار وثلاثمئة دولار
       vendors,
       shipping,
       tax,
