@@ -205,7 +205,9 @@ export class VendorReportsService {
       const head = Object.keys(sec.rows[0] ?? {});
       ws.addRow(head).font = { bold: true };
       for (const row of sec.rows) ws.addRow(head.map((h) => row[h]));
-      ws.columns.forEach((c) => (c.width = 18));
+      // ورقة بلا أسطر (بائع بلا مبيعات في المدى) لا أعمدة لها: ws.columns فيها null، فكان
+      // التصدير يسقط 500 لكل بائع جديد
+      for (let i = 1; i <= head.length; i++) ws.getColumn(i).width = 18;
     }
     return Buffer.from(await wb.xlsx.writeBuffer());
   }

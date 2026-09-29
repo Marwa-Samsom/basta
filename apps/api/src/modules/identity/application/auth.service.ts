@@ -114,7 +114,10 @@ export class AuthService {
     const email = normalizeEmail(input.email);
     const passwordHash = await hashPassword(input.password);
 
-    const existing = await this.prisma.user.findUnique({ where: { email } });
+    // الهاتف فريد كالبريد — كان المكرّر يصل القيد في القاعدة فيرمي 500، والرسالة نفسها لا تكشف أيّهما
+    const existing =
+      (await this.prisma.user.findUnique({ where: { email } })) ??
+      (input.phone ? await this.prisma.user.findUnique({ where: { phone: input.phone } }) : null);
     if (existing) {
       /**
        * الرد نفسه للبريد المستعمل وغير المستعمل من ناحية المستخدم

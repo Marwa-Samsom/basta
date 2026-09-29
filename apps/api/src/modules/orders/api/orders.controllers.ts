@@ -35,6 +35,7 @@ import { CurrentActor, RequirePermission, Roles } from '../../../common/security
 import { OrderLifecycleService } from '../application/order-lifecycle.service';
 import { OrderQueryService } from '../application/order-query.service';
 import type { SubOrderStatus } from '../domain/state-machine';
+import { SubOrderStatus as SubOrderStatuses } from '@prisma/client';
 
 const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('الطلب غير موجود.') });
 
@@ -74,6 +75,7 @@ export class TransitionDto {
 export class VendorOrdersQueryDto {
   @IsOptional()
   @IsString()
+  @IsIn(Object.values(SubOrderStatuses), { message: 'حالة الطلب غير معروفة.' })
   status?: string;
 
   @IsOptional()

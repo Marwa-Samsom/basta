@@ -18,6 +18,8 @@ import { ForbiddenActorError, vendorScopeOf, type Actor } from '../../../common/
 import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
 import { FinanceService } from '../application/finance.service';
 import { ReleaseScheduler } from '../application/release-scheduler';
+import { assertOneOf, IsCalendarDate } from '../../../common/validation';
+import { PayoutStatus } from '@prisma/client';
 
 const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('المورد غير موجود.') });
 
@@ -49,11 +51,11 @@ export class StatementQueryDto {
   currency!: string;
 
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsCalendarDate()
   from?: string;
 
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsCalendarDate()
   to?: string;
 
   /** آخر قيد في الصفحة السابقة (nextCursor) — الكشف صفحات */
@@ -153,7 +155,7 @@ export class AdminFinanceController {
   @Get('payouts')
   @RequirePermission('payouts.approve')
   payouts(@Query('status') status?: string) {
-    return this.finance.payouts({ ...(status ? { status } : {}) });
+    return this.finance.payouts({ ...(status ? { status: assertOneOf(status, Object.values(PayoutStatus), 'حالة السحب') } : {}) });
   }
 
   @Post('payouts/:id/approve')

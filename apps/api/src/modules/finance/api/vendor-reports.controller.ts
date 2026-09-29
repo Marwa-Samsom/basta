@@ -5,6 +5,7 @@ import { IsOptional, Matches } from 'class-validator';
 import { ForbiddenActorError, vendorScopeOf, type Actor } from '../../../common/security/actor';
 import { CurrentActor, Roles } from '../../../common/security/decorators';
 import { VendorReportsService, reportRange } from '../application/vendor-reports.service';
+import { IsCalendarDate } from '../../../common/validation';
 
 function vendorIdOf(actor: Actor): string {
   try {
@@ -17,11 +18,11 @@ function vendorIdOf(actor: Actor): string {
 
 export class ReportQueryDto {
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsCalendarDate()
   from?: string;
 
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsCalendarDate()
   to?: string;
 }
 

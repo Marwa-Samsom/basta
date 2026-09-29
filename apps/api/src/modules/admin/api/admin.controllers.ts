@@ -42,6 +42,8 @@ import { OperationsService } from '../application/operations.service';
 import { ReportsService, type Range } from '../application/reports.service';
 import { PERMISSIONS } from '../domain/permissions';
 import { NormalizeEmail } from '../../../common/email';
+import { assertOneOf, isCalendarDate } from '../../../common/validation';
+import { OrderStatus } from '@prisma/client';
 
 const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('المورد غير موجود.') });
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,7 +52,8 @@ const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 
 /** الفترة: من بداية يوم «من» إلى نهاية يوم «إلى» (أو لحظة محدّدة)؛ افتراضياً آخر 30 يوماً */
 function rangeOf(from?: string, to?: string): Range {
-  const ok = (v?: string) => !v || DATE.test(v) || INSTANT.test(v);
+  // يوم حقيقي لا صيغته وحدها: 2026-13-01 كان Invalid Date يصل Prisma فيرمي 500
+  const ok = (v?: string) => !v || (DATE.test(v) ? isCalendarDate(v) : INSTANT.test(v) && !Number.isNaN(Date.parse(v)));
   if (!ok(from) || !ok(to)) throw new InvalidInputError('التاريخ بصيغة YYYY-MM-DD.');
   const toDate = !to ? new Date() : INSTANT.test(to) ? new Date(to) : new Date(new Date(`${to}T00:00:00.000Z`).getTime() + 86_400_000);
   const fromDate = !from ? new Date(toDate.getTime() - 30 * 86_400_000) : INSTANT.test(from) ? new Date(from) : new Date(`${from}T00:00:00.000Z`);
@@ -420,7 +423,11 @@ export class AdminOperationsController {
   @Get('orders')
   @RequirePermission('orders.manage')
   orders(@Query('q') q?: string, @Query('status') status?: string, @Query('page') page?: string) {
-    return this.ops.orders({ ...(q ? { search: q } : {}), ...(status ? { status } : {}), page: Number(page) || 1 });
+    return this.ops.orders({
+      ...(q ? { search: q } : {}),
+      ...(status ? { status: assertOneOf(status, Object.values(OrderStatus), 'حالة الطلب') } : {}),
+      page: Number(page) || 1,
+    });
   }
 
   @Get('returns')
