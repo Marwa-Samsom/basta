@@ -41,6 +41,7 @@ import { BANNER_PLACEMENTS, ContentService, type CouponInput } from '../applicat
 import { OperationsService } from '../application/operations.service';
 import { ReportsService, type Range } from '../application/reports.service';
 import { PERMISSIONS } from '../domain/permissions';
+import { NormalizeEmail } from '../../../common/email';
 
 const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('المورد غير موجود.') });
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -58,6 +59,7 @@ function rangeOf(from?: string, to?: string): Range {
 }
 
 export class GrantDto {
+  @NormalizeEmail()
   @IsString()
   @MaxLength(200)
   email!: string;

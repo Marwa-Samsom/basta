@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password';
+import { NormalizeEmail } from '../../../../common/email';
 
 /** قاعدة كلمة المرور نفسها في التسجيل — لا قاعدتان لشيء واحد */
 const PASSWORD_RULE = [MIN_PASSWORD_LENGTH, 200, { message: `كلمة المرور من ${MIN_PASSWORD_LENGTH} محارف على الأقل.` }] as const;
@@ -42,12 +43,14 @@ export class VerifyCodeDto {
 
 export class ForgotPasswordDto {
   @ApiProperty()
+  @NormalizeEmail()
   @IsEmail({}, { message: 'صيغة البريد غير صحيحة.' })
   email!: string;
 }
 
 export class ResetPasswordDto {
   @ApiProperty()
+  @NormalizeEmail()
   @IsEmail({}, { message: 'صيغة البريد غير صحيحة.' })
   email!: string;
 

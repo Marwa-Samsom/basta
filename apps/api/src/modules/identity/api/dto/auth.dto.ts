@@ -1,12 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password';
+import { NormalizeEmail } from '../../../../common/email';
 
 /** رمز التطبيق (ستة أرقام)، أو رمز الاستعادة بشرطة أو بدونها وبأي حالة أحرف */
 const SECOND_FACTOR = /^(\d{6}|[A-Za-z0-9]{5}-?[A-Za-z0-9]{5})$/;
 
 export class RegisterDto {
   @ApiProperty({ example: 'noor@example.com' })
+  @NormalizeEmail()
   @IsEmail({}, { message: 'صيغة البريد غير صحيحة.' })
   email!: string;
 
@@ -30,6 +32,7 @@ export class RegisterDto {
 
 export class LoginDto {
   @ApiProperty()
+  @NormalizeEmail()
   @IsEmail({}, { message: 'صيغة البريد غير صحيحة.' })
   email!: string;
 

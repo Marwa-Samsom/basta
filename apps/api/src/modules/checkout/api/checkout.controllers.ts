@@ -33,6 +33,7 @@ import {
 } from '../../payments/public';
 import { CartService } from '../../cart/public';
 import { CheckoutService } from '../application/checkout.service';
+import { NormalizeEmail } from '../../../common/email';
 
 export class AddressDto {
   @IsString()
@@ -94,6 +95,7 @@ export class PlaceOrderDto {
   expectedCurrency!: string;
 
   @IsOptional()
+  @NormalizeEmail()
   @IsEmail({}, { message: 'البريد غير صالح.' })
   guestEmail?: string;
 

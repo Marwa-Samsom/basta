@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword } from '../domain/password';
 import { generateRecoveryCodes, looksLikeRecoveryCode, normalizeRecoveryCode } from '../domain/recovery-codes';
 import { adminNeedsTotpSetup, generateTotpSecret, totpUri, verifyTotpStep } from '../domain/totp';
 import { TokenService, type AccessClaims, type TokenPair } from './token.service';
+import { normalizeEmail } from '../../../common/email';
 
 export interface RequestMeta {
   /** قد تغيب فعلاً: عميل بلا ترويسة، أو طلب داخلي */
@@ -109,9 +110,10 @@ export class AuthService {
     input: { email: string; password: string; fullName: string; phone?: string },
     meta: RequestMeta,
   ): Promise<{ userId: string }> {
+    const email = normalizeEmail(input.email);
     const passwordHash = await hashPassword(input.password);
 
-    const existing = await this.prisma.user.findUnique({ where: { email: input.email } });
+    const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
       /**
        * الرد نفسه للبريد المستعمل وغير المستعمل من ناحية المستخدم
@@ -126,7 +128,7 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email: input.email,
+        email,
         phone: input.phone ?? null,
         passwordHash,
         fullName: input.fullName,
@@ -154,7 +156,7 @@ export class AuthService {
     meta: RequestMeta,
   ): Promise<LoginResult> {
     const user = await this.prisma.user.findUnique({
-      where: { email: input.email },
+      where: { email: normalizeEmail(input.email) },
       include: { roles: true },
     });
 

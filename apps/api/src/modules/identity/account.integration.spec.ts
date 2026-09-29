@@ -96,6 +96,37 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
+describe('البريد لا يفرّق بين الحروف — صندوق واحد حساب واحد', () => {
+  it('تسجيل البريد نفسه بحروف أخرى يُرفض، والدخول والاستعادة بأي حروف يصلان للحساب نفسه', async () => {
+    if (!dbUp) return;
+    const lower = emailOf('casefold');
+    const upper = lower.toUpperCase();
+    const userId = await register('casefold');
+
+    // المهاجم يسجّل الصندوق نفسه بحروف كبيرة — كان حساباً ثانياً
+    const twin = await call('POST', '/auth/register', { body: { email: upper, password: PASSWORD, fullName: 'منتحل' } });
+    expect(twin.statusCode, twin.body).toBe(409);
+    expect(await prisma.user.count({ where: { email: { equals: lower, mode: 'insensitive' } } })).toBe(1);
+
+    // صاحب الحساب يدخل كيفما كتب بريده
+    // وبمسافات نسخها معه من رسالة
+    const login = await call('POST', '/auth/login', { body: { email: `  ${upper} `, password: PASSWORD } });
+    expect(login.statusCode, login.body).toBe(200);
+    expect(sidOf(login.json().tokens.accessToken)).toBeTruthy();
+
+    // ورمز الاستعادة يذهب لحسابه هو
+    expect((await call('POST', '/auth/password/forgot', { body: { email: upper } })).statusCode).toBe(200);
+    expect(await prisma.notification.count({ where: { userId, templateCode: 'password_reset_code', channel: 'email' } })).toBe(1);
+  });
+
+  it('القاعدة ترفض بريداً غير موحَّد ولو كُتب من خارج الخادم', async () => {
+    if (!dbUp) return;
+    await expect(
+      prisma.user.create({ data: { email: `Mixed.${SUFFIX}@Basta.test`, fullName: 'كتابة مباشرة' } }),
+    ).rejects.toThrow(/users_email_normalized/);
+  });
+});
+
 describe('SH-03 · تأكيد البريد', () => {
   it('الرمز يصل بالبريد مجزّأً في القاعدة، ويؤكّد البريد مرة واحدة، ومهلة إعادة الإرسال تسري', async () => {
     if (!dbUp) return;
