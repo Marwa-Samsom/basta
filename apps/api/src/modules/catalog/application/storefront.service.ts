@@ -170,16 +170,14 @@ export class StorefrontService {
       and.push({ attrValues: { some: { attributeValueId: valueId } } });
     }
 
-    const priceFilter: Prisma.ProductVariantWhereInput = {
-      archivedAt: null,
-      isActive: true,
-      ...(input.minPriceMinor !== undefined ? { priceMinorUnits: { gte: BigInt(input.minPriceMinor) } } : {}),
-      ...(input.maxPriceMinor !== undefined
-        ? { priceMinorUnits: { lte: BigInt(input.maxPriceMinor) } }
-        : {}),
+    // الحدّان في مرشّح واحد: كانا مفتاحين `priceMinorUnits` منفصلين فيكتب الثاني
+    // فوق الأول، ومن حدّد الأدنى والأعلى معاً رأى ما تحت الأدنى
+    const price: Prisma.BigIntFilter = {
+      ...(input.minPriceMinor !== undefined ? { gte: BigInt(input.minPriceMinor) } : {}),
+      ...(input.maxPriceMinor !== undefined ? { lte: BigInt(input.maxPriceMinor) } : {}),
     };
     if (input.minPriceMinor !== undefined || input.maxPriceMinor !== undefined) {
-      and.push({ variants: { some: priceFilter } });
+      and.push({ variants: { some: { archivedAt: null, isActive: true, priceMinorUnits: price } } });
     }
 
     return { AND: and };

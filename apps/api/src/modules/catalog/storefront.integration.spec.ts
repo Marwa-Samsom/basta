@@ -327,6 +327,16 @@ describe('الأوجه والتصفية', () => {
     expect(prices.every((p: number) => p <= 20_000)).toBe(true);
   });
 
+  it('الحدّان معاً: لا ما تحت الأدنى ولا ما فوق الأعلى', async () => {
+    if (!dbUp) return;
+    // بلا كلمة بحث: التصفّح من القاعدة دائماً — مسار الأقسام كلها
+    const res = await app.inject({ method: 'GET', ...api(`/storefront/products?vendorId=${vendorId}&minPrice=20000&maxPrice=50000`) });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().engine).toBe('db');
+    // قميص 19,900 تحت الأدنى، وعطر 120,000 فوق الأعلى — تبقى السمّاعة وحدها
+    expect(res.json().items.map((i: { nameAr: string }) => i.nameAr)).toEqual(['سمّاعة لاسلكية']);
+  });
+
   it('الفهرس يسقط إلى قاعدة البيانات لا إلى صفحة خطأ', async () => {
     if (!dbUp) return;
     // بحث بكلمة لا يعرفها المحرّك ولا القاعدة: النتيجة فارغة لا خطأ
