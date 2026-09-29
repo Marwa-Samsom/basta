@@ -15,6 +15,8 @@
 #   bash scripts/rollback-drill.sh
 # =============================================================================
 set -euo pipefail
+# النسخة فيها القاعدة كلها بلا تشفير: ملفّاتها ومجلّدها لصاحبها وحده
+umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PGBIN="${PGBIN:-$ROOT/.localdb/pgsql/bin}"
