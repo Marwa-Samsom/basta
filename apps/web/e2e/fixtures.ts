@@ -33,7 +33,7 @@ export async function makeVendor(t: string) {
     data: {
       ownerUserId: userId, slug: `store-${t}`, nameAr: `متجر ${t}`, status: 'approved', approvedAt: new Date(), settlementCurrency: 'SAR', country: 'SA',
       shippingZones: { create: { nameAr: 'السعودية', regions: { create: { country: 'SA' } }, rates: { create: { method: 'flat', priceMinorUnits: 1_500n } } } },
-      bankAccounts: { create: { holderName: `بائع ${t}`, iban: 'SA0380000000608010167519', bankName: 'بنك تجريبي', isDefault: true } },
+      bankAccounts: { create: { holderName: `بائع ${t}`, iban: 'SA0380000000608010167519', bankName: 'بنك تجريبي', isDefault: true, verifiedAt: new Date() } },
     },
   });
   const product = await prisma.product.create({
