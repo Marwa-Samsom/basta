@@ -22,24 +22,36 @@ function SearchBoxInner() {
   const [active, setActive] = useState(-1);
   const listId = useId();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** بعد 429 تتوقّف الاقتراحات قليلاً — لا تُثقل خادماً يقول «أبطئ» */
+  const pausedUntil = useRef(0);
 
+  /**
+   * الاقتراحات تحسين لا شرط: أي ردّ غير قائمة نصوص (429، 500، جسم آخر) يُفرغها ولا
+   * يمسّ الصندوق. كان جسم الخطأ يُقرأ كأنه اقتراحات فتصير undefined، ويسقط المكوّن
+   * كله عند أول .length — ومعه البحث نفسه. والطلب السابق يُلغى: ردّ قديم بطيء لا
+   * يكتب فوق ما كُتب بعده.
+   */
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
+    const abort = new AbortController();
     timer.current = setTimeout(async () => {
-      if (value.trim().length < 2) {
+      if (value.trim().length < 2 || Date.now() < pausedUntil.current) {
         setSuggestions([]);
         return;
       }
       try {
-        const res = await fetch(`${API_BASE}/storefront/suggest?q=${encodeURIComponent(value)}`);
-        const data = (await res.json()) as { suggestions: string[] };
-        setSuggestions(data.suggestions);
+        const res = await fetch(`${API_BASE}/storefront/suggest?q=${encodeURIComponent(value)}`, { signal: abort.signal });
+        if (res.status === 429) pausedUntil.current = Date.now() + 10_000;
+        const data = res.ok ? ((await res.json()) as { suggestions?: unknown }) : null;
+        const list = Array.isArray(data?.suggestions) ? data.suggestions.filter((s): s is string => typeof s === 'string') : [];
+        setSuggestions(list);
         setActive(-1);
       } catch {
-        setSuggestions([]);
+        if (!abort.signal.aborted) setSuggestions([]);
       }
     }, 200);
     return () => {
+      abort.abort();
       if (timer.current) clearTimeout(timer.current);
     };
   }, [value]);
