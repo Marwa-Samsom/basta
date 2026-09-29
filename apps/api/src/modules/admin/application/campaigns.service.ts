@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { StorefrontService, type StorefrontProductCard } from '../../catalog/public';
+import { signImageKey } from '../../catalog/public';
 
 /** مواضع الحملة في الرئيسية — بترتيب ظهورها. القاعدة تفرضها بقيد CHECK أيضاً */
 export const CAMPAIGN_PLACEMENTS = ['home_top', 'home_middle'] as const;
@@ -159,7 +160,8 @@ export class CampaignsService {
         isDeleted: p.deletedAt !== null,
         shop: { nameAr: p.vendor.nameAr, status: p.vendor.status },
         visible: p.status === 'active' && p.deletedAt === null && p.vendor.status === 'approved',
-        thumbnail: p.images[0] ? `/uploads/${p.images[0].fileKey}/thumb.webp` : null,
+        // لوحة الإدارة: قد يكون المنتج مخفياً — الرابط موقَّع ليظهر لمن يختاره
+        thumbnail: p.images[0] ? `/uploads/${p.images[0].fileKey}/thumb.webp?s=${signImageKey(p.images[0].fileKey)}` : null,
       })),
     };
   }
@@ -190,7 +192,7 @@ export class CampaignsService {
       nameAr: p.nameAr,
       slug: p.slug,
       shop: { nameAr: p.vendor.nameAr },
-      thumbnail: p.images[0] ? `/uploads/${p.images[0].fileKey}/thumb.webp` : null,
+      thumbnail: p.images[0] ? `/uploads/${p.images[0].fileKey}/thumb.webp?s=${signImageKey(p.images[0].fileKey)}` : null,
     }));
   }
 

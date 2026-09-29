@@ -16,6 +16,7 @@ import { ProductImportService } from './application/product-import.service';
 import { ProductService } from './application/product.service';
 import { StorefrontService } from './application/storefront.service';
 import { LocalImageStorage } from './infrastructure/product-images';
+import { ProductImageGate } from './infrastructure/product-image-gate';
 
 @Module({
   imports: [InventoryModule, VendorsModule, SearchModule, NotificationsModule],
@@ -26,6 +27,7 @@ import { LocalImageStorage } from './infrastructure/product-images';
     StorefrontController,
   ],
   providers: [
+    ProductImageGate,
     CategoryService,
     ProductService,
     ProductImageService,
@@ -34,6 +36,6 @@ import { LocalImageStorage } from './infrastructure/product-images';
     LocalImageStorage,
     LowStockNotifier,
   ],
-  exports: [CategoryService, ProductService, StorefrontService],
+  exports: [CategoryService, ProductService, StorefrontService, ProductImageGate],
 })
 export class CatalogModule {}

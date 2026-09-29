@@ -14,6 +14,7 @@ import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
 import { DomainError } from '../../../common/errors/domain-error';
+import { signImageKey } from './product-image-gate';
 
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 /** ضلع أقصر من هذا لا يُظهر المنتج بوضوح في صفحة المنتج */
@@ -149,15 +150,21 @@ export class LocalImageStorage {
     await rm(this.dir(key), { recursive: true, force: true });
   }
 
+  /**
+   * روابط موقَّعة — تصدرها واجهتا البائع والإدارة وحدهما (المحرّر، القوائم، المراجعة)،
+   * فتظهر صورة المسودّة والمرفوض لصاحبها ومراجِعها لا للعالم (ProductImageGate).
+   * المتجر يبني روابطه بلا توقيع: تمرّ لأن منتجها ظاهر.
+   */
   urls(key: string): Record<RenditionName, string> {
     this.dir(key);
     const base = `${UPLOADS_URL_PREFIX}${key}/`;
+    const s = `?s=${signImageKey(key)}`;
     return {
-      'full.webp': `${base}full.webp`,
-      'full.avif': `${base}full.avif`,
-      'medium.webp': `${base}medium.webp`,
-      'medium.avif': `${base}medium.avif`,
-      'thumb.webp': `${base}thumb.webp`,
+      'full.webp': `${base}full.webp${s}`,
+      'full.avif': `${base}full.avif${s}`,
+      'medium.webp': `${base}medium.webp${s}`,
+      'medium.avif': `${base}medium.avif${s}`,
+      'thumb.webp': `${base}thumb.webp${s}`,
     };
   }
 }

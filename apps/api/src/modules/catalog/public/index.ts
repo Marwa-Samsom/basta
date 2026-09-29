@@ -18,6 +18,7 @@ export {
   UPLOADS_URL_PREFIX,
 } from '../infrastructure/product-images';
 export { IMPORT_COLUMNS, IMPORT_MAX_ROWS } from '../domain/import-plan';
+export { ProductImageGate, signImageKey } from '../infrastructure/product-image-gate';
 
 export {
   StorefrontService,

@@ -13,6 +13,7 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
@@ -786,5 +787,57 @@ describe('شجرة الفئات', () => {
     const otherNode = tree.find((n: { id: string }) => n.id === other.id);
     expect(otherNode.children[0].children[0].id).toBe(grand.id);
     void randomUUID;
+  });
+});
+
+// ============================================================================
+describe('صور المنتجات: الظاهر للعموم، والمسودّة والمرفوض برابط موقَّع، والمحذوف بلا ملف', () => {
+  const get = (url: string) => app.inject({ method: 'GET', url });
+  const bare = (url: string) => url.split('?')[0]!;
+  const image = () => sharp({ create: { width: 400, height: 400, channels: 3, background: { r: 30, g: 90, b: 60 } } }).png().toBuffer();
+  const uploadTo = async (id: string) => {
+    const up = await as('a').upload(`/vendor/products/${id}/images`, { name: 'p.png', type: 'image/png', data: await image() });
+    expect(up.statusCode, up.body).toBe(201);
+    return up.json() as { id: string; urls: Record<string, string> };
+  };
+  const live = async (id: string) => {
+    await as('a').post(`/vendor/products/${id}/publish`);
+    await app.get(ProductService).approve(id, await revOf(id));
+  };
+
+  dbIt('المسودّة: الرابط الموقَّع وحده يفتحها — لا العاري ولا المزوَّر', async () => {
+    const draft = await simpleProduct('a', `IMG-DRAFT-${SUFFIX}`);
+    const signed = (await uploadTo(draft.id)).urls['thumb.webp']!;
+    expect(signed).toMatch(/\?s=\d+\.[\w-]{22}$/);
+    expect((await get(signed)).statusCode).toBe(200);
+    expect((await get(bare(signed))).statusCode).toBe(404);
+    expect((await get(`${bare(signed)}?s=9999999999.${'A'.repeat(22)}`)).statusCode).toBe(404);
+  });
+
+  dbIt('المنشور للعموم، والمرفوض يُحجب عنهم', async () => {
+    const shown = await simpleProduct('a', `IMG-LIVE-${SUFFIX}`);
+    const shownUrl = bare((await uploadTo(shown.id)).urls['thumb.webp']!);
+    await live(shown.id);
+    expect((await get(shownUrl)).statusCode).toBe(200);
+
+    const refused = await simpleProduct('a', `IMG-REJ-${SUFFIX}`);
+    const refusedImg = await uploadTo(refused.id);
+    await live(refused.id);
+    await app.get(ProductService).reject(refused.id, 'الصورة مخالفة لسياسة المنصة.');
+    expect((await get(bare(refusedImg.urls['thumb.webp']!))).statusCode).toBe(404);
+    // وصاحبه ومراجِعه يرونها برابطهم الموقَّع
+    expect((await get(refusedImg.urls['thumb.webp']!)).statusCode).toBe(200);
+  });
+
+  dbIt('حذف المنتج يحذف ملفات صوره التي لا يذكرها طلب', async () => {
+    const gone = await simpleProduct('a', `IMG-DEL-${SUFFIX}`);
+    const img = await uploadTo(gone.id);
+    const key = bare(img.urls['thumb.webp']!).replace(/^\/uploads\//, '').replace(/\/thumb\.webp$/, '');
+    const file = join(UPLOADS_ROOT, ...key.split('/'), 'thumb.webp');
+    expect(existsSync(file)).toBe(true);
+    expect((await as('a').delete(`/vendor/products/${gone.id}`)).statusCode).toBeLessThan(300);
+    expect(existsSync(file)).toBe(false);
+    expect(await prisma.productImage.count({ where: { id: img.id } })).toBe(0);
+    expect((await get(img.urls['thumb.webp']!)).statusCode).toBe(404);
   });
 });

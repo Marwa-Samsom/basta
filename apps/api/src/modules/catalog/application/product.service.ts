@@ -614,6 +614,31 @@ export class ProductService {
       );
     });
     this.reindex(id);
+    await this.dropUnorderedImages(id);
+  }
+
+  /**
+   * صور المنتج المحذوف لا تبقى على القرص إلا ما صار لقطة في طلب — سجلّ طلبات
+   * المشتري يعرضها. البوابة تحجبها عن العموم أصلاً؛ وهذا لئلا يبقى ملف لا يُطلب.
+   * فشل حذف ملف يُسجَّل ولا يُعيد الحذف: المنتج محذوف والملف محجوب.
+   */
+  private async dropUnorderedImages(productId: string): Promise<void> {
+    const images = await this.prisma.productImage.findMany({ where: { productId }, select: { id: true, fileKey: true } });
+    if (images.length === 0) return;
+    const ordered = new Set(
+      (
+        await this.prisma.orderItem.findMany({
+          where: { imageKeySnapshot: { in: images.map((i) => i.fileKey) } },
+          select: { imageKeySnapshot: true },
+          distinct: ['imageKeySnapshot'],
+        })
+      ).map((o) => o.imageKeySnapshot),
+    );
+    const orphan = images.filter((i) => !ordered.has(i.fileKey));
+    await this.prisma.productImage.deleteMany({ where: { id: { in: orphan.map((i) => i.id) } } });
+    for (const img of orphan) {
+      await this.storage.remove(img.fileKey).catch((err: unknown) => this.logger.error(`تعذّر حذف ملفات الصورة ${img.fileKey}`, err as Error));
+    }
   }
 
   async publish(scope: VendorScope, id: string): Promise<ProductDetailView> {
