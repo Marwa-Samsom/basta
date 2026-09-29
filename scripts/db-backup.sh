@@ -10,7 +10,8 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 
 : "${PGHOST:=localhost}" "${PGPORT:=5432}" "${PGUSER:=basta}" "${PGDATABASE:=basta}"
-export PGPASSWORD="${PGPASSWORD:-basta_dev_pw}"
+# shellcheck source=lib/pg-password.sh
+source "$ROOT/scripts/lib/pg-password.sh"
 
 case "${1:-backup}" in
   backup)

@@ -2,7 +2,9 @@
 import { PgBoss } from 'pg-boss';
 import pg from 'pg';
 
-const URL = 'postgresql://basta:basta_dev_pw@localhost:5432/basta';
+// الاتصال من البيئة (مالك المخطط) — لا كلمة مرور مكتوبة هنا
+const URL = process.env.DATABASE_MIGRATE_URL;
+if (!URL) throw new Error('اضبط DATABASE_MIGRATE_URL (npx dotenv -e .env -- node …)');
 const boss = new PgBoss({ connectionString: URL, schema: 'queue_probe' });
 boss.on('error', (e) => console.error('خطأ الطابور:', e.message));
 await boss.start();
