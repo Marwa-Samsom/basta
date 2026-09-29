@@ -50,6 +50,8 @@ model User {
   fullName        String
   locale          String     @default("ar")
   status          UserStatus @default(active)
+  /// مالك المنصة — واحد على الأكثر، يُعيَّن من سكربت المدير الأول، ولا يغيّره مدير آخر
+  isPlatformOwner Boolean    @default(false)
   emailVerifiedAt DateTime?  @db.Timestamptz
   phoneVerifiedAt DateTime?  @db.Timestamptz
 

@@ -18,6 +18,7 @@ import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
 import { DEFAULT_TEMPLATES, NotificationsService, REDACTED, eventOf } from '../notifications/public';
+import { OperationsService } from './application/operations.service';
 import { PERMISSION_CODES } from './public';
 
 const prisma = new PrismaClient();
@@ -430,6 +431,50 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     expect(mine.permissions).toEqual(['reports.view']);
     expect((await call('PUT', `/admin/users/${admin.userId}/permissions`, admin.token, { permissions: ['reports.view'] })).statusCode).toBe(409);
     expect((await call('POST', `/admin/users/${mine.id}/revoke`, admin.token)).statusCode).toBe(204);
+  });
+
+  it('لا يمنح مدير ما لا يحمله ولا يسحبه، ولا يمسّ مالك المنصة', async () => {
+    if (!dbUp) return;
+    const perms = async (id: string) => (await prisma.adminPermission.findMany({ where: { userId: id } })).map((p) => p.permission).sort();
+    // مدير يدير المستخدمين ويقرأ التقارير فقط
+    const staff = await makeAdmin('staff', ['users.manage', 'reports.view']);
+    const put = (id: string, permissions: string[]) => call('PUT', `/admin/users/${id}/permissions`, staff.token, { permissions });
+
+    // لا يرفع نفسه
+    const self = await put(staff.userId, ['users.manage', 'reports.view', 'payouts.approve']);
+    expect(self.statusCode, self.body).toBe(403);
+    expect(self.json().details).toEqual({ permissions: ['payouts.approve'] });
+    expect(await perms(staff.userId)).toEqual(['reports.view', 'users.manage']);
+
+    // يمنح غيره مما يحمل، ولا يمنحه غيره
+    const email = `junior.${SUFFIX}@basta.test`;
+    await prisma.user.create({ data: { email, fullName: 'مدير مبتدئ', passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'customer' } } } });
+    expect((await call('POST', '/admin/users/grant', staff.token, { email, permissions: ['payouts.approve'] })).statusCode).toBe(403);
+    const granted = await call('POST', '/admin/users/grant', staff.token, { email, permissions: ['reports.view'] });
+    expect(granted.statusCode, granted.body).toBe(201);
+    expect((await put(granted.json().userId, [])).statusCode).toBe(204);
+
+    // ولا يجرّد مديراً أوسع منه مما لم يُعطَه، ولا يسحب إدارته
+    const senior = await makeAdmin('senior', ['payouts.approve', 'reports.view']);
+    expect((await put(senior.userId, ['reports.view'])).statusCode).toBe(403);
+    expect((await call('POST', `/admin/users/${senior.userId}/revoke`, staff.token)).statusCode).toBe(403);
+    expect(await perms(senior.userId)).toEqual(['payouts.approve', 'reports.view']);
+
+    // مالك المنصة: لا يمسّه حتى مدير بكل الصلاحيات
+    const owner = (await prisma.user.findFirst({ where: { isPlatformOwner: true }, select: { id: true } }))
+      ?? (await prisma.user.create({
+        data: { email: `owner.${SUFFIX}@basta.test`, fullName: 'المالك', isPlatformOwner: true, roles: { create: { role: 'admin' } }, permissions: { create: PERMISSION_CODES.map((permission) => ({ permission })) } },
+        select: { id: true },
+      }));
+    const ownerBefore = await perms(owner.id);
+    expect((await call('PUT', `/admin/users/${owner.id}/permissions`, admin.token, { permissions: ['reports.view'] })).statusCode).toBe(403);
+    expect((await call('POST', `/admin/users/${owner.id}/revoke`, admin.token)).statusCode).toBe(403);
+    expect(await perms(owner.id)).toEqual(ownerBefore);
+    expect((await call('GET', '/admin/users', staff.token)).json().find((u: { id: string }) => u.id === owner.id).isOwner).toBe(true);
+
+    // والمالك وحده فوق القاعدة: يمنح ما يشاء
+    await app.get(OperationsService).setPermissions(owner.id, senior.userId, ['payouts.approve', 'reports.view', 'settings.edit']);
+    expect(await perms(senior.userId)).toEqual(['payouts.approve', 'reports.view', 'settings.edit']);
   });
 
   it('الكوبون والصفحة والبانر والمميّز: من اللوحة إلى المتجر', async () => {

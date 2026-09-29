@@ -17,6 +17,8 @@ interface Admin {
   twoFactor: boolean;
   lastLoginAt: string | null;
   permissions: string[];
+  /** مالك المنصة — لا يغيّره غيره */
+  isOwner: boolean;
 }
 
 interface Perm {
@@ -48,11 +50,20 @@ export default function AdminUsersPage() {
   const [q, setQ] = useState('');
   if (!data || !perms) return <Loading error={error} forbidden={forbidden} />;
 
+  // لا يُمنح ولا يُسحب إلا ما يحمله المدير نفسه — والمالك وحده فوق ذلك (الخادم يفرضه)
+  const iAmOwner = data.some((u) => u.id === me.userId && u.isOwner);
+  const mine = (code: string) => iAmOwner || me.permissions.includes(code);
   const checkboxes = (value: string[], onChange: (v: string[]) => void) => (
     <div className="stack stack--tight">
       {perms.map((p) => (
         <label key={p.code} className="ac2-check">
-          <input type="checkbox" checked={value.includes(p.code)} onChange={(e) => onChange(e.target.checked ? [...value, p.code] : value.filter((x) => x !== p.code))} />
+          <input
+            type="checkbox"
+            checked={value.includes(p.code)}
+            disabled={!mine(p.code)}
+            title={mine(p.code) ? undefined : 'لا تحمل هذه الصلاحية — يمنحها مالك المنصة'}
+            onChange={(e) => onChange(e.target.checked ? [...value, p.code] : value.filter((x) => x !== p.code))}
+          />
           <span>
             <strong>{p.labelAr}</strong> <span className="muted">— {p.hint}</span>
           </span>
@@ -161,6 +172,7 @@ export default function AdminUsersPage() {
                       <span className="ac2-cell">
                         <span className="ac2-cell__main">{u.fullName ?? '—'}</span>
                         {u.id === me.userId ? <span className="ac2-cell__sub">أنت</span> : null}
+                        {u.isOwner ? <span className="badge badge--brand">مالك المنصة</span> : null}
                       </span>
                     </td>
                     <td className="num" data-label="البريد">
@@ -200,12 +212,12 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="end" data-label="">
                       <span className="ac2-actions">
-                        {!editing[u.id] ? (
+                        {!editing[u.id] && (!u.isOwner || u.id === me.userId) ? (
                           <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditing({ ...editing, [u.id]: u.permissions })}>
                             الصلاحيات
                           </button>
                         ) : null}
-                        {u.id !== me.userId ? (
+                        {u.id !== me.userId && !u.isOwner ? (
                           <button
                             type="button"
                             className="btn btn--danger btn--sm"

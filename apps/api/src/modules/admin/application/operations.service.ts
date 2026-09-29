@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
+import { ConflictError, ForbiddenError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
 import { PERMISSION_CODES, SETTINGS_SPEC } from '../domain/permissions';
@@ -39,11 +39,54 @@ export class OperationsService {
       where: { roles: { some: { role: 'admin' } } },
       orderBy: { createdAt: 'asc' },
       select: {
-        id: true, email: true, fullName: true, status: true, totpEnabledAt: true, lastLoginAt: true,
+        id: true, email: true, fullName: true, status: true, totpEnabledAt: true, lastLoginAt: true, isPlatformOwner: true,
         permissions: { select: { permission: true } },
       },
     });
-    return rows.map((u) => ({ ...u, twoFactor: !!u.totpEnabledAt, permissions: u.permissions.map((p) => p.permission) }));
+    return rows.map(({ isPlatformOwner, ...u }) => ({
+      ...u,
+      isOwner: isPlatformOwner,
+      twoFactor: !!u.totpEnabledAt,
+      permissions: u.permissions.map((p) => p.permission),
+    }));
+  }
+
+  /**
+   * لا يُعطي مدير ما لا يملك ولا يأخذ ما لا يملك. صلاحية users.manage كانت
+   * تكفي لمنح النفس كل شيء وسحب الإدارة من أي أحد — ومنهم المدير الأول.
+   *
+   * - كل صلاحية تتغيّر (تُضاف أو تُسحب) يحملها الفاعل نفسه: لا يرفع نفسه، ولا
+   *   يجرّد مديراً مما لم يُعطَه هو
+   * - مالك المنصة لا يغيّره غيره، وهو وحده فوق القاعدة الأولى
+   */
+  private async assertMayChange(actorId: string, target: { id: string; isOwner: boolean; before: readonly string[] }, after: readonly string[]) {
+    const actor = await this.prisma.user.findUniqueOrThrow({
+      where: { id: actorId },
+      select: { isPlatformOwner: true, permissions: { select: { permission: true } } },
+    });
+    if (target.isOwner && target.id !== actorId) {
+      throw new ForbiddenError('مالك المنصة لا تتغيّر صلاحياته ولا تُسحب إدارته إلا منه هو.');
+    }
+    if (actor.isPlatformOwner) return;
+    const held = new Set(actor.permissions.map((p) => p.permission));
+    const changed = [...after.filter((p) => !target.before.includes(p)), ...target.before.filter((p) => !after.includes(p))];
+    const beyond = [...new Set(changed.filter((p) => !held.has(p)))];
+    if (beyond.length > 0) {
+      throw new ForbiddenError(`لا تمنح ولا تسحب صلاحية لا تحملها أنت: ${beyond.join('، ')}. اطلب ذلك من مالك المنصة.`, { permissions: beyond });
+    }
+  }
+
+  private async adminTarget(userId: string) {
+    const u = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isPlatformOwner: true, permissions: { select: { permission: true } }, roles: { select: { role: true } } },
+    });
+    return {
+      id: userId,
+      isOwner: u?.isPlatformOwner ?? false,
+      isAdmin: u?.roles.some((r) => r.role === 'admin') ?? false,
+      before: u?.permissions.map((p) => p.permission) ?? [],
+    };
   }
 
   /**
@@ -56,6 +99,8 @@ export class OperationsService {
     const user = await this.prisma.user.findUnique({ where: { email: email.trim().toLowerCase() }, select: { id: true, status: true } });
     if (!user) throw new NotFoundError('لا حساب بهذا البريد. اطلب من الشخص إنشاء حسابه أولاً.');
     if (user.status !== 'active') throw new ConflictError('الحساب غير نشط.');
+    // المنح يستبدل صلاحيات الحساب كلها — فما يُزال منها كما يُضاف يحكمه المانح
+    await this.assertMayChange(actorId, await this.adminTarget(user.id), permissions);
     await this.prisma.$transaction([
       this.prisma.userRole.upsert({
         where: { userId_role: { userId: user.id, role: 'admin' } },
@@ -76,7 +121,10 @@ export class OperationsService {
     if (actorId === userId && !permissions.includes('users.manage')) {
       throw new ConflictError('لا تسحب من نفسك صلاحية إدارة المستخدمين.');
     }
-    const before = await this.prisma.adminPermission.findMany({ where: { userId }, select: { permission: true } });
+    const target = await this.adminTarget(userId);
+    if (!target.isAdmin) throw new NotFoundError('ليس مديراً.', { userId });
+    await this.assertMayChange(actorId, target, permissions);
+    const before = target.before.map((permission) => ({ permission }));
     await this.prisma.$transaction([
       this.prisma.adminPermission.deleteMany({ where: { userId } }),
       this.prisma.adminPermission.createMany({ data: permissions.map((permission) => ({ userId, permission })) }),
@@ -88,6 +136,10 @@ export class OperationsService {
 
   async revokeAdmin(actorId: string, userId: string) {
     if (actorId === userId) throw new ConflictError('لا تسحب الإدارة من نفسك.');
+    const target = await this.adminTarget(userId);
+    if (!target.isAdmin) throw new NotFoundError('ليس مديراً.', { userId });
+    // السحب يزيل كل صلاحياته: مدير يحمل ما لا يحمله الفاعل لا يسحبه الفاعل
+    await this.assertMayChange(actorId, target, []);
     await this.prisma.$transaction([
       this.prisma.adminPermission.deleteMany({ where: { userId } }),
       this.prisma.userRole.deleteMany({ where: { userId, role: 'admin' } }),

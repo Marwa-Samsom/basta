@@ -93,3 +93,12 @@ export class ConflictError extends DomainError {
   readonly code = 'CONFLICT';
   readonly httpStatus = 409;
 }
+
+/**
+ * فاعل يملك المسار ولا يملك هذا الفعل بعينه — صلاحية لا يحملها هو، أو هدف
+ * محميّ منه. 403 لا 404: المورد ظاهر له أصلاً (قائمة المديرين مثلاً).
+ */
+export class ForbiddenError extends DomainError {
+  readonly code = 'FORBIDDEN';
+  readonly httpStatus = 403;
+}
