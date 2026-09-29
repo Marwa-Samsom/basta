@@ -16,7 +16,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { NobleCryptoPlugin, ScureBase32Plugin, generateSecret, generateSync } from 'otplib';
+import { StorefrontService } from '../catalog/public';
 import { hashPassword } from '../identity/public';
+import { SearchService } from '../search/public';
 import { DOCUMENT_TYPES } from './domain/onboarding';
 import { DOCUMENTS_ROOT } from './infrastructure/document-storage';
 
@@ -505,5 +507,59 @@ describe('عزل البيانات — بائع لا يرى طلب بائع آخ�
     if (!dbUp) return;
     const res = await app.inject({ method: 'GET', ...api('/admin/vendors', sellerToken) });
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('التعليق يصل إلى البحث — الاقتراحات والفهرس', () => {
+  it('منتجات المعلَّق تخرج من الاقتراحات ومن الفهرس فوراً، وتعود برفع التعليق', async () => {
+    if (!dbUp) return;
+    const search = app.get(SearchService);
+    if (!(await search.stats()).up) return console.warn('⚠ محرّك البحث غير شغّال — اختبار الاقتراحات متخطّى.');
+    const storefront = app.get(StorefrontService);
+
+    // منتج منشور للمتجر باسم لا يشاركه فيه شيء في الفهرس
+    const word = `zq${SUFFIX}`.toLowerCase();
+    const product = await prisma.product.findFirstOrThrow({ where: { vendorId, deletedAt: null }, orderBy: { createdAt: 'asc' } });
+    await prisma.product.update({ where: { id: product.id }, data: { nameAr: `قميص ${word}`, status: 'active', publishedAt: new Date() } });
+    await storefront.syncIndex([product.id]);
+    expect(await search.idle()).toBe(true);
+
+    const suggest = async () => (await app.inject({ method: 'GET', url: `/api/v1/storefront/suggest?q=${word}` })).json().suggestions as string[];
+    const indexed = async () => (await search.search({ q: word, page: 1, pageSize: 10 }))?.ids ?? [];
+    expect(await suggest()).toContain(`قميص ${word}`);
+    expect(await indexed()).toContain(product.id);
+
+    const suspend = await app.inject({
+      method: 'POST',
+      ...api(`/admin/vendors/${vendorId}/suspend`, adminToken),
+      payload: { reason: 'شكاوى متكرّرة على عدم الشحن خلال المدة المعلنة.' },
+    });
+    expect(suspend.statusCode, suspend.body).toBe(204);
+    expect(await search.idle()).toBe(true);
+    expect(await suggest()).not.toContain(`قميص ${word}`);
+    expect(await indexed()).not.toContain(product.id);
+
+    const reinstate = await app.inject({ method: 'POST', ...api(`/admin/vendors/${vendorId}/reinstate`, adminToken) });
+    expect(reinstate.statusCode, reinstate.body).toBe(204);
+    expect(await search.idle()).toBe(true);
+    expect(await suggest()).toContain(`قميص ${word}`);
+    expect(await indexed()).toContain(product.id);
+  });
+
+  it('فهرس متأخّر لا يُظهر في الاقتراحات منتجاً لم يعد مرئياً', async () => {
+    if (!dbUp) return;
+    const search = app.get(SearchService);
+    if (!(await search.stats()).up) return;
+    const storefront = app.get(StorefrontService);
+    const word = `zr${SUFFIX}`.toLowerCase();
+    const product = await prisma.product.findFirstOrThrow({ where: { vendorId, deletedAt: null }, orderBy: { createdAt: 'desc' } });
+    await prisma.product.update({ where: { id: product.id }, data: { nameAr: `قميص ${word}`, status: 'active', publishedAt: new Date() } });
+    await storefront.syncIndex([product.id]);
+    expect(await search.idle()).toBe(true);
+
+    // المنتج يختفي في القاعدة دون أن يسمع الفهرس (محرّك نائم وقت التغيير، أو كتابة مباشرة)
+    await prisma.product.update({ where: { id: product.id }, data: { status: 'draft' } });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/storefront/suggest?q=${word}` });
+    expect(res.json().suggestions).not.toContain(`قميص ${word}`);
   });
 });

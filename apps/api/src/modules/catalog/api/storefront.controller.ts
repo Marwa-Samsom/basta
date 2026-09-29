@@ -109,7 +109,7 @@ export class StorefrontController {
   @Get('storefront/suggest')
   @ApiOperation({ summary: 'اقتراحات أثناء الكتابة — ST-06' })
   async suggest(@Query('q') q: string) {
-    return { suggestions: await this.search.suggest(q ?? '') };
+    return { suggestions: await this.storefront.suggest(q ?? '') };
   }
 
   @Public()

@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
 import { SearchService, type SearchDocument, type SearchInput } from '../../search/public';
+import { VendorEvents } from '../../vendors/public';
 import { priceView, type Page, type PriceView } from './views';
 
 export interface StorefrontProductCard {
@@ -69,14 +70,34 @@ const CARD_INCLUDE = {
 type CardRow = Prisma.ProductGetPayload<{ include: typeof CARD_INCLUDE }>;
 
 @Injectable()
-export class StorefrontService {
+export class StorefrontService implements OnModuleInit {
   private readonly logger = new Logger('Storefront');
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
     private readonly search: SearchService,
+    private readonly vendorEvents: VendorEvents,
   ) {}
+
+  /** تعليق متجر أو رفعه أو اعتماده يغيّر ظهور منتجاته كلها — الفهرس يتبعه فوراً */
+  onModuleInit(): void {
+    this.vendorEvents.onVisibilityChanged((vendorId) => this.syncVendor(vendorId));
+  }
+
+  /**
+   * اقتراحات أثناء الكتابة — ST-06. أسماء من الفهرس، تمرّ بقاعدة الرؤية كما تمرّ
+   * نتائج البحث (list): الفهرس نسخة قد تتأخّر — متجر عُلّق والمحرّك نائم، أو
+   * كتابة لم تبلغه — فيقترح منتجاً لم يعد يُباع. القاعدة تقول الكلمة الأخيرة.
+   */
+  async suggest(term: string, limit = 6): Promise<string[]> {
+    const hits = await this.search.suggestHits(term, limit * 2);
+    if (hits.length === 0) return [];
+    const visible = new Set(
+      (await this.prisma.product.findMany({ where: { ...VISIBLE, id: { in: hits.map((h) => h.id) } }, select: { id: true } })).map((p) => p.id),
+    );
+    return [...new Set(hits.filter((h) => visible.has(h.id)).map((h) => h.nameAr))].slice(0, limit);
+  }
 
   // ------------------------------------------------------------- القائمة
 
@@ -636,6 +657,12 @@ export class StorefrontService {
       docs.length > 0 ? this.search.upsert(docs) : Promise.resolve(true),
       gone.length > 0 ? this.search.remove(gone) : Promise.resolve(true),
     ]);
+  }
+
+  /** منتجات متجر كلها — بعد تغيّر حالته. syncIndex يضيف المرئي ويحذف ما سواه */
+  async syncVendor(vendorId: string): Promise<void> {
+    const ids = (await this.prisma.product.findMany({ where: { vendorId, deletedAt: null }, select: { id: true } })).map((p) => p.id);
+    for (let i = 0; i < ids.length; i += 500) await this.syncIndex(ids.slice(i, i + 500));
   }
 
   /** إعادة بناء الفهرس كاملاً — سكربت أو لوحة إدارة. */
