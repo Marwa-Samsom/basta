@@ -20,6 +20,7 @@ import { FakePaymentProvider } from '../payments/public';
 import { TrackingService } from '../shipping/public';
 import { toCharge } from './domain/refunds';
 import { OrderLifecycleService, OrderScheduler } from './public';
+import { REFUND_STALE_MS, stalledRefund } from './application/order-lifecycle.service';
 
 const prisma = new PrismaClient();
 let app: NestFastifyApplication;
@@ -553,5 +554,72 @@ describe('الاسترداد يُعاد بلا دفع مرتين', () => {
     // البوابة ردّت مرة واحدة — الإعادة سمعت الردّ الأول بالمفتاح نفسه
     expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
     expect(await statusOf(a.id)).toBe('refunded');
+  });
+});
+
+describe('استرداد عالق في processing — سقط منفّذه فيُعاد', () => {
+  /** إلغاء يسجّل استرداداً بلا تنفيذه، ثم يُترك كما يتركه خادم سقط بعد حجزه */
+  async function stuckRefund(claimedMsAgo: number) {
+    const { a, order } = await placeOrder([1, 1]);
+    const original = lifecycle.executeRefund.bind(lifecycle);
+    lifecycle.executeRefund = async () => false;
+    try {
+      expect((await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/cancel`, buyer.token, {})).statusCode).toBe(200);
+    } finally {
+      lifecycle.executeRefund = original;
+    }
+    const refund = await prisma.refund.findFirstOrThrow({ where: { subOrderId: a.id } });
+    await prisma.refund.update({
+      where: { id: refund.id },
+      data: { status: 'processing', claimedAt: new Date(Date.now() - claimedMsAgo) },
+    });
+    return { a, refund, intent: order.payment!.providerIntentId! };
+  }
+  const isDue = async (id: string, now = new Date()) =>
+    (await prisma.refund.count({ where: { id, ...stalledRefund(now) } })) === 1;
+
+  it('سقط قبل البوابة: بعد المهلة تلتقطه المهمة وتردّ المال مرة', async () => {
+    if (!dbUp) return;
+    const { a, refund, intent } = await stuckRefund(REFUND_STALE_MS + 60_000);
+    expect(await isDue(refund.id)).toBe(true);
+    expect(await lifecycle.executeRefund(refund.id)).toBe(true);
+    expect((await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } })).status).toBe('succeeded');
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+    expect(await statusOf(a.id)).toBe('refunded');
+  });
+
+  it('سقط بعد البوابة وقبل التسجيل: الإعادة تسمع الردّ الأول ولا تردّ ثانيةً', async () => {
+    if (!dbUp) return;
+    const { refund, intent } = await stuckRefund(REFUND_STALE_MS + 60_000);
+    // ما فعله المنفّذ الساقط قبل سقوطه: البوابة ردّت بمفتاح الاسترداد
+    const first = await fake.refund(intent, refund.amountMinorUnits, `refund:${refund.id}`);
+    expect(await lifecycle.executeRefund(refund.id)).toBe(true);
+    const done = await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } });
+    expect(done.status).toBe('succeeded');
+    expect(done.providerRefundId).toBe(first.refundId);
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+  });
+
+  it('تنفيذ حيّ قبل انقضاء المهلة لا يُنتزع', async () => {
+    if (!dbUp) return;
+    const { refund, intent } = await stuckRefund(30_000);
+    expect(await isDue(refund.id)).toBe(false);
+    expect(await lifecycle.executeRefund(refund.id)).toBe(false);
+    expect((await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } })).status).toBe('processing');
+    expect(fake.refundsOf(intent)).toEqual([]);
+  });
+
+  it('مُعيدان معاً على العالق نفسه: ردّ واحد وإشعار واحد', async () => {
+    if (!dbUp) return;
+    const { refund, intent } = await stuckRefund(REFUND_STALE_MS + 60_000);
+    const results = await Promise.all([lifecycle.executeRefund(refund.id), lifecycle.executeRefund(refund.id)]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+    const order = await prisma.subOrder.findUniqueOrThrow({ where: { id: refund.subOrderId }, select: { order: { select: { customerUserId: true, orderNumber: true } } } });
+    const notes = await prisma.notification.findMany({
+      where: { userId: order.order.customerUserId!, templateCode: 'refund_issued', channel: 'in_app' },
+      select: { payloadJson: true },
+    });
+    expect(notes.filter((n) => (n.payloadJson as Record<string, string>)['order_number'] === order.order.orderNumber)).toHaveLength(1);
   });
 });

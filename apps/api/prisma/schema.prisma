@@ -1132,6 +1132,8 @@ model Refund {
   amountMinorUnits       BigInt
   reason                 String
   status                 String   @default("pending")
+  /// متى حُجز للتنفيذ (processing) — ما طال عليه بلا نتيجة سقط منفّذه فيُعاد
+  claimedAt              DateTime? @db.Timestamptz
   providerRefundId       String?
   requestedBy            String?  @db.Uuid
   approvedBy             String?  @db.Uuid

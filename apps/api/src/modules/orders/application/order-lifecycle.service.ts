@@ -38,6 +38,21 @@ export interface TransitionInput {
   readonly returnRequestId?: string | null;
 }
 
+/**
+ * مهلة التنفيذ: استرداد بقي processing أطول منها سقط منفّذه بين الحجز والتسجيل.
+ * أطول بكثير من طلب بوابة واحد، فلا يُنتزع تنفيذٌ حيّ بطيء.
+ */
+export const REFUND_STALE_MS = 5 * 60_000;
+
+/** «عالق»: processing حُجز قبل المهلة — أو بلا وقت حجز (صفوف ما قبل claimedAt) وقديم */
+export function stalledRefund(now: Date): Prisma.RefundWhereInput {
+  const before = new Date(now.getTime() - REFUND_STALE_MS);
+  return {
+    status: 'processing',
+    OR: [{ claimedAt: { lt: before } }, { claimedAt: null, createdAt: { lt: before } }],
+  };
+}
+
 const ROLE_OF: Readonly<Record<TransitionActor, Role | null>> = Object.freeze({
   vendor: 'vendor_owner',
   customer: 'customer',
@@ -355,16 +370,18 @@ export class OrderLifecycleService {
    * نفسه: كل إعادة له تسمع من البوابة الردّ الأول. ومعرّف ردّ البوابة يُكتب فور
    * نجاحها، قبل المعاملة، فيبقى أثر المال الخارج ولو سقط ما بعده.
    */
-  async executeRefund(refundId: string): Promise<boolean> {
+  async executeRefund(refundId: string, now: Date = new Date()): Promise<boolean> {
     const refund = await this.prisma.refund.findUnique({
       where: { id: refundId },
       include: { payment: { select: { providerIntentId: true, amountMinorUnits: true, id: true } } },
     });
-    if (!refund || refund.status !== 'pending') return false;
+    if (!refund || (refund.status !== 'pending' && refund.status !== 'processing')) return false;
 
+    // المعلّق يُحجز، والعالق في processing بعد مهلة التنفيذ يُحجز من جديد: سقط منفّذه
+    // بين الحجز والتسجيل. الشرط على claimedAt في الكتابة: مُعيدان معاً يحجز أحدهما
     const claimed = await this.prisma.refund.updateMany({
-      where: { id: refundId, status: 'pending' },
-      data: { status: 'processing' },
+      where: { id: refundId, OR: [{ status: 'pending' }, stalledRefund(now)] },
+      data: { status: 'processing', claimedAt: now },
     });
     if (claimed.count === 0) return false;
 
@@ -379,10 +396,12 @@ export class OrderLifecycleService {
       });
 
       await this.prisma.$transaction(async (tx) => {
-        await tx.refund.update({
-          where: { id: refundId },
+        // شرطيّ: منفّذ أبطأ أُعيد حجزه من تحته ربما سجّل النجاح قبله — لا إشعار ولا انتقال مرتين
+        const { count } = await tx.refund.updateMany({
+          where: { id: refundId, status: 'processing' },
           data: { status: 'succeeded', providerRefundId: result.refundId },
         });
+        if (count === 0) return;
         const o = await tx.subOrder.findUniqueOrThrow({
           where: { id: refund.subOrderId },
           select: { order: { select: { orderNumber: true, currency: true, customerUserId: true, customer: { select: { fullName: true } } } } },
