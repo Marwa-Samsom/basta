@@ -430,6 +430,41 @@ describe('بوابة 10 · البند 5 — كشف الحساب يطابق ال�
     }
   });
 
+  it('الكشف صفحات بالمؤشّر: الصفحات معاً = الكشف كله بأرصدته، والمدة لا تحمّل ما قبلها', async () => {
+    if (!dbUp) return;
+    const v = vendors[0]!;
+    const whole = await finance.statement(v.vendorId, v.currency);
+    expect(whole.rows.length).toBeGreaterThan(2);
+    expect(whole.nextCursor).toBeNull();
+
+    // صفحتان سطران سطران حتى النهاية — المؤشّر يمرّ بكل قيد مرة، والرصيد يكمل من الصفحة السابقة
+    const paged: typeof whole.rows = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const page = await finance.statement(v.vendorId, v.currency, {}, cursor, 2);
+      expect(page.rows.length).toBeLessThanOrEqual(2);
+      expect(page.closing).toEqual(whole.closing);
+      paged.push(...page.rows);
+      cursor = page.nextCursor ?? undefined;
+      pages++;
+    } while (cursor && pages < 1000);
+    expect(pages).toBe(Math.ceil(whole.rows.length / 2));
+    expect(paged).toEqual(whole.rows);
+
+    // مدة بعد آخر قيد: لا أسطر، والافتتاحي مجموع ما قبلها في القاعدة
+    const tomorrow = new Date(Date.now() + 86_400_000);
+    const later = await finance.statement(v.vendorId, v.currency, { from: tomorrow });
+    expect(later.rows).toHaveLength(0);
+    expect(later.opening).toEqual(whole.closing);
+    expect(later.closing).toEqual(whole.closing);
+
+    // مدة أطول من سنة تُرفض، ومؤشّر بائع آخر لا يُقبل
+    expect((await call('GET', `/vendor/finance/statement?currency=${v.currency}&from=2024-01-01&to=2026-01-01`, v.token)).statusCode).toBe(400);
+    const foreign = await prisma.ledgerEntry.findFirstOrThrow({ where: { vendorId: { not: v.vendorId } }, select: { id: true } });
+    expect((await call('GET', `/vendor/finance/statement?currency=${v.currency}&cursor=${foreign.id}`, v.token)).statusCode).toBe(400);
+  });
+
   it('بائع لا يرى كشف غيره، ولا يطلب سحباً من محفظة غيره', async () => {
     if (!dbUp) return;
     const other = await call('GET', `/vendor/finance/statement?currency=JOD`, vendors[0]!.token);

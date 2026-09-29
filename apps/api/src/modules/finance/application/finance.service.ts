@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
@@ -18,6 +18,12 @@ export const ENTRY_LABELS: Record<string, string> = {
   adjustment_debit: 'تسوية مدينة',
   fx_rounding: 'فرق صرف',
 };
+
+/** قيود صفحة الكشف — الصفحة التالية بالمؤشّر */
+export const STATEMENT_PAGE = 500;
+/** أطول مدة لكشف واحد أو تصدير */
+export const STATEMENT_MAX_DAYS = 366;
+const ZERO = { pending: 0n, available: 0n };
 
 export interface StatementRow {
   id: string;
@@ -73,37 +79,79 @@ export class FinanceService {
     }));
   }
 
-  /** كشف الحساب: كل قيد بترتيبه ورصيد الجيبين بعده — يطابق الدفتر سطراً بسطر */
-  async statement(vendorId: string, currency: string, range: { from?: Date; to?: Date } = {}) {
-    const all = await this.prisma.ledgerEntry.findMany({
-      where: { vendorId, currency },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: {
-        id: true,
-        createdAt: true,
-        entryType: true,
-        direction: true,
-        bucket: true,
-        amountMinorUnits: true,
-        memo: true,
-        reversesEntryId: true,
-        subOrder: { select: { subOrderNumber: true } },
-      },
-    });
-    let pending = 0n;
-    let available = 0n;
-    let opening = { pending: 0n, available: 0n };
-    const rows: StatementRow[] = [];
-    for (const e of all) {
+  /**
+   * كشف الحساب: كل قيد بترتيبه ورصيد الجيبين بعده — يطابق الدفتر سطراً بسطر.
+   *
+   * كان يحمّل دفتر البائع كله مع كل طلب — منذ أول قيد، في الذاكرة — ليحسب الرصيد
+   * الافتتاحي ثم يرمي ما قبل المدة. بائع نشط يصير عشرات آلاف الصفوف لكل فتح صفحة.
+   * الآن ما في المدة وحده، صفحةً صفحة (STATEMENT_PAGE)، والأرصدة مجاميع في القاعدة
+   * على الفهرس (vendorId, currency, createdAt):
+   * - الافتتاحي: كل ما قبل from — والختامي: كل ما حتى to — للمدة كلها لا للصفحة
+   * - رصيد أول سطر في الصفحة: ما حتى المؤشّر (cursor = آخر قيد في الصفحة السابقة)
+   * المؤشّر يُقارَن في القاعدة بـ (createdAt, id): الوقت مخزَّن بالميكروثانية وتاريخ
+   * JavaScript بالمللي ثانية، فمقارنته هنا تُسقط قيوداً في المللي ثانية نفسها أو تكرّرها.
+   */
+  async statement(
+    vendorId: string,
+    currency: string,
+    range: { from?: Date; to?: Date } = {},
+    cursor?: string,
+    pageSize: number = STATEMENT_PAGE,
+  ) {
+    if (range.from && range.to && range.to.getTime() - range.from.getTime() > STATEMENT_MAX_DAYS * 86_400_000) {
+      throw new InvalidInputError(`كشف الحساب لمدة ${STATEMENT_MAX_DAYS} يوماً على الأكثر — ضيّق التاريخين.`);
+    }
+    if (cursor && !(await this.prisma.ledgerEntry.findFirst({ where: { id: cursor, vendorId, currency }, select: { id: true } }))) {
+      throw new InvalidInputError('مؤشّر الصفحة لا يخصّ هذا الكشف — ابدأ من الصفحة الأولى.');
+    }
+    const from = range.from ?? null;
+    const to = range.to ?? null;
+    const after = cursor ?? null;
+    const [opening, closing, beforePage, ids] = await Promise.all([
+      from ? this.balance(Prisma.sql`"vendorId" = ${vendorId}::uuid AND "currency" = ${currency} AND "createdAt" < ${from}`) : ZERO,
+      this.balance(Prisma.sql`"vendorId" = ${vendorId}::uuid AND "currency" = ${currency} AND (${to}::timestamptz IS NULL OR "createdAt" <= ${to})`),
+      after
+        ? this.balance(Prisma.sql`"vendorId" = ${vendorId}::uuid AND "currency" = ${currency}
+            AND ("createdAt", "id") <= (SELECT c."createdAt", c."id" FROM "ledger_entries" c WHERE c."id" = ${after}::uuid)`)
+        : null,
+      this.prisma.$queryRaw<{ id: string }[]>`
+        SELECT e."id" FROM "ledger_entries" e
+        WHERE e."vendorId" = ${vendorId}::uuid AND e."currency" = ${currency}
+          AND (${from}::timestamptz IS NULL OR e."createdAt" >= ${from})
+          AND (${to}::timestamptz IS NULL OR e."createdAt" <= ${to})
+          AND (${after}::uuid IS NULL
+               OR (e."createdAt", e."id") > (SELECT c."createdAt", c."id" FROM "ledger_entries" c WHERE c."id" = ${after}::uuid))
+        ORDER BY e."createdAt", e."id"
+        LIMIT ${pageSize + 1}`,
+    ]);
+    const more = ids.length > pageSize;
+    const pageIds = ids.slice(0, pageSize).map((r) => r.id);
+    const byId = new Map(
+      (
+        await this.prisma.ledgerEntry.findMany({
+          where: { id: { in: pageIds } },
+          select: {
+            id: true,
+            createdAt: true,
+            entryType: true,
+            direction: true,
+            bucket: true,
+            amountMinorUnits: true,
+            memo: true,
+            reversesEntryId: true,
+            subOrder: { select: { subOrderNumber: true } },
+          },
+        })
+      ).map((e) => [e.id, e]),
+    );
+
+    let { pending, available } = beforePage ?? opening;
+    const rows: StatementRow[] = pageIds.map((id) => {
+      const e = byId.get(id)!;
       const s = e.direction === 'credit' ? e.amountMinorUnits : -e.amountMinorUnits;
       if (e.bucket === 'pending') pending += s;
       else available += s;
-      if (range.from && e.createdAt < range.from) {
-        opening = { pending, available };
-        continue;
-      }
-      if (range.to && e.createdAt > range.to) continue;
-      rows.push({
+      return {
         id: e.id,
         createdAt: e.createdAt,
         entryType: e.entryType,
@@ -116,43 +164,68 @@ export class FinanceService {
         reversesEntryId: e.reversesEntryId,
         pendingAfter: pending.toString(),
         availableAfter: available.toString(),
-      });
-    }
-    const last = rows[rows.length - 1];
+      };
+    });
     return {
       currency,
       opening: { pendingMinorUnits: opening.pending.toString(), availableMinorUnits: opening.available.toString() },
-      closing: {
-        pendingMinorUnits: last?.pendingAfter ?? opening.pending.toString(),
-        availableMinorUnits: last?.availableAfter ?? opening.available.toString(),
-      },
+      closing: { pendingMinorUnits: closing.pending.toString(), availableMinorUnits: closing.available.toString() },
       rows,
+      /** آخر قيد في الصفحة — يُرسل cursor للصفحة التالية؛ null حين لا صفحة بعدها */
+      nextCursor: more ? pageIds[pageIds.length - 1]! : null,
     };
   }
 
+  /** رصيد الجيبين لقيود الشرط — مجموع في القاعدة لا حلقة في الذاكرة */
+  private async balance(where: Prisma.Sql): Promise<{ pending: bigint; available: bigint }> {
+    const groups = await this.prisma.$queryRaw<{ bucket: string; direction: string; total: bigint | null }[]>`
+      SELECT "bucket", "direction", SUM("amountMinorUnits")::bigint AS total
+      FROM "ledger_entries" WHERE ${where} GROUP BY "bucket", "direction"`;
+    let pending = 0n;
+    let available = 0n;
+    for (const g of groups) {
+      const signed = g.direction === 'credit' ? (g.total ?? 0n) : -(g.total ?? 0n);
+      if (g.bucket === 'pending') pending += signed;
+      else available += signed;
+    }
+    return { pending, available };
+  }
+
+  /**
+   * التصدير هو الكشف كله للمدة: يمرّ على صفحاته بالمؤشّر فلا يُحمَّل الدفتر دفعة
+   * واحدة. بلا بداية يبدأ قبل سنة — مدة الكشف القصوى — لا منذ أول قيد.
+   */
   async statementCsv(vendorId: string, currency: string, range: { from?: Date; to?: Date } = {}): Promise<string> {
-    const s = await this.statement(vendorId, currency, range);
+    const from = range.from ?? new Date((range.to ?? new Date()).getTime() - STATEMENT_MAX_DAYS * 86_400_000);
     const esc = (v: string | null) => `"${(v ?? '').replace(/"/g, '""')}"`;
     const head = ['التاريخ', 'النوع', 'الطلب', 'الجيب', 'دائن', 'مدين', 'المعلّق بعده', 'المتاح بعده', 'ملاحظة', 'المعرّف', 'يعكس'];
-    const lines = s.rows.map((r) =>
-      [
-        r.createdAt.toISOString(),
-        r.label,
-        r.subOrderNumber,
-        r.bucket === 'pending' ? 'معلّق' : 'متاح',
-        r.direction === 'credit' ? r.amountMinorUnits : '',
-        r.direction === 'debit' ? r.amountMinorUnits : '',
-        r.pendingAfter,
-        r.availableAfter,
-        r.memo,
-        r.id,
-        r.reversesEntryId,
-      ]
-        .map((v) => esc(v))
-        .join(','),
-    );
+    const lines: string[] = [head.map(esc).join(',')];
+    let cursor: string | undefined;
+    do {
+      const page = await this.statement(vendorId, currency, { from, ...(range.to ? { to: range.to } : {}) }, cursor);
+      for (const r of page.rows) {
+        lines.push(
+          [
+            r.createdAt.toISOString(),
+            r.label,
+            r.subOrderNumber,
+            r.bucket === 'pending' ? 'معلّق' : 'متاح',
+            r.direction === 'credit' ? r.amountMinorUnits : '',
+            r.direction === 'debit' ? r.amountMinorUnits : '',
+            r.pendingAfter,
+            r.availableAfter,
+            r.memo,
+            r.id,
+            r.reversesEntryId,
+          ]
+            .map((v) => esc(v))
+            .join(','),
+        );
+      }
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
     // BOM ليقرأ Excel العربية، والمبالغ بالوحدات الصغرى كما في الدفتر
-    return `﻿${[head.map(esc).join(','), ...lines].join('\r\n')}\r\n`;
+    return `﻿${lines.join('\r\n')}\r\n`;
   }
 
   // ---------------------------------------------------------------- السحب
