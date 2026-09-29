@@ -243,7 +243,13 @@ export class AdminOrdersController {
     private readonly lifecycle: OrderLifecycleService,
   ) {}
 
+  /**
+   * التفاصيل بالصلاحية نفسها التي تفتح قائمتها (orders.manage): عنوان الشحن
+   * وحالة الدفع والمبالغ بيانات مشترٍ. كانت بالدور وحده، فمدير التسويق أو
+   * المحتوى يقرأ عنوان أي مشترٍ برقم طلبه.
+   */
   @Get(':number')
+  @RequirePermission('orders.manage')
   detail(@Param('number') number: string) {
     return this.query.adminDetail(number);
   }

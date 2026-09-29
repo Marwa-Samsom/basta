@@ -369,6 +369,22 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     expect((await vendorMove(0, a.id, 'preparing')).statusCode).toBe(200);
   });
 
+  it('تفاصيل الطلب في الإدارة بصلاحية orders.manage — لا بالدور وحده', async () => {
+    if (!dbUp) return;
+    const { order } = await placeOrder([1, 1]);
+    const c = await user('content-admin', 'admin', ['content.manage']);
+    const content = await login(c.email, generateSync({ strategy: 'totp', secret: adminTotpSecret, crypto: totpCrypto, base32: totpBase32 }));
+
+    const denied = await call('GET', `/admin/orders/${order.orderNumber}`, content);
+    expect(denied.statusCode).toBe(403);
+    expect(denied.body).not.toContain(ADDRESS.street);
+    expect(denied.body).not.toContain(ADDRESS.phone);
+    expect((await call('GET', `/admin/orders/${order.orderNumber}`, stranger.token)).statusCode).toBe(403);
+
+    const ok = await call('GET', `/admin/orders/${order.orderNumber}`, admin.token);
+    expect(ok.statusCode, ok.body).toBe(200);
+  });
+
   it('الإدارة تلغي بصلاحية orders.cancel وحدها، وبسبب مكتوب', async () => {
     if (!dbUp) return;
     const { a, b } = await placeOrder([1, 1]);
