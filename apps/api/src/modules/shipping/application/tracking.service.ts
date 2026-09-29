@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
@@ -58,17 +59,25 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
       throw new ConflictError('البوليصة تُصدر للطلب قيد التجهيز أو الجاهز للشحن.', { status: sub.status });
     }
     const addr = (sub.order.shippingAddressSnapshot ?? {}) as Record<string, string>;
-    const waybill = await this.carrier.createWaybill({
-      subOrderNumber: sub.subOrderNumber,
-      recipient: addr['recipientName'] ?? '',
-      city: addr['city'] ?? '',
-    });
-    await this.prisma.shipment.upsert({
-      where: { subOrderId },
-      create: { subOrderId, carrierCode: waybill.carrierCode, trackingNumber: waybill.trackingNumber, status: 'created' },
-      update: { carrierCode: waybill.carrierCode, trackingNumber: waybill.trackingNumber, status: 'created' },
-    });
-    return waybill;
+    // الرقم فريد لكل شركة (shipments_carrier_tracking_key): تصادم نادر يُعاد برقم جديد
+    for (let attempt = 0; ; attempt++) {
+      const waybill = await this.carrier.createWaybill({
+        subOrderNumber: sub.subOrderNumber,
+        recipient: addr['recipientName'] ?? '',
+        city: addr['city'] ?? '',
+      });
+      try {
+        await this.prisma.shipment.upsert({
+          where: { subOrderId },
+          create: { subOrderId, carrierCode: waybill.carrierCode, trackingNumber: waybill.trackingNumber, status: 'created' },
+          update: { carrierCode: waybill.carrierCode, trackingNumber: waybill.trackingNumber, status: 'created' },
+        });
+        return waybill;
+      } catch (err) {
+        if (attempt < 3 && err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') continue;
+        throw err;
+      }
+    }
   }
 
   /**
@@ -76,8 +85,9 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
    * ينقلان الفرعي عبر آلة الحالات.
    */
   async record(trackingNumber: string, code: TrackingCode, at: Date = new Date(), location?: string): Promise<boolean> {
+    // حدث الشركة لشحنتها هي: رقم يكتبه بائع لتوصيله الذاتي قد يطابق رقمها
     const shipment = await this.prisma.shipment.findFirst({
-      where: { trackingNumber },
+      where: { trackingNumber, carrierCode: this.carrier.code },
       select: { id: true, subOrderId: true, status: true, events: { select: { code: true } } },
     });
     if (!shipment) throw new NotFoundError('رقم تتبّع غير معروف.', { trackingNumber });
@@ -116,8 +126,10 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
 
   /** تتبّع عام برقم الشحنة: الأحداث وحدها — لا اسم ولا عنوان */
   async track(trackingNumber: string) {
+    // التتبّع العام لشحنات الشركات: رقم التوصيل الذاتي مرجع البائع، يتكرّر بين البائعين
+    // فيُظهر شحنة غيرك — ولا أحداث له من شركة أصلاً
     const s = await this.prisma.shipment.findFirst({
-      where: { trackingNumber },
+      where: { trackingNumber, carrierCode: { not: 'self' } },
       select: {
         carrierCode: true,
         trackingNumber: true,

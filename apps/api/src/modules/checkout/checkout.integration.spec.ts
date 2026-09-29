@@ -17,6 +17,7 @@ import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
 import { InventoryService } from '../inventory/public';
 import { FakePaymentProvider } from '../payments/public';
+import { orderNumber } from './domain/snapshot';
 import { CheckoutService } from './public';
 
 const prisma = new PrismaClient();
@@ -341,10 +342,38 @@ describe('بوابة 08 · البند 4 — انقطاع الاتصال ينته
     // الحجز باقٍ أثناء الانتظار: لا تُباع القطعة لغيره وماله ربما خُصم
     expect(pending.reservationIds.length).toBe(1);
 
-    // المشتري يعود لصفحة الطلب — السؤال عن الحالة يطلق المصالحة
-    const status = await call('GET', `/checkout/orders/${pending.orderNumber}`);
+    // رقم طلب الضيف وحده لا يفتحه ولا يطلق مصالحته: 404 كأنه غير موجود، والطلب باقٍ معلّقاً
+    for (const headers of [{}, { 'x-order-key': 'guessed-key' }]) {
+      const peek = await call('GET', `/checkout/orders/${pending.orderNumber}`, { headers });
+      expect(peek.statusCode).toBe(404);
+    }
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: pending.id } })).status).toBe('pending_payment');
+
+    // المشتري يعود لصفحة الطلب بمفتاحه — السؤال عن الحالة يطلق المصالحة
+    const key = res.json().accessKey as string;
+    expect(key).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const status = await call('GET', `/checkout/orders/${pending.orderNumber}`, { headers: { 'x-order-key': key } });
     expect(status.json().outcome).toBe('paid');
     expect(status.json().subOrderCount).toBe(1);
+  });
+
+  it('رقم الطلب من مولّد معمّى بثمانية محارف، ومفتاح الضيف يُعاد لإعادة المحاولة بالمفتاح نفسه', async () => {
+    if (!dbUp) return;
+    const numbers = new Set(Array.from({ length: 2000 }, () => orderNumber(new Date('2026-09-29T10:00:00Z'))));
+    expect(numbers.size).toBe(2000);
+    for (const n of numbers) expect(n).toMatch(/^BST-260929-[2-9A-HJ-NP-Z]{8}$/);
+
+    // إعادة «ادفع» بمفتاح عدم التكرار نفسه تعيد الطلب نفسه ومفتاحه نفسه
+    const cart = await cartWith([{ variantId: variantIds[0]!, qty: 1 }]);
+    const idem = randomUUID();
+    const first = await pay(cart, 'tok_success', idem);
+    const again = await pay(cart, 'tok_success', idem);
+    expect(again.json().orderId).toBe(first.json().orderId);
+    expect(again.json().accessKey).toBe(first.json().accessKey);
+    // والمفتاح لطلب واحد: مفتاح طلب آخر لا يفتحه
+    const other = await pay(await cartWith([{ variantId: variantIds[0]!, qty: 1 }]), 'tok_success');
+    const cross = await call('GET', `/checkout/orders/${first.json().orderNumber}`, { headers: { 'x-order-key': other.json().accessKey } });
+    expect(cross.statusCode).toBe(404);
   });
 
   it('لم يُخصم المال وانقطع الاتصال: المصالحة تحسمه فاشلاً وتحرّر الحجز', async () => {

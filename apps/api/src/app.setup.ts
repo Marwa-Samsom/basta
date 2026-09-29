@@ -50,7 +50,7 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     // رمز السلة ومفتاح عدم التكرار ترويستان مخصّصتان — غيابهما هنا يُسقط الدفع من المتصفّح وحده
-    allowedHeaders: ['authorization', 'content-type', 'x-cart-token', 'idempotency-key'],
+    allowedHeaders: ['authorization', 'content-type', 'x-cart-token', 'idempotency-key', 'x-order-key'],
   });
 
   // الحد العام أعلى حدود المسارات؛ كل مسار يضيّقه لنفسه (الاستيراد 5 م.ب)

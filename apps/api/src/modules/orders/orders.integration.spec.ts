@@ -478,6 +478,35 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect(await tracking.record(trk, 'in_transit')).toBe(false);
   });
 
+  it('رقم التتبّع لشحنته وحدها: لا يُنسخ لشركة الشحن، والتوصيل الذاتي لا يُظهر شحنة غيره', async () => {
+    if (!dbUp) return;
+    const { a, b } = await placeOrder([1, 1]);
+    const trk = await deliver(0, a.id);
+    for (const to of ['accepted', 'preparing', 'ready_to_ship']) expect((await vendorMove(1, b.id, to)).statusCode).toBe(200);
+
+    // بائع آخر يكتب رقم شحنة غيره لشركة الشحن نفسها: فريد لكل شركة — 409 ولا يُشحن
+    const hijack = await vendorMove(1, b.id, 'shipped', { tracking: trk, carrierCode: 'basta-express' });
+    expect(hijack.statusCode, hijack.body).toBe(409);
+    expect((await prisma.subOrder.findUniqueOrThrow({ where: { id: b.id } })).status).toBe('ready_to_ship');
+
+    // وللتوصيل الذاتي مرجعه يكتبه كما يشاء — ولو طابق رقماً لشركة
+    expect((await vendorMove(1, b.id, 'shipped', { tracking: trk })).statusCode).toBe(200);
+
+    // التتبّع العام يعرض شحنة الشركة لا الذاتية
+    const res = await call('GET', `/track/${trk}`);
+    expect(res.json().carrierCode).toBe('basta-express');
+    expect(res.json().events).toHaveLength(4);
+
+    // مرجع توصيل ذاتي ليس رقماً لشركة: لا يُتتبَّع علناً، وحدث «سُلّم» باسم الشركة لا يصيبه
+    const { b: c } = await placeOrder([1, 1]);
+    for (const to of ['accepted', 'preparing', 'ready_to_ship']) expect((await vendorMove(1, c.id, to)).statusCode).toBe(200);
+    const ref = `SELF-${randomUUID().slice(0, 8)}`;
+    expect((await vendorMove(1, c.id, 'shipped', { tracking: ref })).statusCode).toBe(200);
+    expect((await call('GET', `/track/${ref}`)).statusCode).toBe(404);
+    await expect(tracking.record(ref, 'delivered')).rejects.toThrow(/رقم تتبّع غير معروف/);
+    expect((await prisma.subOrder.findUniqueOrThrow({ where: { id: c.id } })).status).toBe('shipped');
+  });
+
   it('نزاع مفتوح يجمّد الإكمال، والتصعيد يصل الإدارة، والحسم يفكّه', async () => {
     if (!dbUp) return;
     const { a, b } = await placeOrder([1, 1]);

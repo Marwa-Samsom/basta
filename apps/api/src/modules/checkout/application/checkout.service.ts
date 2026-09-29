@@ -15,7 +15,8 @@ import { format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type ChargeOutcome, type PaymentProvider } from '../../payments/public';
 import { PricingService } from '../../pricing/public';
-import { orderNumber, toSnapshot, type Snapshot } from '../domain/snapshot';
+import { guestOrderKey, orderNumber, toSnapshot, type Snapshot } from '../domain/snapshot';
+import { loadEnv } from '../../../common/config/env';
 
 export interface CheckoutAddress {
   readonly recipientName: string;
@@ -58,6 +59,8 @@ export interface OrderResult {
   readonly subOrderCount: number;
   readonly actionUrl?: string;
   readonly failure?: { code: string; message: string };
+  /** لطلب الضيف وحده: يُرسل في x-order-key لقراءة حالته (guestOrderKey) */
+  readonly accessKey?: string;
 }
 
 /**
@@ -704,6 +707,7 @@ export class CheckoutService {
         status: true,
         currency: true,
         grandTotalMinorUnits: true,
+        customerUserId: true,
         _count: { select: { subOrders: true } },
         payment: { select: { status: true, providerIntentId: true, failureCode: true, failureMessage: true } },
       },
@@ -719,6 +723,8 @@ export class CheckoutService {
       outcome,
       total: { minorUnits: order.grandTotalMinorUnits.toString(), currency: order.currency },
       subOrderCount: order._count.subOrders,
+      // تصل النتيجة من وضع الطلب (أو أعاده بمفتاح عدم التكرار نفسه) أو من أثبت المفتاح
+      ...(order.customerUserId ? {} : { accessKey: guestOrderKey(order.id, loadEnv().jwtAccessSecret) }),
       ...(outcome === 'requires_action' && order.payment?.providerIntentId
         ? { actionUrl: `/checkout/verify?intent=${order.payment.providerIntentId}` }
         : {}),

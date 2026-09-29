@@ -5,6 +5,7 @@
  * بـ Number في مكان ما تفقد الدقة فوق 2^53 بصمت (ADR-001).
  */
 import type { Breakdown, PricedCart, PricedLine, PricedSubOrder } from '../../pricing/public';
+import { createHmac, hkdfSync, randomInt, timingSafeEqual } from 'node:crypto';
 
 type Stringified<T> = {
   [K in keyof T]: T[K] extends bigint
@@ -79,10 +80,30 @@ export function toSnapshot(cart: PricedCart): Snapshot {
 
 /** رقم طلب يقرؤه إنسان على الهاتف: بلا حروف متشابهة (0/O، 1/I) */
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+/** 32^8 ≈ تريليون رقم لكل يوم — كان ستة من Math.random (مليار، ومولّد غير معمّى) */
+export const ORDER_TAIL = 8;
 
-export function orderNumber(now: Date, random: () => number = Math.random): string {
+export function orderNumber(now: Date, random: (max: number) => number = randomInt): string {
   const date = now.toISOString().slice(2, 10).replace(/-/g, '');
   let tail = '';
-  for (let i = 0; i < 6; i++) tail += ALPHABET[Math.floor(random() * ALPHABET.length)];
+  for (let i = 0; i < ORDER_TAIL; i++) tail += ALPHABET[random(ALPHABET.length)];
   return `BST-${date}-${tail}`;
+}
+
+/**
+ * مفتاح طلب الضيف. الرقم يُقرأ على الهاتف ويُكتب في رسائل ولقطات شاشة — ليس سرّاً؛
+ * وطلب الضيف بلا حساب يحرسه، فكان رقمه وحده يفتح حالته ومبلغه ويطلق مصالحته.
+ * المفتاح HMAC لمعرّف الطلب بسرّ الخادم: لا يُخزَّن، ويُعاد حسابه لإعادة المحاولة
+ * بمفتاح عدم التكرار نفسه، ولا يُشتقّ من الرقم.
+ */
+export function guestOrderKey(orderId: string, secret: string): string {
+  const key = hkdfSync('sha256', secret, 'basta', 'guest-order-key', 32);
+  return createHmac('sha256', Buffer.from(key)).update(orderId).digest('base64url');
+}
+
+export function guestOrderKeyMatches(orderId: string, secret: string, presented: string | undefined): boolean {
+  if (!presented) return false;
+  const expected = Buffer.from(guestOrderKey(orderId, secret));
+  const given = Buffer.from(presented);
+  return expected.length === given.length && timingSafeEqual(expected, given);
 }

@@ -9,12 +9,15 @@ import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
 import { cartApi, cartHeaders, type CartView } from '@/lib/cart';
 import { attemptKey, definitive, endAttempt } from '@/lib/checkout-attempt';
+import { rememberOrderKey } from '@/lib/order-key';
 import { imageUrl } from '@/lib/storefront';
 
 interface OrderResult {
   orderId: string;
   orderNumber: string;
   outcome: 'paid' | 'failed' | 'requires_action' | 'pending';
+  /** لطلب الضيف: مفتاح قراءة حالته */
+  accessKey?: string;
 }
 
 /** بطاقات المزوّد الوهمي — كل واحدة تصنع حالة من حالات البوابة (ADR-012) */
@@ -208,6 +211,7 @@ export default function CheckoutPage() {
       // الخادم أجاب بطلب معروف — مدفوعاً أو مرفوضاً أو معلّقاً تحسمه المصالحة.
       // الشراء التالية (بطاقة أخرى، أو سلة جديدة) محاولة جديدة بمفتاح جديد
       endAttempt();
+      rememberOrderKey(result.orderNumber, result.accessKey);
       router.push(`/orders/${result.orderNumber}`);
     } catch (err) {
       if (err instanceof ApiError && Array.isArray(err.details?.['blockers'])) {

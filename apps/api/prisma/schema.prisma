@@ -975,6 +975,7 @@ model Shipment {
   subOrder SubOrder        @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
   events   ShipmentEvent[]
 
+  @@index([trackingNumber])
   @@map("shipments")
 }
 
