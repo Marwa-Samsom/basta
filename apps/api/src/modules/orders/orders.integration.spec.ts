@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
+import { LedgerService } from '../finance/public';
 import { NotificationsService } from '../notifications/public';
 import { FakePaymentProvider } from '../payments/public';
 import { TrackingService } from '../shipping/public';
@@ -621,5 +622,71 @@ describe('استرداد عالق في processing — سقط منفّذه فيُ
       select: { payloadJson: true },
     });
     expect(notes.filter((n) => (n.payloadJson as Record<string, string>)['order_number'] === order.order.orderNumber)).toHaveLength(1);
+  });
+});
+
+describe('حسم النزاع لصالح المشتري يردّ ماله — ولا يُحرَّر للبائع', () => {
+  const pendingNet = async (subId: string) =>
+    (await prisma.ledgerEntry.findMany({ where: { refType: 'sub_order', refId: subId, bucket: 'pending' } })).reduce(
+      (a, r) => a + (r.direction === 'credit' ? r.amountMinorUnits : -r.amountMinorUnits),
+      0n,
+    );
+  async function disputed() {
+    const { a, order } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_as_described', message: 'وصلت القطعة مكسورة تماماً' });
+    expect(opened.statusCode, opened.body).toBe(201);
+    return { a, order, id: opened.json().id as string };
+  }
+  const resolveForCustomer = (id: string) =>
+    call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'customer', resolution: 'القطعة مكسورة بالصور — يُردّ المبلغ كاملاً' });
+
+  it('يُردّ ما دفعه المشتري للمتجر كله، ويصير الفرعي مسترَداً، ولا يبقى للبائع معلّق', async () => {
+    if (!dbUp) return;
+    const { a, order, id } = await disputed();
+    expect(await pendingNet(a.id)).toBeGreaterThan(0n);
+
+    const r = await resolveForCustomer(id);
+    expect(r.statusCode, r.body).toBe(204);
+
+    expect((await prisma.dispute.findUniqueOrThrow({ where: { id } })).status).toBe('resolved_customer');
+    expect(await statusOf(a.id)).toBe('refunded');
+    const refund = await prisma.refund.findFirstOrThrow({ where: { subOrderId: a.id } });
+    expect(refund.status).toBe('succeeded');
+    expect(refund.amountMinorUnits).toBe(a.chargeTotalMinorUnits);
+    expect(fake.refundsOf(order.payment!.providerIntentId!)).toContain(a.chargeTotalMinorUnits);
+    // مال البائع عن هذا الفرعي عُكس — لا شيء يحرّره الإغلاق
+    expect(await pendingNet(a.id)).toBe(0n);
+  });
+
+  it('فشل تسجيل الاسترداد يُبقي النزاع مفتوحاً والمال مجمّداً', async () => {
+    if (!dbUp) return;
+    const { a, id } = await disputed();
+    const ledger = app.get(LedgerService);
+    const original = ledger.postFullRefund.bind(ledger);
+    ledger.postFullRefund = async () => {
+      throw new Error('انقطع الاتصال بالقاعدة');
+    };
+    try {
+      expect((await resolveForCustomer(id)).statusCode).toBe(500);
+    } finally {
+      ledger.postFullRefund = original;
+    }
+    expect((await prisma.dispute.findUniqueOrThrow({ where: { id } })).status).toBe('open');
+    expect(await statusOf(a.id)).toBe('delivered');
+    expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(0);
+
+    // وتصحّ الإعادة بعدها
+    expect((await resolveForCustomer(id)).statusCode).toBe(204);
+    expect(await statusOf(a.id)).toBe('refunded');
+  });
+
+  it('مسار الانتقال العام لا يجعل الفرعي «مسترَداً» بلا ردّ — ولو بصلاحية orders.manage', async () => {
+    if (!dbUp) return;
+    const { a } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const r = await call('POST', `/admin/orders/stores/${a.id}/transition`, admin.token, { to: 'refunded' });
+    expect(r.statusCode).toBeGreaterThanOrEqual(400);
+    expect(await statusOf(a.id)).toBe('delivered');
   });
 });

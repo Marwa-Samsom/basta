@@ -58,19 +58,27 @@ const RULES: Readonly<Record<SubOrderStatus, readonly Rule[]>> = Object.freeze({
   shipped: [
     { to: 'delivered', actors: ['vendor', 'carrier', 'admin'] },
     { to: 'delivery_failed', actors: ['vendor', 'carrier'] },
+    // حسم نزاع لصالح المشتري (disputes.resolve): النظام وحده — لا طريق للإدارة إليه من مسار الانتقال العام
+    { to: 'refunded', actors: ['system'] },
   ],
   delivery_failed: [
     { to: 'shipped', actors: ['vendor', 'carrier'] },
     { to: 'returned', actors: ['vendor', 'admin'] },
+    // حسم نزاع لصالح المشتري (disputes.resolve): النظام وحده — لا طريق للإدارة إليه من مسار الانتقال العام
+    { to: 'refunded', actors: ['system'] },
   ],
   delivered: [
     { to: 'return_requested', actors: ['customer'] },
     // النظام وحده يكمل: 14 يوماً بلا نزاع — لا يُعلنها بائع ولا مشترٍ
     { to: 'completed', actors: ['system'] },
+    // حسم نزاع لصالح المشتري (disputes.resolve): النظام وحده — لا طريق للإدارة إليه من مسار الانتقال العام
+    { to: 'refunded', actors: ['system'] },
   ],
   return_requested: [
     { to: 'returned', actors: ['vendor', 'admin'] },
     { to: 'delivered', actors: ['vendor', 'admin'], requiresReason: true },
+    // حسم نزاع لصالح المشتري (disputes.resolve): النظام وحده — لا طريق للإدارة إليه من مسار الانتقال العام
+    { to: 'refunded', actors: ['system'] },
   ],
   returned: [{ to: 'refunded', actors: ['system', 'admin'] }],
   rejected_by_vendor: [{ to: 'refunded', actors: ['system'] }],
