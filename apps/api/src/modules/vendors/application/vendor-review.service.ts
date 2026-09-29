@@ -148,6 +148,8 @@ export class VendorReviewService {
         status: 'approved',
         approvedAt: new Date(),
         approvedBy: actor.userId,
+        // الاعتماد يثبّت العملة (ADR-013): بعده تُسعَّر المنتجات والشحن وتُفتح المحفظة بها
+        settlementCurrencyLockedAt: vendor.settlementCurrencyLockedAt ?? new Date(),
         rejectionReason: null,
         rejectedAt: null,
       },

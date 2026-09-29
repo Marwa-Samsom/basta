@@ -219,16 +219,44 @@ export function assertSettlementCurrency(currency: string): void {
   }
 }
 
+/** حالات التأهيل التي تتغيّر فيها العملة — قبل الإرسال للمراجعة أو بعد رفضه */
+const CURRENCY_OPEN_STATES: readonly VendorLifecycle[] = ['pending', 'rejected'];
+
+/** العملة مقفلة في عين البائع: مثبَّتة، أو المتجر تجاوز التأهيل — الواجهة لا تعرض ما سيُرفض */
+export const currencyLocked = (lockedAt: Date | null, status: VendorLifecycle): boolean =>
+  lockedAt !== null || !CURRENCY_OPEN_STATES.includes(status);
+
 /**
  * ADR-013: عملة التسوية تُثبَّت ولا تُغيَّر بعد تثبيتها.
  * تغييرها لاحقاً يعني محفظة جديدة وتسوية القديمة وأسعاراً أُعيد تفسيرها —
  * فالمنع هنا أرخص من التصحيح هناك.
+ *
+ * التثبيت كان اختيارياً (lock في الطلب): متجر لم يثبّتها يُعتمد ويبيع ثم يغيّرها،
+ * فتُقرأ كل أسعاره وأسعار شحنه بعملة أخرى — 19.900 د.أ مخزّنة 19900 تصير 199.00 ر.س.
+ * الآن ثلاثة شروط لا شرط واحد:
+ * - غير مثبَّتة (والاعتماد يثبّتها)
+ * - المتجر في التأهيل (pending أو rejected): ما يراجعه المدير هو ما يُعتمد
+ * - لا شيء مسعَّر بها بعد: متغيّر منتج أو سعر شحن أو طلب
  */
-export function assertCurrencyChangeable(lockedAt: Date | null): void {
-  if (lockedAt !== null) {
+export function assertCurrencyChangeable(state: {
+  lockedAt: Date | null;
+  status: VendorLifecycle;
+  priced: boolean;
+}): void {
+  if (state.lockedAt !== null) {
     throw new ConflictError(
       'عملة التسوية مثبَّتة ولا يمكن تغييرها. راسل الدعم إن كان التثبيت خطأً.',
-      { lockedAt: lockedAt.toISOString() },
+      { lockedAt: state.lockedAt.toISOString() },
+    );
+  }
+  if (!CURRENCY_OPEN_STATES.includes(state.status)) {
+    throw new ConflictError('عملة التسوية تتغيّر قبل إرسال الطلب للمراجعة فقط. راسل الدعم إن احتجت تغييرها.', {
+      status: state.status,
+    });
+  }
+  if (state.priced) {
+    throw new ConflictError(
+      'أسعار منتجاتك أو شحنك مكتوبة بالعملة الحالية — تغييرها يغيّر معنى كل سعر. احذف المسعَّر أولاً أو راسل الدعم.',
     );
   }
 }

@@ -103,7 +103,7 @@ export default function CurrencyPage() {
       <div className="vo-callout vo-callout--warning" role="note">
         <Icon name="alert" size={19} />
         <div className="vo-callout__text">
-          <p className="vo-callout__title">لا يمكن تغيير العملة بعد أول عملية بيع</p>
+          <p className="vo-callout__title">تُثبَّت العملة عند اعتماد متجرك — ولا تتغيّر بعد أن تسعّر بها منتجاً أو شحناً</p>
           <p className="vo-callout__body">اختر العملة التي تتعامل بها فعلياً مع بنكك.</p>
         </div>
       </div>

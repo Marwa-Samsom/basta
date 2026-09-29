@@ -169,6 +169,27 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(roles.map((r) => r.role)).toContain('vendor_owner');
   });
 
+  it('VD-04: العملة تتغيّر في التأهيل ما دام لا شيء مسعَّراً بها — ADR-013', async () => {
+    if (!dbUp) return;
+    const put = (payload: object) => app.inject({ method: 'PUT', ...api('/vendor/onboarding/settlement-currency', sellerToken), payload });
+    const sar = await put({ currency: 'SAR' });
+    expect(sar.statusCode, sar.body).toBe(200);
+    expect(sar.json().settlementCurrency).toBe('SAR');
+    expect((await put({ currency: 'JOD' })).statusCode).toBe(200);
+
+    // سعر شحن مكتوب بالدينار: تغيير العملة يغيّر معناه — يُمنع
+    const zone = await prisma.shippingZone.create({
+      data: { vendorId, nameAr: 'الأردن', regions: { create: { country: 'JO' } }, rates: { create: { method: 'flat', priceMinorUnits: 2_500n } } },
+    });
+    const priced = await put({ currency: 'SAR' });
+    expect(priced.statusCode).toBe(409);
+    expect(priced.json().message).toMatch(/مكتوبة بالعملة الحالية/);
+    // والعملة نفسها لا تغيّر معنى شيء
+    expect((await put({ currency: 'JOD' })).statusCode).toBe(200);
+    await prisma.shippingZone.delete({ where: { id: zone.id } });
+    expect((await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } })).settlementCurrency).toBe('JOD');
+  });
+
   it('VD-01: الرابط المستعمَل يُقترح له بديل لا يُرفض جافاً', async () => {
     if (!dbUp) return;
     const res = await app.inject({
@@ -350,31 +371,24 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(res.statusCode).toBe(409);
   });
 
-  it('VD-04: عملة التسوية تُثبَّت مرة واحدة ولا رجعة — ADR-013', async () => {
+  it('VD-04: الاعتماد يثبّت العملة ولا رجعة — ADR-013', async () => {
     if (!dbUp) return;
-    const change = await app.inject({
-      method: 'PUT',
-      ...api('/vendor/onboarding/settlement-currency', sellerToken),
-      payload: { currency: 'SAR' },
-    });
-    expect(change.statusCode, change.body).toBe(200);
-    expect(change.json().settlementCurrency).toBe('SAR');
-
-    const lock = await app.inject({
-      method: 'PUT',
-      ...api('/vendor/onboarding/settlement-currency', sellerToken),
-      payload: { currency: 'JOD', lock: true },
-    });
-    expect(lock.statusCode).toBe(200);
-    expect(lock.json().settlementCurrencyLocked).toBe(true);
-
-    const after = await app.inject({
-      method: 'PUT',
-      ...api('/vendor/onboarding/settlement-currency', sellerToken),
-      payload: { currency: 'USD' },
-    });
+    const put = (payload: object) => app.inject({ method: 'PUT', ...api('/vendor/onboarding/settlement-currency', sellerToken), payload });
+    // لم يثبّتها البائع قط (القيمة الافتراضية من البلد)، والاعتماد ثبّتها
+    const view = await app.inject({ method: 'GET', ...api('/vendor/onboarding', sellerToken) });
+    expect(view.json().settlementCurrencyLocked).toBe(true);
+    const after = await put({ currency: 'USD' });
     expect(after.statusCode).toBe(409);
     expect(after.json().message).toMatch(/مثبَّتة/);
+
+    // متجر اعتُمد قبل التثبيت التلقائي ولم يثبّتها: يبيع — فلا تتغيّر أيضاً
+    const locked = (await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } })).settlementCurrencyLockedAt;
+    await prisma.vendor.update({ where: { id: vendorId }, data: { settlementCurrencyLockedAt: null } });
+    const legacy = await put({ currency: 'USD' });
+    expect(legacy.statusCode).toBe(409);
+    expect(legacy.json().message).toMatch(/قبل إرسال الطلب/);
+    await prisma.vendor.update({ where: { id: vendorId }, data: { settlementCurrencyLockedAt: locked } });
+    expect((await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } })).settlementCurrency).toBe('JOD');
   });
 
   it('VD-05: ملف المتجر يُحفظ بعد الاعتماد', async () => {
