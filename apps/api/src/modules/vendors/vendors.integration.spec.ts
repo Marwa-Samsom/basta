@@ -147,6 +147,9 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     const view = res.json().vendor;
     // الرمز القديم صدر لعميل بلا متجر: الرحلة تكمل بالرمز الجديد لا بخروج وعودة
     expect(res.json().tokens.accessToken).toBeTruthy();
+    // ورمز التحديث الجديد كوكي HttpOnly كما في الدخول — لا في الجسم
+    expect(res.json().tokens).not.toHaveProperty('refreshToken');
+    expect(String(res.headers['set-cookie'])).toMatch(/^basta_rt=[\w-]+;.*HttpOnly/);
     sellerToken = res.json().tokens.accessToken;
     vendorId = view.id;
     createdVendorIds.push(vendorId);

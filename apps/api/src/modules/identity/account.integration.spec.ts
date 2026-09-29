@@ -23,7 +23,7 @@ type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
 const call = (
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   url: string,
-  opts: { token?: string; body?: unknown; ua?: string } = {},
+  opts: { token?: string; body?: unknown; ua?: string; cookie?: string } = {},
 ): Promise<Res> =>
   app.inject({
     method,
@@ -32,9 +32,18 @@ const call = (
     headers: {
       'user-agent': opts.ua ?? 'vitest-agent',
       ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
+      ...(opts.cookie ? { cookie: `basta_rt=${opts.cookie}` } : {}),
     },
     ...(opts.body !== undefined ? { payload: opts.body as Record<string, unknown> } : {}),
   });
+
+/** رمز التحديث من كوكي الردّ — لا يصل في الجسم */
+const rtOf = (res: Res): string => {
+  const raw = res.headers['set-cookie'];
+  const line = (Array.isArray(raw) ? raw : [raw ?? '']).find((c) => c.startsWith('basta_rt='));
+  if (!line) throw new Error(`لا كوكي تحديث: ${res.statusCode} ${res.body}`);
+  return line.slice('basta_rt='.length).split(';')[0]!;
+};
 
 const emailOf = (tag: string) => `${tag}.${SUFFIX}@basta.test`;
 
@@ -47,7 +56,7 @@ async function register(tag: string): Promise<string> {
 async function login(tag: string, password = PASSWORD, ua = 'vitest-agent'): Promise<{ accessToken: string; refreshToken: string }> {
   const r = await call('POST', '/auth/login', { body: { email: emailOf(tag), password }, ua });
   expect(r.statusCode, r.body).toBe(200);
-  return r.json().tokens;
+  return { accessToken: r.json().tokens.accessToken, refreshToken: rtOf(r) };
 }
 
 const sidOf = (accessToken: string): string =>
@@ -215,7 +224,7 @@ describe('SH-04 · استعادة كلمة المرور', () => {
     expect(ok.statusCode, ok.body).toBe(200);
     expect(await prisma.refreshToken.count({ where: { userId, revokedAt: null } })).toBe(0);
     for (const s of [s1, s2]) {
-      expect((await call('POST', '/auth/refresh', { body: { refreshToken: s.refreshToken } })).statusCode).toBe(401);
+      expect((await call('POST', '/auth/refresh', { cookie: s.refreshToken })).statusCode).toBe(401);
     }
     expect((await call('POST', '/auth/login', { body: { email: emailOf('reset'), password: PASSWORD } })).statusCode).toBe(401);
     await login('reset', NEW);
@@ -274,9 +283,9 @@ describe('ST-25 · الملف وكلمة المرور والجلسات', () => {
     const r = await call('POST', '/me/account/sessions/revoke-others', { token: me.accessToken });
     expect(r.statusCode, r.body).toBe(200);
     expect(r.json().revokedSessions).toBe(1);
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: other.refreshToken } })).statusCode).toBe(401);
+    expect((await call('POST', '/auth/refresh', { cookie: other.refreshToken })).statusCode).toBe(401);
     // الجلسة الحالية حيّة، وتدويرها يُبقي معرّفها
-    const rotated = await call('POST', '/auth/refresh', { body: { refreshToken: me.refreshToken } });
+    const rotated = await call('POST', '/auth/refresh', { cookie: me.refreshToken });
     expect(rotated.statusCode).toBe(200);
     expect(sidOf(rotated.json().accessToken)).toBe(sidOf(me.accessToken));
   });
@@ -293,7 +302,7 @@ describe('ST-25 · الملف وكلمة المرور والجلسات', () => {
 
     const r = await call('DELETE', `/me/account/sessions/${sidOf(victim.accessToken)}`, { token: intruder.accessToken });
     expect(r.statusCode).toBe(404);
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: victim.refreshToken } })).statusCode).toBe(200);
+    expect((await call('POST', '/auth/refresh', { cookie: victim.refreshToken })).statusCode).toBe(200);
 
     // وصاحبها يُنهيها
     const second = await login('victim');
@@ -315,14 +324,63 @@ describe('ST-25 · الملف وكلمة المرور والجلسات', () => {
     const ok = await call('POST', '/me/account/password', { token: me.accessToken, body: { currentPassword: PASSWORD, newPassword: NEW } });
     expect(ok.statusCode, ok.body).toBe(200);
     expect(ok.json()).toEqual({ revokedSessions: 1, currentKept: true });
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: other.refreshToken } })).statusCode).toBe(401);
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: me.refreshToken } })).statusCode).toBe(200);
+    expect((await call('POST', '/auth/refresh', { cookie: other.refreshToken })).statusCode).toBe(401);
+    expect((await call('POST', '/auth/refresh', { cookie: me.refreshToken })).statusCode).toBe(200);
     await login('chpw', NEW);
   });
 });
 
+describe('رمز التحديث كوكي HttpOnly — لا يقرؤه سكربت', () => {
+  const cookieLine = (res: Res) => {
+    const raw = res.headers['set-cookie'];
+    return (Array.isArray(raw) ? raw : [raw ?? '']).find((c) => c.startsWith('basta_rt=')) ?? '';
+  };
+
+  it('الدخول: الرمز في كوكي HttpOnly محصور بمسارات /auth، ولا أثر له في الجسم', async () => {
+    if (!dbUp) return;
+    await register('rt-cookie');
+    const r = await call('POST', '/auth/login', { body: { email: emailOf('rt-cookie'), password: PASSWORD } });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().tokens.accessToken).toBeTruthy();
+    expect(r.json().tokens).not.toHaveProperty('refreshToken');
+    expect(r.body).not.toContain(rtOf(r));
+
+    const attrs = cookieLine(r).split(';').map((a) => a.trim());
+    expect(attrs).toContain('HttpOnly');
+    expect(attrs).toContain('SameSite=Strict');
+    expect(attrs).toContain('Path=/api/v1/auth');
+    expect(attrs).toContain(`Max-Age=${30 * 86_400}`);
+  });
+
+  it('التدوير يقرأ الكوكي وحده — الرمز في الجسم لا يُقبل — ويعيد الجديد كوكياً', async () => {
+    if (!dbUp) return;
+    await register('rt-rotate');
+    const s = await login('rt-rotate');
+    const inBody = await call('POST', '/auth/refresh', { body: { refreshToken: s.refreshToken } });
+    expect(inBody.statusCode).toBe(401);
+
+    const r = await call('POST', '/auth/refresh', { cookie: s.refreshToken });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().accessToken).toBeTruthy();
+    expect(r.json()).not.toHaveProperty('refreshToken');
+    const next = rtOf(r);
+    expect(next).not.toBe(s.refreshToken);
+    expect((await call('POST', '/auth/refresh', { cookie: next })).statusCode).toBe(200);
+  });
+
+  it('الخروج يُبطل رمز الكوكي ويمسحه', async () => {
+    if (!dbUp) return;
+    await register('rt-logout');
+    const s = await login('rt-logout');
+    const out = await call('POST', '/auth/logout', { cookie: s.refreshToken });
+    expect(out.statusCode).toBe(204);
+    expect(cookieLine(out)).toMatch(/^basta_rt=;.*Max-Age=0/);
+    expect((await call('POST', '/auth/refresh', { cookie: s.refreshToken })).statusCode).toBe(401);
+  });
+});
+
 describe('تدوير رمز التحديث تحت التزامن', () => {
-  const refresh = (refreshToken: string, ua = 'vitest-agent') => call('POST', '/auth/refresh', { body: { refreshToken }, ua });
+  const refresh = (refreshToken: string, ua = 'vitest-agent') => call('POST', '/auth/refresh', { cookie: refreshToken, ua });
 
   it('خمسة تجديدات متزامنة بالرمز نفسه: جلسة واحدة لا خمس، والبقية 409 بلا إنهاء الجلسة', async () => {
     if (!dbUp) return;
@@ -338,7 +396,7 @@ describe('تدوير رمز التحديث تحت التزامن', () => {
     // رمز واحد حيّ في العائلة — خلف الفائز — والجلسة لم تُنهَ
     const live = await prisma.refreshToken.findMany({ where: { userId, revokedAt: null } });
     expect(live).toHaveLength(1);
-    const next = ok[0]!.json().refreshToken as string;
+    const next = rtOf(ok[0]!);
     expect((await refresh(next)).statusCode).toBe(200);
   });
 
@@ -353,7 +411,7 @@ describe('تدوير رمز التحديث تحت التزامن', () => {
     expect(thief.statusCode).toBe(401);
     expect(thief.json().message).toMatch(/استعمال مكرّر/);
     expect(await prisma.refreshToken.count({ where: { userId, revokedAt: null } })).toBe(0);
-    expect((await refresh(first.json().refreshToken)).statusCode).toBe(401);
+    expect((await refresh(rtOf(first))).statusCode).toBe(401);
   });
 
   it('بعد المهلة ولو من الجهاز نفسه: سرقة', async () => {
@@ -375,7 +433,7 @@ describe('تدوير رمز التحديث تحت التزامن', () => {
     if (!dbUp) return;
     await register('rot-logout');
     const s = await login('rot-logout');
-    expect((await call('POST', '/auth/logout', { token: s.accessToken, body: { refreshToken: s.refreshToken } })).statusCode).toBeLessThan(300);
+    expect((await call('POST', '/auth/logout', { token: s.accessToken, cookie: s.refreshToken })).statusCode).toBeLessThan(300);
     expect((await refresh(s.refreshToken)).statusCode).toBe(401);
   });
 });
@@ -388,7 +446,7 @@ describe('رمز الوصول يُقرأ مع القاعدة — لا ينتظر
     await register('live-logout');
     const s = await login('live-logout');
     expect((await me(s.accessToken)).statusCode).toBe(200);
-    await call('POST', '/auth/logout', { token: s.accessToken, body: { refreshToken: s.refreshToken } });
+    await call('POST', '/auth/logout', { token: s.accessToken, cookie: s.refreshToken });
     expect((await me(s.accessToken)).statusCode).toBe(401);
   });
 

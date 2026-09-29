@@ -41,7 +41,7 @@ export class TokenService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private static refreshTtlMs(): number {
+  static refreshTtlMs(): number {
     const raw = loadEnv().jwtRefreshTtl;
     const days = Number(raw.replace('d', '')) || 30;
     return days * 86_400_000;

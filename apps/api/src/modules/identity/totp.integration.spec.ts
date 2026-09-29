@@ -22,14 +22,26 @@ const crypto = new NobleCryptoPlugin();
 const base32 = new ScureBase32Plugin();
 
 type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
-const call = (method: 'GET' | 'POST', url: string, opts: { token?: string; body?: unknown } = {}): Promise<Res> =>
+const call = (method: 'GET' | 'POST', url: string, opts: { token?: string; body?: unknown; cookie?: string } = {}): Promise<Res> =>
   app.inject({
     method,
     url: `/api/v1${url}`,
     remoteAddress: '10.9.1.1',
-    headers: { 'user-agent': 'vitest-agent', ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) },
+    headers: {
+      'user-agent': 'vitest-agent',
+      ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
+      ...(opts.cookie ? { cookie: `basta_rt=${opts.cookie}` } : {}),
+    },
     ...(opts.body !== undefined ? { payload: opts.body as Record<string, unknown> } : {}),
   });
+
+/** رمز التحديث من كوكي الردّ — لا يصل في الجسم */
+const rtOf = (res: Res): string => {
+  const raw = res.headers['set-cookie'];
+  const line = (Array.isArray(raw) ? raw : [raw ?? '']).find((c) => c.startsWith('basta_rt='));
+  if (!line) throw new Error(`لا كوكي تحديث: ${res.statusCode} ${res.body}`);
+  return line.slice('basta_rt='.length).split(';')[0]!;
+};
 
 const emailOf = (tag: string) => `${tag}.${SUFFIX}@basta.test`;
 const totpOf = (secret: string) => generateSync({ strategy: 'totp', secret, crypto, base32 });
@@ -95,7 +107,7 @@ describe('التحقق بخطوتين لغير المدير', () => {
     if (!dbUp) return;
     const userId = await register('enable');
     const before = await loginRaw('enable');
-    const oldRefresh = before.json().tokens.refreshToken;
+    const oldRefresh = rtOf(before);
 
     const { codes } = await enable('enable', userId);
     expect(codes).toHaveLength(10);
@@ -107,7 +119,7 @@ describe('التحقق بخطوتين لغير المدير', () => {
     for (const r of rows) for (const c of codes) expect(r.codeHash).not.toContain(c.replace('-', ''));
 
     // الجلسة التي سبقت التفعيل لا تتجدّد: كل جهاز يدخل بالرمز من جديد
-    const refreshed = await call('POST', '/auth/refresh', { body: { refreshToken: oldRefresh } });
+    const refreshed = await call('POST', '/auth/refresh', { cookie: oldRefresh });
     expect(refreshed.statusCode).toBe(401);
 
     // الثغرة المغلقة: جلسة (ولو مسروقة) لا تبدأ تهيئة جديدة تصفّر التحقق المفعَّل
@@ -303,7 +315,7 @@ describe('إعادة الضبط من الإدارة', () => {
     const victimId = await register('lost');
     const { secret } = await enable('lost', victimId);
     const victimSession = await loginRaw('lost', totpOf(secret));
-    const victimRefresh = victimSession.json().tokens.refreshToken;
+    const victimRefresh = rtOf(victimSession);
 
     const support = await admin('support', ['customers.manage']);
     const outsider = await admin('outsider', ['reports.view']);
@@ -322,7 +334,7 @@ describe('إعادة الضبط من الإدارة', () => {
     expect(ok.statusCode, ok.body).toBe(204);
 
     expect(await prisma.totpRecoveryCode.count({ where: { userId: victimId } })).toBe(0);
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: victimRefresh } })).statusCode).toBe(401);
+    expect((await call('POST', '/auth/refresh', { cookie: victimRefresh })).statusCode).toBe(401);
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { entityId: victimId, action: 'customer.totp_reset' } });
     expect((audit.afterJson as Record<string, string>)['reason']).toBe(reason);
     expect(await prisma.notification.count({ where: { userId: victimId, templateCode: 'totp_reset_by_admin' } })).toBeGreaterThan(0);

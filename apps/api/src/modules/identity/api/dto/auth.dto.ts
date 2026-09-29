@@ -71,13 +71,6 @@ export class TotpDisableDto extends TotpCodeDto {
   password!: string;
 }
 
-export class RefreshDto {
-  @ApiProperty()
-  @IsString()
-  @Length(20, 400)
-  refreshToken!: string;
-}
-
 export class TotpConfirmDto {
   @ApiProperty()
   @Matches(/^\d{6}$/, { message: 'رمز التحقق ستة أرقام.' })

@@ -24,6 +24,8 @@ async function guestBuys(page: Page, productSlug: string, productName: string): 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(productName);
   await page.getByRole('button', { name: 'أضف إلى السلة' }).click();
   await page.getByRole('link', { name: 'اذهب إلى السلة' }).click();
+  // الاسم نفسه في صفحة المنتج ثلاث مرات — التأكيد قبل وصول السلة يلتقطها
+  await page.waitForURL((u) => u.pathname === '/cart');
   await expect(page.getByText(productName, { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'إتمام الشراء' }).click();
 

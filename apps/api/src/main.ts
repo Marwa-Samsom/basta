@@ -38,7 +38,10 @@ async function bootstrap() {
   if (docs) SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
 
   const port = Number(process.env.PORT ?? 4000);
-  await app.listen({ port, host: '0.0.0.0' });
+  // التطوير على «::» — IPv4 و IPv6 معاً: الواجهة تنادي الـ API باسم المضيف الذي
+  // فُتحت به (localhost أو 127.0.0.1) ليكون كوكي الجلسة من «الموقع» نفسه، و
+  // localhost يُترجم ::1 أولاً. الإنتاج باقٍ على IPv4: حاوية بلا IPv6 ترفض «::»
+  await app.listen({ port, host: process.env['NODE_ENV'] === 'production' ? '0.0.0.0' : '::' });
   Logger.log(`API على http://localhost:${port}/api/v1${docs ? ' · التوثيق /api/docs' : ''}`, 'Bootstrap');
 }
 
