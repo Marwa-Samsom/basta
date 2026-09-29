@@ -131,36 +131,45 @@ export class CheckoutService {
     // 2 · الطلب الأب بلقطته
     let order: { id: string; orderNumber: string };
     try {
-      order = await this.prisma.order.create({
-        data: {
-          orderNumber: orderNumber(new Date()),
-          customerUserId: input.userId,
-          guestEmail: input.userId ? null : (input.guestEmail ?? null),
-          guestPhone: input.userId ? null : (input.guestPhone ?? null),
-          idempotencyKey: input.idempotencyKey,
-          currency: quote.currency,
-          itemsSubtotalMinorUnits: quote.totals.items,
-          shippingTotalMinorUnits: quote.totals.shipping,
-          discountTotalMinorUnits: quote.totals.discount,
-          taxTotalMinorUnits: quote.totals.tax,
-          grandTotalMinorUnits: quote.totals.total,
-          status: 'pending_payment',
-          shippingAddressSnapshot: { ...input.address } as Prisma.InputJsonValue,
-          customerNote: input.note?.trim() || null,
-          pricingSnapshot: toSnapshot(quote) as unknown as Prisma.InputJsonValue,
-          reservationIds,
-          payment: {
-            create: {
-              provider: this.provider.name,
-              amountMinorUnits: quote.totals.total,
-              currency: quote.currency,
-              method: 'card',
-              status: 'pending',
+      // الطلب وحجز الكوبون معاً: كوبون استُنفد أو تجاوز حدّ صاحبه يُسقط الطلب قبل أي مال
+      order = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            orderNumber: orderNumber(new Date()),
+            customerUserId: input.userId,
+            guestEmail: input.userId ? null : (input.guestEmail ?? null),
+            guestPhone: input.userId ? null : (input.guestPhone ?? null),
+            idempotencyKey: input.idempotencyKey,
+            currency: quote.currency,
+            itemsSubtotalMinorUnits: quote.totals.items,
+            shippingTotalMinorUnits: quote.totals.shipping,
+            discountTotalMinorUnits: quote.totals.discount,
+            taxTotalMinorUnits: quote.totals.tax,
+            grandTotalMinorUnits: quote.totals.total,
+            status: 'pending_payment',
+            shippingAddressSnapshot: { ...input.address } as Prisma.InputJsonValue,
+            customerNote: input.note?.trim() || null,
+            pricingSnapshot: toSnapshot(quote) as unknown as Prisma.InputJsonValue,
+            reservationIds,
+            payment: {
+              create: {
+                provider: this.provider.name,
+                amountMinorUnits: quote.totals.total,
+                currency: quote.currency,
+                method: 'card',
+                status: 'pending',
+              },
             },
           },
-        },
-        select: { id: true, orderNumber: true },
-      });
+          select: { id: true, orderNumber: true },
+        });
+        if (quote.coupon) {
+          await this.reserveCoupon(tx, quote.coupon.code, created.id, input.userId ?? null, quote.coupon.discountMinor);
+        }
+        return created;
+        // انتظار قفل الكوبون تحت ضغط يتجاوز مهلة Prisma الافتراضية (2ث للاتصال و5ث للمعاملة)
+        // فيسقط الطلب بخطأ داخلي — المهل نفسها التي تعطيها وحدة المخزون لأقفالها
+      }, { maxWait: 10_000, timeout: 20_000 });
     } catch (err) {
       // لا طلب بلا صاحب ولا حجز بلا طلب: فشل الإنشاء يحرّر الحجز فوراً
       await this.inventory.release(reservationIds);
@@ -368,21 +377,74 @@ export class CheckoutService {
       data: { status: 'captured', authorizedAt: new Date(), capturedAt: new Date() },
     });
 
+    // الكوبون حُجز عند إنشاء الطلب (reserveCoupon) — يُسجَّل هنا لطلب سبق ذلك وحده
     if (snapshot.coupon) {
-      const coupon = await tx.coupon.findUnique({ where: { code: snapshot.coupon.code } });
-      if (coupon) {
+      const coupon = await tx.coupon.findUnique({ where: { code: snapshot.coupon.code }, select: { id: true } });
+      const reserved = coupon
+        ? await tx.couponRedemption.findUnique({ where: { couponId_orderId: { couponId: coupon.id, orderId } } })
+        : null;
+      if (coupon && !reserved) {
         await tx.couponRedemption.create({
-          data: {
-            couponId: coupon.id,
-            orderId,
-            userId: order.customerUserId,
-            discountMinorUnits: BigInt(snapshot.coupon.discountMinor),
-          },
+          data: { couponId: coupon.id, orderId, userId: order.customerUserId, discountMinorUnits: BigInt(snapshot.coupon.discountMinor) },
         });
         await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
       }
     }
     return true;
+  }
+
+  // ============================================================= الكوبون
+
+  /**
+   * حجز استعمال الكوبون مع إنشاء الطلب، تحت قفل صفّه.
+   *
+   * كان الحدّ يُقرأ عند التسعير ويُزاد العدّاد بعد الدفع بلا شرط: عشرة طلبات
+   * متزامنة ترى «بقي استعمال» كلها فتمرّ كلها. والحدّ لكل مستخدم يُتخطّى بالشراء
+   * ضيفاً — لا هوية فيُعدّ عليها. الآن:
+   *   · القفل يسلسل الطلبات على الكوبون الواحد، والعدّ بعده يرى من سبق
+   *   · الاستعمال يُحجز بسطر redemption وزيادة العدّاد في معاملة الطلب نفسها،
+   *     ويُحرَّر إن فشل الدفع أو أُلغي الطلب قبله (releaseCoupon)
+   *   · كوبون بحدّ لكل مستخدم يطلب حساباً: الضيف يبدّل بريده كما يشاء، فلا
+   *     حدّ يُفرض عليه
+   */
+  private async reserveCoupon(
+    tx: Prisma.TransactionClient,
+    code: string,
+    orderId: string,
+    userId: string | null,
+    discountMinor: bigint,
+  ): Promise<void> {
+    const [c] = await tx.$queryRaw<
+      { id: string; usageLimitTotal: number | null; usageLimitPerUser: number | null; usedCount: number }[]
+    >`SELECT "id", "usageLimitTotal", "usageLimitPerUser", "usedCount" FROM "coupons" WHERE "code" = ${code} FOR UPDATE`;
+    if (!c) throw new ConflictError('الكوبون غير صالح. أزله من السلة وأكمل الطلب.');
+    if (c.usageLimitTotal !== null && c.usedCount >= c.usageLimitTotal) {
+      throw new ConflictError('استُنفد الكوبون للتوّ. أزله من السلة وأكمل الطلب.', { code });
+    }
+    if (c.usageLimitPerUser !== null) {
+      if (!userId) {
+        throw new ConflictError('هذا الكوبون بعدد استعمالات لكل حساب — سجّل الدخول لتستعمله.', { code });
+      }
+      const used = await tx.couponRedemption.count({ where: { couponId: c.id, userId } });
+      if (used >= c.usageLimitPerUser) {
+        throw new ConflictError('استعملت هذا الكوبون بعدد مرّاته المسموح. أزله من السلة وأكمل الطلب.', { code });
+      }
+    }
+    await tx.couponRedemption.create({
+      data: { couponId: c.id, orderId, userId, discountMinorUnits: discountMinor },
+    });
+    await tx.coupon.update({ where: { id: c.id }, data: { usedCount: { increment: 1 } } });
+  }
+
+  /** طلب لم يُدفع (فشل أو أُلغي قبل الدفع) يعيد استعمال كوبونه — لا يُحسب على صاحبه ولا على الحدّ */
+  private async releaseCoupon(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
+    const held = await tx.couponRedemption.findMany({ where: { orderId }, select: { id: true, couponId: true } });
+    for (const r of held) {
+      const { count } = await tx.couponRedemption.deleteMany({ where: { id: r.id } });
+      if (count > 0) {
+        await tx.coupon.updateMany({ where: { id: r.couponId, usedCount: { gt: 0 } }, data: { usedCount: { decrement: 1 } } });
+      }
+    }
   }
 
   /**
@@ -431,6 +493,7 @@ export class CheckoutService {
     const canceled = await this.prisma.$transaction(async (tx) => {
       if ((await lockOrder(tx)) !== 'pending_payment') return false;
       await tx.order.update({ where: { id: orderId }, data: { status: 'canceled', canceledAt: new Date() } });
+      await this.releaseCoupon(tx, orderId);
       return true;
     });
     if (canceled) {
@@ -547,6 +610,7 @@ export class CheckoutService {
         where: { orderId },
         data: { status: 'failed', failureCode: code, failureMessage: message },
       });
+      await this.releaseCoupon(tx, orderId);
       return true;
     });
   }

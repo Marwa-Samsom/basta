@@ -53,6 +53,8 @@ export interface CouponInput {
   readonly maxDiscountMinor: bigint | null;
   readonly minOrderMinor: bigint | null;
   readonly currency: string | null;
+  /** خانات عملة الكوبون — لتحويل سقف الخصم إلى عملة الدفع */
+  readonly currencyDigits?: number | null;
   readonly fundedBy: 'platform' | 'vendor';
 }
 
@@ -169,14 +171,9 @@ function couponDiscount(
   switch (coupon.type) {
     case 'free_shipping':
       return { items: 0n, shipping: shippingMinor };
-    case 'percent': {
-      const raw = (itemsMinor * BigInt(coupon.valueBps ?? 0)) / 10_000n;
-      const capped =
-        coupon.maxDiscountMinor !== null && coupon.currency === currency && raw > coupon.maxDiscountMinor
-          ? coupon.maxDiscountMinor
-          : raw;
-      return { items: capped, shipping: 0n };
-    }
+    case 'percent':
+      // بلا سقف هنا: السقف للطلب كله لا لكل بائع — capPercent بعد حساب البائعين جميعاً
+      return { items: (itemsMinor * BigInt(coupon.valueBps ?? 0)) / 10_000n, shipping: 0n };
     case 'fixed': {
       // الثابت بعملة البائع فقط: خصم «5 دنانير» على منتج بالريال يحتاج صرفاً
       // لا يملكه الكوبون، فيُمنع إنشاؤه كذلك لا يُحوَّل هنا بصمت
@@ -185,6 +182,39 @@ function couponDiscount(
       return { items: value > itemsMinor ? itemsMinor : value, shipping: 0n };
     }
   }
+}
+
+/**
+ * سقف خصم النسبة للطلب كله — بعملة الكوبون، أياً كانت عملات البائعين.
+ *
+ * كان يُطبَّق لكل بائع على حدة، فسلة من ثلاثة بائعين تأخذ ثلاثة أضعاف السقف؛
+ * ويُتخطّى إن خالفت عملةُ البائع عملةَ الكوبون فيصير الخصم بلا سقف. الآن:
+ * السقف يُحوَّل إلى عملة الدفع (بلا هامش — قيمته الحقيقية)، ويوزَّع على البائعين
+ * بنسبة خصومهم بـ allocate (فمجموع الحصص = السقف بالضبط)، وتُعاد كل حصة إلى
+ * عملة بائعها بالتقريب لأسفل. وخصم البائع أقلّ الاثنين. مضمون ألّا يتجاوز
+ * ما يُخصم من المشتري السقف: الحصة المُعادة لأسفل ثم المحوَّلة بالتقريب لا
+ * تتخطّى عدداً صحيحاً كانت دونه.
+ */
+function capPercent(
+  coupon: CouponInput | null,
+  ctxs: { vendor: VendorContext; disc: { items: bigint; shipping: bigint } }[],
+  fx: FxInput,
+): void {
+  if (!coupon || coupon.type !== 'percent' || coupon.maxDiscountMinor === null) return;
+  const capCurrency = coupon.currency ?? fx.orderCurrency;
+  const capDigits = coupon.currency ? (coupon.currencyDigits ?? fx.orderDigits) : fx.orderDigits;
+  const capOrder = convertMinor(coupon.maxDiscountMinor, fxFactor(capCurrency, capDigits, { ...fx, spreadBps: 0 }));
+
+  const factors = ctxs.map((c) => fxFactor(c.vendor.currency, c.vendor.currencyDigits, fx));
+  const rawOrder = ctxs.map((c, i) => convertMinor(c.disc.items, factors[i]!));
+  if (rawOrder.reduce((a, b) => a + b, 0n) <= capOrder) return;
+
+  const shares = allocate(capOrder, rawOrder);
+  ctxs.forEach((c, i) => {
+    const f = factors[i]!;
+    const back = f === 1 ? shares[i]! : BigInt(Math.floor(Number(shares[i]!) / f));
+    if (back < c.disc.items) c.disc = { ...c.disc, items: back };
+  });
 }
 
 // ------------------------------------------------------------ التسعير
@@ -215,7 +245,8 @@ export function priceCart(input: {
   let couponMatched = false;
   const subOrders: PricedSubOrder[] = [];
 
-  for (const vendorId of [...byVendor.keys()].sort()) {
+  // المرور الأول: بنود كل بائع وشحنه وخصمه الخام — السقف يحتاجهم جميعاً معاً
+  const ctxs = [...byVendor.keys()].sort().map((vendorId) => {
     const lines = byVendor.get(vendorId) ?? [];
     const vendor = input.vendors.get(vendorId);
     if (!vendor) throw new InvalidInputError('بائع مجهول في السلة.', { vendorId });
@@ -237,6 +268,11 @@ export function priceCart(input: {
     const disc = eligible
       ? couponDiscount(input.coupon, vendorId, vendor.currency, items, shippingMinor)
       : { items: 0n, shipping: 0n };
+    return { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc };
+  });
+  capPercent(input.coupon, ctxs, input.fx);
+
+  for (const { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc } of ctxs) {
     if (disc.items > 0n || disc.shipping > 0n) couponMatched = true;
 
     const lineDiscounts = allocate(disc.items, subtotals);
