@@ -5,6 +5,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
 import { LedgerService } from './ledger.service';
+import { csvCell } from '../../../common/csv';
 
 export const ENTRY_LABELS: Record<string, string> = {
   sale_credit: 'مبيعات',
@@ -197,7 +198,7 @@ export class FinanceService {
    */
   async statementCsv(vendorId: string, currency: string, range: { from?: Date; to?: Date } = {}): Promise<string> {
     const from = range.from ?? new Date((range.to ?? new Date()).getTime() - STATEMENT_MAX_DAYS * 86_400_000);
-    const esc = (v: string | null) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const esc = csvCell;
     const head = ['التاريخ', 'النوع', 'الطلب', 'الجيب', 'دائن', 'مدين', 'المعلّق بعده', 'المتاح بعده', 'ملاحظة', 'المعرّف', 'يعكس'];
     const lines: string[] = [head.map(esc).join(',')];
     let cursor: string | undefined;

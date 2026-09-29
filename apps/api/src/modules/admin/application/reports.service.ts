@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { convert, money, toDecimalString } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { csvCell } from '../../../common/csv';
 
 export interface Range {
   from: Date;
@@ -169,7 +170,7 @@ export class ReportsService {
   }
 
   async csv(r: Range): Promise<string> {
-    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const esc = csvCell;
     const parts: string[] = [`${esc('الفترة')},${esc(r.from.toISOString())},${esc(r.to.toISOString())}`, esc('المبالغ بالوحدات الصغرى لكل عملة')];
     for (const sec of this.flatten(await this.financial(r))) {
       parts.push('', esc(sec.name));

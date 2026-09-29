@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { InvalidInputError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { csvCell } from '../../../common/csv';
 
 export interface ReportRange {
   from: Date;
@@ -185,7 +186,7 @@ export class VendorReportsService {
   }
 
   async csv(vendorId: string, r: ReportRange): Promise<string> {
-    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const esc = csvCell;
     const { rep, sections } = await this.sections(vendorId, r);
     const parts: string[] = [`${esc('الفترة')},${esc(rep.range.from)},${esc(rep.range.to)}`, esc('المبالغ بالوحدات الصغرى لكل عملة')];
     for (const sec of sections) {

