@@ -2,12 +2,13 @@
 
 import '@/styles/screens/account-area.css';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { Alert, Field, PageHead, TextInput } from '@/components/ui';
 import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
 import { cartApi, cartHeaders, type CartView } from '@/lib/cart';
+import { attemptKey, definitive, endAttempt } from '@/lib/checkout-attempt';
 import { imageUrl } from '@/lib/storefront';
 
 interface OrderResult {
@@ -119,7 +120,6 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const attemptKey = useRef<string | null>(null);
   // العناوين المحفوظة للداخل — تملأ الحقول نفسها ولا تغيّر شيئاً في الدفع
   const [saved, setSaved] = useState<SavedAddress[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
@@ -187,11 +187,12 @@ export default function CheckoutPage() {
     if (!quote) return;
     setBusy(true);
     setError(null);
-    attemptKey.current ??= crypto.randomUUID();
+    const cart = cartHeaders();
+    const key = attemptKey(cart['x-cart-token'] ?? null);
     try {
       const result = await api<OrderResult>('/checkout', {
         method: 'POST',
-        headers: { ...cartHeaders(), 'idempotency-key': attemptKey.current },
+        headers: { ...cart, 'idempotency-key': key },
         body: {
           address: {
             ...address,
@@ -204,8 +205,9 @@ export default function CheckoutPage() {
           ...(signedIn ? {} : { guestEmail: email }),
         },
       });
-      // الفشل المعروف ينهي المحاولة: المحاولة التالية طلب جديد بمفتاح جديد
-      if (result.outcome === 'failed') attemptKey.current = null;
+      // الخادم أجاب بطلب معروف — مدفوعاً أو مرفوضاً أو معلّقاً تحسمه المصالحة.
+      // الشراء التالية (بطاقة أخرى، أو سلة جديدة) محاولة جديدة بمفتاح جديد
+      endAttempt();
       router.push(`/orders/${result.orderNumber}`);
     } catch (err) {
       if (err instanceof ApiError && Array.isArray(err.details?.['blockers'])) {
@@ -220,8 +222,9 @@ export default function CheckoutPage() {
           setQuoted(null);
         }
       }
-      // خطأ قبل الدفع (مخزون، تحقّق) لا يستهلك المفتاح؛ خطأ شبكة يُبقيه فلا يُدفع مرتين
-      if (err instanceof ApiError) attemptKey.current = null;
+      // رفض قاطع قبل أي مال ينهي المحاولة؛ 502/504 وانقطاع الشبكة يُبقيان المفتاح
+      // (checkout-attempt) — «ادفع» ثانيةً يعيد الطلب نفسه إن كان خُصم، لا يدفع مرتين
+      if (definitive(err)) endAttempt();
       setError(err instanceof Error ? err.message : 'تعذّر إتمام الطلب.');
     } finally {
       setBusy(false);
