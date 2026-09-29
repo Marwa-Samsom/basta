@@ -379,3 +379,66 @@ describe('تدوير رمز التحديث تحت التزامن', () => {
     expect((await refresh(s.refreshToken)).statusCode).toBe(401);
   });
 });
+
+describe('رمز الوصول يُقرأ مع القاعدة — لا ينتظر انتهاءه', () => {
+  const me = (token: string) => call('GET', '/me/account', { token });
+
+  it('الخروج يُسقط رمز الوصول في الطلب التالي', async () => {
+    if (!dbUp) return;
+    await register('live-logout');
+    const s = await login('live-logout');
+    expect((await me(s.accessToken)).statusCode).toBe(200);
+    await call('POST', '/auth/logout', { token: s.accessToken, body: { refreshToken: s.refreshToken } });
+    expect((await me(s.accessToken)).statusCode).toBe(401);
+  });
+
+  it('تغيير كلمة المرور يُسقط رموز الأجهزة الأخرى فوراً، ويُبقي الحالي', async () => {
+    if (!dbUp) return;
+    await register('live-chpw');
+    const other = await login('live-chpw', PASSWORD, 'other-device');
+    const current = await login('live-chpw', PASSWORD, 'this-device');
+    const r = await call('POST', '/me/account/password', {
+      token: current.accessToken,
+      body: { currentPassword: PASSWORD, newPassword: 'عبارة-مرور-جديدة-للجلسات' },
+    });
+    expect(r.statusCode, r.body).toBe(200);
+    expect((await me(other.accessToken)).statusCode).toBe(401);
+    expect((await me(current.accessToken)).statusCode).toBe(200);
+  });
+
+  it('الحساب الموقوف يُرفض في الطلب التالي ولو كان رمزه صالح التوقيع', async () => {
+    if (!dbUp) return;
+    const userId = await register('live-suspend');
+    const s = await login('live-suspend');
+    expect((await me(s.accessToken)).statusCode).toBe(200);
+    // الإيقاف في القاعدة وحدها — بلا إبطال جلسات — فالحارس نفسه هو ما يُثبَت
+    await prisma.user.update({ where: { id: userId }, data: { status: 'suspended' } });
+    const after = await me(s.accessToken);
+    expect(after.statusCode).toBe(401);
+    expect(after.json().message).toMatch(/الحساب غير متاح/);
+  });
+
+  it('الصلاحية المسحوبة والدور المسحوب يسريان فوراً', async () => {
+    if (!dbUp) return;
+    const userId = await register('live-perm');
+    const secret = 'JBSWY3DPEHPK3PXP'.padEnd(32, 'D');
+    await prisma.userRole.create({ data: { userId, role: 'admin' } });
+    await prisma.adminPermission.create({ data: { userId, permission: 'content.manage' } });
+    await prisma.user.update({ where: { id: userId }, data: { totpSecretEnc: secret, totpEnabledAt: new Date() } });
+    const { NobleCryptoPlugin, ScureBase32Plugin, generateSync } = await import('otplib');
+    const code = generateSync({ strategy: 'totp', secret, crypto: new NobleCryptoPlugin(), base32: new ScureBase32Plugin() });
+    const r = await call('POST', '/auth/login', { body: { email: emailOf('live-perm'), password: PASSWORD, totp: code } });
+    expect(r.statusCode, r.body).toBe(200);
+    const token = r.json().tokens.accessToken as string;
+    const templates = () => call('GET', '/admin/notifications/templates', { token });
+    expect((await templates()).statusCode).toBe(200);
+
+    // سحب في القاعدة وحدها — بلا إنهاء الجلسة: الرمز ما زال يحمل الصلاحية في مطالباته
+    await prisma.adminPermission.deleteMany({ where: { userId } });
+    expect((await templates()).statusCode).toBe(403);
+    await prisma.userRole.deleteMany({ where: { userId, role: 'admin' } });
+    expect((await templates()).statusCode).toBe(403);
+    // والجلسة نفسها باقية: ما سُحب هو الصلاحية لا الدخول
+    expect((await me(token)).statusCode).toBe(200);
+  });
+});

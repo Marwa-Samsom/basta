@@ -23,6 +23,31 @@ export interface LoginResult {
   requiresTotp: boolean;
 }
 
+/** ما تُبنى منه المطالبات — مشترك بين الإصدار والتحقق مع كل طلب */
+const CLAIMS_SELECT = {
+  status: true,
+  deletedAt: true,
+  totpEnabledAt: true,
+  roles: { select: { role: true } },
+  permissions: { select: { permission: true } },
+  vendors: { select: { id: true } },
+} as const;
+
+function claimsOf(
+  userId: string,
+  user: Prisma.UserGetPayload<{ select: typeof CLAIMS_SELECT }>,
+): AccessClaims {
+  const roles = user.roles.map((r) => r.role as Role);
+  const claims: AccessClaims = {
+    sub: userId,
+    roles,
+    permissions: user.permissions.map((p) => p.permission),
+    ...(user.vendors[0] ? { vendorId: user.vendors[0].id } : {}),
+  };
+  // القاعدة التي لا تُخرَق: إداري بلا 2FA لا يحصل على رمز كامل
+  return adminNeedsTotpSetup(roles, user.totpEnabledAt) ? { ...claims, limited: true } : claims;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -37,25 +62,45 @@ export class AuthService {
   async buildClaims(userId: string): Promise<AccessClaims> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { roles: true, permissions: true, vendors: { select: { id: true } } },
+      select: CLAIMS_SELECT,
     });
     if (!user || user.status !== 'active' || user.deletedAt) {
       throw new UnauthorizedException('الحساب غير متاح.');
     }
+    return claimsOf(userId, user);
+  }
 
-    const roles = user.roles.map((r) => r.role as Role);
-    const claims: AccessClaims = {
-      sub: user.id,
-      roles,
-      permissions: user.permissions.map((p) => p.permission),
-      ...(user.vendors[0] ? { vendorId: user.vendors[0].id } : {}),
-    };
-
-    // القاعدة التي لا تُخرَق: إداري بلا 2FA لا يحصل على رمز كامل
-    if (adminNeedsTotpSetup(roles, user.totpEnabledAt)) {
-      return { ...claims, limited: true };
+  /**
+   * الفاعل كما هو الآن في القاعدة، لا كما كان حين وُقِّع الرمز.
+   *
+   * رمز الوصول يعيش 15 دقيقة، وكانت مطالباته تُصدَّق كما هي: الموقوف، والمدير
+   * الذي سُحبت صلاحياته، ومن غيّر كلمة مروره (فأُنهيت جلساته) — كلهم يعملون
+   * حتى ينتهي الرمز. الآن يُقرأ مع كل طلب، باستعلام واحد: الحساب فعّال،
+   * والجلسة (عائلة رمز التحديث، `sid`) حيّة، والأدوار والصلاحيات من القاعدة.
+   * كل ما يُنهي جلسة — الخروج، تغيير كلمة المرور، الإيقاف، سحب الصلاحيات،
+   * كشف السرقة — يسري إذن في الطلب التالي لا بعد ربع ساعة.
+   */
+  async liveClaims(token: AccessClaims): Promise<AccessClaims> {
+    const sid = typeof token.sid === 'string' ? token.sid : null;
+    if (!sid) throw new UnauthorizedException('انتهت جلستك. سجّل الدخول من جديد.');
+    const user = await this.prisma.user.findUnique({
+      where: { id: token.sub },
+      select: {
+        ...CLAIMS_SELECT,
+        refreshTokens: {
+          where: { familyId: sid, revokedAt: null, expiresAt: { gt: new Date() } },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (!user || user.status !== 'active' || user.deletedAt) {
+      throw new UnauthorizedException('الحساب غير متاح.');
     }
-    return claims;
+    if (user.refreshTokens.length === 0) {
+      throw new UnauthorizedException('انتهت جلستك. سجّل الدخول من جديد.');
+    }
+    return { ...claimsOf(token.sub, user), sid };
   }
 
   // ---------------------------------------------------------------- التسجيل
