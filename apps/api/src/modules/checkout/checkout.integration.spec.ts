@@ -355,3 +355,97 @@ describe('بوابة 08 · البند 4 — انقطاع الاتصال ينته
     expect(await checkout.reconcile(orderId, later)).toBe('failed');
   });
 });
+
+describe('دفع يصل بعد إغلاق الطلب — يُردّ ولا يُرمى', () => {
+  /** طلب بانتظار التحقق (3-D Secure) ثم يُغلق فاشلاً — كما تفعل المصالحة عند انتهاء المهلة */
+  async function closedThenCaptured() {
+    const token = await cartWith([{ variantId: variantIds[0]!, qty: 1 }]);
+    const res = await pay(token, 'tok_3ds');
+    expect(res.json().outcome).toBe('requires_action');
+    const orderId = res.json().orderId as string;
+    expect(await checkout.markFailed(orderId, 'action_timeout', 'انتهت مهلة التحقق.')).toBe(true);
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+    // البوابة أكملت التحقق والخصم بعد الإغلاق — tok_3ds حقيقته captured
+    const webhook = () => {
+      const body = fake.eventFor(payment.providerIntentId!, orderId, payment.amountMinorUnits, payment.currency);
+      return app.inject({
+        method: 'POST',
+        url: '/api/v1/payments/webhook/fake',
+        headers: { 'x-signature': FakePaymentProvider.sign(body), 'content-type': 'application/json' },
+        payload: body,
+      });
+    };
+    return { orderId, payment, webhook };
+  }
+
+  it('النجاح المتأخر يُردّ كله مرة واحدة، ولا يُحيي الطلب ولا يقسّمه', async () => {
+    if (!dbUp) return;
+    const { orderId, payment, webhook } = await closedThenCaptured();
+    const stock = await stockOf(variantIds[0]!);
+
+    const r = await webhook();
+    expect(r.statusCode, r.body).toBe(200);
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(order.status).toBe('payment_failed');
+    expect(order.paidAt).toBeNull();
+    expect(order.payment!.status).toBe('refunded');
+    expect(order.payment!.lateRefundId).toBeTruthy();
+    expect(await prisma.subOrder.count({ where: { orderId } })).toBe(0);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
+    // المخزون المحرَّر بالفشل لا يُستهلك بالنجاح المتأخر
+    expect(await stockOf(variantIds[0]!)).toEqual(stock);
+    const audits = await prisma.auditLog.findMany({ where: { entityId: orderId, action: { startsWith: 'payment.late_capture' } } });
+    expect(audits.map((a) => a.action).sort()).toEqual(['payment.late_capture', 'payment.late_capture_refunded']);
+  });
+
+  it('الإشعار والمصالحة والإشعار المكرّر معاً يردّون مرة واحدة', async () => {
+    if (!dbUp) return;
+    const { orderId, payment, webhook } = await closedThenCaptured();
+    await Promise.all([
+      webhook(),
+      webhook(), // حدث بمعرّف آخر — البوابة ترسل أكثر من حدث للخصم نفسه
+      checkout.apply(orderId, { status: 'captured', intentId: payment.providerIntentId! }),
+    ]);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { orderId } })).status).toBe('refunded');
+  });
+
+  it('إشعار نجاح مكرّر لطلب مدفوع فعلاً لا يردّ شيئاً', async () => {
+    if (!dbUp) return;
+    const token = await cartWith([{ variantId: variantIds[1]!, qty: 1 }]);
+    const res = await pay(token, 'tok_success');
+    expect(res.json().outcome).toBe('paid');
+    const orderId = res.json().orderId as string;
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+    await checkout.apply(orderId, { status: 'captured', intentId: payment.providerIntentId! });
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([]);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { orderId } })).lateCaptureAt).toBeNull();
+  });
+
+  it('سقوط البوابة بين الحجز والردّ: المصالحة تكمل الردّ مرة واحدة', async () => {
+    if (!dbUp) return;
+    const { orderId, payment, webhook } = await closedThenCaptured();
+    const original = fake.refund.bind(fake);
+    fake.refund = async () => {
+      throw new Error('انقطع الاتصال بالبوابة');
+    };
+    try {
+      const r = await webhook();
+      // الإشعار يفشل فتعيده البوابة — لكن الحجز قائم والمصالحة لا تنتظرها
+      expect(r.statusCode).toBe(500);
+    } finally {
+      fake.refund = original;
+    }
+    const pending = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+    expect(pending.lateCaptureAt).not.toBeNull();
+    expect(pending.lateRefundId).toBeNull();
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([]);
+
+    const later = new Date(Date.now() + 5 * 60_000);
+    await checkout.settleLateRefunds(later);
+    await checkout.settleLateRefunds(later);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { orderId } })).status).toBe('refunded');
+  });
+});

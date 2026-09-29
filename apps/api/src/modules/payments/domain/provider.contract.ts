@@ -70,6 +70,16 @@ export function paymentProviderContract(name: string, make: () => ContractHarnes
       await expect(h.provider.refund(r.intentId, 1n)).rejects.toThrow();
     });
 
+    it('5ب · الاسترداد بمفتاح عدم التكرار نفسه يعيد الردّ الأول ولا يردّ مرتين', async () => {
+      const h = make();
+      const r = await h.provider.charge(req(h, h.tokens.success, 10_000n));
+      const key = `refund-${randomUUID()}`;
+      const first = await h.provider.refund(r.intentId, 10_000n, key);
+      // إعادة بعد انقطاع: المبلغ كله رُدّ، فلو لم يُحترم المفتاح لرُفض الثاني أو رُدّ مرتين
+      await expect(h.provider.refund(r.intentId, 10_000n, key)).resolves.toEqual(first);
+      await expect(h.provider.refund(r.intentId, 1n)).rejects.toThrow();
+    });
+
     it('6 · إشعار بتوقيع مزوّر يُرفض، والسليم يُحلَّل بمبلغه', async () => {
       const h = make();
       if (!h.signWebhook || !h.webhookBody) return;

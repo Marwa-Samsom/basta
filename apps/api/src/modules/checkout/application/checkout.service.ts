@@ -208,8 +208,12 @@ export class CheckoutService {
 
     switch (outcome.status) {
       case 'captured':
-        await this.markPaid(orderId);
-        if (cartId) await this.carts.clear(cartId).catch(() => undefined);
+        if (await this.markPaid(orderId)) {
+          if (cartId) await this.carts.clear(cartId).catch(() => undefined);
+          return;
+        }
+        // لم يُقسَّم: إمّا دُفع من قبل (إشعار مكرّر) وإمّا أُغلق قبل أن يصل المال
+        await this.refundLateCapture(orderId, outcome.intentId);
         return;
       case 'failed':
         await this.markFailed(orderId, outcome.code, outcome.message);
@@ -419,6 +423,92 @@ export class CheckoutService {
     }
   }
 
+  // ========================================================== الدفع المتأخر
+
+  /**
+   * نجاح وصل لطلب أُغلق قبله — انتهت مهلة التحقق، أو حسمته المصالحة فاشلاً.
+   * كان يُرمى بصمت (markPaid يشترط pending_payment): المال خُصم بلا طلب ولا ردّ.
+   *
+   * لا يُحيا الطلب: المشتري رأى «فشل» وربما طلب من جديد، وإحياؤه يشحن له
+   * مرتين. يُردّ المال كله ويُبلَّغ. والشرط `paidAt IS NULL` هو الفاصل: طلب دُفع
+   * ثم أُلغيت متاجره كلها صار canceled أيضاً، لكن ماله رُدّ بمساره — ردّه هنا ثانيةً
+   * دفعٌ مرتين.
+   *
+   * مسار واحد يردّ: `lateCaptureAt` يُحجز بكتابة شرطية (إشعار ومصالحة معاً
+   * يحجز أحدهما). ثم الردّ بمفتاح عدم تكرار، فإعادته بعد سقوطٍ لا تردّ مرتين.
+   */
+  private async refundLateCapture(orderId: string, intentId: string | undefined): Promise<void> {
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { status: true, paidAt: true, payment: { select: { id: true, capturedAt: true, providerIntentId: true } } },
+      });
+      const payment = order?.payment;
+      if (!order || !payment || order.paidAt || payment.capturedAt) return null;
+      if (order.status !== 'payment_failed' && order.status !== 'canceled') return null;
+      const { count } = await tx.payment.updateMany({
+        where: { id: payment.id, lateCaptureAt: null, capturedAt: null },
+        data: { lateCaptureAt: new Date(), ...(intentId && !payment.providerIntentId ? { providerIntentId: intentId } : {}) },
+      });
+      if (count === 0) return null;
+      await tx.auditLog.create({
+        data: {
+          action: 'payment.late_capture',
+          entityType: 'Order',
+          entityId: orderId,
+          afterJson: { orderStatus: order.status, intentId: intentId ?? payment.providerIntentId ?? null },
+        },
+      });
+      return payment.id;
+    });
+    if (!claimed) return;
+    this.logger.warn(`الطلب ${orderId} دُفع بعد إغلاقه (${intentId ?? '—'}) — يُردّ المال كله`);
+    await this.settleLateRefund(claimed);
+  }
+
+  /** يردّ دفعاً متأخراً محجوزاً — ويُعاد بلا خطر من المصالحة إن سقط قبل أن يتمّ */
+  private async settleLateRefund(paymentId: string): Promise<void> {
+    const p = await this.prisma.payment.findUniqueOrThrow({
+      where: { id: paymentId },
+      select: {
+        providerIntentId: true,
+        amountMinorUnits: true,
+        currency: true,
+        lateRefundId: true,
+        order: { select: { id: true, orderNumber: true, customerUserId: true } },
+      },
+    });
+    if (p.lateRefundId) return;
+    if (!p.providerIntentId) throw new Error(`دفع متأخر بلا تفويض — الطلب ${p.order.id}`);
+
+    // المفتاح ثابت للدفعة: الإعادة بعد انقطاع تعيد الردّ الأول عند البوابة
+    const { refundId } = await this.provider.refund(p.providerIntentId, p.amountMinorUnits, `late-capture:${paymentId}`);
+
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.payment.updateMany({
+        where: { id: paymentId, lateRefundId: null },
+        data: { lateRefundId: refundId, status: 'refunded' },
+      });
+      if (count === 0) return;
+      await tx.auditLog.create({
+        data: {
+          action: 'payment.late_capture_refunded',
+          entityType: 'Order',
+          entityId: p.order.id,
+          afterJson: { refundId, amount: p.amountMinorUnits.toString(), currency: p.currency },
+        },
+      });
+      await this.notifications.enqueue(
+        {
+          code: 'late_payment_refunded',
+          userId: p.order.customerUserId,
+          vars: { order_number: p.order.orderNumber, amount: formatMoney(money(p.amountMinorUnits, p.currency)) },
+        },
+        tx,
+      );
+    });
+  }
+
   // =============================================================== الفشل
 
   /** الفشل يحرّر الحجز ويختم الطلب — لا مخزون مستهلك ولا طلب معلّق بلا صاحب */
@@ -487,7 +577,23 @@ export class CheckoutService {
         this.logger.error(`تعذّرت مصالحة الطلب ${o.id}`, err as Error),
       );
     }
-    return stale.length;
+
+    return stale.length + (await this.settleLateRefunds(now));
+  }
+
+  /** دفعات متأخرة حُجزت ولم يتمّ ردّها (سقطت البوابة أو الخادم بينهما) — المفتاح يمنع الردّ مرتين */
+  async settleLateRefunds(now: Date = new Date()): Promise<number> {
+    const unsettled = await this.prisma.payment.findMany({
+      where: { lateCaptureAt: { not: null, lt: new Date(now.getTime() - 60_000) }, lateRefundId: null },
+      select: { id: true },
+      take: 50,
+    });
+    for (const p of unsettled) {
+      await this.settleLateRefund(p.id).catch((err: unknown) =>
+        this.logger.error(`تعذّر ردّ الدفع المتأخر ${p.id}`, err as Error),
+      );
+    }
+    return unsettled.length;
   }
 
   // ============================================================ القراءة

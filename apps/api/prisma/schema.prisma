@@ -1092,6 +1092,10 @@ model Payment {
   capturedAt       DateTime?     @db.Timestamptz
   failureCode      String?
   failureMessage   String?
+  /// نجاح وصل بعد أن أُغلق الطلب فاشلاً أو ملغى: حجزٌ للردّ يأخذه مسار واحد
+  lateCaptureAt    DateTime?     @db.Timestamptz
+  /// معرّف ردّ ذلك النجاح عند المزوّد — وجوده يعني أن المال عاد لصاحبه
+  lateRefundId     String?
   createdAt        DateTime      @default(now()) @db.Timestamptz
 
   order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)

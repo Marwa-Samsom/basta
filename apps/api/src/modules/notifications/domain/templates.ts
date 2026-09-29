@@ -68,6 +68,14 @@ export const EVENTS: readonly EventDef[] = [
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', reason: 'نفدت الكمية لدى البائع', link: '/account/orders/BST-260921-A1B2C3' },
   },
   {
+    // نجاح وصل من البوابة بعد أن أُغلق الطلب فاشلاً — رُدّ كله، ولم يُنشأ طلب
+    code: 'late_payment_refunded',
+    labelAr: 'دفع متأخر رُدّ',
+    audience: 'customer',
+    variables: ['order_number', 'amount'],
+    sample: { order_number: 'BST-260921-A1B2C3', amount: '125.500 د.أ' },
+  },
+  {
     code: 'refund_issued',
     labelAr: 'تنفيذ استرداد',
     audience: 'customer',
@@ -273,6 +281,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'مرحباً {{name}}،\n\nرددنا {{amount}} إلى وسيلة دفعك عن الطلب {{order_number}}. قد يستغرق ظهوره في كشف بطاقتك بضعة أيام عمل حسب البنك.\n\n{{link}}\n\nبسطة',
     'استرداد {{amount}} عن الطلب {{order_number}}'),
   t('refund_issued', 'in_app', 'رددنا {{amount}} إلى وسيلة دفعك عن الطلب {{order_number}}.'),
+
+  t('late_payment_refunded', 'email',
+    'وصلنا تأكيد دفعك للطلب {{order_number}} بعد أن كان قد أُغلق دون إتمام، فلم يُنشأ الطلب.\n\nرددنا المبلغ كاملاً، {{amount}}، إلى وسيلة دفعك. قد يستغرق ظهوره في كشف بطاقتك بضعة أيام عمل حسب البنك.\n\nإن كنت ما زلت تريد المنتجات فاطلبها من جديد.\n\nبسطة',
+    'رددنا {{amount}} عن الطلب {{order_number}}'),
+  t('late_payment_refunded', 'in_app', 'وصل دفعك للطلب {{order_number}} بعد إغلاقه، فرددنا {{amount}} كاملاً إلى وسيلة دفعك.'),
 
   t('dispute_message', 'email',
     'مرحباً {{name}}،\n\nوصلتك رسالة جديدة في النزاع على الطلب {{order_number}}. اقرأها وردّ من هنا: {{link}}\n\nبسطة',

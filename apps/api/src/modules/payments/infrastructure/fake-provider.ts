@@ -105,7 +105,20 @@ export class FakePaymentProvider implements PaymentProvider {
   /** ما خُصم فعلاً لكل تفويض — البوابة الحقيقية ترفض ردّ أكثر منه */
   private readonly charged = new Map<string, bigint>();
 
-  async refund(intentId: string, amountMinor: bigint): Promise<{ refundId: string }> {
+  /** عدم التكرار عند المزوّد: المفتاح نفسه يعيد الردّ الأول ولا يردّ المال مرتين */
+  private readonly refundByKey = new Map<string, { refundId: string }>();
+
+  async refund(intentId: string, amountMinor: bigint, idempotencyKey?: string): Promise<{ refundId: string }> {
+    if (idempotencyKey) {
+      const seen = this.refundByKey.get(idempotencyKey);
+      if (seen) return seen;
+    }
+    const result = await this.refundOnce(intentId, amountMinor);
+    if (idempotencyKey) this.refundByKey.set(idempotencyKey, result);
+    return result;
+  }
+
+  private async refundOnce(intentId: string, amountMinor: bigint): Promise<{ refundId: string }> {
     // الذاكرة تُفقد عند إعادة التشغيل محلياً؛ التفويض الوهمي يُعرف من شكله
     if (!this.intents.has(intentId) && !intentId.startsWith('fake_pi_')) {
       throw new InvalidInputError('تفويض غير معروف للاسترداد.');
