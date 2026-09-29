@@ -135,7 +135,9 @@ beforeAll(async () => {
   const cartToken = cart.json().token as string;
   const add = await call('POST', '/cart/items', undefined, { variantId: shops[0]!.variantId, qty: 1 }, { 'x-cart-token': cartToken });
   expect(add.statusCode, add.body).toBe(201);
-  const placed = await call('POST', '/checkout', alice.token, { address: ADDRESS, paymentToken: 'tok_success' }, {
+  // الإجمالي كما يراه المشتري تحت «ادفع» — يُرسل مع الطلب ولا يُخصم غيره
+  const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, { 'x-cart-token': cartToken })).json();
+  const placed = await call('POST', '/checkout', alice.token, { address: ADDRESS, paymentToken: 'tok_success', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
     'x-cart-token': cartToken,
     'idempotency-key': randomUUID(),
   });

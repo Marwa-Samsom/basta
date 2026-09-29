@@ -65,9 +65,24 @@ async function cartWith(items: { variantId: string; qty: number }[], currency = 
   return token;
 }
 
+/**
+ * الإجمالي كما يراه المشتري تحت «ادفع»: تسعير السلة بعنوان الطلب. يُرسل مع
+ * الطلب كما ترسله الواجهة. سلة لا تُسعَّر (فارغة، رمز خاطئ) تأخذ صفراً — الطلب
+ * يُرفض قبل المقارنة بسببه الحقيقي.
+ */
+async function seen(cart: string): Promise<{ expectedTotal: string; expectedCurrency: string }> {
+  const q = await call('POST', '/checkout/quote', {
+    body: { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city },
+    headers: { 'x-cart-token': cart },
+  });
+  return q.statusCode === 200
+    ? { expectedTotal: q.json().totals.total.minorUnits, expectedCurrency: q.json().currency }
+    : { expectedTotal: '0', expectedCurrency: 'JOD' };
+}
+
 async function pay(token: string, paymentToken: string, key = randomUUID()) {
   return call('POST', '/checkout', {
-    body: { address: ADDRESS, paymentToken, guestEmail: `buyer.${SUFFIX}@basta.test` },
+    body: { address: ADDRESS, paymentToken, guestEmail: `buyer.${SUFFIX}@basta.test`, ...(await seen(token)) },
     headers: { 'x-cart-token': token, 'idempotency-key': key },
   });
 }
@@ -572,9 +587,9 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
     expect(r.statusCode, r.body).toBe(200);
     return cart;
   }
-  const checkoutAs = (cart: string, paymentToken: string, token?: string) =>
+  const checkoutAs = async (cart: string, paymentToken: string, token?: string) =>
     call('POST', '/checkout', {
-      body: { address: ADDRESS, paymentToken, ...(token ? {} : { guestEmail: `guest.${randomUUID()}@basta.test` }) },
+      body: { address: ADDRESS, paymentToken, ...(token ? {} : { guestEmail: `guest.${randomUUID()}@basta.test` }), ...(await seen(cart)) },
       headers: { 'x-cart-token': cart, 'idempotency-key': randomUUID(), ...(token ? { authorization: `Bearer ${token}` } : {}) },
     });
   async function member(tag: string): Promise<string> {
@@ -644,5 +659,81 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
     expect(paid.statusCode, paid.body).toBe(200);
     expect(paid.json().outcome).toBe('paid');
     expect((await prisma.coupon.findUniqueOrThrow({ where: { id: c.id } })).usedCount).toBe(1);
+  });
+});
+
+describe('الإجمالي الذي رآه المشتري هو ما يُخصم — لا غيره', () => {
+  const SA_ADDRESS = { ...ADDRESS, phone: '+966500000000', country: 'SA', region: 'الرياض', city: 'الرياض' };
+  let variantId = '';
+
+  // بائع يشحن إلى بلدين بسعرين: الأردن 5.000 د.أ والسعودية 25.000 د.أ
+  beforeAll(async () => {
+    if (!dbUp) return;
+    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
+    const owner = await prisma.user.create({
+      data: { email: `two-zones.${SUFFIX}@basta.test`, fullName: 'بائع بمنطقتين', passwordHash: await hashPassword('كلمة-مرور-اختبار-طويلة'), roles: { create: { role: 'vendor_owner' } } },
+    });
+    const vendor = await prisma.vendor.create({
+      data: {
+        ownerUserId: owner.id, slug: `v-zones-${SUFFIX}`, nameAr: 'متجر بمنطقتين', status: 'approved', approvedAt: new Date(), settlementCurrency: 'JOD', country: 'JO',
+        shippingZones: {
+          create: [
+            { nameAr: 'الأردن', regions: { create: { country: 'JO' } }, rates: { create: { method: 'flat', priceMinorUnits: 5_000n, minDays: 1, maxDays: 3 } } },
+            { nameAr: 'السعودية', regions: { create: { country: 'SA' } }, rates: { create: { method: 'flat', priceMinorUnits: 25_000n, minDays: 3, maxDays: 7 } } },
+          ],
+        },
+      },
+    });
+    vendorIds.push(vendor.id);
+    const product = await prisma.product.create({
+      data: { vendorId: vendor.id, categoryId: category.id, slug: `p-zones-${SUFFIX}`, nameAr: 'منتج بمنطقتين', status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendor.id, sku: `ZONES-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 10, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 10, reason: 'import' } });
+    variantId = variant.id;
+  });
+
+  const quoteFor = async (cart: string, a: typeof ADDRESS) =>
+    (await call('POST', '/checkout/quote', { body: { country: a.country, region: a.region, city: a.city }, headers: { 'x-cart-token': cart } })).json();
+  const place = (cart: string, a: typeof ADDRESS, expected: { expectedTotal?: string; expectedCurrency?: string }, key = randomUUID()) =>
+    call('POST', '/checkout', {
+      body: { address: a, paymentToken: 'tok_success', guestEmail: `zones.${randomUUID()}@basta.test`, ...expected },
+      headers: { 'x-cart-token': cart, 'idempotency-key': key },
+    });
+
+  it('حسب الشحن للأردن ثم دفع بعنوان سعودي: 409 بالإجمالي الجديد، ولا طلب ولا حجز ولا مال', async () => {
+    if (!dbUp) return;
+    const cart = await cartWith([{ variantId, qty: 1 }]);
+    const jo = await quoteFor(cart, ADDRESS);
+    const sa = await quoteFor(cart, SA_ADDRESS);
+    expect(jo.totals.total.minorUnits).not.toBe(sa.totals.total.minorUnits);
+    const before = await stockOf(variantId);
+
+    const key = randomUUID();
+    const res = await place(cart, SA_ADDRESS, { expectedTotal: jo.totals.total.minorUnits, expectedCurrency: jo.currency }, key);
+    expect(res.statusCode, res.body).toBe(409);
+    expect(res.json().details).toEqual({ reason: 'TOTAL_CHANGED', total: sa.totals.total.minorUnits, currency: 'JOD' });
+    expect(await prisma.order.count({ where: { idempotencyKey: key } })).toBe(0);
+    expect(await stockOf(variantId)).toEqual(before);
+
+    // يراه ويؤكّده: الطلب بالعنوان السعودي يُخصم بإجماليه هو
+    const ok = await place(cart, SA_ADDRESS, { expectedTotal: sa.totals.total.minorUnits, expectedCurrency: sa.currency });
+    expect(ok.statusCode, ok.body).toBe(200);
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: ok.json().orderId }, include: { payment: true } });
+    expect(order.grandTotalMinorUnits.toString()).toBe(sa.totals.total.minorUnits);
+    expect(order.payment!.amountMinorUnits.toString()).toBe(sa.totals.total.minorUnits);
+  });
+
+  it('بلا إجمالي أو بعملة أخرى لا دفع', async () => {
+    if (!dbUp) return;
+    const cart = await cartWith([{ variantId, qty: 1 }]);
+    const jo = await quoteFor(cart, ADDRESS);
+    expect((await place(cart, ADDRESS, {})).statusCode).toBe(400);
+    const otherCurrency = await place(cart, ADDRESS, { expectedTotal: jo.totals.total.minorUnits, expectedCurrency: 'SAR' });
+    expect(otherCurrency.statusCode).toBe(409);
+    expect(otherCurrency.json().details.reason).toBe('TOTAL_CHANGED');
   });
 });

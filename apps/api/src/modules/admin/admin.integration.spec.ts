@@ -84,9 +84,13 @@ async function placeOrder(qty = 2) {
   const cart = await call('POST', '/cart', undefined, { currency: 'SAR' });
   const token = cart.json().token as string;
   await call('POST', '/cart/items', undefined, { variantId: vendor.variantId, qty }, { 'x-cart-token': token });
+  const address = { recipientName: 'مشترٍ', phone: '+966500000001', country: 'SA', region: 'الرياض', city: 'الرياض', street: 'شارع 1' };
+  const shown = (await call('POST', '/checkout/quote', undefined, { country: address.country, region: address.region, city: address.city }, { 'x-cart-token': token })).json();
   const res = await call('POST', '/checkout', buyer.token, {
-    address: { recipientName: 'مشترٍ', phone: '+966500000001', country: 'SA', region: 'الرياض', city: 'الرياض', street: 'شارع 1' },
+    address,
     paymentToken: 'tok_success',
+    expectedTotal: shown.totals.total.minorUnits,
+    expectedCurrency: shown.currency,
   }, { 'x-cart-token': token, 'idempotency-key': randomUUID() });
   expect(res.statusCode, res.body).toBe(200);
   return prisma.order.findUniqueOrThrow({ where: { id: res.json().orderId }, include: { subOrders: { include: { items: true } } } });

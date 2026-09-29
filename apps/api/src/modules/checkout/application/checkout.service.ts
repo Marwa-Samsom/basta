@@ -35,6 +35,8 @@ export interface PlaceOrderInput {
   readonly idempotencyKey: string;
   readonly address: CheckoutAddress;
   readonly paymentToken: string;
+  /** ما رآه المشتري تحت «ادفع» — لا يُخصم غيره */
+  readonly expected: { readonly total: bigint; readonly currency: string };
   readonly userId: string | null;
   readonly guestEmail?: string | null;
   readonly guestPhone?: string | null;
@@ -118,6 +120,19 @@ export class CheckoutService {
     });
     if (quote.blockers.length > 0) {
       throw new ConflictError('لا يمكن إتمام الطلب بعد.', { blockers: quote.blockers });
+    }
+    /**
+     * التسعير يُعاد هنا بعنوان الطلب وسلّته الآن، وقد يختلف عمّا رآه المشتري:
+     * غيّر العنوان بعد «احسب الشحن»، أو تغيّر سعر أو سعر شحن أو كوبون، أو
+     * عدّل السلة من تبويب آخر. خصم المبلغ الجديد بصمت خصمٌ لما لم يوافق عليه —
+     * فيُرفض قبل أي حجز أو مال، ومعه الإجمالي الصحيح ليراه ويؤكّده.
+     */
+    if (quote.totals.total !== input.expected.total || cart.currency !== input.expected.currency) {
+      throw new ConflictError('تغيّر الإجمالي منذ حسبته. راجع المبلغ الجديد ثم اضغط «ادفع».', {
+        reason: 'TOTAL_CHANGED',
+        total: quote.totals.total.toString(),
+        currency: cart.currency,
+      });
     }
 
     // 1 · الحجز — يرمي InsufficientStockError باسم المنتج قبل أي مال

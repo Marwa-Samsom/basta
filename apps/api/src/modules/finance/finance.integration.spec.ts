@@ -72,7 +72,9 @@ async function placeOrder(qty: number[], currency = 'JOD') {
     const r = await call('POST', '/cart/items', undefined, { variantId: vendors[i]!.variantId, qty: q }, { 'x-cart-token': token });
     expect(r.statusCode, r.body).toBe(201);
   }
-  const res = await call('POST', '/checkout', buyer.token, { address: ADDRESS, paymentToken: 'tok_success' }, {
+  // الإجمالي كما يراه المشتري تحت «ادفع» — يُرسل مع الطلب ولا يُخصم غيره
+  const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, { 'x-cart-token': token })).json();
+  const res = await call('POST', '/checkout', buyer.token, { address: ADDRESS, paymentToken: 'tok_success', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
     'x-cart-token': token,
     'idempotency-key': randomUUID(),
   });

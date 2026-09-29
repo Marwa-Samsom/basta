@@ -122,7 +122,9 @@ beforeAll(async () => {
     const r = await call('POST', '/cart/items', undefined, { variantId: seats[i]!.variantId, qty }, { 'x-cart-token': token });
     expect(r.statusCode, r.body).toBe(201);
   }
-  const placed = await call('POST', '/checkout', buyerToken, { address: ADDRESS, paymentToken: 'tok_success' }, {
+  // الإجمالي كما يراه المشتري تحت «ادفع» — يُرسل مع الطلب ولا يُخصم غيره
+  const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, { 'x-cart-token': token })).json();
+  const placed = await call('POST', '/checkout', buyerToken, { address: ADDRESS, paymentToken: 'tok_success', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
     'x-cart-token': token,
     'idempotency-key': randomUUID(),
   });

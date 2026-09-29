@@ -83,6 +83,16 @@ export class PlaceOrderDto {
   @Length(3, 120)
   paymentToken!: string;
 
+  /**
+   * الإجمالي الذي رآه المشتري تحت «ادفع» — بالوحدات الصغرى وعملته، كما أعاده
+   * /checkout/quote. الخادم يعيد التسعير ولا يخصم مبلغاً غيره (409، reason TOTAL_CHANGED).
+   */
+  @Matches(/^[0-9]{1,19}$/, { message: 'أرسل الإجمالي الذي رأيته قبل الدفع.' })
+  expectedTotal!: string;
+
+  @Matches(/^[A-Z]{3}$/, { message: 'أرسل عملة الإجمالي الذي رأيته.' })
+  expectedCurrency!: string;
+
   @IsOptional()
   @IsEmail({}, { message: 'البريد غير صالح.' })
   guestEmail?: string;
@@ -148,6 +158,7 @@ export class CheckoutController {
       idempotencyKey,
       address: dto.address,
       paymentToken: dto.paymentToken,
+      expected: { total: BigInt(dto.expectedTotal), currency: dto.expectedCurrency },
       userId: actor?.userId ?? null,
       guestEmail: dto.guestEmail ?? null,
       guestPhone: dto.guestPhone ?? null,
