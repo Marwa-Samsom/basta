@@ -96,9 +96,25 @@ ok "لا انحراف في views التدقيق"
 
 # -----------------------------------------------------------------------------
 say "النسخ الاحتياطي والاستعادة"
-bash scripts/db-backup.sh backup >/dev/null
-bash scripts/db-backup.sh verify >/dev/null || die "الاستعادة لا تطابق الأصل"
-ok "نسخة أُخذت واستُعيدت على قاعدة نظيفة، والحرّاس نجت"
+# بمفتاح عابر ومجلد مؤقت: كان كل تشغيل يترك نسخة مكشوفة في .localdb/backups (42 نسخة
+# في مجلد يزامنه OneDrive). الفحص يثبت الآلية، لا يراكم نسخاً ولا يمسّ مفتاح صاحب المشروع
+bk="$(mktemp -d)"
+(
+  export BACKUP_DIR="$bk/out" BACKUP_PUBLIC_KEY="$bk/k.pub" BACKUP_PRIVATE_KEY="$bk/k.pem"
+  bash scripts/db-backup.sh keygen >/dev/null
+  bash scripts/db-backup.sh backup >/dev/null
+  enc="$(ls "$bk/out"/*.dump.enc)"
+  # نصّ pg_dump يبدأ بـ PGDMP — إن ظهر في الملف فالتشفير لم يحدث
+  ! head -c 5 "$enc" | grep -q PGDMP || die "النسخة مكتوبة بلا تشفير"
+  bash scripts/db-backup.sh verify >/dev/null || die "الاستعادة لا تطابق الأصل"
+  # بايت واحد يتغيّر ← الفكّ يُرفض ولا يُترك منه شيء
+  printf '\x00' | dd of="$enc" bs=1 seek=4096 conv=notrunc 2>/dev/null
+  if bash scripts/db-backup.sh open "$enc" "$bk/x.dump" >/dev/null 2>&1 || [ -e "$bk/x.dump" ]; then
+    die "نسخة معدَّلة فُكّت"
+  fi
+) || { rm -rf "$bk"; exit 1; }
+rm -rf "$bk"
+ok "نسخة مشفّرة أُخذت واستُعيدت على قاعدة نظيفة، والحرّاس نجت، والمعدَّلة تُرفض"
 
 # -----------------------------------------------------------------------------
 say "حرّاس الكود"

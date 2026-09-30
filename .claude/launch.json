@@ -29,6 +29,23 @@
         "@basta/web"
       ],
       "port": 3100
+    },
+    {
+      "name": "search",
+      "runtimeExecutable": "C:/Users/Mirvat/OneDrive/Desktop/basta/.localdb/meili/meilisearch.exe",
+      "runtimeArgs": [
+        "--http-addr",
+        "127.0.0.1:7701",
+        "--db-path",
+        ".localdb/meili/data",
+        "--dump-dir",
+        ".localdb/meili/dumps",
+        "--master-key",
+        "basta_local_dev_key_0001",
+        "--env",
+        "development"
+      ],
+      "port": 7701
     }
   ]
 }

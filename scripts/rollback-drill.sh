@@ -15,13 +15,16 @@
 #   bash scripts/rollback-drill.sh
 # =============================================================================
 set -euo pipefail
-# النسخة فيها القاعدة كلها بلا تشفير: ملفّاتها ومجلّدها لصاحبها وحده
 umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PGBIN="${PGBIN:-$ROOT/.localdb/pgsql/bin}"
-BACKUP_DIR="${BACKUP_DIR:-$ROOT/.localdb/backups}"
 : "${PGHOST:=localhost}" "${PGPORT:=5432}" "${PGUSER:=basta}"
+# النسخ مشفّرة كما في الإطلاق الحقيقي، لكن بمفتاح عابر وفي مجلد مؤقت يُحذف: التمرين يقيس
+# الاستعادة بفكّها، ولا يترك نسخاً ولا يحتاج مفتاح صاحب المشروع الخاص
+WORK="$(mktemp -d)"
+export BACKUP_DIR="$WORK/backups" BACKUP_PUBLIC_KEY="$WORK/k.pub" BACKUP_PRIVATE_KEY="$WORK/k.pem"
+bash "$ROOT/scripts/db-backup.sh" keygen >/dev/null
 # shellcheck source=lib/pg-password.sh
 source "$ROOT/scripts/lib/pg-password.sh"
 STAGING="basta_staging_drill"
@@ -33,7 +36,7 @@ now_ms() { date +%s%3N; }
 mkdir -p "$BACKUP_DIR"
 
 cleanup() { "$PGBIN/dropdb" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" --if-exists "$STAGING" >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+trap 'cleanup; rm -rf "$WORK"' EXIT
 
 # بصمة البيانات: ما يجب أن يعود بعد التراجع كما كان بالضبط
 fingerprint() {
@@ -49,15 +52,16 @@ fingerprint() {
 
 printf '\n\033[1m1 · تجهيز التجريبية من حالة الإنتاج\033[0m\n'
 bash "$ROOT/scripts/db-backup.sh" backup >/dev/null
-src="$(ls -t "$BACKUP_DIR"/basta_*.dump | head -1)"
+src="$(ls -t "$BACKUP_DIR"/basta_*.dump.enc | head -1)"
+bash "$ROOT/scripts/db-backup.sh" open "$src" "$WORK/src.dump" >/dev/null
 cleanup
 "$PGBIN/createdb" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$STAGING"
-"$PGBIN/pg_restore" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$STAGING" "$src" 2>/dev/null || true
+"$PGBIN/pg_restore" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$STAGING" "$WORK/src.dump" 2>/dev/null || true
+rm -f "$WORK/src.dump"
 ok "التجريبية من $(basename "$src")"
 
 printf '\n\033[1m2 · نسخة ما قبل الإصدار وبصمته\033[0m\n'
-pre="$BACKUP_DIR/${STAGING}_prerelease_$(date +%Y%m%d_%H%M%S).dump"
-"$PGBIN/pg_dump" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$STAGING" -Fc -f "$pre"
+pre="$(PGDATABASE="$STAGING" bash "$ROOT/scripts/db-backup.sh" backup | sed 's/^✓ //')"
 before="$(fingerprint)"
 ok "نسخة $(basename "$pre") · بصمة $before"
 
@@ -75,10 +79,12 @@ ok "المخطط والإعداد المالي تغيّرا: فترة التعل
 
 printf '\n\033[1m4 · التراجع: استعادة نسخة ما قبل الإصدار\033[0m\n'
 t0="$(now_ms)"
+# الفكّ داخل الزمن المقيس: هكذا تجري الاستعادة الحقيقية
+bash "$ROOT/scripts/db-backup.sh" open "$pre" "$WORK/pre.dump" >/dev/null
 "${PSQL[@]}" -d postgres -qc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$STAGING' AND pid <> pg_backend_pid();" >/dev/null
 "$PGBIN/dropdb" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$STAGING"
 "$PGBIN/createdb" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$STAGING"
-"$PGBIN/pg_restore" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$STAGING" "$pre" 2>/dev/null || true
+"$PGBIN/pg_restore" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$STAGING" "$WORK/pre.dump" 2>/dev/null || true
 t1="$(now_ms)"
 ok "استُعيدت في $(( (t1 - t0) )) ms"
 
@@ -96,4 +102,3 @@ done
 ok "منظرات التدقيق صفر"
 
 printf '\n\033[32m\033[1m✅ التراجع مجرَّب: %s ms من القرار إلى قاعدة سليمة\033[0m\n' "$(( t1 - t0 ))"
-rm -f "$pre"

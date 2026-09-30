@@ -29,6 +29,8 @@
     "verify": "bash scripts/verify-local.sh",
     "db:backup": "bash scripts/db-backup.sh backup",
     "db:verify-restore": "bash scripts/db-backup.sh verify",
+    "db:backup-keygen": "bash scripts/db-backup.sh keygen",
+    "db:backup-seal-legacy": "bash scripts/db-backup.sh seal-legacy",
     "verify:quick": "bash scripts/verify-local.sh --keep",
     "search:start": ".localdb/meili/meilisearch.exe --http-addr 127.0.0.1:7701 --db-path .localdb/meili/data --dump-dir .localdb/meili/dumps --master-key basta_local_dev_key_0001 --env development",
     "admin:grant": "npm run admin:grant -w @basta/api --",
