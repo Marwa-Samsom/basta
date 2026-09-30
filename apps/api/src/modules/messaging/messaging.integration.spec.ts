@@ -135,7 +135,9 @@ beforeAll(async () => {
   const cartToken = cart.json().token as string;
   const add = await call('POST', '/cart/items', undefined, { variantId: shops[0]!.variantId, qty: 1 }, { 'x-cart-token': cartToken });
   expect(add.statusCode, add.body).toBe(201);
-  const placed = await call('POST', '/checkout', alice.token, { address: ADDRESS, paymentToken: 'tok_success' }, {
+  // الإجمالي كما يراه المشتري تحت «ادفع» — يُرسل مع الطلب ولا يُخصم غيره
+  const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, { 'x-cart-token': cartToken })).json();
+  const placed = await call('POST', '/checkout', alice.token, { address: ADDRESS, paymentToken: 'tok_success', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
     'x-cart-token': cartToken,
     'idempotency-key': randomUUID(),
   });
@@ -379,8 +381,11 @@ describe('ST-28 · VD-15 · المقروء والتنبيه', () => {
     expect(await customerSets(carol.userId, id)).toBe(2);
 
     // التنبيه يحمل سياق المحادثة ونصّها
+    // الأول بالترتيب: للمتجر تنبيهان على المحادثة (السؤال الأول ثم الثالث بعد قراءته)،
+    // وبلا ترتيب تعيد القاعدة أيّهما شاءت
     const n = await prisma.notification.findFirstOrThrow({
       where: { templateCode: 'message_to_vendor', userId: x.ownerId, payloadJson: { path: ['link'], equals: `/vendor/messages?c=${id}` } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
     expect(n.payloadJson).toMatchObject({ customer_name: 'مشترٍ carol', context: 'منتج: عباءة x', preview: 'السؤال الأول', store_name: x.nameAr });
   });

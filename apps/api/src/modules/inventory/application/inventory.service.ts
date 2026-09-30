@@ -224,16 +224,20 @@ export class InventoryService {
    * سطر ناقص واحد يُسقط الحجز كله برسالة تسمّيه: مشترٍ حُجز له نصف سلّته
    * يدفع ثم يكتشف النقص، وهذا ما وُجد ADR-006 لمنعه.
    */
-  async reserve(input: {
-    readonly lines: readonly ReservationLineInput[];
-    readonly cartId?: string | null | undefined;
-    readonly orderId?: string | null | undefined;
-    readonly now?: Date | undefined;
-  }): Promise<ReservationResult> {
+  async reserve(
+    input: {
+      readonly lines: readonly ReservationLineInput[];
+      readonly cartId?: string | null | undefined;
+      readonly orderId?: string | null | undefined;
+      readonly now?: Date | undefined;
+    },
+    /** معاملة المستدعي — إعادة الحجز والتثبيت معاً بعد دفع متأخر (checkout) */
+    tx?: Tx,
+  ): Promise<ReservationResult> {
     const lines = normalizeReservationLines(input.lines);
     const ttl = await this.ttlMinutes();
 
-    return this.within(undefined, async (t) => {
+    return this.within(tx, async (t) => {
       const locked = await this.lock(
         t,
         lines.map((l) => l.variantId),

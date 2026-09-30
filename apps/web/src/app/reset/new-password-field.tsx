@@ -76,11 +76,5 @@ export function NewPasswordField({
   );
 }
 
-/** وجهة «التالي» من الرابط — مسار داخلي فقط، لا `//موقع-آخر` يحوّل إليه رابط مصنوع */
-export function safeNext(raw: string | null, fallback: string): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return fallback;
-  return raw;
-}
-
 /** البريد يُنقل من «نسيت» إلى صفحة التعيين في ذاكرة الجلسة لا في الرابط — الرابط يُسجَّل ويُشارك */
 export const RESET_EMAIL_KEY = 'basta.resetEmail';

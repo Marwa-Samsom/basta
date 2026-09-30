@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { NotificationsModule } from '../notifications/public';
 import { AccountController } from './api/account.controller';
 import { AuthController } from './api/auth.controller';
 import { AuthGuard } from './api/guards/auth.guard';
+import { SessionCookieInterceptor } from './api/session-cookie.interceptor';
 import { AccountService } from './application/account.service';
 import { AuthService } from './application/auth.service';
 import { OtpStore } from './application/otp.store';
@@ -28,6 +29,8 @@ import { AuditService } from './infrastructure/audit.service';
      * العكس — حارس يُضاف يدوياً لكل متحكّم — ينتهي بمسار منسيّ مكشوف.
      */
     { provide: APP_GUARD, useClass: AuthGuard },
+    // رمز التحديث لا يخرج في جسم أي ردّ — يُنقل إلى كوكي HttpOnly
+    { provide: APP_INTERCEPTOR, useClass: SessionCookieInterceptor },
   ],
   exports: [AuthService, TokenService, AuditService],
 })

@@ -13,13 +13,14 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
-import { InvalidInputError, InvalidStateTransitionError } from '../../common/errors/domain-error';
+import { ConflictError, InvalidInputError, InvalidStateTransitionError } from '../../common/errors/domain-error';
 import { hashPassword } from '../identity/public';
 import { CategoryService, ProductService, UPLOADS_ROOT, type EffectiveAttribute } from './public';
 
@@ -125,6 +126,10 @@ const dbIt: typeof it = ((name: string, fn: never, timeout?: number) =>
   )) as never;
 
 // ---------------------------------------------------------------------------- أدوات
+
+/** نسخة المحتوى الحالية — ما يراه المراجِع حين يفتح المنتج */
+const revOf = async (id: string): Promise<number> =>
+  (await prisma.product.findUniqueOrThrow({ where: { id }, select: { contentRevision: true } })).contentRevision;
 
 function as(tag: Tag) {
   const headers = { authorization: `Bearer ${vendors[tag].token}` };
@@ -295,7 +300,7 @@ describe('بوابة 05 · البند الأول — دورة حياة منتج 
     const submitted = await A.post(`/vendor/products/${product.id}/publish`);
     expect(submitted.statusCode).toBe(200);
     expect(submitted.json().status).toBe('pending_review');
-    await app.get(ProductService).approve(product.id);
+    await app.get(ProductService).approve(product.id, await revOf(product.id));
     expect((await A.get(`/vendor/products/${product.id}`)).json().status).toBe('active');
     const stripped = await A.patch(`/vendor/products/${product.id}`, { attributes: [] });
     expect(stripped.statusCode).toBe(400);
@@ -454,33 +459,90 @@ describe('مراجعة المنتجات قبل النشر — Q-15', () => {
       status: 'pending_review',
       rejectReason: null,
     });
-    await service.approve(product.id);
+    await service.approve(product.id, await revOf(product.id));
     const approved = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
     expect(approved.status).toBe('active');
     expect(approved.publishedAt).not.toBeNull();
 
     // الاعتماد مرتين انتقال غير مسموح
-    await expect(service.approve(product.id)).rejects.toBeInstanceOf(InvalidStateTransitionError);
+    await expect(service.approve(product.id, await revOf(product.id))).rejects.toBeInstanceOf(InvalidStateTransitionError);
+  });
+
+  dbIt('البائع يعدّل بعد أن فتح المراجِع المنتج: الاعتماد يُردّ ولا يُنشر ما لم يُقرأ', async () => {
+    const A = as('a');
+    const service = app.get(ProductService);
+    const product = await simpleProduct('a', `REREAD-${SUFFIX}`);
+    await A.post(`/vendor/products/${product.id}/publish`);
+
+    // المراجِع يفتحه: النسخة في تفاصيله
+    const opened = await service.adminGet({ userId: vendors.a.userId, roles: ['admin'] } as never, product.id);
+    expect(opened.status).toBe('pending_review');
+
+    // والبائع يغيّر الاسم والوصف قبل الاعتماد
+    const edited = await A.patch(`/vendor/products/${product.id}`, { nameAr: 'اسم آخر لم يقرأه أحد', descriptionAr: 'وصف جديد' });
+    expect(edited.statusCode, edited.body).toBe(200);
+    expect(edited.json().contentRevision).toBe(opened.contentRevision + 1);
+
+    const stale = await service.approve(product.id, opened.contentRevision).catch((e: unknown) => e);
+    expect(stale).toBeInstanceOf(ConflictError);
+    expect((stale as ConflictError).details).toEqual({ reason: 'CONTENT_CHANGED', contentRevision: opened.contentRevision + 1 });
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('pending_review');
+
+    // يعيد الفتح فيقرأ الجديد ويعتمده
+    await service.approve(product.id, opened.contentRevision + 1);
+    expect(await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).toMatchObject({ status: 'active', nameAr: 'اسم آخر لم يقرأه أحد' });
+  });
+
+  dbIt('إضافة صورة أو حذفها نسخة جديدة، والسعر لا', async () => {
+    const A = as('a');
+    const service = app.get(ProductService);
+    const sku = `REV-IMG-${SUFFIX}`;
+    const product = await simpleProduct('a', sku);
+    const variantId = product.variants[0]?.id as string;
+    await A.post(`/vendor/products/${product.id}/publish`);
+    const r0 = await revOf(product.id);
+
+    // السعر تشغيل لا محتوى (Q-16) — الاعتماد بالنسخة المفتوحة يمرّ بعده
+    expect((await A.patch(`/vendor/products/${product.id}`, { variants: [{ id: variantId, sku, price: '15.00', stock: 4 }] })).statusCode).toBe(200);
+    expect(await revOf(product.id)).toBe(r0);
+
+    const png = await sharp({ create: { width: 900, height: 900, channels: 3, background: { r: 20, g: 90, b: 140 } } }).png().toBuffer();
+    const up = await A.upload(`/vendor/products/${product.id}/images`, { name: 'p.png', type: 'image/png', data: png });
+    expect(up.statusCode, up.body).toBe(201);
+    expect(await revOf(product.id)).toBe(r0 + 1);
+    await expect(service.approve(product.id, r0)).rejects.toBeInstanceOf(ConflictError);
+
+    expect((await A.delete(`/vendor/products/${product.id}/images/${up.json().id}`)).statusCode).toBeLessThan(300);
+    expect(await revOf(product.id)).toBe(r0 + 2);
+    await service.approve(product.id, r0 + 2);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('active');
   });
 
   dbIt('المسودة لم تُرسل فلا تُعتمد ولا تُرفض، والطابور لا يحوي إلا ما ينتظر', async () => {
     const service = app.get(ProductService);
     const draft = await simpleProduct('a', `DRAFT-${SUFFIX}`);
 
-    await expect(service.approve(draft.id)).rejects.toBeInstanceOf(InvalidStateTransitionError);
+    await expect(service.approve(draft.id, await revOf(draft.id))).rejects.toBeInstanceOf(InvalidStateTransitionError);
     await expect(service.reject(draft.id, 'سبب كافٍ للرفض')).rejects.toBeInstanceOf(InvalidStateTransitionError);
     expect((await prisma.product.findUniqueOrThrow({ where: { id: draft.id } })).status).toBe('draft');
 
     await as('a').post(`/vendor/products/${draft.id}/publish`);
-    const queue = await service.adminList({ status: 'pending_review', pageSize: 100 });
-    expect(queue.items.some((p) => p.id === draft.id)).toBe(true);
-    expect(queue.items.every((p) => p.status === 'pending_review')).toBe(true);
-    expect(queue.items.find((p) => p.id === draft.id)?.vendor.nameAr).toBe('متجر a');
+    // الطابور بالأقدم أولاً، وقاعدة التطوير تتراكم فيها منتجات تنتظر من تشغيلات سابقة:
+    // يُتصفَّح صفحةً صفحة حتى يظهر — لا يُفترض أن الصفحة الأولى تكفي
+    const seen: { id: string; status: string; vendor: { nameAr: string } }[] = [];
+    for (let page = 1; page <= 50 && !seen.some((p) => p.id === draft.id); page++) {
+      const queue = await service.adminList({ status: 'pending_review', pageSize: 100, page });
+      seen.push(...queue.items);
+      if (queue.items.length < 100) break;
+    }
+    expect(seen.some((p) => p.id === draft.id)).toBe(true);
+    expect(seen.every((p) => p.status === 'pending_review')).toBe(true);
+    expect(seen.find((p) => p.id === draft.id)?.vendor.nameAr).toBe('متجر a');
 
     // سحب الإرسال يعيده مسودة ويخرجه من الطابور
     expect((await as('a').post(`/vendor/products/${draft.id}/unpublish`)).json().status).toBe('draft');
-    const after = await service.adminList({ status: 'pending_review', pageSize: 100 });
-    expect(after.items.some((p) => p.id === draft.id)).toBe(false);
+    // الطابور هو ما حالته pending_review — والصفحة الأولى وحدها قد لا تحويه أصلاً فتنجح كذباً
+    expect(await prisma.product.count({ where: { id: draft.id, status: 'pending_review', deletedAt: null } })).toBe(0);
   });
 });
 
@@ -495,7 +557,7 @@ describe('تعديل المنشور — Q-16', () => {
     const status = async () => (await A.get(`/vendor/products/${product.id}`)).json().status;
     const publish = async () => {
       await A.post(`/vendor/products/${product.id}/publish`);
-      await service.approve(product.id);
+      await service.approve(product.id, await revOf(product.id));
       expect(await status()).toBe('active');
     };
     await publish();
@@ -725,5 +787,57 @@ describe('شجرة الفئات', () => {
     const otherNode = tree.find((n: { id: string }) => n.id === other.id);
     expect(otherNode.children[0].children[0].id).toBe(grand.id);
     void randomUUID;
+  });
+});
+
+// ============================================================================
+describe('صور المنتجات: الظاهر للعموم، والمسودّة والمرفوض برابط موقَّع، والمحذوف بلا ملف', () => {
+  const get = (url: string) => app.inject({ method: 'GET', url });
+  const bare = (url: string) => url.split('?')[0]!;
+  const image = () => sharp({ create: { width: 400, height: 400, channels: 3, background: { r: 30, g: 90, b: 60 } } }).png().toBuffer();
+  const uploadTo = async (id: string) => {
+    const up = await as('a').upload(`/vendor/products/${id}/images`, { name: 'p.png', type: 'image/png', data: await image() });
+    expect(up.statusCode, up.body).toBe(201);
+    return up.json() as { id: string; urls: Record<string, string> };
+  };
+  const live = async (id: string) => {
+    await as('a').post(`/vendor/products/${id}/publish`);
+    await app.get(ProductService).approve(id, await revOf(id));
+  };
+
+  dbIt('المسودّة: الرابط الموقَّع وحده يفتحها — لا العاري ولا المزوَّر', async () => {
+    const draft = await simpleProduct('a', `IMG-DRAFT-${SUFFIX}`);
+    const signed = (await uploadTo(draft.id)).urls['thumb.webp']!;
+    expect(signed).toMatch(/\?s=\d+\.[\w-]{22}$/);
+    expect((await get(signed)).statusCode).toBe(200);
+    expect((await get(bare(signed))).statusCode).toBe(404);
+    expect((await get(`${bare(signed)}?s=9999999999.${'A'.repeat(22)}`)).statusCode).toBe(404);
+  });
+
+  dbIt('المنشور للعموم، والمرفوض يُحجب عنهم', async () => {
+    const shown = await simpleProduct('a', `IMG-LIVE-${SUFFIX}`);
+    const shownUrl = bare((await uploadTo(shown.id)).urls['thumb.webp']!);
+    await live(shown.id);
+    expect((await get(shownUrl)).statusCode).toBe(200);
+
+    const refused = await simpleProduct('a', `IMG-REJ-${SUFFIX}`);
+    const refusedImg = await uploadTo(refused.id);
+    await live(refused.id);
+    await app.get(ProductService).reject(refused.id, 'الصورة مخالفة لسياسة المنصة.');
+    expect((await get(bare(refusedImg.urls['thumb.webp']!))).statusCode).toBe(404);
+    // وصاحبه ومراجِعه يرونها برابطهم الموقَّع
+    expect((await get(refusedImg.urls['thumb.webp']!)).statusCode).toBe(200);
+  });
+
+  dbIt('حذف المنتج يحذف ملفات صوره التي لا يذكرها طلب', async () => {
+    const gone = await simpleProduct('a', `IMG-DEL-${SUFFIX}`);
+    const img = await uploadTo(gone.id);
+    const key = bare(img.urls['thumb.webp']!).replace(/^\/uploads\//, '').replace(/\/thumb\.webp$/, '');
+    const file = join(UPLOADS_ROOT, ...key.split('/'), 'thumb.webp');
+    expect(existsSync(file)).toBe(true);
+    expect((await as('a').delete(`/vendor/products/${gone.id}`)).statusCode).toBeLessThan(300);
+    expect(existsSync(file)).toBe(false);
+    expect(await prisma.productImage.count({ where: { id: img.id } })).toBe(0);
+    expect((await get(img.urls['thumb.webp']!)).statusCode).toBe(404);
   });
 });

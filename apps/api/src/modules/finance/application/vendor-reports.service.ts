@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { InvalidInputError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { csvCell } from '../../../common/csv';
 
 export interface ReportRange {
   from: Date;
@@ -185,7 +186,7 @@ export class VendorReportsService {
   }
 
   async csv(vendorId: string, r: ReportRange): Promise<string> {
-    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const esc = csvCell;
     const { rep, sections } = await this.sections(vendorId, r);
     const parts: string[] = [`${esc('الفترة')},${esc(rep.range.from)},${esc(rep.range.to)}`, esc('المبالغ بالوحدات الصغرى لكل عملة')];
     for (const sec of sections) {
@@ -205,7 +206,9 @@ export class VendorReportsService {
       const head = Object.keys(sec.rows[0] ?? {});
       ws.addRow(head).font = { bold: true };
       for (const row of sec.rows) ws.addRow(head.map((h) => row[h]));
-      ws.columns.forEach((c) => (c.width = 18));
+      // ورقة بلا أسطر (بائع بلا مبيعات في المدى) لا أعمدة لها: ws.columns فيها null، فكان
+      // التصدير يسقط 500 لكل بائع جديد
+      for (let i = 1; i <= head.length; i++) ws.getColumn(i).width = 18;
     }
     return Buffer.from(await wb.xlsx.writeBuffer());
   }

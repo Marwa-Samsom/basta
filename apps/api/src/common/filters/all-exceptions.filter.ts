@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   ArgumentsHost,
   Catch,
@@ -24,7 +25,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const res = ctx.getResponse<{ status: (c: number) => { send: (b: unknown) => void } }>();
+    const reply = ctx.getResponse<{ status: (c: number) => { header: (k: string, v: string) => { send: (b: unknown) => void } } }>();
+    /**
+     * الخطأ JSON دائماً، ولو كان المسار يعلن نوعاً آخر: @Header('content-type', 'text/csv')
+     * يُضبط قبل المعالج، فكان خطأ مسار تصدير (فترة مرفوضة مثلاً) يُرسَل كائناً بنوع
+     * CSV فيرفضه Fastify — ويصل 500 بدل الرسالة.
+     */
+    const res = { status: (c: number) => ({ send: (b: unknown) => reply.status(c).header('content-type', 'application/json; charset=utf-8').send(b) }) };
     const req = ctx.getRequest<{ url?: string; method?: string; id?: string }>();
 
     if (exception instanceof DomainError) {
@@ -40,6 +47,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const status = exception.getStatus();
       const body = exception.getResponse();
       res.status(status).send(typeof body === 'string' ? { message: body } : body);
+      return;
+    }
+
+    /**
+     * شبكة أخيرة لمدخل لم يُفحص قبل القاعدة: قيمة مكرّرة لعمود فريد (P2002)، وقيمة لا
+     * تناسب نوع عمودها كمعرّف غير صالح (P2023). كلاهما من الطلب لا من الخادم — 409 و 400
+     * برسالة، لا «خلل غير متوقّع». يُسجَّل تحذيراً ليُفحص المدخل في مكانه.
+     */
+    if (exception instanceof Prisma.PrismaClientKnownRequestError && (exception.code === 'P2002' || exception.code === 'P2023')) {
+      this.logger.warn(`${req.method} ${req.url} [${req.id ?? '—'}] ${exception.code} ${exception.message.split('\n').pop() ?? ''}`);
+      const conflict = exception.code === 'P2002';
+      res.status(conflict ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST).send({
+        code: conflict ? 'CONFLICT' : 'INVALID_INPUT',
+        message: conflict ? 'القيمة مستعملة من قبل. غيّرها وأعد المحاولة.' : 'قيمة غير صالحة في الطلب. راجع المدخلات وأعد المحاولة.',
+      });
       return;
     }
 

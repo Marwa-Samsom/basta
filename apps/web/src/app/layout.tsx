@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { connection } from 'next/server';
 // الخطوط مستضافة ذاتياً: سياسة المحتوى لا تسمح بخطوط من أصل آخر، والمشروع محلي
 // بلا اعتماد على شبكة خارجية.
 //
@@ -40,7 +41,10 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // كل صفحة تُصيَّر عند الطلب: سياسة المحتوى تحمل nonce جديداً لكل طلب
+  // (src/proxy.ts)، وصفحة مبنية سلفاً لا تعرفه فتُحجب سكربتاتها كلها
+  await connection();
   // lang و dir على عنصر html — أساس RTL لا خاصية CSS
   return (
     <html lang="ar" dir="rtl">

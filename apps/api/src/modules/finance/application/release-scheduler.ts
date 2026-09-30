@@ -33,13 +33,15 @@ export class ReleaseScheduler implements OnApplicationBootstrap, OnModuleDestroy
     if (this.timer) clearInterval(this.timer);
   }
 
-  async tick(now: Date = new Date()): Promise<number> {
+  async tick(now: Date = new Date(), batch = 500): Promise<number> {
     if (this.running) return 0;
     this.running = true;
     try {
       const due = await this.prisma.subOrder.findMany({
         where: {
           holdReleaseAt: { lte: now },
+          // ما حُسم لا يعود — ولو لم يُنقل منه شيء (مسترَدّ كله)
+          holdSettledAt: null,
           status: { in: ['delivered', 'completed', 'refunded'] },
           disputes: { none: { status: { in: ['open', 'escalated'] } } },
           returns: { none: { status: 'requested' } },
@@ -47,7 +49,7 @@ export class ReleaseScheduler implements OnApplicationBootstrap, OnModuleDestroy
         },
         select: { id: true },
         orderBy: { holdReleaseAt: 'asc' },
-        take: 500,
+        take: batch,
       });
       let n = 0;
       for (const s of due) {

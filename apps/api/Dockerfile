@@ -21,4 +21,6 @@ COPY --from=build /app/apps/api/prisma ./prisma
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 USER node
 EXPOSE 4000
+# الحياة لا الجاهزية: سقوط القاعدة يُخرج الخادم من الموازن (/health 503) ولا يعيد تشغيله
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3   CMD node -e "fetch('http://127.0.0.1:4000/api/v1/health/live').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 CMD ["node", "dist/main.js"]

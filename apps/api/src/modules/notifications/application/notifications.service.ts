@@ -1,15 +1,17 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
+import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import {
   CHANNELS,
   CHANNEL_LABELS,
+  defaultTemplate,
   DEFAULT_TEMPLATES,
   EVENTS,
   eventOf,
   PREF_CATEGORIES,
   prefCategoryOf,
+  redactVars,
   render,
   usedVariables,
   type Channel,
@@ -72,7 +74,35 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
       })),
       skipDuplicates: true,
     });
+    await this.enforceProtected();
     return r.count;
+  }
+
+  /**
+   * ما عُبث به في القاعدة قبل القفل لا يبقى: المقفول يعود نصّ الكود وتُحذف
+   * قنواته المضافة، والتنبيه الإلزامي يعود مفعّلاً. يُكتب المختلف وحده، فلا
+   * يتحرّك «آخر تعديل» عند كل إقلاع.
+   */
+  private async enforceProtected(): Promise<void> {
+    for (const ev of EVENTS) {
+      if (ev.locked) {
+        const seeds = DEFAULT_TEMPLATES.filter((t) => t.code === ev.code);
+        await this.prisma.notificationTemplate.deleteMany({
+          where: { code: ev.code, channel: { notIn: seeds.map((s) => s.channel) } },
+        });
+        const rows = await this.prisma.notificationTemplate.findMany({ where: { code: ev.code, locale: 'ar' } });
+        for (const row of rows) {
+          const seed = seeds.find((s) => s.channel === row.channel)!;
+          if (row.subject === seed.subject && row.body === seed.body && row.isEnabled) continue;
+          await this.prisma.notificationTemplate.update({
+            where: { code_channel_locale: { code: row.code, channel: row.channel, locale: row.locale } },
+            data: { subject: seed.subject, body: seed.body, isEnabled: true, updatedAt: new Date(), updatedBy: null },
+          });
+        }
+      } else if (ev.mandatory) {
+        await this.prisma.notificationTemplate.updateMany({ where: { code: ev.code, isEnabled: false }, data: { isEnabled: true } });
+      }
+    }
   }
 
   // ------------------------------------------------------------ الإدراج
@@ -82,10 +112,13 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     db: Db = this.prisma,
   ): Promise<number> {
     if (!input.userId) return 0;
-    let templates = await db.notificationTemplate.findMany({
-      where: { code: input.code, locale: 'ar', isEnabled: true },
-      select: { channel: true },
-    });
+    // المقفول: قنواته من الكود — قناة أُضيفت في القاعدة لا توصل رمزاً إلى مكان آخر
+    let templates = eventOf(input.code)?.locked
+      ? DEFAULT_TEMPLATES.filter((t) => t.code === input.code).map((t) => ({ channel: t.channel }))
+      : await db.notificationTemplate.findMany({
+          where: { code: input.code, locale: 'ar', isEnabled: true },
+          select: { channel: true },
+        });
     // فئة أطفأها صاحبها: داخل الموقع وحده — لا يضيع شيء، يصل أهدأ فقط
     const category = prefCategoryOf(input.code);
     if (category) {
@@ -171,20 +204,36 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     if (claimed.count === 0) return null;
     const n = await this.prisma.notification.findUniqueOrThrow({ where: { id } });
     const channel = n.channel as Channel;
+    const ev = eventOf(n.templateCode);
+    const vars = n.payloadJson as Record<string, string>;
+    const secret = (ev?.secret?.length ?? 0) > 0;
 
+    // الختام يمحو الأسرار: الرمز يصل صاحبه ثم لا يبقى في صفّ يقرؤه السجل
     const finish = async (status: 'sent' | 'failed' | 'skipped', data: Prisma.NotificationUpdateInput = {}) => {
-      await this.prisma.notification.update({ where: { id }, data: { status, ...data } });
+      const scrubbed = secret ? { payloadJson: redactVars(n.templateCode, vars) } : {};
+      await this.prisma.notification.update({ where: { id }, data: { status, ...data, ...scrubbed } });
       return status;
     };
 
     try {
-      const tpl = await this.prisma.notificationTemplate.findUnique({
-        where: { code_channel_locale: { code: n.templateCode, channel, locale: 'ar' } },
-      });
+      // المقفول يُرسل بنصّ الكود وحده — صفّه في القاعدة للعرض لا للإرسال
+      const tpl = ev?.locked
+        ? (() => {
+            const d = defaultTemplate(n.templateCode, channel);
+            return d ? { subject: d.subject, body: d.body, isEnabled: true } : null;
+          })()
+        : await this.prisma.notificationTemplate.findUnique({
+            where: { code_channel_locale: { code: n.templateCode, channel, locale: 'ar' } },
+          });
       if (!tpl || !tpl.isEnabled) return finish('skipped', { error: 'القالب غير مفعّل' });
-      const vars = n.payloadJson as Record<string, string>;
       const subject = tpl.subject ? render(tpl.subject, vars) : null;
       const body = render(tpl.body, vars);
+      // ما يُخزَّن: النص نفسه والسرّ محجوب
+      const shown = secret ? redactVars(n.templateCode, vars) : vars;
+      const stored = {
+        subject: secret ? (tpl.subject ? render(tpl.subject, shown) : null) : subject,
+        body: secret ? render(tpl.body, shown) : body,
+      };
 
       const user = await this.prisma.user.findUnique({ where: { id: n.userId }, select: { email: true, phone: true } });
       let recipient: string | null = null;
@@ -196,12 +245,12 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
         recipient = sub?.endpoint ?? null;
       }
       if (!recipient) {
-        return finish('skipped', { subject, body, error: `لا عنوان لقناة ${CHANNEL_LABELS[channel]}` });
+        return finish('skipped', { ...stored, error: `لا عنوان لقناة ${CHANNEL_LABELS[channel]}` });
       }
 
       // داخل الموقع: الصف نفسه هو الرسالة
       const ref = channel === 'in_app' ? 'in_app' : await deliver({ id, channel, recipient, subject, body });
-      return finish('sent', { subject, body, recipient, deliveryRef: ref, sentAt: new Date(), error: null });
+      return finish('sent', { ...stored, recipient, deliveryRef: ref, sentAt: new Date(), error: null });
     } catch (err) {
       const message = (err as Error).message;
       // خطأ القالب لا يُصلحه التكرار؛ خطأ القناة قد يُصلحه
@@ -310,6 +359,12 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     const ev = eventOf(code);
     if (!ev) throw new NotFoundError('حدث غير معروف.', { code });
     if (!CHANNELS.includes(channel)) throw new InvalidInputError('قناة غير معروفة.');
+    if (ev.locked) {
+      throw new ConflictError('قالب رمز أمان: نصّه وقنواته مثبّتة في الكود ولا تُحرَّر من اللوحة، حتى لا يُكشف الرمز.');
+    }
+    if (ev.mandatory && input.isEnabled === false) {
+      throw new ConflictError('تنبيه أمن إلزامي: يُحرَّر نصّه ولا يُوقف، فإيقافه يُخفي عن صاحب الحساب أن حسابه في خطر.');
+    }
     if (channel === 'email' && !input.subject?.trim()) throw new InvalidInputError('البريد يحتاج عنواناً.');
     const unknown = usedVariables(`${input.subject ?? ''} ${input.body}`).filter((v) => !ev.variables.includes(v));
     if (unknown.length) {

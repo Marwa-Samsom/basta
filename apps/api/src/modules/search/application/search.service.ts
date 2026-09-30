@@ -184,17 +184,20 @@ export class SearchService {
     }
   }
 
-  /** اقتراحات أثناء الكتابة — ST-06. أسماء لا منتجات كاملة. */
-  async suggest(term: string, limit = 6): Promise<string[]> {
+  /**
+   * مرشّحو الاقتراحات أثناء الكتابة — ST-06: المعرّف والاسم. الفهرس نسخة قد
+   * تتأخّر عن القاعدة، فالكتالوج يصفّيهم بقاعدة الرؤية قبل أن يراهم أحد.
+   */
+  async suggestHits(term: string, limit = 12): Promise<{ id: string; nameAr: string }[]> {
     if (term.trim().length < 2) return [];
     try {
-      const res = await this.meili.request<{ hits: { nameAr: string }[] }>(
+      const res = await this.meili.request<{ hits: { id: string; nameAr: string }[] }>(
         'POST',
         `/indexes/${this.meili.index}/search`,
-        { q: term, limit, attributesToRetrieve: ['nameAr'] },
+        { q: term, limit, attributesToRetrieve: ['id', 'nameAr'] },
         900,
       );
-      return [...new Set(res.hits.map((h) => h.nameAr))];
+      return res.hits;
     } catch {
       return [];
     }

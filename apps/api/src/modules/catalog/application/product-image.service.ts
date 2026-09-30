@@ -65,7 +65,7 @@ export class ProductImageService {
           sort: product._count.images,
         },
       });
-      await this.returnToReviewIfPublished(scope, productId);
+      await this.contentChanged(scope, productId);
       return {
         id: image.id,
         variantId: image.variantId,
@@ -93,7 +93,7 @@ export class ProductImageService {
     if (!image) throw new NotFoundError('الصورة غير موجودة.', { imageId });
 
     await this.prisma.productImage.delete({ where: { id: imageId } });
-    await this.returnToReviewIfPublished(scope, productId);
+    await this.contentChanged(scope, productId);
     // الصف حُذف فالصورة غير مرئية؛ ملف لم يُحذف يُسجَّل ولا يُفشل طلب البائع
     await this.storage.remove(image.fileKey).catch((err: unknown) =>
       this.logger.error(`تعذّر حذف ملفات الصورة ${image.fileKey}`, err as Error),
@@ -101,13 +101,13 @@ export class ProductImageService {
   }
 
   /**
-   * Q-16: الصور محتوى يراه المشتري — إضافتها أو حذفها في منتج منشور يعيده للمراجعة.
-   * الشرط على الحالة داخل الكتابة: منتج غير منشور لا يتغيّر.
+   * Q-16: الصور محتوى يراه المشتري — إضافتها أو حذفها نسخة محتوى جديدة (فلا يُعتمد
+   * ما فتحه المراجِع قبلها)، وفي منتج منشور تعيده للمراجعة.
+   * الشرط على الحالة داخل الكتابة: منتج غير منشور لا تتغيّر حالته.
    */
-  private async returnToReviewIfPublished(scope: VendorScope, productId: string): Promise<void> {
-    await new ScopedRepository(this.prisma.product as never, scope, 'المنتج').updateWhere(
-      { id: productId, status: 'active', deletedAt: null },
-      { status: 'pending_review' },
-    );
+  private async contentChanged(scope: VendorScope, productId: string): Promise<void> {
+    const products = new ScopedRepository(this.prisma.product as never, scope, 'المنتج');
+    await products.updateWhere({ id: productId, deletedAt: null }, { contentRevision: { increment: 1 } });
+    await products.updateWhere({ id: productId, status: 'active', deletedAt: null }, { status: 'pending_review' });
   }
 }

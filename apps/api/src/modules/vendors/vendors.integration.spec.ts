@@ -16,7 +16,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { NobleCryptoPlugin, ScureBase32Plugin, generateSecret, generateSync } from 'otplib';
+import { StorefrontService } from '../catalog/public';
 import { hashPassword } from '../identity/public';
+import { SearchService } from '../search/public';
 import { DOCUMENT_TYPES } from './domain/onboarding';
 import { DOCUMENTS_ROOT } from './infrastructure/document-storage';
 
@@ -147,6 +149,9 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     const view = res.json().vendor;
     // الرمز القديم صدر لعميل بلا متجر: الرحلة تكمل بالرمز الجديد لا بخروج وعودة
     expect(res.json().tokens.accessToken).toBeTruthy();
+    // ورمز التحديث الجديد كوكي HttpOnly كما في الدخول — لا في الجسم
+    expect(res.json().tokens).not.toHaveProperty('refreshToken');
+    expect(String(res.headers['set-cookie'])).toMatch(/^basta_rt=[\w-]+;.*HttpOnly/);
     sellerToken = res.json().tokens.accessToken;
     vendorId = view.id;
     createdVendorIds.push(vendorId);
@@ -162,6 +167,27 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
 
     const roles = await prisma.userRole.findMany({ where: { userId: sellerUserId } });
     expect(roles.map((r) => r.role)).toContain('vendor_owner');
+  });
+
+  it('VD-04: العملة تتغيّر في التأهيل ما دام لا شيء مسعَّراً بها — ADR-013', async () => {
+    if (!dbUp) return;
+    const put = (payload: object) => app.inject({ method: 'PUT', ...api('/vendor/onboarding/settlement-currency', sellerToken), payload });
+    const sar = await put({ currency: 'SAR' });
+    expect(sar.statusCode, sar.body).toBe(200);
+    expect(sar.json().settlementCurrency).toBe('SAR');
+    expect((await put({ currency: 'JOD' })).statusCode).toBe(200);
+
+    // سعر شحن مكتوب بالدينار: تغيير العملة يغيّر معناه — يُمنع
+    const zone = await prisma.shippingZone.create({
+      data: { vendorId, nameAr: 'الأردن', regions: { create: { country: 'JO' } }, rates: { create: { method: 'flat', priceMinorUnits: 2_500n } } },
+    });
+    const priced = await put({ currency: 'SAR' });
+    expect(priced.statusCode).toBe(409);
+    expect(priced.json().message).toMatch(/مكتوبة بالعملة الحالية/);
+    // والعملة نفسها لا تغيّر معنى شيء
+    expect((await put({ currency: 'JOD' })).statusCode).toBe(200);
+    await prisma.shippingZone.delete({ where: { id: zone.id } });
+    expect((await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } })).settlementCurrency).toBe('JOD');
   });
 
   it('VD-01: الرابط المستعمَل يُقترح له بديل لا يُرفض جافاً', async () => {
@@ -345,31 +371,24 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(res.statusCode).toBe(409);
   });
 
-  it('VD-04: عملة التسوية تُثبَّت مرة واحدة ولا رجعة — ADR-013', async () => {
+  it('VD-04: الاعتماد يثبّت العملة ولا رجعة — ADR-013', async () => {
     if (!dbUp) return;
-    const change = await app.inject({
-      method: 'PUT',
-      ...api('/vendor/onboarding/settlement-currency', sellerToken),
-      payload: { currency: 'SAR' },
-    });
-    expect(change.statusCode, change.body).toBe(200);
-    expect(change.json().settlementCurrency).toBe('SAR');
-
-    const lock = await app.inject({
-      method: 'PUT',
-      ...api('/vendor/onboarding/settlement-currency', sellerToken),
-      payload: { currency: 'JOD', lock: true },
-    });
-    expect(lock.statusCode).toBe(200);
-    expect(lock.json().settlementCurrencyLocked).toBe(true);
-
-    const after = await app.inject({
-      method: 'PUT',
-      ...api('/vendor/onboarding/settlement-currency', sellerToken),
-      payload: { currency: 'USD' },
-    });
+    const put = (payload: object) => app.inject({ method: 'PUT', ...api('/vendor/onboarding/settlement-currency', sellerToken), payload });
+    // لم يثبّتها البائع قط (القيمة الافتراضية من البلد)، والاعتماد ثبّتها
+    const view = await app.inject({ method: 'GET', ...api('/vendor/onboarding', sellerToken) });
+    expect(view.json().settlementCurrencyLocked).toBe(true);
+    const after = await put({ currency: 'USD' });
     expect(after.statusCode).toBe(409);
     expect(after.json().message).toMatch(/مثبَّتة/);
+
+    // متجر اعتُمد قبل التثبيت التلقائي ولم يثبّتها: يبيع — فلا تتغيّر أيضاً
+    const locked = (await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } })).settlementCurrencyLockedAt;
+    await prisma.vendor.update({ where: { id: vendorId }, data: { settlementCurrencyLockedAt: null } });
+    const legacy = await put({ currency: 'USD' });
+    expect(legacy.statusCode).toBe(409);
+    expect(legacy.json().message).toMatch(/قبل إرسال الطلب/);
+    await prisma.vendor.update({ where: { id: vendorId }, data: { settlementCurrencyLockedAt: locked } });
+    expect((await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } })).settlementCurrency).toBe('JOD');
   });
 
   it('VD-05: ملف المتجر يُحفظ بعد الاعتماد', async () => {
@@ -502,5 +521,59 @@ describe('عزل البيانات — بائع لا يرى طلب بائع آخ�
     if (!dbUp) return;
     const res = await app.inject({ method: 'GET', ...api('/admin/vendors', sellerToken) });
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('التعليق يصل إلى البحث — الاقتراحات والفهرس', () => {
+  it('منتجات المعلَّق تخرج من الاقتراحات ومن الفهرس فوراً، وتعود برفع التعليق', async () => {
+    if (!dbUp) return;
+    const search = app.get(SearchService);
+    if (!(await search.stats()).up) return console.warn('⚠ محرّك البحث غير شغّال — اختبار الاقتراحات متخطّى.');
+    const storefront = app.get(StorefrontService);
+
+    // منتج منشور للمتجر باسم لا يشاركه فيه شيء في الفهرس
+    const word = `zq${SUFFIX}`.toLowerCase();
+    const product = await prisma.product.findFirstOrThrow({ where: { vendorId, deletedAt: null }, orderBy: { createdAt: 'asc' } });
+    await prisma.product.update({ where: { id: product.id }, data: { nameAr: `قميص ${word}`, status: 'active', publishedAt: new Date() } });
+    await storefront.syncIndex([product.id]);
+    expect(await search.idle()).toBe(true);
+
+    const suggest = async () => (await app.inject({ method: 'GET', url: `/api/v1/storefront/suggest?q=${word}` })).json().suggestions as string[];
+    const indexed = async () => (await search.search({ q: word, page: 1, pageSize: 10 }))?.ids ?? [];
+    expect(await suggest()).toContain(`قميص ${word}`);
+    expect(await indexed()).toContain(product.id);
+
+    const suspend = await app.inject({
+      method: 'POST',
+      ...api(`/admin/vendors/${vendorId}/suspend`, adminToken),
+      payload: { reason: 'شكاوى متكرّرة على عدم الشحن خلال المدة المعلنة.' },
+    });
+    expect(suspend.statusCode, suspend.body).toBe(204);
+    expect(await search.idle()).toBe(true);
+    expect(await suggest()).not.toContain(`قميص ${word}`);
+    expect(await indexed()).not.toContain(product.id);
+
+    const reinstate = await app.inject({ method: 'POST', ...api(`/admin/vendors/${vendorId}/reinstate`, adminToken) });
+    expect(reinstate.statusCode, reinstate.body).toBe(204);
+    expect(await search.idle()).toBe(true);
+    expect(await suggest()).toContain(`قميص ${word}`);
+    expect(await indexed()).toContain(product.id);
+  });
+
+  it('فهرس متأخّر لا يُظهر في الاقتراحات منتجاً لم يعد مرئياً', async () => {
+    if (!dbUp) return;
+    const search = app.get(SearchService);
+    if (!(await search.stats()).up) return;
+    const storefront = app.get(StorefrontService);
+    const word = `zr${SUFFIX}`.toLowerCase();
+    const product = await prisma.product.findFirstOrThrow({ where: { vendorId, deletedAt: null }, orderBy: { createdAt: 'desc' } });
+    await prisma.product.update({ where: { id: product.id }, data: { nameAr: `قميص ${word}`, status: 'active', publishedAt: new Date() } });
+    await storefront.syncIndex([product.id]);
+    expect(await search.idle()).toBe(true);
+
+    // المنتج يختفي في القاعدة دون أن يسمع الفهرس (محرّك نائم وقت التغيير، أو كتابة مباشرة)
+    await prisma.product.update({ where: { id: product.id }, data: { status: 'draft' } });
+    const res = await app.inject({ method: 'GET', url: `/api/v1/storefront/suggest?q=${word}` });
+    expect(res.json().suggestions).not.toContain(`قميص ${word}`);
   });
 });

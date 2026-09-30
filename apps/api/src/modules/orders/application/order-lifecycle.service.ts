@@ -36,6 +36,23 @@ export interface TransitionInput {
   readonly carrierCode?: string | null;
   /** للإرجاع المقبول: الطلب الذي تُعاد قطعه */
   readonly returnRequestId?: string | null;
+  /** يُردّ كل ما بقي من الفرعي — حسم النزاع لصالح المشتري وحده يمرّره (refundForDispute) */
+  readonly fullRefund?: boolean;
+}
+
+/**
+ * مهلة التنفيذ: استرداد بقي processing أطول منها سقط منفّذه بين الحجز والتسجيل.
+ * أطول بكثير من طلب بوابة واحد، فلا يُنتزع تنفيذٌ حيّ بطيء.
+ */
+export const REFUND_STALE_MS = 5 * 60_000;
+
+/** «عالق»: processing حُجز قبل المهلة — أو بلا وقت حجز (صفوف ما قبل claimedAt) وقديم */
+export function stalledRefund(now: Date): Prisma.RefundWhereInput {
+  const before = new Date(now.getTime() - REFUND_STALE_MS);
+  return {
+    status: 'processing',
+    OR: [{ claimedAt: { lt: before } }, { claimedAt: null, createdAt: { lt: before } }],
+  };
 }
 
 const ROLE_OF: Readonly<Record<TransitionActor, Role | null>> = Object.freeze({
@@ -106,6 +123,39 @@ export class OrderLifecycleService {
     );
 
     // الاسترداد بعد الالتزام: البوابة خارج معاملتنا
+    for (const id of refundIds) await this.executeRefund(id);
+  }
+
+  /**
+   * حسم نزاع لصالح المشتري — يُردّ له ما بقي، ويصير الفرعي «مسترَداً».
+   *
+   * كان الحسم يغلق النزاع وحده: لا ردّ للمشتري، وإغلاقه يفكّ تجميد مال البائع
+   * فيُحرَّر له. الآن كله معاملة واحدة: `close` (إغلاق النزاع، يمرّره صاحبه)،
+   * وتسجيل الاسترداد وعكس قيوده، والانتقال — فإن فشل شيء بقي النزاع مفتوحاً
+   * والمال مجمّداً. ثم يُنفَّذ الاسترداد بعد الالتزام بمفتاحه الثابت.
+   */
+  async refundForDispute(
+    subOrderId: string,
+    adminUserId: string,
+    reason: string,
+    close: (tx: Tx) => Promise<void>,
+  ): Promise<void> {
+    const refundIds = await this.prisma.$transaction(
+      async (tx) => {
+        await close(tx);
+        await tx.$queryRaw`SELECT 1 FROM "sub_orders" WHERE "id" = ${subOrderId}::uuid FOR UPDATE`;
+        const sub = await tx.subOrder.findUnique({
+          where: { id: subOrderId },
+          select: { id: true, orderId: true, vendorId: true, status: true },
+        });
+        if (!sub) throw new NotFoundError('الطلب غير موجود.', { subOrderId });
+        const from = sub.status as SubOrderStatus;
+        if (from === 'refunded') return []; // رُدّ كله من قبل — لا شيء يبقى
+        assertTransition(from, 'refunded', 'system', { reason });
+        return this.apply(tx, sub, from, 'refunded', { kind: 'system', userId: adminUserId }, { reason, fullRefund: true });
+      },
+      { timeout: 20_000 },
+    );
     for (const id of refundIds) await this.executeRefund(id);
   }
 
@@ -200,6 +250,11 @@ export class OrderLifecycleService {
     if (to === 'returned' && from === 'delivery_failed') {
       await this.restock(tx, sub.id, null, 'return', actor.userId);
       refunds.push(await this.recordFullRefund(tx, sub.id, 'تعذّر التوصيل', actor.userId));
+    }
+    // حسم نزاع لصالح المشتري: ما بقي كله يُردّ (ما رُدّ من قبل بإرجاع جزئي يُطرح)،
+    // والقطع لا تعود للمخزون — لم يستلمها البائع
+    if (to === 'refunded' && input.fullRefund) {
+      refunds.push(await this.recordFullRefund(tx, sub.id, input.reason ?? 'حسم نزاع لصالح المشتري', actor.userId));
     }
     if (to === 'delivered' && from === 'return_requested') {
       await tx.returnRequest.updateMany({
@@ -348,31 +403,45 @@ export class OrderLifecycleService {
   /**
    * ينفّذ استرداداً معلّقاً عند البوابة. عديم الأثر عند التكرار: الشرط على
    * status = 'pending' داخل الكتابة. فشل البوابة يُبقيه معلّقاً فتعيده المهمة.
+   *
+   * **والإعادة لا تدفع مرتين.** البوابة قد تنجح ثم تسقط معاملتنا بعدها (خطأ
+   * قاعدة، انتقال مرفوض، إشعار معطوب) فيعود الاسترداد معلّقاً وتعيده المهمة —
+   * وكان يُرسَل بلا مفتاح فيُردّ المال مرة ثانية. المفتاح الآن معرّف الاسترداد
+   * نفسه: كل إعادة له تسمع من البوابة الردّ الأول. ومعرّف ردّ البوابة يُكتب فور
+   * نجاحها، قبل المعاملة، فيبقى أثر المال الخارج ولو سقط ما بعده.
    */
-  async executeRefund(refundId: string): Promise<boolean> {
+  async executeRefund(refundId: string, now: Date = new Date()): Promise<boolean> {
     const refund = await this.prisma.refund.findUnique({
       where: { id: refundId },
       include: { payment: { select: { providerIntentId: true, amountMinorUnits: true, id: true } } },
     });
-    if (!refund || refund.status !== 'pending') return false;
+    if (!refund || (refund.status !== 'pending' && refund.status !== 'processing')) return false;
 
+    // المعلّق يُحجز، والعالق في processing بعد مهلة التنفيذ يُحجز من جديد: سقط منفّذه
+    // بين الحجز والتسجيل. الشرط على claimedAt في الكتابة: مُعيدان معاً يحجز أحدهما
     const claimed = await this.prisma.refund.updateMany({
-      where: { id: refundId, status: 'pending' },
-      data: { status: 'processing' },
+      where: { id: refundId, OR: [{ status: 'pending' }, stalledRefund(now)] },
+      data: { status: 'processing', claimedAt: now },
     });
     if (claimed.count === 0) return false;
 
     try {
       const result =
         refund.amountMinorUnits > 0n && refund.payment.providerIntentId
-          ? await this.provider.refund(refund.payment.providerIntentId, refund.amountMinorUnits)
+          ? await this.provider.refund(refund.payment.providerIntentId, refund.amountMinorUnits, `refund:${refundId}`)
           : { refundId: 'none' };
+      await this.prisma.refund.updateMany({
+        where: { id: refundId, status: 'processing' },
+        data: { providerRefundId: result.refundId },
+      });
 
       await this.prisma.$transaction(async (tx) => {
-        await tx.refund.update({
-          where: { id: refundId },
+        // شرطيّ: منفّذ أبطأ أُعيد حجزه من تحته ربما سجّل النجاح قبله — لا إشعار ولا انتقال مرتين
+        const { count } = await tx.refund.updateMany({
+          where: { id: refundId, status: 'processing' },
           data: { status: 'succeeded', providerRefundId: result.refundId },
         });
+        if (count === 0) return;
         const o = await tx.subOrder.findUniqueOrThrow({
           where: { id: refund.subOrderId },
           select: { order: { select: { orderNumber: true, currency: true, customerUserId: true, customer: { select: { fullName: true } } } } },

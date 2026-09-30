@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { writeErrorLog } from '../../../common/observability/error-log';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { OrderLifecycleService } from './order-lifecycle.service';
+import { OrderLifecycleService, stalledRefund } from './order-lifecycle.service';
 
 const EVERY_FIVE_MINUTES = 300_000;
 const HOUR = 3_600_000;
@@ -104,14 +104,21 @@ export class OrderScheduler implements OnApplicationBootstrap, OnModuleDestroy {
     return done;
   }
 
+  /**
+   * المعلّق أقدم من دقيقة، والعالق في processing بعد مهلة التنفيذ — سقط منفّذه
+   * بين الحجز والتسجيل، وكان يبقى هناك إلى الأبد. الإعادة آمنة: مفتاح البوابة
+   * ثابت للاسترداد فلا يُردّ مرتين.
+   */
   async retryRefunds(now: Date): Promise<number> {
-    const pending = await this.prisma.refund.findMany({
-      where: { status: 'pending', createdAt: { lt: new Date(now.getTime() - 60_000) } },
+    const due = await this.prisma.refund.findMany({
+      where: {
+        OR: [{ status: 'pending', createdAt: { lt: new Date(now.getTime() - 60_000) } }, stalledRefund(now)],
+      },
       select: { id: true },
       take: 50,
     });
     let done = 0;
-    for (const r of pending) if (await this.lifecycle.executeRefund(r.id)) done++;
+    for (const r of due) if (await this.lifecycle.executeRefund(r.id, now)) done++;
     return done;
   }
 

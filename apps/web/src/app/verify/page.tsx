@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
 import { api, ApiError, session } from '@/lib/api';
-import { safeNext } from '../reset/new-password-field';
+import { safeNext } from '@/lib/safe-path';
 
 interface Status {
   email: string | null;

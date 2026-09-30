@@ -7,12 +7,13 @@ import { VendorBankService } from './application/vendor-bank.service';
 import { VendorDirectory } from './application/vendor-directory.service';
 import { VendorOnboardingService } from './application/vendor-onboarding.service';
 import { VendorReviewService } from './application/vendor-review.service';
+import { VendorEvents } from './application/vendor-events';
 import { VendorDocumentStorage } from './infrastructure/document-storage';
 
 @Module({
   imports: [IdentityModule, NotificationsModule],
   controllers: [VendorOnboardingController, AdminVendorsController, VendorBankController, AdminVendorBankController],
-  providers: [VendorDirectory, VendorOnboardingService, VendorReviewService, VendorDocumentStorage, VendorBankService],
-  exports: [VendorDirectory],
+  providers: [VendorDirectory, VendorOnboardingService, VendorReviewService, VendorDocumentStorage, VendorBankService, VendorEvents],
+  exports: [VendorDirectory, VendorEvents],
 })
 export class VendorsModule {}

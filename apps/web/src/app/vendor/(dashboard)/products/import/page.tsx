@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { api, API_BASE, ApiError, session } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { num } from '@/lib/catalog';
+import { csvCell } from '@/lib/csv';
 
 interface RejectedLine {
   line: number;
@@ -96,7 +97,8 @@ export default function ImportPage() {
       ),
     ];
     const csv = rows
-      .map((cells) => cells.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(','))
+      // السبب والرمز قد يحملان نصّ الملف نفسه — لا يُفتح معادلةً
+      .map((cells) => cells.map(csvCell).join(','))
       .join('\r\n');
     // BOM كي يفتح Excel العربية بلا تشويه
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });

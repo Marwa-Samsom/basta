@@ -197,8 +197,11 @@ describe('بوابة 07 · البحث العربي', () => {
 
   it('أوجه البحث تعدّ المطابقات لا المتجر كله', async () => {
     if (!dbUp || !meiliUp) return;
-    const res = await app.inject({ method: 'GET', ...api('/storefront/products?q=قمييص') });
+    // مقصورة على متجر الاختبار: قاعدة التطوير تتراكم فيها متاجر كل تشغيل، والمحرّك يعيد
+    // مئة قيمة لكل وجه على الأكثر — فبحث عام يتجاوزها ويعدّ ما لا تُظهره الأوجه
+    const res = await app.inject({ method: 'GET', ...api(`/storefront/products?q=قمييص&vendorId=${vendorId}`) });
     const body = res.json() as { total: number; facets: { vendors: { count: number }[] } };
+    expect(body.total).toBeGreaterThan(0);
     const counted = body.facets.vendors.reduce((sum, v) => sum + v.count, 0);
     // كل منتج لبائع واحد: مجموع عدّاد البائعين هو عدد المطابقات بالضبط
     expect(counted).toBe(body.total);
@@ -248,44 +251,40 @@ describe('قاعدة الرؤية — تُكتب مرة وتسري على كل �
 
   it('بوابة 06 · البند 2: تعليق البائع يُخفي منتجاته فوراً بلا لمس صفوفها', async () => {
     if (!dbUp) return;
-    const before = await app.inject({ method: 'GET', ...api('/storefront/products?pageSize=48') });
-    const beforeIds: string[] = before.json().items.map((i: { id: string }) => i.id);
-    expect(beforeIds).toContain(productIds[0]);
+    /**
+     * يُفحص بمنتجات هذا الملف لا بالصفحة الأولى من المتجر كله: ملفات الاختبار الأخرى
+     * تنشر في القاعدة نفسها معاً فتزيح منتجاتنا عن الصفحة الأولى — وحين يسقط الاختبار
+     * في منتصفه كان المتجر يبقى معلَّقاً فيُسقط ما بعده.
+     */
+    const own = await prisma.product.findMany({ where: { vendorId, status: 'active', deletedAt: null }, select: { id: true, slug: true } });
+    const other = await prisma.product.findFirstOrThrow({ where: { vendorId: secondVendorId, status: 'active', deletedAt: null }, select: { slug: true } });
+    const page = async (slug: string) => (await app.inject({ method: 'GET', ...api(`/storefront/products/${slug}`) })).statusCode;
+    const listed = async () =>
+      (await app.inject({ method: 'GET', ...api(`/storefront/products?vendorId=${vendorId}&pageSize=48`) })).json().items.map((i: { id: string }) => i.id) as string[];
 
-    await prisma.vendor.update({
-      where: { id: vendorId },
-      data: { status: 'suspended', suspendedAt: new Date() },
-    });
+    expect(await listed()).toContain(productIds[0]);
+    for (const p of own) expect(await page(p.slug), p.slug).toBe(200);
 
-    const after = await app.inject({ method: 'GET', ...api('/storefront/products?pageSize=48') });
-    const afterIds: string[] = after.json().items.map((i: { id: string }) => i.id);
+    await prisma.vendor.update({ where: { id: vendorId }, data: { status: 'suspended', suspendedAt: new Date() } });
+    try {
+      // منتجات المعلَّق كلها تختفي من القائمة ومن صفحاتها…
+      expect(await listed()).toEqual([]);
+      for (const p of own) expect(await page(p.slug), p.slug).toBe(404);
+      // …ومنتج بائع آخر يبقى: الإخفاء على البائع لا على المتجر كله
+      expect(await page(other.slug)).toBe(200);
 
-    const own = await prisma.product.findMany({ where: { vendorId }, select: { id: true } });
-    const ownIds = new Set(own.map((p) => p.id));
-    // منتجات المعلَّق كلها تختفي…
-    for (const id of beforeIds.filter((p) => ownIds.has(p))) {
-      expect(afterIds).not.toContain(id);
+      // وحالة المنتج نفسها لم تتغيّر: الإخفاء من شرط البائع لا من نسخة محفوظة
+      expect((await prisma.product.findUniqueOrThrow({ where: { id: productIds[0]! } })).status).toBe('active');
+
+      // وصفحة متجره تُعرض بحالتها لا 404 — ST-12، فلا ينكسر رابط مفهرس
+      const vendor = await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } });
+      const shop = await app.inject({ method: 'GET', ...api(`/storefront/shops/${vendor.slug}`) });
+      expect(shop.statusCode).toBe(200);
+      expect(shop.json().vendor.isSuspended).toBe(true);
+      expect(shop.json().products).toHaveLength(0);
+    } finally {
+      await prisma.vendor.update({ where: { id: vendorId }, data: { status: 'approved', suspendedAt: null } });
     }
-    // …ومنتجات غيره تبقى: الإخفاء على البائع لا على المتجر كله
-    for (const id of beforeIds.filter((p) => !ownIds.has(p))) {
-      expect(afterIds).toContain(id);
-    }
-
-    // وحالة المنتج نفسها لم تتغيّر: الإخفاء من شرط البائع لا من نسخة محفوظة
-    const row = await prisma.product.findUniqueOrThrow({ where: { id: productIds[0]! } });
-    expect(row.status).toBe('active');
-
-    // وصفحة متجره تُعرض بحالتها لا 404 — ST-12، فلا ينكسر رابط مفهرس
-    const vendor = await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId } });
-    const shop = await app.inject({ method: 'GET', ...api(`/storefront/shops/${vendor.slug}`) });
-    expect(shop.statusCode).toBe(200);
-    expect(shop.json().vendor.isSuspended).toBe(true);
-    expect(shop.json().products).toHaveLength(0);
-
-    await prisma.vendor.update({
-      where: { id: vendorId },
-      data: { status: 'approved', suspendedAt: null },
-    });
   });
 
   it('صفحة البائع المعتمد تعرض منتجاته وحدها', async () => {
@@ -317,6 +316,22 @@ describe('الأوجه والتصفية', () => {
     const res = await app.inject({ method: 'GET', ...api('/storefront/products?maxPrice=20000') });
     const prices = res.json().items.map((i: { price: { minorUnits: string } }) => Number(i.price.minorUnits));
     expect(prices.every((p: number) => p <= 20_000)).toBe(true);
+  });
+
+  it('الحدّان معاً: لا ما تحت الأدنى ولا ما فوق الأعلى', async () => {
+    if (!dbUp) return;
+    // بلا كلمة بحث: التصفّح من القاعدة دائماً — مسار الأقسام كلها
+    const res = await app.inject({ method: 'GET', ...api(`/storefront/products?vendorId=${vendorId}&minPrice=20000&maxPrice=50000`) });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().engine).toBe('db');
+    // قميص 19,900 تحت الأدنى، وعطر 120,000 فوق الأعلى، والسمّاعة 45,000 بينهما. اختبارات
+    // البحث في الملف تنشر للمتجر نفسه منتجات أخرى — يُفحص الشرط لا القائمة بعينها
+    const items = res.json().items as { nameAr: string; price: { minorUnits: string } }[];
+    expect(items.map((i) => i.nameAr)).toContain('سمّاعة لاسلكية');
+    expect(items.map((i) => i.nameAr)).not.toContain('قميص قطني أزرق');
+    expect(items.map((i) => i.nameAr)).not.toContain('عطر أحمد الملكي');
+    for (const i of items) expect(Number(i.price.minorUnits)).toBeGreaterThanOrEqual(20_000);
+    for (const i of items) expect(Number(i.price.minorUnits)).toBeLessThanOrEqual(50_000);
   });
 
   it('الفهرس يسقط إلى قاعدة البيانات لا إلى صفحة خطأ', async () => {

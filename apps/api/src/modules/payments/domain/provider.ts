@@ -45,7 +45,12 @@ export interface PaymentProvider {
   charge(request: ChargeRequest): Promise<ChargeOutcome>;
   /** سؤال المزوّد عن حقيقة تفويض — للمصالحة بعد «لا نعرف» */
   retrieve(intentId: string): Promise<ChargeOutcome>;
-  refund(intentId: string, amountMinor: bigint): Promise<{ refundId: string }>;
+  /**
+   * `idempotencyKey` إلزامي: إعادة الطلب بالمفتاح نفسه — بعد انقطاع أو سقوط
+   * خادم أو معاملة أُرجعت بعد نجاح البوابة — تعيد الردّ الأول ولا تردّ المال
+   * مرتين. كل ردّ قد يُعاد، فلا ردّ بلا مفتاح ثابت له.
+   */
+  refund(intentId: string, amountMinor: bigint, idempotencyKey: string): Promise<{ refundId: string }>;
   void(intentId: string): Promise<void>;
   /** يتحقّق من توقيع الإشعار ويحلّله. التوقيع الخاطئ يُرفض قبل أي أثر */
   parseWebhook(rawBody: string, signature: string | undefined): ProviderEvent;

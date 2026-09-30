@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, type ProductStatus } from '@prisma/client';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
+  ConflictError,
   DomainError,
   DuplicateError,
   InvalidInputError,
@@ -480,6 +481,8 @@ export class ProductService {
     await this.write(async (tx) => {
       const fields: Prisma.ProductUncheckedUpdateManyInput = {};
       if (backToReview) fields.status = 'pending_review';
+      // كل تعديل محتوى نسخة جديدة — وقيد المراجعة خاصة: اعتماد نسخة قديمة يُردّ
+      if (contentChanged) fields.contentRevision = { increment: 1 };
       if (input.categoryId !== undefined) fields.categoryId = input.categoryId;
       if (input.brandId !== undefined) fields.brandId = input.brandId;
       if (input.nameAr !== undefined) fields.nameAr = input.nameAr;
@@ -611,6 +614,31 @@ export class ProductService {
       );
     });
     this.reindex(id);
+    await this.dropUnorderedImages(id);
+  }
+
+  /**
+   * صور المنتج المحذوف لا تبقى على القرص إلا ما صار لقطة في طلب — سجلّ طلبات
+   * المشتري يعرضها. البوابة تحجبها عن العموم أصلاً؛ وهذا لئلا يبقى ملف لا يُطلب.
+   * فشل حذف ملف يُسجَّل ولا يُعيد الحذف: المنتج محذوف والملف محجوب.
+   */
+  private async dropUnorderedImages(productId: string): Promise<void> {
+    const images = await this.prisma.productImage.findMany({ where: { productId }, select: { id: true, fileKey: true } });
+    if (images.length === 0) return;
+    const ordered = new Set(
+      (
+        await this.prisma.orderItem.findMany({
+          where: { imageKeySnapshot: { in: images.map((i) => i.fileKey) } },
+          select: { imageKeySnapshot: true },
+          distinct: ['imageKeySnapshot'],
+        })
+      ).map((o) => o.imageKeySnapshot),
+    );
+    const orphan = images.filter((i) => !ordered.has(i.fileKey));
+    await this.prisma.productImage.deleteMany({ where: { id: { in: orphan.map((i) => i.id) } } });
+    for (const img of orphan) {
+      await this.storage.remove(img.fileKey).catch((err: unknown) => this.logger.error(`تعذّر حذف ملفات الصورة ${img.fileKey}`, err as Error));
+    }
   }
 
   async publish(scope: VendorScope, id: string): Promise<ProductDetailView> {
@@ -668,11 +696,17 @@ export class ProductService {
   // ================================================================ مراجعة الإدارة — Q-15
   // وصول إداري صريح بلا نطاق بائع: الإدارة ترى كل المتاجر (ADR-010).
 
-  /** اعتماد منتج قيد المراجعة. المعتمد لأول مرة يأخذ publishedAt، والمُعاد اعتماده يحتفظ بتاريخه. */
-  async approve(id: string): Promise<void> {
+  /**
+   * اعتماد منتج قيد المراجعة. المعتمد لأول مرة يأخذ publishedAt، والمُعاد اعتماده يحتفظ بتاريخه.
+   *
+   * `reviewed` نسخة المحتوى التي فتحها المراجِع. البائع يستطيع التعديل والمنتج قيد
+   * المراجعة، والاعتماد بلا نسخة كان يُنشر ما كُتب بعد الفتح — محتوى لم يره أحد.
+   * النسخة شرط في الكتابة نفسها: تعديل بين الفتح والاعتماد يُردّ 409 بالنسخة الحالية.
+   */
+  async approve(id: string, reviewed: number): Promise<void> {
     const product = await this.prisma.product.findFirst({
       where: { id, deletedAt: null },
-      select: { status: true, publishedAt: true, vendor: { select: { status: true } } },
+      select: { status: true, publishedAt: true, contentRevision: true, vendor: { select: { status: true } } },
     });
     if (!product) throw new NotFoundError('المنتج غير موجود.', { id });
     if (product.status !== 'pending_review') {
@@ -682,12 +716,22 @@ export class ProductService {
       throw new InvalidInputError('المتجر غير معتمد أو معلَّق — لا يُعتمد منتج لا يستطيع صاحبه البيع.');
     }
 
-    // الشرط على الحالة داخل الكتابة: اعتمادان متزامنان أو سحب البائع أثناء المراجعة لا يمرّان معاً
+    // الشرط على الحالة والنسخة داخل الكتابة: اعتمادان متزامنان، أو سحب البائع أو
+    // تعديله أثناء المراجعة، لا يمرّ معه اعتماد
     const { count } = await this.prisma.product.updateMany({
-      where: { id, deletedAt: null, status: 'pending_review' },
+      where: { id, deletedAt: null, status: 'pending_review', contentRevision: reviewed },
       data: { status: 'active', rejectReason: null, publishedAt: product.publishedAt ?? new Date() },
     });
-    if (count === 0) throw new InvalidStateTransitionError('pending_review', 'active');
+    if (count === 0) {
+      const now = await this.prisma.product.findFirst({ where: { id, deletedAt: null }, select: { status: true, contentRevision: true } });
+      if (now?.status === 'pending_review' && now.contentRevision !== reviewed) {
+        throw new ConflictError('عدّل البائع المنتج منذ فتحته. راجع النسخة الحالية ثم اعتمدها.', {
+          reason: 'CONTENT_CHANGED',
+          contentRevision: now.contentRevision,
+        });
+      }
+      throw new InvalidStateTransitionError(now?.status ?? 'deleted', 'active');
+    }
     this.reindex(id);
   }
 
@@ -1041,6 +1085,7 @@ export class ProductService {
       slug: row.slug,
       status: row.status,
       rejectReason: row.rejectReason,
+      contentRevision: row.contentRevision,
       nameAr: row.nameAr,
       nameEn: row.nameEn,
       descriptionAr: row.descriptionAr,

@@ -297,6 +297,10 @@ export class PricingService {
       maxDiscountMinor: c.maxDiscountMinorUnits,
       minOrderMinor: c.minOrderMinorUnits,
       currency: c.currency,
+      currencyDigits: c.currency
+        ? ((await this.prisma.currency.findUnique({ where: { code: c.currency }, select: { minorUnitDigits: true } }))
+            ?.minorUnitDigits ?? null)
+        : null,
       fundedBy: c.fundedBy as 'platform' | 'vendor',
     };
   }

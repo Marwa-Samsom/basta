@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { use, useEffect } from 'react';
 import { Feedback, Loading, ReasonButton } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { media, PRODUCT_STATUS, TONE, useAction, useAdminData } from '@/lib/admin';
 import { money } from '@/lib/orders';
 
@@ -14,6 +14,8 @@ interface Detail {
   nameAr: string;
   status: string;
   rejectReason: string | null;
+  /** النسخة المعروضة — يُعتمد بها، فلا يُنشر ما عدّله البائع بعد فتحها */
+  contentRevision: number;
   descriptionAr: string | null;
   category: { nameAr: string };
   currency: string;
@@ -43,7 +45,14 @@ export default function AdminProductPage({ params }: { params: Promise<{ id: str
 
   const approve = () =>
     act.run(async () => {
-      await api(`/admin/products/${id}/approve`, { method: 'POST' });
+      if (!p) return;
+      try {
+        await api(`/admin/products/${id}/approve`, { method: 'POST', body: { contentRevision: p.contentRevision } });
+      } catch (e) {
+        // البائع عدّل بعد الفتح: تُعرض النسخة الحالية ليقرأها قبل أن يعتمد، والرسالة تقول لماذا
+        if (e instanceof ApiError && e.details?.['reason'] === 'CONTENT_CHANGED') reload();
+        throw e;
+      }
       await next();
     }, 'نُشر المنتج.');
 

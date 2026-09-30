@@ -27,6 +27,19 @@ outbox/
 # قاعدة بيانات محلية محمولة — لا تُلتزم أبداً
 .localdb/
 
+# نسخ القاعدة والفهرس: كل بيانات المنصة (حسابات، عناوين، دفتر) بلا تشفير. تُكتب في
+# .localdb/ افتراضياً، وهذا لما يُكتب خارجه — BACKUP_DIR آخر، أو dumps/ التي ينشئها
+# Meilisearch في مجلد تشغيله إن لم يُعطَ --dump-dir
+dumps/
+backups/
+snapshots/
+*.dump
+*.dump.gz
+*.sql
+*.sql.gz
+*.snapshot
+!apps/api/prisma/migrations/**/*.sql
+
 # سجل تشغيل محلي
 apps/api/api.log
 

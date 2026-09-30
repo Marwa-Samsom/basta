@@ -7,6 +7,7 @@ import { OTP_MAX_ATTEMPTS, OTP_TTL_MINUTES, otpMessage } from '../domain/otp';
 import { hashPassword } from '../domain/password';
 import type { RequestMeta } from './auth.service';
 import { OtpStore } from './otp.store';
+import { normalizeEmail } from '../../../common/email';
 
 /** رسالة واحدة لكل فشل في إعادة التعيين — أي تفصيل يكشف أن للبريد حساباً ورمزاً حيّاً */
 export const RESET_FAILED = 'الرمز غير صحيح أو انتهت صلاحيته. اطلب رمزاً جديداً من «نسيت كلمة المرور».';
@@ -118,7 +119,7 @@ export class RecoveryService {
   async forgotPassword(email: string, meta: RequestMeta): Promise<{ message: string }> {
     const now = new Date();
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizeEmail(email) },
       select: { id: true, fullName: true, status: true, deletedAt: true },
     });
     if (user && user.status === 'active' && !user.deletedAt) {
@@ -157,7 +158,7 @@ export class RecoveryService {
     // التجزئة أولاً وللجميع: كلفة زمنية واحدة سواء وُجد الحساب أم لا
     const passwordHash = await hashPassword(input.newPassword);
     const user = await this.prisma.user.findUnique({
-      where: { email: input.email },
+      where: { email: normalizeEmail(input.email) },
       select: { id: true, status: true, deletedAt: true, emailVerifiedAt: true },
     });
     if (!user || user.status !== 'active' || user.deletedAt) throw new InvalidInputError(RESET_FAILED);

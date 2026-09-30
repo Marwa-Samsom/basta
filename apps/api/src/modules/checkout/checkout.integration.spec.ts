@@ -15,7 +15,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
+import { InventoryService } from '../inventory/public';
 import { FakePaymentProvider } from '../payments/public';
+import { orderNumber } from './domain/snapshot';
 import { CheckoutService } from './public';
 
 const prisma = new PrismaClient();
@@ -64,9 +66,24 @@ async function cartWith(items: { variantId: string; qty: number }[], currency = 
   return token;
 }
 
+/**
+ * الإجمالي كما يراه المشتري تحت «ادفع»: تسعير السلة بعنوان الطلب. يُرسل مع
+ * الطلب كما ترسله الواجهة. سلة لا تُسعَّر (فارغة، رمز خاطئ) تأخذ صفراً — الطلب
+ * يُرفض قبل المقارنة بسببه الحقيقي.
+ */
+async function seen(cart: string): Promise<{ expectedTotal: string; expectedCurrency: string }> {
+  const q = await call('POST', '/checkout/quote', {
+    body: { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city },
+    headers: { 'x-cart-token': cart },
+  });
+  return q.statusCode === 200
+    ? { expectedTotal: q.json().totals.total.minorUnits, expectedCurrency: q.json().currency }
+    : { expectedTotal: '0', expectedCurrency: 'JOD' };
+}
+
 async function pay(token: string, paymentToken: string, key = randomUUID()) {
   return call('POST', '/checkout', {
-    body: { address: ADDRESS, paymentToken, guestEmail: `buyer.${SUFFIX}@basta.test` },
+    body: { address: ADDRESS, paymentToken, guestEmail: `buyer.${SUFFIX}@basta.test`, ...(await seen(token)) },
     headers: { 'x-cart-token': token, 'idempotency-key': key },
   });
 }
@@ -325,10 +342,38 @@ describe('بوابة 08 · البند 4 — انقطاع الاتصال ينته
     // الحجز باقٍ أثناء الانتظار: لا تُباع القطعة لغيره وماله ربما خُصم
     expect(pending.reservationIds.length).toBe(1);
 
-    // المشتري يعود لصفحة الطلب — السؤال عن الحالة يطلق المصالحة
-    const status = await call('GET', `/checkout/orders/${pending.orderNumber}`);
+    // رقم طلب الضيف وحده لا يفتحه ولا يطلق مصالحته: 404 كأنه غير موجود، والطلب باقٍ معلّقاً
+    for (const headers of [{}, { 'x-order-key': 'guessed-key' }]) {
+      const peek = await call('GET', `/checkout/orders/${pending.orderNumber}`, { headers });
+      expect(peek.statusCode).toBe(404);
+    }
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: pending.id } })).status).toBe('pending_payment');
+
+    // المشتري يعود لصفحة الطلب بمفتاحه — السؤال عن الحالة يطلق المصالحة
+    const key = res.json().accessKey as string;
+    expect(key).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const status = await call('GET', `/checkout/orders/${pending.orderNumber}`, { headers: { 'x-order-key': key } });
     expect(status.json().outcome).toBe('paid');
     expect(status.json().subOrderCount).toBe(1);
+  });
+
+  it('رقم الطلب من مولّد معمّى بثمانية محارف، ومفتاح الضيف يُعاد لإعادة المحاولة بالمفتاح نفسه', async () => {
+    if (!dbUp) return;
+    const numbers = new Set(Array.from({ length: 2000 }, () => orderNumber(new Date('2026-09-29T10:00:00Z'))));
+    expect(numbers.size).toBe(2000);
+    for (const n of numbers) expect(n).toMatch(/^BST-260929-[2-9A-HJ-NP-Z]{8}$/);
+
+    // إعادة «ادفع» بمفتاح عدم التكرار نفسه تعيد الطلب نفسه ومفتاحه نفسه
+    const cart = await cartWith([{ variantId: variantIds[0]!, qty: 1 }]);
+    const idem = randomUUID();
+    const first = await pay(cart, 'tok_success', idem);
+    const again = await pay(cart, 'tok_success', idem);
+    expect(again.json().orderId).toBe(first.json().orderId);
+    expect(again.json().accessKey).toBe(first.json().accessKey);
+    // والمفتاح لطلب واحد: مفتاح طلب آخر لا يفتحه
+    const other = await pay(await cartWith([{ variantId: variantIds[0]!, qty: 1 }]), 'tok_success');
+    const cross = await call('GET', `/checkout/orders/${first.json().orderNumber}`, { headers: { 'x-order-key': other.json().accessKey } });
+    expect(cross.statusCode).toBe(404);
   });
 
   it('لم يُخصم المال وانقطع الاتصال: المصالحة تحسمه فاشلاً وتحرّر الحجز', async () => {
@@ -353,5 +398,371 @@ describe('بوابة 08 · البند 4 — انقطاع الاتصال ينته
 
     const later = new Date(Date.now() + 16 * 60_000);
     expect(await checkout.reconcile(orderId, later)).toBe('failed');
+  });
+});
+
+describe('دفع يصل بعد إغلاق الطلب — يُردّ ولا يُرمى', () => {
+  /** طلب بانتظار التحقق (3-D Secure) ثم يُغلق فاشلاً — كما تفعل المصالحة عند انتهاء المهلة */
+  async function closedThenCaptured() {
+    const token = await cartWith([{ variantId: variantIds[0]!, qty: 1 }]);
+    const res = await pay(token, 'tok_3ds');
+    expect(res.json().outcome).toBe('requires_action');
+    const orderId = res.json().orderId as string;
+    expect(await checkout.markFailed(orderId, 'action_timeout', 'انتهت مهلة التحقق.')).toBe(true);
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+    // البوابة أكملت التحقق والخصم بعد الإغلاق — tok_3ds حقيقته captured
+    const webhook = () => {
+      const body = fake.eventFor(payment.providerIntentId!, orderId, payment.amountMinorUnits, payment.currency);
+      return app.inject({
+        method: 'POST',
+        url: '/api/v1/payments/webhook/fake',
+        headers: { 'x-signature': FakePaymentProvider.sign(body), 'content-type': 'application/json' },
+        payload: body,
+      });
+    };
+    return { orderId, payment, webhook };
+  }
+
+  it('النجاح المتأخر يُردّ كله مرة واحدة، ولا يُحيي الطلب ولا يقسّمه', async () => {
+    if (!dbUp) return;
+    const { orderId, payment, webhook } = await closedThenCaptured();
+    const stock = await stockOf(variantIds[0]!);
+
+    const r = await webhook();
+    expect(r.statusCode, r.body).toBe(200);
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(order.status).toBe('payment_failed');
+    expect(order.paidAt).toBeNull();
+    expect(order.payment!.status).toBe('refunded');
+    expect(order.payment!.lateRefundId).toBeTruthy();
+    expect(await prisma.subOrder.count({ where: { orderId } })).toBe(0);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
+    // المخزون المحرَّر بالفشل لا يُستهلك بالنجاح المتأخر
+    expect(await stockOf(variantIds[0]!)).toEqual(stock);
+    const audits = await prisma.auditLog.findMany({ where: { entityId: orderId, action: { startsWith: 'payment.late_capture' } } });
+    expect(audits.map((a) => a.action).sort()).toEqual(['payment.late_capture', 'payment.late_capture_refunded']);
+  });
+
+  it('الإشعار والمصالحة والإشعار المكرّر معاً يردّون مرة واحدة', async () => {
+    if (!dbUp) return;
+    const { orderId, payment, webhook } = await closedThenCaptured();
+    await Promise.all([
+      webhook(),
+      webhook(), // حدث بمعرّف آخر — البوابة ترسل أكثر من حدث للخصم نفسه
+      checkout.apply(orderId, { status: 'captured', intentId: payment.providerIntentId! }),
+    ]);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { orderId } })).status).toBe('refunded');
+  });
+
+  it('إشعار نجاح مكرّر لطلب مدفوع فعلاً لا يردّ شيئاً', async () => {
+    if (!dbUp) return;
+    const token = await cartWith([{ variantId: variantIds[1]!, qty: 1 }]);
+    const res = await pay(token, 'tok_success');
+    expect(res.json().outcome).toBe('paid');
+    const orderId = res.json().orderId as string;
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+    await checkout.apply(orderId, { status: 'captured', intentId: payment.providerIntentId! });
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([]);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { orderId } })).lateCaptureAt).toBeNull();
+  });
+
+  it('سقوط البوابة بين الحجز والردّ: المصالحة تكمل الردّ مرة واحدة', async () => {
+    if (!dbUp) return;
+    const { orderId, payment, webhook } = await closedThenCaptured();
+    const original = fake.refund.bind(fake);
+    fake.refund = async () => {
+      throw new Error('انقطع الاتصال بالبوابة');
+    };
+    try {
+      const r = await webhook();
+      // الإشعار يفشل فتعيده البوابة — لكن الحجز قائم والمصالحة لا تنتظرها
+      expect(r.statusCode).toBe(500);
+    } finally {
+      fake.refund = original;
+    }
+    const pending = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+    expect(pending.lateCaptureAt).not.toBeNull();
+    expect(pending.lateRefundId).toBeNull();
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([]);
+
+    const later = new Date(Date.now() + 5 * 60_000);
+    await checkout.settleLateRefunds(later);
+    await checkout.settleLateRefunds(later);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
+    expect((await prisma.payment.findUniqueOrThrow({ where: { orderId } })).status).toBe('refunded');
+  });
+});
+
+describe('دفع بعد انتهاء الحجز — إشعاران متزامنان لا يردّان مالاً عن طلب مدفوع', () => {
+  let n = 0;
+  /** منتج بقطعة واحدة لدى البائع الأول — القطعة الأخيرة هي ما يُتسابق عليه */
+  async function oneUnit(): Promise<string> {
+    n++;
+    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
+    const product = await prisma.product.create({
+      data: { vendorId: vendorIds[0]!, categoryId: category.id, slug: `last-${n}-${SUFFIX}`, nameAr: `القطعة الأخيرة ${n}`, status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendorIds[0]!, sku: `LAST-${n}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 9_900n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 1, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 1, reason: 'import' } });
+    return variant.id;
+  }
+
+  /** طلب بانتظار التحقق، ثم انقضى حجزه — البوابة ستؤكّد الخصم بعد المهلة */
+  async function expiredPending(variantId: string) {
+    const res = await pay(await cartWith([{ variantId, qty: 1 }]), 'tok_3ds');
+    expect(res.json().outcome).toBe('requires_action');
+    const orderId = res.json().orderId as string;
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    // الحجز لم يعد نشطاً — كما يتركه منظّف الحجوز المنتهية (بلا لمس حجوز الاختبارات الأخرى)
+    await app.get(InventoryService).release(order.reservationIds);
+    const webhook = () => {
+      const body = fake.eventFor(order.payment!.providerIntentId!, orderId, order.payment!.amountMinorUnits, order.payment!.currency);
+      return app.inject({
+        method: 'POST',
+        url: '/api/v1/payments/webhook/fake',
+        headers: { 'x-signature': FakePaymentProvider.sign(body), 'content-type': 'application/json' },
+        payload: body,
+      });
+    };
+    return { orderId, payment: order.payment!, webhook };
+  }
+
+  it('المخزون متاح: يُعاد الحجز ويُكمل الطلب — بلا ردّ', async () => {
+    if (!dbUp) return;
+    const variantId = await oneUnit();
+    const { orderId, payment, webhook } = await expiredPending(variantId);
+    expect((await webhook()).statusCode).toBe(200);
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(order.status).toBe('processing');
+    expect(order.payment!.status).toBe('captured');
+    expect(await prisma.subOrder.count({ where: { orderId } })).toBe(1);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([]);
+    expect(await stockOf(variantId)).toEqual({ onHand: 0, reserved: 0 });
+  });
+
+  it('إشعاران معاً على القطعة الأخيرة: يُكمل الطلب مرة، ولا يُردّ ماله ولا يُختم مردوداً', async () => {
+    if (!dbUp) return;
+    const variantId = await oneUnit();
+    const { orderId, payment, webhook } = await expiredPending(variantId);
+    const [a, b] = await Promise.all([webhook(), webhook()]);
+    expect([a.statusCode, b.statusCode], `${a.body}\n${b.body}`).toEqual([200, 200]);
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(order.status).toBe('processing');
+    expect(order.payment!.status).toBe('captured');
+    expect(order.payment!.lateCaptureAt).toBeNull();
+    expect(await prisma.subOrder.count({ where: { orderId } })).toBe(1);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([]);
+    expect(await stockOf(variantId)).toEqual({ onHand: 0, reserved: 0 });
+  });
+
+  it('نفد المخزون فعلاً: يُلغى الطلب ويُردّ المال مرة واحدة ولو وصل الإشعار مرتين', async () => {
+    if (!dbUp) return;
+    const variantId = await oneUnit();
+    const { orderId, payment, webhook } = await expiredPending(variantId);
+    // مشترٍ آخر اشترى القطعة الأخيرة بعد انقضاء الحجز
+    expect((await pay(await cartWith([{ variantId, qty: 1 }]), 'tok_success')).json().outcome).toBe('paid');
+
+    const [a, b] = await Promise.all([webhook(), webhook()]);
+    expect([a.statusCode, b.statusCode], `${a.body}\n${b.body}`).toEqual([200, 200]);
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(order.status).toBe('canceled');
+    expect(order.paidAt).toBeNull();
+    expect(order.payment!.status).toBe('refunded');
+    expect(order.payment!.lateRefundId).toBeTruthy();
+    expect(await prisma.subOrder.count({ where: { orderId } })).toBe(0);
+    expect(fake.refundsOf(payment.providerIntentId!)).toEqual([payment.amountMinorUnits]);
+    // القطعة بيعت مرة واحدة — للمشتري الآخر
+    expect(await stockOf(variantId)).toEqual({ onHand: 0, reserved: 0 });
+  });
+});
+
+describe('حدود الكوبون — تُحجز مع الطلب تحت قفل، ولا يتخطّاها ضيف', () => {
+  let n = 0;
+  /** منتج بمخزون وافر — لا يتنافس الاختبار على مخزون اختبار آخر */
+  async function stocked(): Promise<string> {
+    n++;
+    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
+    const product = await prisma.product.create({
+      data: { vendorId: vendorIds[1]!, categoryId: category.id, slug: `cpn-${n}-${SUFFIX}`, nameAr: `منتج الكوبون ${n}`, status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendorIds[1]!, sku: `CPN-${n}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 50, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 50, reason: 'import' } });
+    return variant.id;
+  }
+  const coupon = (code: string, limits: { total?: number; perUser?: number }) =>
+    prisma.coupon.create({
+      data: {
+        code,
+        scope: 'platform',
+        type: 'percent',
+        valueBps: 1000,
+        usageLimitTotal: limits.total ?? null,
+        usageLimitPerUser: limits.perUser ?? null,
+      },
+    });
+  async function cartWithCoupon(variantId: string, code: string, token?: string): Promise<string> {
+    const cart = await cartWith([{ variantId, qty: 1 }]);
+    const r = await call('PUT', '/cart/coupon', { body: { code }, headers: { 'x-cart-token': cart, ...(token ? { authorization: `Bearer ${token}` } : {}) } });
+    expect(r.statusCode, r.body).toBe(200);
+    return cart;
+  }
+  const checkoutAs = async (cart: string, paymentToken: string, token?: string) =>
+    call('POST', '/checkout', {
+      body: { address: ADDRESS, paymentToken, ...(token ? {} : { guestEmail: `guest.${randomUUID()}@basta.test` }), ...(await seen(cart)) },
+      headers: { 'x-cart-token': cart, 'idempotency-key': randomUUID(), ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    });
+  async function member(tag: string): Promise<string> {
+    const email = `cpn.${tag}.${SUFFIX}@basta.test`;
+    const password = 'كلمة-مرور-اختبار-طويلة';
+    expect((await call('POST', '/auth/register', { body: { email, password, fullName: 'مشترٍ الكوبون' } })).statusCode).toBe(201);
+    return (await call('POST', '/auth/login', { body: { email, password } })).json().tokens.accessToken as string;
+  }
+
+  it('الحدّ الكلي تحت التزامن: كوبون لاستعمالين وخمسة طلبات معاً — يمرّ اثنان', async () => {
+    if (!dbUp) return;
+    const variantId = await stocked();
+    const c = await coupon(`TOTAL2-${SUFFIX}`.toUpperCase(), { total: 2 });
+    const carts = await Promise.all(Array.from({ length: 5 }, () => cartWithCoupon(variantId, c.code)));
+    const results = await Promise.all(carts.map((cart) => checkoutAs(cart, 'tok_success')));
+
+    const ok = results.filter((r) => r.statusCode === 200 && r.json().outcome === 'paid');
+    // الرفض في موضعين كلاهما صحيح: التسعير (400) إن التزم اثنان قبل أن يُسعَّر هذا،
+    // أو الحجز تحت القفل (409) إن تزامنوا فعلاً — التوقيت يختار، والحصيلة واحدة
+    const rejected = results.filter((r) => r.statusCode === 400 || r.statusCode === 409);
+    expect(ok, results.map((r) => `${r.statusCode} ${r.body}`).join('\n')).toHaveLength(2);
+    expect(rejected, results.map((r) => `${r.statusCode} ${r.body}`).join('\n')).toHaveLength(3);
+    for (const r of rejected) expect(r.json().message).toMatch(/استُنفد/);
+    expect((await prisma.coupon.findUniqueOrThrow({ where: { id: c.id } })).usedCount).toBe(2);
+    expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(2);
+    // المرفوض لا يحبس مخزوناً
+    expect(await stockOf(variantId)).toEqual({ onHand: 48, reserved: 0 });
+  });
+
+  it('كوبون بحدّ لكل مستخدم لا يستعمله ضيف — ولا يحبس مخزونه', async () => {
+    if (!dbUp) return;
+    const variantId = await stocked();
+    const c = await coupon(`ONCE-G-${SUFFIX}`.toUpperCase(), { perUser: 1 });
+    const r = await checkoutAs(await cartWithCoupon(variantId, c.code), 'tok_success');
+    expect(r.statusCode).toBe(409);
+    expect(r.json().message).toMatch(/سجّل الدخول/);
+    expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(0);
+    expect(await stockOf(variantId)).toEqual({ onHand: 50, reserved: 0 });
+  });
+
+  it('الحدّ لكل مستخدم تحت التزامن: طلبان معاً من الحساب نفسه — يمرّ واحد', async () => {
+    if (!dbUp) return;
+    const variantId = await stocked();
+    const c = await coupon(`ONCE-M-${SUFFIX}`.toUpperCase(), { perUser: 1 });
+    const token = await member('once');
+    const carts = await Promise.all([cartWithCoupon(variantId, c.code, token), cartWithCoupon(variantId, c.code, token)]);
+    const results = await Promise.all(carts.map((cart) => checkoutAs(cart, 'tok_success', token)));
+    expect(results.filter((r) => r.statusCode === 200).length, results.map((r) => r.body).join('\n')).toBe(1);
+    // التسعير (400) أو الحجز تحت القفل (409) — بحسب أيّهما بلغه الطلب الثاني أولاً
+    const rejected = results.filter((r) => r.statusCode === 400 || r.statusCode === 409);
+    expect(rejected, results.map((r) => `${r.statusCode} ${r.body}`).join('\n')).toHaveLength(1);
+    expect(rejected[0]!.json().message).toMatch(/استعملت هذا الكوبون/);
+    expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(1);
+  });
+
+  it('فشل الدفع يعيد الاستعمال: لا يُحسب على صاحبه ولا على الحدّ', async () => {
+    if (!dbUp) return;
+    const variantId = await stocked();
+    const c = await coupon(`RETRY-${SUFFIX}`.toUpperCase(), { total: 1, perUser: 1 });
+    const token = await member('retry');
+    const declined = await checkoutAs(await cartWithCoupon(variantId, c.code, token), 'tok_decline', token);
+    expect(declined.json().outcome).toBe('failed');
+    expect((await prisma.coupon.findUniqueOrThrow({ where: { id: c.id } })).usedCount).toBe(0);
+    expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(0);
+
+    const paid = await checkoutAs(await cartWithCoupon(variantId, c.code, token), 'tok_success', token);
+    expect(paid.statusCode, paid.body).toBe(200);
+    expect(paid.json().outcome).toBe('paid');
+    expect((await prisma.coupon.findUniqueOrThrow({ where: { id: c.id } })).usedCount).toBe(1);
+  });
+});
+
+describe('الإجمالي الذي رآه المشتري هو ما يُخصم — لا غيره', () => {
+  const SA_ADDRESS = { ...ADDRESS, phone: '+966500000000', country: 'SA', region: 'الرياض', city: 'الرياض' };
+  let variantId = '';
+
+  // بائع يشحن إلى بلدين بسعرين: الأردن 5.000 د.أ والسعودية 25.000 د.أ
+  beforeAll(async () => {
+    if (!dbUp) return;
+    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
+    const owner = await prisma.user.create({
+      data: { email: `two-zones.${SUFFIX}@basta.test`, fullName: 'بائع بمنطقتين', passwordHash: await hashPassword('كلمة-مرور-اختبار-طويلة'), roles: { create: { role: 'vendor_owner' } } },
+    });
+    const vendor = await prisma.vendor.create({
+      data: {
+        ownerUserId: owner.id, slug: `v-zones-${SUFFIX}`, nameAr: 'متجر بمنطقتين', status: 'approved', approvedAt: new Date(), settlementCurrency: 'JOD', country: 'JO',
+        shippingZones: {
+          create: [
+            { nameAr: 'الأردن', regions: { create: { country: 'JO' } }, rates: { create: { method: 'flat', priceMinorUnits: 5_000n, minDays: 1, maxDays: 3 } } },
+            { nameAr: 'السعودية', regions: { create: { country: 'SA' } }, rates: { create: { method: 'flat', priceMinorUnits: 25_000n, minDays: 3, maxDays: 7 } } },
+          ],
+        },
+      },
+    });
+    vendorIds.push(vendor.id);
+    const product = await prisma.product.create({
+      data: { vendorId: vendor.id, categoryId: category.id, slug: `p-zones-${SUFFIX}`, nameAr: 'منتج بمنطقتين', status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendor.id, sku: `ZONES-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 10, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 10, reason: 'import' } });
+    variantId = variant.id;
+  });
+
+  const quoteFor = async (cart: string, a: typeof ADDRESS) =>
+    (await call('POST', '/checkout/quote', { body: { country: a.country, region: a.region, city: a.city }, headers: { 'x-cart-token': cart } })).json();
+  const place = (cart: string, a: typeof ADDRESS, expected: { expectedTotal?: string; expectedCurrency?: string }, key = randomUUID()) =>
+    call('POST', '/checkout', {
+      body: { address: a, paymentToken: 'tok_success', guestEmail: `zones.${randomUUID()}@basta.test`, ...expected },
+      headers: { 'x-cart-token': cart, 'idempotency-key': key },
+    });
+
+  it('حسب الشحن للأردن ثم دفع بعنوان سعودي: 409 بالإجمالي الجديد، ولا طلب ولا حجز ولا مال', async () => {
+    if (!dbUp) return;
+    const cart = await cartWith([{ variantId, qty: 1 }]);
+    const jo = await quoteFor(cart, ADDRESS);
+    const sa = await quoteFor(cart, SA_ADDRESS);
+    expect(jo.totals.total.minorUnits).not.toBe(sa.totals.total.minorUnits);
+    const before = await stockOf(variantId);
+
+    const key = randomUUID();
+    const res = await place(cart, SA_ADDRESS, { expectedTotal: jo.totals.total.minorUnits, expectedCurrency: jo.currency }, key);
+    expect(res.statusCode, res.body).toBe(409);
+    expect(res.json().details).toEqual({ reason: 'TOTAL_CHANGED', total: sa.totals.total.minorUnits, currency: 'JOD' });
+    expect(await prisma.order.count({ where: { idempotencyKey: key } })).toBe(0);
+    expect(await stockOf(variantId)).toEqual(before);
+
+    // يراه ويؤكّده: الطلب بالعنوان السعودي يُخصم بإجماليه هو
+    const ok = await place(cart, SA_ADDRESS, { expectedTotal: sa.totals.total.minorUnits, expectedCurrency: sa.currency });
+    expect(ok.statusCode, ok.body).toBe(200);
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: ok.json().orderId }, include: { payment: true } });
+    expect(order.grandTotalMinorUnits.toString()).toBe(sa.totals.total.minorUnits);
+    expect(order.payment!.amountMinorUnits.toString()).toBe(sa.totals.total.minorUnits);
+  });
+
+  it('بلا إجمالي أو بعملة أخرى لا دفع', async () => {
+    if (!dbUp) return;
+    const cart = await cartWith([{ variantId, qty: 1 }]);
+    const jo = await quoteFor(cart, ADDRESS);
+    expect((await place(cart, ADDRESS, {})).statusCode).toBe(400);
+    const otherCurrency = await place(cart, ADDRESS, { expectedTotal: jo.totals.total.minorUnits, expectedCurrency: 'SAR' });
+    expect(otherCurrency.statusCode).toBe(409);
+    expect(otherCurrency.json().details.reason).toBe('TOTAL_CHANGED');
   });
 });

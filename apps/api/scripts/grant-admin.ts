@@ -6,6 +6,10 @@
  * الشخص ينشئ حسابه من /register بنفسه أولاً (لا كلمة مرور تمرّ بيد أحد)،
  * ثم يمنحه هذا الأمر الدور وكل الصلاحيات. التحقق الثنائي يُفرض عند أول
  * دخول له. بعدها يمنح المديرون غيرهم من AD-23، ولا يُستعمل هذا ثانية.
+ *
+ * المدير الأول **مالك المنصة** إن لم يكن لها مالك: لا يغيّر صلاحياته ولا يسحب
+ * إدارته مدير آخر، وهو وحده يمنح ما لا يحمله المانح. تشغيل الأمر لحساب ثانٍ
+ * يعطيه الإدارة والصلاحيات ولا يجعله مالكاً.
  */
 import { PrismaClient } from '@prisma/client';
 import { PERMISSION_CODES } from '../src/modules/admin/domain/permissions';
@@ -29,10 +33,12 @@ async function main(): Promise<void> {
       data: PERMISSION_CODES.map((permission) => ({ userId: user.id, permission })),
       skipDuplicates: true,
     });
+    const owner = await prisma.user.findFirst({ where: { isPlatformOwner: true }, select: { id: true } });
+    if (!owner) await prisma.user.update({ where: { id: user.id }, data: { isPlatformOwner: true } });
     await prisma.auditLog.create({
       data: { actorUserId: null, action: 'admin.bootstrap', entityType: 'User', entityId: user.id, afterJson: { permissions: [...PERMISSION_CODES] } },
     });
-    console.log(`✓ ${email} مدير بكل الصلاحيات. التحقق الثنائي يُطلب عند أول دخول.`);
+    console.log(`✓ ${email} مدير بكل الصلاحيات${owner ? '' : ' ومالك المنصة'}. التحقق الثنائي يُطلب عند أول دخول.`);
   } finally {
     await prisma.$disconnect();
   }

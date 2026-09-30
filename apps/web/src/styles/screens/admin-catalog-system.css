@@ -319,6 +319,7 @@ fieldset.ac2-divider > legend { float: inline-start; inline-size: 100%; padding:
 .ac2-cellbtn[data-state='unreviewed'] { background: var(--warning-subtle); border-color: var(--warning); color: var(--warning-text); }
 .ac2-cellbtn[data-state='off'] { background: var(--surface-sunken); color: var(--text-faint); }
 .ac2-cellbtn[data-state='empty'] { background: transparent; border-style: dashed; color: var(--text-muted); }
+.ac2-cellbtn[data-state='locked'] { background: var(--surface-sunken); color: var(--text-muted); }
 .ac2-cellbtn[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); border-style: solid; }
 .ac2-cellbtn:hover:not([aria-pressed='true']) { border-color: var(--brand); }
 

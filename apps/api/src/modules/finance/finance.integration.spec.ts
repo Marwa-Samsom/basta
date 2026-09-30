@@ -72,7 +72,9 @@ async function placeOrder(qty: number[], currency = 'JOD') {
     const r = await call('POST', '/cart/items', undefined, { variantId: vendors[i]!.variantId, qty: q }, { 'x-cart-token': token });
     expect(r.statusCode, r.body).toBe(201);
   }
-  const res = await call('POST', '/checkout', buyer.token, { address: ADDRESS, paymentToken: 'tok_success' }, {
+  // الإجمالي كما يراه المشتري تحت «ادفع» — يُرسل مع الطلب ولا يُخصم غيره
+  const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, { 'x-cart-token': token })).json();
+  const res = await call('POST', '/checkout', buyer.token, { address: ADDRESS, paymentToken: 'tok_success', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
     'x-cart-token': token,
     'idempotency-key': randomUUID(),
   });
@@ -161,7 +163,7 @@ beforeAll(async () => {
         ownerUserId: u.id, slug: `v-${tag}-${SUFFIX}`, nameAr: `متجر ${tag}`, status: 'approved', approvedAt: new Date(),
         settlementCurrency: currency, country: 'SA',
         shippingZones: { create: { nameAr: 'السعودية', regions: { create: { country: 'SA' } }, rates: { create: { method: 'flat', priceMinorUnits: 1_700n } } } },
-        bankAccounts: { create: { holderName: `بائع ${tag}`, iban: 'SA0380000000608010167519', bankName: 'بنك تجريبي', isDefault: true } },
+        bankAccounts: { create: { holderName: `بائع ${tag}`, iban: 'SA0380000000608010167519', bankName: 'بنك تجريبي', isDefault: true, verifiedAt: new Date() } },
       },
     });
     const product = await prisma.product.create({
@@ -428,10 +430,119 @@ describe('بوابة 10 · البند 5 — كشف الحساب يطابق ال�
     }
   });
 
+  it('الكشف صفحات بالمؤشّر: الصفحات معاً = الكشف كله بأرصدته، والمدة لا تحمّل ما قبلها', async () => {
+    if (!dbUp) return;
+    const v = vendors[0]!;
+    const whole = await finance.statement(v.vendorId, v.currency);
+    expect(whole.rows.length).toBeGreaterThan(2);
+    expect(whole.nextCursor).toBeNull();
+
+    // صفحتان سطران سطران حتى النهاية — المؤشّر يمرّ بكل قيد مرة، والرصيد يكمل من الصفحة السابقة
+    const paged: typeof whole.rows = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const page = await finance.statement(v.vendorId, v.currency, {}, cursor, 2);
+      expect(page.rows.length).toBeLessThanOrEqual(2);
+      expect(page.closing).toEqual(whole.closing);
+      paged.push(...page.rows);
+      cursor = page.nextCursor ?? undefined;
+      pages++;
+    } while (cursor && pages < 1000);
+    expect(pages).toBe(Math.ceil(whole.rows.length / 2));
+    expect(paged).toEqual(whole.rows);
+
+    // مدة بعد آخر قيد: لا أسطر، والافتتاحي مجموع ما قبلها في القاعدة
+    const tomorrow = new Date(Date.now() + 86_400_000);
+    const later = await finance.statement(v.vendorId, v.currency, { from: tomorrow });
+    expect(later.rows).toHaveLength(0);
+    expect(later.opening).toEqual(whole.closing);
+    expect(later.closing).toEqual(whole.closing);
+
+    // مدة أطول من سنة تُرفض، ومؤشّر بائع آخر لا يُقبل
+    expect((await call('GET', `/vendor/finance/statement?currency=${v.currency}&from=2024-01-01&to=2026-01-01`, v.token)).statusCode).toBe(400);
+    // والتصدير كذلك — رسالة JSON لا 500 مع أن المسار يعلن CSV
+    const longCsv = await call('GET', `/vendor/finance/statement.csv?currency=${v.currency}&from=2024-01-01&to=2026-01-01`, v.token);
+    expect(longCsv.statusCode, longCsv.body).toBe(400);
+    expect(longCsv.headers['content-type']).toContain('application/json');
+    const foreign = await prisma.ledgerEntry.findFirstOrThrow({ where: { vendorId: { not: v.vendorId } }, select: { id: true } });
+    expect((await call('GET', `/vendor/finance/statement?currency=${v.currency}&cursor=${foreign.id}`, v.token)).statusCode).toBe(400);
+  });
+
   it('بائع لا يرى كشف غيره، ولا يطلب سحباً من محفظة غيره', async () => {
     if (!dbUp) return;
     const other = await call('GET', `/vendor/finance/statement?currency=JOD`, vendors[0]!.token);
     expect(other.json().rows ?? []).toHaveLength(0);
     expect((await call('GET', '/vendor/finance/wallets', buyer.token)).statusCode).toBe(403);
+  });
+});
+
+describe('تحرير الأرصدة لا يتجوّع بالمسترَدّ كله', () => {
+  /** بائع شحنه مجاني: إرجاع كل قطعة يترك معلّقه صفراً — الحالة التي كانت تسدّ الطابور */
+  async function freeShippingVendor(): Promise<number> {
+    const tag = `free${Date.now()}`;
+    const email = `v${tag}.${SUFFIX}@basta.test`;
+    const u = await prisma.user.create({
+      data: { email, fullName: 'بائع شحن مجاني', passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'vendor_owner' } } },
+    });
+    const v = await prisma.vendor.create({
+      data: {
+        ownerUserId: u.id, slug: `v-${tag}-${SUFFIX}`, nameAr: 'متجر الشحن المجاني', status: 'approved', approvedAt: new Date(),
+        settlementCurrency: 'JOD', country: 'SA',
+        shippingZones: { create: { nameAr: 'السعودية', regions: { create: { country: 'SA' } }, rates: { create: { method: 'flat', priceMinorUnits: 0n } } } },
+        bankAccounts: { create: { holderName: 'بائع', iban: 'SA0380000000608010167519', bankName: 'بنك', isDefault: true, verifiedAt: new Date() } },
+      },
+    });
+    const product = await prisma.product.create({
+      data: { vendorId: v.id, categoryId: vendors[0]!.categoryId, slug: `p-${tag}-${SUFFIX}`, nameAr: 'منتج بشحن مجاني', status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: v.id, sku: `SKU-${tag}`.toUpperCase(), priceMinorUnits: 5_000n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 20, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 20, reason: 'import' } });
+    vendors.push({ userId: u.id, vendorId: v.id, variantId: variant.id, productId: product.id, categoryId: vendors[0]!.categoryId, currency: 'JOD', token: await login(email) });
+    return vendors.length - 1;
+  }
+  const pendingNet = async (subId: string) =>
+    (await prisma.ledgerEntry.findMany({ where: { refType: 'sub_order', refId: subId, bucket: 'pending' } })).reduce(
+      (a, r) => a + (r.direction === 'credit' ? r.amountMinorUnits : -r.amountMinorUnits),
+      0n,
+    );
+
+  it('مسترَدّان كلياً أقدم من فرعي عادي، والدفعة بحجمهما: يُحسمان مرة ثم يُحرَّر العادي', async () => {
+    if (!dbUp) return;
+    const f = await freeShippingVendor();
+    const zeros: string[] = [];
+    for (let k = 0; k < 2; k++) {
+      const qty = vendors.map((_, idx) => (idx === f ? 1 : 0));
+      const { order, sub } = await placeOrder(qty);
+      const s = sub(f);
+      await deliver(f, s.id);
+      await returnOne(f, order.orderNumber, s.id, s.items[0]!.id, 1);
+      expect(await pendingNet(s.id)).toBe(0n);
+      zeros.push(s.id);
+    }
+    const { sub } = await placeOrder([1, 0]);
+    const normal = sub(0);
+    await deliver(0, normal.id);
+
+    // المسترَدّان أقدم موعداً — كانا يتصدّران كل دفعة إلى الأبد
+    const day = 86_400_000;
+    for (const [k, id] of zeros.entries()) {
+      await prisma.subOrder.update({ where: { id }, data: { holdReleaseAt: new Date(Date.now() - (10 - k) * day) } });
+    }
+    await prisma.subOrder.update({ where: { id: normal.id }, data: { holdReleaseAt: new Date(Date.now() - 5 * day) } });
+
+    await release.tick(new Date(), 2);
+    for (const id of zeros) {
+      expect((await prisma.subOrder.findUniqueOrThrow({ where: { id } })).holdSettledAt).not.toBeNull();
+    }
+    await release.tick(new Date(), 2);
+    expect(await prisma.ledgerEntry.count({ where: { refId: normal.id, entryType: 'hold_release_out' } })).toBe(1);
+    expect((await prisma.subOrder.findUniqueOrThrow({ where: { id: normal.id } })).holdSettledAt).not.toBeNull();
+    // المسترَدّ كله لا يُكتب له قيد تحرير بصفر، ولا يعود إلى الطابور
+    for (const id of zeros) expect(await prisma.ledgerEntry.count({ where: { refId: id, entryType: 'hold_release_out' } })).toBe(0);
+    expect(await viewCount('audit_wallet_drift')).toBe(0);
   });
 });

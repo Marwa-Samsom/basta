@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { Public } from '../../../common/security/decorators';
 import { SearchService } from '../../search/public';
@@ -28,9 +28,10 @@ export class StorefrontQueryDto {
   brandId?: string;
 
   /** معرّفات قيم سمات مفصولة بفواصل — لون أحمر + مقاس M */
+  /** معرّفات قيم سمات مفصولة بفاصلة — غير المعرّف كان يصل Prisma فيرمي 500 */
   @IsOptional()
-  @IsString()
   @MaxLength(500)
+  @Matches(/^[0-9a-f-]{36}(,[0-9a-f-]{36})*,?$/i, { message: 'قيم التصفية معرّفات مفصولة بفاصلة.' })
   attrs?: string;
 
   @IsOptional()
@@ -109,7 +110,7 @@ export class StorefrontController {
   @Get('storefront/suggest')
   @ApiOperation({ summary: 'اقتراحات أثناء الكتابة — ST-06' })
   async suggest(@Query('q') q: string) {
-    return { suggestions: await this.search.suggest(q ?? '') };
+    return { suggestions: await this.storefront.suggest(q ?? '') };
   }
 
   @Public()

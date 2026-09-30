@@ -7,6 +7,7 @@ import { Suspense, useState } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { Field, TextInput } from '@/components/ui';
+import { safeNext } from '@/lib/safe-path';
 
 interface LoginResponse {
   tokens: Tokens;
@@ -64,7 +65,8 @@ function PasswordField({
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') ?? '/vendor/onboarding/status';
+  // الوجهة من الرابط: مسار داخلي وإلا فالافتراضي — لا `?next=https://…` يخرج بالمستخدم بعد الدخول
+  const next = safeNext(params.get('next'), '/vendor/onboarding/status');
   const isAdmin = next.startsWith('/admin');
 
   const [email, setEmail] = useState('');

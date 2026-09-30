@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Actor, Role } from '../../../../common/security/actor';
+import { AuthService } from '../../application/auth.service';
 import { TokenService } from '../../application/token.service';
 import {
   ALLOW_LIMITED,
@@ -29,6 +30,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly tokens: TokenService,
+    private readonly auth: AuthService,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -48,7 +50,7 @@ export class AuthGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(OPTIONAL_AUTH, targets)) {
       const bearer = req.headers['authorization'];
       if (bearer?.startsWith('Bearer ')) {
-        const claims = await this.tokens.verifyAccess(bearer.slice(7));
+        const claims = await this.auth.liveClaims(await this.tokens.verifyAccess(bearer.slice(7)));
         req.actor = {
           userId: claims.sub,
           roles: claims.roles as Role[],
@@ -66,7 +68,9 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('مطلوب تسجيل الدخول.');
     }
 
-    const claims = await this.tokens.verifyAccess(header.slice(7));
+    // التوقيع يثبت من أصدر الرمز؛ القاعدة تثبت أن صاحبه ما زال كما كان — الموقوف
+    // والجلسة المُنهاة والصلاحية المسحوبة تسري في الطلب التالي لا بعد انتهاء الرمز
+    const claims = await this.auth.liveClaims(await this.tokens.verifyAccess(header.slice(7)));
 
     // 1 · الرمز المحدود لا يفتح إلا ما سُمح له صراحةً
     const allowLimited = this.reflector.getAllAndOverride<boolean>(ALLOW_LIMITED, targets);

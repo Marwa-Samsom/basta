@@ -5,6 +5,7 @@ import { use, useEffect, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
 import { Alert, Spinner } from '@/components/ui';
 import { api, session } from '@/lib/api';
+import { orderKeyHeaders } from '@/lib/order-key';
 
 interface OrderResult {
   orderNumber: string;
@@ -61,7 +62,9 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
     let timer: ReturnType<typeof setTimeout> | null = null;
     const poll = async (attempt: number): Promise<void> => {
       try {
-        const next = await api<OrderResult>(`/checkout/orders/${encodeURIComponent(decodeURIComponent(number))}`);
+        const plain = decodeURIComponent(number);
+        // طلب الضيف بمفتاحه المحفوظ هنا عند الدفع؛ صاحب الحساب بجلسته
+        const next = await api<OrderResult>(`/checkout/orders/${encodeURIComponent(plain)}`, { headers: orderKeyHeaders(plain) });
         if (!alive) return;
         setOrder(next);
         if (next.outcome === 'pending' && attempt < 20) {

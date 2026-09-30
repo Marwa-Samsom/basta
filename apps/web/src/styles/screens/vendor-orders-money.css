@@ -41,6 +41,8 @@
 
 .vm-list-empty { padding: 20px var(--space-4); color: var(--text-muted); font-size: var(--text-sm); }
 .vm-list-empty--center { padding-block: 38px; display: grid; justify-items: center; gap: var(--space-2); text-align: center; }
+/* الكشف صفحات: زرّ الصفحة التالية تحت الجدول وعدد ما جُلب */
+.vm-more { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-block-start: 1px solid var(--border-default); }
 .vm-list-empty__title { font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--text-strong); }
 
 /* هيكل التحميل — كتل التصميم: عنوان 26×240 ثم كتلة 96 ثم لوحة 260 */

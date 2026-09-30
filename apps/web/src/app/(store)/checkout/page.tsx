@@ -2,18 +2,22 @@
 
 import '@/styles/screens/account-area.css';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { Alert, Field, PageHead, TextInput } from '@/components/ui';
 import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
 import { cartApi, cartHeaders, type CartView } from '@/lib/cart';
+import { attemptKey, definitive, endAttempt } from '@/lib/checkout-attempt';
+import { rememberOrderKey } from '@/lib/order-key';
 import { imageUrl } from '@/lib/storefront';
 
 interface OrderResult {
   orderId: string;
   orderNumber: string;
   outcome: 'paid' | 'failed' | 'requires_action' | 'pending';
+  /** لطلب الضيف: مفتاح قراءة حالته */
+  accessKey?: string;
 }
 
 /** بطاقات المزوّد الوهمي — كل واحدة تصنع حالة من حالات البوابة (ADR-012) */
@@ -109,14 +113,28 @@ export default function CheckoutPage() {
   });
   const [email, setEmail] = useState('');
   const [card, setCard] = useState<string>('tok_success');
-  const [quote, setQuote] = useState<CartView | null>(null);
+  /**
+   * الإجمالي محسوب لعنوان بعينه: الشحن والضريبة ببلده ومنطقته ومدينته. تغيير
+   * أيٍّ منها بعد «احسب الشحن» كان يُبقي الإجمالي القديم معروضاً تحت «ادفع»،
+   * والخادم يسعّر بالعنوان الجديد — فيُخصم مبلغ لم يره المشتري. الحساب يُحفظ
+   * مع مفتاح عنوانه، ولا يُعدّ حساباً لعنوان غيره.
+   */
+  const [quoted, setQuoted] = useState<{ key: string; view: CartView } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [blockers, setBlockers] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const attemptKey = useRef<string | null>(null);
   // العناوين المحفوظة للداخل — تملأ الحقول نفسها ولا تغيّر شيئاً في الدفع
   const [saved, setSaved] = useState<SavedAddress[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
+
+  const addressKey = [address.country, address.region.trim(), address.city.trim()].join('|');
+  const quote = quoted && quoted.key === addressKey ? quoted.view : null;
+  /** حُسب الشحن ثم تغيّر العنوان — يُقال للمشتري لماذا اختفى الإجمالي */
+  const stale = quoted !== null && quote === null;
+  const priced = (view: CartView, a: typeof address) => {
+    setQuoted({ key: [a.country, a.region.trim(), a.city.trim()].join('|'), view });
+    setBlockers(view.blockers);
+  };
 
   const set = (key: keyof typeof address) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setAddress((a) => ({ ...a, [key]: e.target.value }));
@@ -160,8 +178,7 @@ export default function CheckoutPage() {
     setError(null);
     try {
       const q = await cartApi.quote({ country: address.country, region: address.region, city: address.city });
-      setQuote(q);
-      setBlockers(q.blockers);
+      priced(q, address);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذّر حساب الشحن.');
     } finally {
@@ -170,31 +187,48 @@ export default function CheckoutPage() {
   }
 
   async function pay(): Promise<void> {
+    if (!quote) return;
     setBusy(true);
     setError(null);
-    attemptKey.current ??= crypto.randomUUID();
+    const cart = cartHeaders();
+    const key = attemptKey(cart['x-cart-token'] ?? null);
     try {
       const result = await api<OrderResult>('/checkout', {
         method: 'POST',
-        headers: { ...cartHeaders(), 'idempotency-key': attemptKey.current },
+        headers: { ...cart, 'idempotency-key': key },
         body: {
           address: {
             ...address,
             ...(address.building ? {} : { building: undefined }),
           },
           paymentToken: card,
+          // ما يراه تحت «ادفع» — الخادم لا يخصم غيره
+          expectedTotal: quote.totals.total.minorUnits,
+          expectedCurrency: quote.currency,
           ...(signedIn ? {} : { guestEmail: email }),
         },
       });
-      // الفشل المعروف ينهي المحاولة: المحاولة التالية طلب جديد بمفتاح جديد
-      if (result.outcome === 'failed') attemptKey.current = null;
+      // الخادم أجاب بطلب معروف — مدفوعاً أو مرفوضاً أو معلّقاً تحسمه المصالحة.
+      // الشراء التالية (بطاقة أخرى، أو سلة جديدة) محاولة جديدة بمفتاح جديد
+      endAttempt();
+      rememberOrderKey(result.orderNumber, result.accessKey);
       router.push(`/orders/${result.orderNumber}`);
     } catch (err) {
       if (err instanceof ApiError && Array.isArray(err.details?.['blockers'])) {
         setBlockers(err.details['blockers'] as string[]);
       }
-      // خطأ قبل الدفع (مخزون، تحقّق) لا يستهلك المفتاح؛ خطأ شبكة يُبقيه فلا يُدفع مرتين
-      if (err instanceof ApiError) attemptKey.current = null;
+      // تغيّر الإجمالي في الخادم (سعر، شحن، كوبون، سلة من تبويب آخر): يُعاد
+      // الحساب ليرى الجديد، ولا يُدفع حتى يضغط «ادفع» عليه
+      if (err instanceof ApiError && err.details?.['reason'] === 'TOTAL_CHANGED') {
+        try {
+          priced(await cartApi.quote({ country: address.country, region: address.region, city: address.city }), address);
+        } catch {
+          setQuoted(null);
+        }
+      }
+      // رفض قاطع قبل أي مال ينهي المحاولة؛ 502/504 وانقطاع الشبكة يُبقيان المفتاح
+      // (checkout-attempt) — «ادفع» ثانيةً يعيد الطلب نفسه إن كان خُصم، لا يدفع مرتين
+      if (definitive(err)) endAttempt();
       setError(err instanceof Error ? err.message : 'تعذّر إتمام الطلب.');
     } finally {
       setBusy(false);
@@ -212,7 +246,8 @@ export default function CheckoutPage() {
     <div className="sp-page">
       <PageHead title="إتمام الشراء" />
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {blockers.length > 0 ? (
+      {/* موانع حساب قديم لعنوان تغيّر لا تُعرض — تُحسب من جديد مع الشحن */}
+      {blockers.length > 0 && !stale ? (
         <Alert tone="warning" title="قبل الدفع">
           <ul className="blockers">
             {blockers.map((b) => (
@@ -317,6 +352,12 @@ export default function CheckoutPage() {
             >
               احسب الشحن
             </button>
+            {stale ? (
+              <p className="sp-note" role="status">
+                <Icon name="info" size={14} />
+                غيّرت العنوان — احسب الشحن من جديد لترى الإجمالي لهذا العنوان قبل الدفع.
+              </p>
+            ) : null}
           </Section>
 
           <Section n={3} title="الشحن لكل متجر" state={stateOf(3)}>

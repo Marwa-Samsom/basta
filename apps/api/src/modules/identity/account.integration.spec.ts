@@ -23,7 +23,7 @@ type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
 const call = (
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   url: string,
-  opts: { token?: string; body?: unknown; ua?: string } = {},
+  opts: { token?: string; body?: unknown; ua?: string; cookie?: string } = {},
 ): Promise<Res> =>
   app.inject({
     method,
@@ -32,9 +32,18 @@ const call = (
     headers: {
       'user-agent': opts.ua ?? 'vitest-agent',
       ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
+      ...(opts.cookie ? { cookie: `basta_rt=${opts.cookie}` } : {}),
     },
     ...(opts.body !== undefined ? { payload: opts.body as Record<string, unknown> } : {}),
   });
+
+/** رمز التحديث من كوكي الردّ — لا يصل في الجسم */
+const rtOf = (res: Res): string => {
+  const raw = res.headers['set-cookie'];
+  const line = (Array.isArray(raw) ? raw : [raw ?? '']).find((c) => c.startsWith('basta_rt='));
+  if (!line) throw new Error(`لا كوكي تحديث: ${res.statusCode} ${res.body}`);
+  return line.slice('basta_rt='.length).split(';')[0]!;
+};
 
 const emailOf = (tag: string) => `${tag}.${SUFFIX}@basta.test`;
 
@@ -47,7 +56,7 @@ async function register(tag: string): Promise<string> {
 async function login(tag: string, password = PASSWORD, ua = 'vitest-agent'): Promise<{ accessToken: string; refreshToken: string }> {
   const r = await call('POST', '/auth/login', { body: { email: emailOf(tag), password }, ua });
   expect(r.statusCode, r.body).toBe(200);
-  return r.json().tokens;
+  return { accessToken: r.json().tokens.accessToken, refreshToken: rtOf(r) };
 }
 
 const sidOf = (accessToken: string): string =>
@@ -85,6 +94,37 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.close();
   await prisma.$disconnect();
+});
+
+describe('البريد لا يفرّق بين الحروف — صندوق واحد حساب واحد', () => {
+  it('تسجيل البريد نفسه بحروف أخرى يُرفض، والدخول والاستعادة بأي حروف يصلان للحساب نفسه', async () => {
+    if (!dbUp) return;
+    const lower = emailOf('casefold');
+    const upper = lower.toUpperCase();
+    const userId = await register('casefold');
+
+    // المهاجم يسجّل الصندوق نفسه بحروف كبيرة — كان حساباً ثانياً
+    const twin = await call('POST', '/auth/register', { body: { email: upper, password: PASSWORD, fullName: 'منتحل' } });
+    expect(twin.statusCode, twin.body).toBe(409);
+    expect(await prisma.user.count({ where: { email: { equals: lower, mode: 'insensitive' } } })).toBe(1);
+
+    // صاحب الحساب يدخل كيفما كتب بريده
+    // وبمسافات نسخها معه من رسالة
+    const login = await call('POST', '/auth/login', { body: { email: `  ${upper} `, password: PASSWORD } });
+    expect(login.statusCode, login.body).toBe(200);
+    expect(sidOf(login.json().tokens.accessToken)).toBeTruthy();
+
+    // ورمز الاستعادة يذهب لحسابه هو
+    expect((await call('POST', '/auth/password/forgot', { body: { email: upper } })).statusCode).toBe(200);
+    expect(await prisma.notification.count({ where: { userId, templateCode: 'password_reset_code', channel: 'email' } })).toBe(1);
+  });
+
+  it('القاعدة ترفض بريداً غير موحَّد ولو كُتب من خارج الخادم', async () => {
+    if (!dbUp) return;
+    await expect(
+      prisma.user.create({ data: { email: `Mixed.${SUFFIX}@Basta.test`, fullName: 'كتابة مباشرة' } }),
+    ).rejects.toThrow(/users_email_normalized/);
+  });
 });
 
 describe('SH-03 · تأكيد البريد', () => {
@@ -215,7 +255,7 @@ describe('SH-04 · استعادة كلمة المرور', () => {
     expect(ok.statusCode, ok.body).toBe(200);
     expect(await prisma.refreshToken.count({ where: { userId, revokedAt: null } })).toBe(0);
     for (const s of [s1, s2]) {
-      expect((await call('POST', '/auth/refresh', { body: { refreshToken: s.refreshToken } })).statusCode).toBe(401);
+      expect((await call('POST', '/auth/refresh', { cookie: s.refreshToken })).statusCode).toBe(401);
     }
     expect((await call('POST', '/auth/login', { body: { email: emailOf('reset'), password: PASSWORD } })).statusCode).toBe(401);
     await login('reset', NEW);
@@ -274,9 +314,9 @@ describe('ST-25 · الملف وكلمة المرور والجلسات', () => {
     const r = await call('POST', '/me/account/sessions/revoke-others', { token: me.accessToken });
     expect(r.statusCode, r.body).toBe(200);
     expect(r.json().revokedSessions).toBe(1);
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: other.refreshToken } })).statusCode).toBe(401);
+    expect((await call('POST', '/auth/refresh', { cookie: other.refreshToken })).statusCode).toBe(401);
     // الجلسة الحالية حيّة، وتدويرها يُبقي معرّفها
-    const rotated = await call('POST', '/auth/refresh', { body: { refreshToken: me.refreshToken } });
+    const rotated = await call('POST', '/auth/refresh', { cookie: me.refreshToken });
     expect(rotated.statusCode).toBe(200);
     expect(sidOf(rotated.json().accessToken)).toBe(sidOf(me.accessToken));
   });
@@ -293,7 +333,7 @@ describe('ST-25 · الملف وكلمة المرور والجلسات', () => {
 
     const r = await call('DELETE', `/me/account/sessions/${sidOf(victim.accessToken)}`, { token: intruder.accessToken });
     expect(r.statusCode).toBe(404);
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: victim.refreshToken } })).statusCode).toBe(200);
+    expect((await call('POST', '/auth/refresh', { cookie: victim.refreshToken })).statusCode).toBe(200);
 
     // وصاحبها يُنهيها
     const second = await login('victim');
@@ -315,8 +355,179 @@ describe('ST-25 · الملف وكلمة المرور والجلسات', () => {
     const ok = await call('POST', '/me/account/password', { token: me.accessToken, body: { currentPassword: PASSWORD, newPassword: NEW } });
     expect(ok.statusCode, ok.body).toBe(200);
     expect(ok.json()).toEqual({ revokedSessions: 1, currentKept: true });
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: other.refreshToken } })).statusCode).toBe(401);
-    expect((await call('POST', '/auth/refresh', { body: { refreshToken: me.refreshToken } })).statusCode).toBe(200);
+    expect((await call('POST', '/auth/refresh', { cookie: other.refreshToken })).statusCode).toBe(401);
+    expect((await call('POST', '/auth/refresh', { cookie: me.refreshToken })).statusCode).toBe(200);
     await login('chpw', NEW);
+  });
+});
+
+describe('رمز التحديث كوكي HttpOnly — لا يقرؤه سكربت', () => {
+  const cookieLine = (res: Res) => {
+    const raw = res.headers['set-cookie'];
+    return (Array.isArray(raw) ? raw : [raw ?? '']).find((c) => c.startsWith('basta_rt=')) ?? '';
+  };
+
+  it('الدخول: الرمز في كوكي HttpOnly محصور بمسارات /auth، ولا أثر له في الجسم', async () => {
+    if (!dbUp) return;
+    await register('rt-cookie');
+    const r = await call('POST', '/auth/login', { body: { email: emailOf('rt-cookie'), password: PASSWORD } });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().tokens.accessToken).toBeTruthy();
+    expect(r.json().tokens).not.toHaveProperty('refreshToken');
+    expect(r.body).not.toContain(rtOf(r));
+
+    const attrs = cookieLine(r).split(';').map((a) => a.trim());
+    expect(attrs).toContain('HttpOnly');
+    expect(attrs).toContain('SameSite=Strict');
+    expect(attrs).toContain('Path=/api/v1/auth');
+    expect(attrs).toContain(`Max-Age=${30 * 86_400}`);
+  });
+
+  it('التدوير يقرأ الكوكي وحده — الرمز في الجسم لا يُقبل — ويعيد الجديد كوكياً', async () => {
+    if (!dbUp) return;
+    await register('rt-rotate');
+    const s = await login('rt-rotate');
+    const inBody = await call('POST', '/auth/refresh', { body: { refreshToken: s.refreshToken } });
+    expect(inBody.statusCode).toBe(401);
+
+    const r = await call('POST', '/auth/refresh', { cookie: s.refreshToken });
+    expect(r.statusCode, r.body).toBe(200);
+    expect(r.json().accessToken).toBeTruthy();
+    expect(r.json()).not.toHaveProperty('refreshToken');
+    const next = rtOf(r);
+    expect(next).not.toBe(s.refreshToken);
+    expect((await call('POST', '/auth/refresh', { cookie: next })).statusCode).toBe(200);
+  });
+
+  it('الخروج يُبطل رمز الكوكي ويمسحه', async () => {
+    if (!dbUp) return;
+    await register('rt-logout');
+    const s = await login('rt-logout');
+    const out = await call('POST', '/auth/logout', { cookie: s.refreshToken });
+    expect(out.statusCode).toBe(204);
+    expect(cookieLine(out)).toMatch(/^basta_rt=;.*Max-Age=0/);
+    expect((await call('POST', '/auth/refresh', { cookie: s.refreshToken })).statusCode).toBe(401);
+  });
+});
+
+describe('تدوير رمز التحديث تحت التزامن', () => {
+  const refresh = (refreshToken: string, ua = 'vitest-agent') => call('POST', '/auth/refresh', { cookie: refreshToken, ua });
+
+  it('خمسة تجديدات متزامنة بالرمز نفسه: جلسة واحدة لا خمس، والبقية 409 بلا إنهاء الجلسة', async () => {
+    if (!dbUp) return;
+    const userId = await register('rot-race');
+    const s = await login('rot-race');
+
+    const results = await Promise.all(Array.from({ length: 5 }, () => refresh(s.refreshToken)));
+    const ok = results.filter((r) => r.statusCode === 200);
+    expect(ok, results.map((r) => `${r.statusCode} ${r.body}`).join('\n')).toHaveLength(1);
+    expect(results.filter((r) => r.statusCode === 409)).toHaveLength(4);
+    expect(results.find((r) => r.statusCode === 409)!.json().code).toBe('REFRESH_ROTATED');
+
+    // رمز واحد حيّ في العائلة — خلف الفائز — والجلسة لم تُنهَ
+    const live = await prisma.refreshToken.findMany({ where: { userId, revokedAt: null } });
+    expect(live).toHaveLength(1);
+    const next = rtOf(ok[0]!);
+    expect((await refresh(next)).statusCode).toBe(200);
+  });
+
+  it('الرمز المدوَّر من جهاز آخر — ولو في المهلة — سرقة: تُنهى العائلة', async () => {
+    if (!dbUp) return;
+    const userId = await register('rot-thief');
+    const s = await login('rot-thief');
+    const first = await refresh(s.refreshToken);
+    expect(first.statusCode).toBe(200);
+
+    const thief = await refresh(s.refreshToken, 'curl/8.0 attacker');
+    expect(thief.statusCode).toBe(401);
+    expect(thief.json().message).toMatch(/استعمال مكرّر/);
+    expect(await prisma.refreshToken.count({ where: { userId, revokedAt: null } })).toBe(0);
+    expect((await refresh(rtOf(first))).statusCode).toBe(401);
+  });
+
+  it('بعد المهلة ولو من الجهاز نفسه: سرقة', async () => {
+    if (!dbUp) return;
+    const userId = await register('rot-late');
+    const s = await login('rot-late');
+    expect((await refresh(s.refreshToken)).statusCode).toBe(200);
+    // التدوير «حدث» قبل دقيقة
+    await prisma.refreshToken.updateMany({
+      where: { userId, replacedById: { not: null } },
+      data: { revokedAt: new Date(Date.now() - 60_000) },
+    });
+    const late = await refresh(s.refreshToken);
+    expect(late.statusCode).toBe(401);
+    expect(await prisma.refreshToken.count({ where: { userId, revokedAt: null } })).toBe(0);
+  });
+
+  it('رمز خرج صاحبه به لا يُعدّ تزامناً ولو للتوّ', async () => {
+    if (!dbUp) return;
+    await register('rot-logout');
+    const s = await login('rot-logout');
+    expect((await call('POST', '/auth/logout', { token: s.accessToken, cookie: s.refreshToken })).statusCode).toBeLessThan(300);
+    expect((await refresh(s.refreshToken)).statusCode).toBe(401);
+  });
+});
+
+describe('رمز الوصول يُقرأ مع القاعدة — لا ينتظر انتهاءه', () => {
+  const me = (token: string) => call('GET', '/me/account', { token });
+
+  it('الخروج يُسقط رمز الوصول في الطلب التالي', async () => {
+    if (!dbUp) return;
+    await register('live-logout');
+    const s = await login('live-logout');
+    expect((await me(s.accessToken)).statusCode).toBe(200);
+    await call('POST', '/auth/logout', { token: s.accessToken, cookie: s.refreshToken });
+    expect((await me(s.accessToken)).statusCode).toBe(401);
+  });
+
+  it('تغيير كلمة المرور يُسقط رموز الأجهزة الأخرى فوراً، ويُبقي الحالي', async () => {
+    if (!dbUp) return;
+    await register('live-chpw');
+    const other = await login('live-chpw', PASSWORD, 'other-device');
+    const current = await login('live-chpw', PASSWORD, 'this-device');
+    const r = await call('POST', '/me/account/password', {
+      token: current.accessToken,
+      body: { currentPassword: PASSWORD, newPassword: 'عبارة-مرور-جديدة-للجلسات' },
+    });
+    expect(r.statusCode, r.body).toBe(200);
+    expect((await me(other.accessToken)).statusCode).toBe(401);
+    expect((await me(current.accessToken)).statusCode).toBe(200);
+  });
+
+  it('الحساب الموقوف يُرفض في الطلب التالي ولو كان رمزه صالح التوقيع', async () => {
+    if (!dbUp) return;
+    const userId = await register('live-suspend');
+    const s = await login('live-suspend');
+    expect((await me(s.accessToken)).statusCode).toBe(200);
+    // الإيقاف في القاعدة وحدها — بلا إبطال جلسات — فالحارس نفسه هو ما يُثبَت
+    await prisma.user.update({ where: { id: userId }, data: { status: 'suspended' } });
+    const after = await me(s.accessToken);
+    expect(after.statusCode).toBe(401);
+    expect(after.json().message).toMatch(/الحساب غير متاح/);
+  });
+
+  it('الصلاحية المسحوبة والدور المسحوب يسريان فوراً', async () => {
+    if (!dbUp) return;
+    const userId = await register('live-perm');
+    const secret = 'JBSWY3DPEHPK3PXP'.padEnd(32, 'D');
+    await prisma.userRole.create({ data: { userId, role: 'admin' } });
+    await prisma.adminPermission.create({ data: { userId, permission: 'content.manage' } });
+    await prisma.user.update({ where: { id: userId }, data: { totpSecretEnc: secret, totpEnabledAt: new Date() } });
+    const { NobleCryptoPlugin, ScureBase32Plugin, generateSync } = await import('otplib');
+    const code = generateSync({ strategy: 'totp', secret, crypto: new NobleCryptoPlugin(), base32: new ScureBase32Plugin() });
+    const r = await call('POST', '/auth/login', { body: { email: emailOf('live-perm'), password: PASSWORD, totp: code } });
+    expect(r.statusCode, r.body).toBe(200);
+    const token = r.json().tokens.accessToken as string;
+    const templates = () => call('GET', '/admin/notifications/templates', { token });
+    expect((await templates()).statusCode).toBe(200);
+
+    // سحب في القاعدة وحدها — بلا إنهاء الجلسة: الرمز ما زال يحمل الصلاحية في مطالباته
+    await prisma.adminPermission.deleteMany({ where: { userId } });
+    expect((await templates()).statusCode).toBe(403);
+    await prisma.userRole.deleteMany({ where: { userId, role: 'admin' } });
+    expect((await templates()).statusCode).toBe(403);
+    // والجلسة نفسها باقية: ما سُحب هو الصلاحية لا الدخول
+    expect((await me(token)).statusCode).toBe(200);
   });
 });

@@ -3,6 +3,7 @@ import type { Role } from '@prisma/client';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
+import { OrderLifecycleService } from '../../orders/public';
 
 /** حالات يُفتح فيها نزاع: بعد الشحن وحتى قبل الإكمال */
 const DISPUTABLE = ['shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned'] as const;
@@ -27,6 +28,7 @@ export class DisputesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly lifecycle: OrderLifecycleService,
   ) {}
 
   async open(
@@ -148,20 +150,37 @@ export class DisputesService {
     if (count === 0) throw new ConflictError('النزاع مغلق.');
   }
 
+  /**
+   * الحسم — بصلاحية disputes.resolve.
+   *
+   * لصالح البائع: يُغلق النزاع فيُفكّ تجميد ماله. لصالح المشتري: كان يُغلق
+   * بالطريقة نفسها — فلا يُردّ للمشتري شيء، ويُحرَّر مال البائع كأنه ربح. الآن
+   * الإغلاق والاسترداد معاملة واحدة في دورة حياة الطلب: فشل أحدهما يُبقي النزاع
+   * مفتوحاً والمال مجمّداً.
+   */
   async resolve(adminUserId: string, id: string, input: { outcome: 'customer' | 'vendor'; resolution: string }): Promise<void> {
-    const { count } = await this.prisma.dispute.updateMany({
-      where: { id, status: { in: OPEN } },
-      data: {
-        status: input.outcome === 'customer' ? 'resolved_customer' : 'resolved_vendor',
-        resolution: input.resolution.trim(),
-        resolvedBy: adminUserId,
-        closedAt: new Date(),
-      },
-    });
-    if (count === 0) throw new ConflictError('النزاع مغلق أو غير موجود.');
-    await this.prisma.auditLog.create({
-      data: { actorUserId: adminUserId, actorRole: 'admin', action: 'dispute.resolve', entityType: 'Dispute', entityId: id, afterJson: input },
-    });
+    const resolution = input.resolution.trim();
+    const close = async (db: Pick<PrismaService, 'dispute' | 'auditLog'>) => {
+      const { count } = await db.dispute.updateMany({
+        where: { id, status: { in: OPEN } },
+        data: {
+          status: input.outcome === 'customer' ? 'resolved_customer' : 'resolved_vendor',
+          resolution,
+          resolvedBy: adminUserId,
+          closedAt: new Date(),
+        },
+      });
+      if (count === 0) throw new ConflictError('النزاع مغلق أو غير موجود.');
+      await db.auditLog.create({
+        data: { actorUserId: adminUserId, actorRole: 'admin', action: 'dispute.resolve', entityType: 'Dispute', entityId: id, afterJson: input },
+      });
+    };
+
+    if (input.outcome === 'vendor') return close(this.prisma);
+
+    const d = await this.prisma.dispute.findUnique({ where: { id }, select: { subOrderId: true } });
+    if (!d) throw new ConflictError('النزاع مغلق أو غير موجود.');
+    await this.lifecycle.refundForDispute(d.subOrderId, adminUserId, `حسم النزاع لصالح المشتري: ${resolution}`, close);
   }
 
   private scope(party: Party) {

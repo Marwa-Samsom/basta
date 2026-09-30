@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import '@/styles/screens/admin-operations.css';
 import '@/styles/screens/admin-catalog-system.css';
+import { LogoutButton } from '@/components/logout-button';
 import { DashIdent, DashShell, type DashNavGroup } from '@/components/dash-shell';
 import type { IconName } from '@/components/icons';
 import { Alert, Spinner } from '@/components/ui';
@@ -108,16 +109,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
         groups={groups}
         sideFoot={
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm btn--block"
-            onClick={() => {
-              session.clear();
-              router.replace('/login?next=/admin');
-            }}
-          >
+          <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login?next=/admin">
             خروج
-          </button>
+          </LogoutButton>
         }
       >
         {children}

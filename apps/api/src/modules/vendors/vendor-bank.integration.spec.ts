@@ -262,6 +262,84 @@ describe('VD-20 · الافتراضي والتوثيق والأرشفة', () => 
   });
 });
 
+describe('المتجر المعتمد لا يمرّ من مسار التسجيل، والسحب إلى الموثَّق وحده', () => {
+  /** ملف PDF صغير في multipart — كما ترسله صفحة الوثائق */
+  function upload(url: string, token: string): Promise<Res> {
+    const boundary = `----basta${Date.now()}`;
+    const payload = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="cr.pdf"\r\nContent-Type: application/pdf\r\n\r\n`),
+      Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n'),
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    return app.inject({
+      method: 'POST',
+      url: `/api/v1${url}`,
+      headers: { authorization: `Bearer ${token}`, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload,
+    });
+  }
+
+  it('الاسم والرابط والوثائق والآيبان مثبّتة بعد الاعتماد — ولا يُمسّ شيء', async () => {
+    if (!dbUp) return;
+    const v = await makeVendor('frozen');
+    await prisma.vendorDocument.create({
+      data: { vendorId: v.vendorId, type: 'commercial_register', fileKey: `${v.vendorId}/cr/original`, mimeType: 'application/pdf', sizeBytes: 10, status: 'accepted' },
+    });
+    const before = await prisma.vendor.findUniqueOrThrow({ where: { id: v.vendorId } });
+    const [bankBefore] = await liveAccounts(v.vendorId);
+
+    const rename = await app.inject({
+      method: 'PATCH', url: '/api/v1/vendor/onboarding/shop',
+      headers: { authorization: `Bearer ${v.token}` }, payload: { nameAr: 'اسم آخر تماماً', slug: `stolen-${SUFFIX}` },
+    });
+    expect(rename.statusCode, rename.body).toBe(409);
+    expect(rename.json().message).toMatch(/معتمد/);
+
+    const bank = await call('PUT', '/vendor/onboarding/bank', v.token, { holderName: 'المهاجم', iban: iban(), bankName: 'بنك المهاجم' });
+    expect(bank.statusCode, bank.body).toBe(409);
+
+    const doc = await upload('/vendor/onboarding/documents/commercial_register', v.token);
+    expect(doc.statusCode, doc.body).toBe(409);
+
+    const after = await prisma.vendor.findUniqueOrThrow({ where: { id: v.vendorId } });
+    expect(after.nameAr).toBe(before.nameAr);
+    expect(after.slug).toBe(before.slug);
+    const accounts = await liveAccounts(v.vendorId);
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0]!.iban).toBe(bankBefore!.iban);
+    expect(accounts[0]!.verifiedAt).not.toBeNull();
+    const docs = await prisma.vendorDocument.findMany({ where: { vendorId: v.vendorId } });
+    expect(docs.map((d) => [d.fileKey, d.status])).toEqual([[`${v.vendorId}/cr/original`, 'accepted']]);
+
+    // الوصف والسياسات محتوى حيّ — تبقى متاحة
+    const profile = await app.inject({
+      method: 'PATCH', url: '/api/v1/vendor/onboarding/profile',
+      headers: { authorization: `Bearer ${v.token}` }, payload: { descriptionAr: 'وصف جديد للمتجر' },
+    });
+    expect(profile.statusCode, profile.body).toBe(200);
+  });
+
+  it('السحب: الافتراضي غير الموثَّق يُرفض، والمتجر الموقوف لا يسحب', async () => {
+    if (!dbUp) return;
+    const v = await makeVendor('payout');
+    const payout = () => call('POST', '/vendor/finance/payouts', v.token, { currency: 'SAR', amountMinorUnits: '100' });
+
+    // آيبان كُتب فوق الافتراضي من المسار القديم: بقي افتراضياً بلا توثيق
+    await prisma.vendorBankAccount.updateMany({ where: { vendorId: v.vendorId, isDefault: true }, data: { iban: iban(), verifiedAt: null } });
+    const unverified = await payout();
+    expect(unverified.statusCode, unverified.body).toBe(409);
+    expect(unverified.json().message).toMatch(/لم يوثّقه/);
+
+    await prisma.vendorBankAccount.updateMany({ where: { vendorId: v.vendorId, isDefault: true }, data: { verifiedAt: new Date() } });
+    await prisma.vendor.update({ where: { id: v.vendorId }, data: { status: 'suspended' } });
+    const suspended = await payout();
+    expect(suspended.statusCode, suspended.body).toBe(409);
+    expect(suspended.json().message).toMatch(/موقوف/);
+
+    expect(await prisma.payoutRequest.count({ where: { vendorId: v.vendorId } })).toBe(0);
+  });
+});
+
 describe('VD-20 · تفضيلات الإشعار', () => {
   it('الفئة المطفأة تصل داخل الموقع وحده، والمشغَّلة بكل قنواتها', async () => {
     if (!dbUp) return;

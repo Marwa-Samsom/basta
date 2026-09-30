@@ -1,13 +1,21 @@
 name: basta
 
+# خدمات التطوير المحلية.
+#
+# كل منفذ مربوط بـ 127.0.0.1: كانت على 0.0.0.0 فيصل إليها كل من على الشبكة نفسها
+# (مقهى، مكتب، شبكة مشتركة) — قاعدة البيانات بكلمة مرور مكتوبة في هذا الملف، و Redis
+# بلا كلمة مرور، ولوحة MinIO بـ minioadmin. وكلمات المرور من .env لا من هنا: غيابها
+# يوقف `docker compose up` برسالته بدل أن تعمل الخدمة بكلمة يعرفها كل من قرأ المستودع.
+# القيم في .env.example (ولّد قيمك: openssl rand -base64 24).
+
 services:
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: basta
-      POSTGRES_PASSWORD: basta_dev_pw
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?اضبط POSTGRES_PASSWORD في .env}
       POSTGRES_DB: basta
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:5432:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -18,8 +26,10 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
-    ports: ["6379:6379"]
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?اضبط REDIS_PASSWORD في .env}
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?اضبط REDIS_PASSWORD في .env}
+    ports: ["127.0.0.1:6379:6379"]
     volumes:
       - redisdata:/data
     healthcheck:
@@ -31,9 +41,9 @@ services:
   meilisearch:
     image: getmeili/meilisearch:v1.11
     environment:
-      MEILI_MASTER_KEY: meili_dev_master_key_change_me
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?اضبط MEILI_MASTER_KEY في .env}
       MEILI_ENV: development
-    ports: ["7700:7700"]
+    ports: ["127.0.0.1:7700:7700"]
     volumes:
       - meilidata:/meili_data
 
@@ -41,15 +51,15 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports: ["9000:9000", "9001:9001"]
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-basta}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?اضبط MINIO_ROOT_PASSWORD في .env}
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
     volumes:
       - miniodata:/data
 
   mailpit:
     image: axllent/mailpit:latest
-    ports: ["1025:1025", "8025:8025"]
+    ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
 
 volumes:
   pgdata:

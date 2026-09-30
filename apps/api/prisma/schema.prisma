@@ -17,8 +17,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  /// التطبيق: مستخدم تشغيل لا يملك الجداول — لا يغيّر المخطط ولا يعطّل الحرّاس،
+  /// ولا UPDATE/DELETE له على جداول الإضافة فقط (ADR-005). يهيّئه db:app-role
+  url       = env("DATABASE_URL")
+  /// المهاجرات وحدها: مالك المخطط. لا تُعطى للتطبيق أبداً
+  directUrl = env("DATABASE_MIGRATE_URL")
 }
 
 // ============================================================================
@@ -46,12 +50,16 @@ model User {
   fullName        String
   locale          String     @default("ar")
   status          UserStatus @default(active)
+  /// مالك المنصة — واحد على الأكثر، يُعيَّن من سكربت المدير الأول، ولا يغيّره مدير آخر
+  isPlatformOwner Boolean    @default(false)
   emailVerifiedAt DateTime?  @db.Timestamptz
   phoneVerifiedAt DateTime?  @db.Timestamptz
 
   // 2FA إلزامي على الإدارة ولا يمكن تعطيله — SRS A-07
   totpSecretEnc String?
   totpEnabledAt DateTime? @db.Timestamptz
+  /// سرّ تهيئة لم تُؤكَّد بعد — لا يسري ولا يمسّ `totpSecretEnc` قبل رمز صحيح منه
+  totpPendingSecretEnc String?
   /// آخر خطوة TOTP استُعملت — يُرفض ما لا يتجاوزها (مقاومة إعادة التشغيل)
   totpLastStep  Int?
 
@@ -127,6 +135,8 @@ model RefreshToken {
   familyId  String    @db.Uuid
   expiresAt DateTime  @db.Timestamptz
   revokedAt DateTime? @db.Timestamptz
+  /// من حلّ محلّه بالتدوير — يميّز «دُوِّر» عن «أُبطل»، ويعرّف جهاز الخلف لمهلة التزامن
+  replacedById String? @db.Uuid
   userAgent String?
   ip        String?
   createdAt DateTime  @default(now()) @db.Timestamptz
@@ -453,6 +463,8 @@ model Product {
   descriptionEn String?
   status        ProductStatus @default(draft)
   rejectReason  String?
+  /// يزيد مع كل تعديل محتوى — الاعتماد يشترط النسخة التي راجعها المدير
+  contentRevision Int         @default(0)
   hasVariants   Boolean       @default(false)
   ratingAvg     Decimal       @default(0) @db.Decimal(3, 2)
   ratingCount   Int           @default(0)
@@ -662,6 +674,7 @@ model Cart {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([createdAt])
   @@map("carts")
 }
 
@@ -783,6 +796,7 @@ model Order {
 
   @@index([customerUserId, placedAt(sort: Desc)])
   @@index([status])
+  @@index([paidAt])
   @@map("orders")
 }
 
@@ -819,6 +833,8 @@ model SubOrder {
   deliveredAt   DateTime? @db.Timestamptz
   /// ADR-007: deliveredAt + settings.hold_period_days
   holdReleaseAt DateTime? @db.Timestamptz
+  /// حُسم تحرير المعلّق — نُقل، أو لم يبقَ ما يُنقل (مسترَدّ كله). لا يعود إلى طابور التحرير
+  holdSettledAt DateTime? @db.Timestamptz
   completedAt   DateTime? @db.Timestamptz
   canceledAt    DateTime? @db.Timestamptz
   cancelReason  String?
@@ -839,6 +855,7 @@ model SubOrder {
   @@index([vendorId, status, placedAt(sort: Desc)])
   // فهرس جزئي في المهاجرة لمهمة التحرير اليومية
   @@index([holdReleaseAt])
+  @@index([placedAt])
   @@map("sub_orders")
 }
 
@@ -958,6 +975,7 @@ model Shipment {
   subOrder SubOrder        @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
   events   ShipmentEvent[]
 
+  @@index([trackingNumber])
   @@map("shipments")
 }
 
@@ -1084,6 +1102,10 @@ model Payment {
   capturedAt       DateTime?     @db.Timestamptz
   failureCode      String?
   failureMessage   String?
+  /// نجاح وصل بعد أن أُغلق الطلب فاشلاً أو ملغى: حجزٌ للردّ يأخذه مسار واحد
+  lateCaptureAt    DateTime?     @db.Timestamptz
+  /// معرّف ردّ ذلك النجاح عند المزوّد — وجوده يعني أن المال عاد لصاحبه
+  lateRefundId     String?
   createdAt        DateTime      @default(now()) @db.Timestamptz
 
   order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1120,6 +1142,8 @@ model Refund {
   amountMinorUnits       BigInt
   reason                 String
   status                 String   @default("pending")
+  /// متى حُجز للتنفيذ (processing) — ما طال عليه بلا نتيجة سقط منفّذه فيُعاد
+  claimedAt              DateTime? @db.Timestamptz
   providerRefundId       String?
   requestedBy            String?  @db.Uuid
   approvedBy             String?  @db.Uuid
@@ -1132,6 +1156,7 @@ model Refund {
   payment  Payment  @relation(fields: [paymentId], references: [id])
 
   @@index([subOrderId])
+  @@index([createdAt])
   @@map("refunds")
 }
 
@@ -1230,6 +1255,7 @@ model LedgerEntry {
   @@index([vendorId, currency, createdAt(sort: Desc)])
   @@index([walletId, bucket])
   @@index([refType, refId])
+  @@index([createdAt])
   @@map("ledger_entries")
 }
 
@@ -1254,6 +1280,7 @@ model PlatformLedgerEntry {
 
   @@index([subOrderId])
   @@index([currency, createdAt])
+  @@index([createdAt])
   @@map("platform_ledger_entries")
 }
 
@@ -1289,6 +1316,7 @@ model PayoutRequest {
 
   @@index([vendorId, status])
   @@index([status, requestedAt])
+  @@index([paidAt])
   @@map("payout_requests")
 }
 

@@ -337,3 +337,70 @@ describe('الشحن', () => {
     if (!q.available) expect(q.reason).toMatch(/لا يشحن/);
   });
 });
+
+describe('سقف خصم النسبة — للطلب كله، بعملة الكوبون', () => {
+  const percent = (cap: bigint, currency: string, digits: number): CouponInput => ({
+    code: 'P20',
+    scope: 'platform',
+    vendorId: null,
+    type: 'percent',
+    valueBps: 2000,
+    valueMinor: null,
+    maxDiscountMinor: cap,
+    minOrderMinor: null,
+    currency,
+    currencyDigits: digits,
+    fundedBy: 'platform',
+  });
+  const tax = { rateBps: 0, inclusive: true };
+
+  it('ثلاثة بائعين لا يأخذون ثلاثة أضعاف السقف', () => {
+    // 20% من 200 ريال لكلٍّ = 40، والسقف 50 ريالاً — كان كل بائع يأخذ 40 فيصير الخصم 120
+    const vendors = new Map([['a', vendor('a', 'SAR')], ['b', vendor('b', 'SAR')], ['c', vendor('c', 'SAR')]]);
+    const shipping = new Map([['a', ship(0n)], ['b', ship(0n)], ['c', ship(0n)]]);
+    const cart = priceCart({
+      lines: [line('a', 20_000n, 1), line('b', 20_000n, 1), line('c', 20_000n, 1)],
+      vendors,
+      shipping,
+      tax,
+      fx: { ...FX, orderCurrency: 'SAR', orderDigits: 2 },
+      coupon: percent(5_000n, 'SAR', 2),
+    });
+    expect(cart.totals.discount).toBe(5_000n);
+    expect(cart.coupon?.discountMinor).toBe(5_000n);
+    // موزَّع بنسبة الخصوم، ومجموع الحصص بالضبط
+    expect(cart.subOrders.map((s) => s.vendor.discount).reduce((a, b) => a + b, 0n)).toBe(5_000n);
+  });
+
+  it('عملة البائع تخالف عملة الكوبون: السقف يسري محوَّلاً ولا يُتخطّى', () => {
+    // سقف 50 ريالاً، والبائعان بالدينار والدولار، والدفع بالدولار — كان الخصم بلا سقف
+    const vendors = new Map([['j', vendor('j', 'JOD')], ['u', vendor('u', 'USD')]]);
+    const shipping = new Map([['j', ship(0n)], ['u', ship(0n)]]);
+    const cart = priceCart({
+      lines: [line('j', 100_000n, 1), line('u', 30_000n, 1)], // مئة دينار وثلاثمئة دولار
+      vendors,
+      shipping,
+      tax,
+      fx: FX,
+      coupon: percent(5_000n, 'SAR', 2),
+    });
+    // 50 ريالاً بالدولار بسعر الصرف الحقيقي (بلا هامش)
+    const capUsd = BigInt(Math.round(5_000 * (1 / 3.75)));
+    expect(cart.totals.discount).toBeLessThanOrEqual(capUsd);
+    expect(cart.totals.discount).toBeGreaterThan(capUsd - 5n);
+    expect(cart.subOrders.every((s) => s.vendor.discount > 0n)).toBe(true);
+  });
+
+  it('خصم دون السقف لا يمسّه التوزيع', () => {
+    const vendors = new Map([['a', vendor('a', 'SAR')], ['b', vendor('b', 'SAR')]]);
+    const cart = priceCart({
+      lines: [line('a', 10_000n, 1), line('b', 10_000n, 1)],
+      vendors,
+      shipping: new Map([['a', ship(0n)], ['b', ship(0n)]]),
+      tax,
+      fx: { ...FX, orderCurrency: 'SAR', orderDigits: 2 },
+      coupon: percent(100_000n, 'SAR', 2),
+    });
+    expect(cart.subOrders.map((s) => s.vendor.discount)).toEqual([2_000n, 2_000n]);
+  });
+});

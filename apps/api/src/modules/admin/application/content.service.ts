@@ -8,6 +8,21 @@ import { ConflictError, InvalidInputError, NotFoundError } from '../../../common
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { UPLOADS_ROOT, UPLOADS_URL_PREFIX } from '../../catalog/public';
 
+/**
+ * مسار داخل الموقع لا موقع آخر. `^/` وحدها تقبل `//evil.com` — رابط لموقع آخر
+ * بلا بروتوكول. والمتصفح يحذف التاب وسطر الجديد ويقرأ `\` كـ `/`، فيُرفض كل محرف
+ * تحكّم أو مسافة وكل `\`، ثم يجب أن يبقى المسار المحلَّل على الأصل نفسه.
+ * نسخة الواجهة: internalPath في apps/web/src/lib/safe-path.ts — القاعدة نفسها.
+ */
+export function isInternalPath(raw: string): boolean {
+  if (raw[0] !== '/' || /[\x00-\x20\x7f\\]/.test(raw)) return false;
+  try {
+    return new URL(raw, 'https://basta.invalid').origin === 'https://basta.invalid';
+  } catch {
+    return false;
+  }
+}
+
 export const BANNER_PLACEMENTS = ['home_hero', 'home_middle', 'category_top'] as const;
 const FEATURED_KEY = 'home_featured_product_ids';
 
@@ -170,7 +185,7 @@ export class ContentService {
   ) {
     if (!(BANNER_PLACEMENTS as readonly string[]).includes(input.placement)) throw new InvalidInputError('موضع غير معروف.');
     if (!/^banners\/[0-9a-f-]{36}$/.test(input.imageKey)) throw new InvalidInputError('ارفع صورة البانر أولاً.');
-    if (input.linkUrl && !/^\/[^\s]*$/.test(input.linkUrl)) throw new InvalidInputError('الرابط مسار داخل الموقع يبدأ بـ /.');
+    if (input.linkUrl && !isInternalPath(input.linkUrl)) throw new InvalidInputError('الرابط مسار داخل الموقع يبدأ بـ / (لا // ولا \\ ولا مسافات).');
     const data = {
       placement: input.placement,
       imageKey: input.imageKey,

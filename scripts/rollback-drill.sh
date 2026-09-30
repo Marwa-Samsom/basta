@@ -15,12 +15,15 @@
 #   bash scripts/rollback-drill.sh
 # =============================================================================
 set -euo pipefail
+# النسخة فيها القاعدة كلها بلا تشفير: ملفّاتها ومجلّدها لصاحبها وحده
+umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PGBIN="${PGBIN:-$ROOT/.localdb/pgsql/bin}"
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/.localdb/backups}"
 : "${PGHOST:=localhost}" "${PGPORT:=5432}" "${PGUSER:=basta}"
-export PGPASSWORD="${PGPASSWORD:-basta_dev_pw}"
+# shellcheck source=lib/pg-password.sh
+source "$ROOT/scripts/lib/pg-password.sh"
 STAGING="basta_staging_drill"
 PSQL=("$PGBIN/psql" -h "$PGHOST" -p "$PGPORT" -U "$PGUSER")
 q() { "${PSQL[@]}" -d "$STAGING" -tAc "$1" | tr -d '\r'; }

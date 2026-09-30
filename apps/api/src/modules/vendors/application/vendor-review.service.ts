@@ -8,6 +8,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor } from '../../../common/security/actor';
 import { AuditService } from '../../identity/public';
 import { NotificationsService } from '../../notifications/public';
+import { VendorEvents } from './vendor-events';
 import {
   assertTransition,
   DOCUMENT_LABELS,
@@ -42,6 +43,7 @@ export class VendorReviewService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly events: VendorEvents,
   ) {}
 
   async queue(query: { status?: string; limit?: number; offset?: number } = {}): Promise<{
@@ -146,6 +148,8 @@ export class VendorReviewService {
         status: 'approved',
         approvedAt: new Date(),
         approvedBy: actor.userId,
+        // الاعتماد يثبّت العملة (ADR-013): بعده تُسعَّر المنتجات والشحن وتُفتح المحفظة بها
+        settlementCurrencyLockedAt: vendor.settlementCurrencyLockedAt ?? new Date(),
         rejectionReason: null,
         rejectedAt: null,
       },
@@ -174,6 +178,7 @@ export class VendorReviewService {
       entityType: 'Vendor',
       entityId: vendorId,
     });
+    await this.events.visibilityChanged(vendorId);
     await this.notifications.enqueueVendor({ code: 'vendor_approved', vendorId, vars: { link: '/vendor' } });
   }
 
@@ -239,6 +244,7 @@ export class VendorReviewService {
       entityId: vendorId,
       after: { reason: trimmed },
     });
+    await this.events.visibilityChanged(vendorId);
   }
 
   async reinstate(actor: Actor, vendorId: string): Promise<void> {
@@ -263,6 +269,7 @@ export class VendorReviewService {
       entityType: 'Vendor',
       entityId: vendorId,
     });
+    await this.events.visibilityChanged(vendorId);
   }
 
   private async require(vendorId: string) {

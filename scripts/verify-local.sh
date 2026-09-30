@@ -18,7 +18,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 PGBIN="${PGBIN:-$ROOT/.localdb/pgsql/bin}"
-export PGPASSWORD="${PGPASSWORD:-basta_dev_pw}"
+# shellcheck source=lib/pg-password.sh
+source "$ROOT/scripts/lib/pg-password.sh"
 KEEP_DB=false
 [[ "${1:-}" == "--keep" ]] && KEEP_DB=true
 

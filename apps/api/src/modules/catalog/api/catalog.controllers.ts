@@ -41,6 +41,7 @@ import {
   ListProductsQueryDto,
   MoveCategoryDto,
   RejectProductDto,
+  ApproveProductDto,
   AttributeValueCreateDto,
   UpdateCategoryDto,
   UpdateProductDto,
@@ -200,8 +201,8 @@ export class AdminCatalogController {
   @Post('products/:id/approve')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'اعتماد منتج قيد المراجعة — يصير منشوراً (Q-15)' })
-  async approveProduct(@Param('id', uuidParam) id: string): Promise<void> {
-    await this.products.approve(id);
+  async approveProduct(@Param('id', uuidParam) id: string, @Body() dto: ApproveProductDto): Promise<void> {
+    await this.products.approve(id, dto.contentRevision);
   }
 
   @Post('products/:id/reject')

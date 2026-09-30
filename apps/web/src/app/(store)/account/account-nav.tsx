@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Icon, type IconName } from '@/components/icons';
+import { LogoutButton } from '@/components/logout-button';
 import { api, session } from '@/lib/api';
 import { NOTIFICATIONS_CHANGED } from '@/lib/addresses';
 
@@ -87,6 +88,14 @@ export function AccountNav() {
             </li>
           );
         })}
+        {signedIn ? (
+          <li>
+            <LogoutButton className="aa-nav__link aa-nav__link--out" next="/">
+              <Icon name="lock" size={17} />
+              <span className="aa-nav__label">خروج</span>
+            </LogoutButton>
+          </li>
+        ) : null}
       </ul>
     </nav>
   );

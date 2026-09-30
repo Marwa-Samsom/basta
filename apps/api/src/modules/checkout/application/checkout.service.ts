@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   ConflictError,
+  InsufficientStockError,
   InvalidInputError,
   NotFoundError,
   ReservationExpiredError,
@@ -14,7 +15,8 @@ import { format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type ChargeOutcome, type PaymentProvider } from '../../payments/public';
 import { PricingService } from '../../pricing/public';
-import { orderNumber, toSnapshot, type Snapshot } from '../domain/snapshot';
+import { guestOrderKey, orderNumber, toSnapshot, type Snapshot } from '../domain/snapshot';
+import { loadEnv } from '../../../common/config/env';
 
 export interface CheckoutAddress {
   readonly recipientName: string;
@@ -34,6 +36,8 @@ export interface PlaceOrderInput {
   readonly idempotencyKey: string;
   readonly address: CheckoutAddress;
   readonly paymentToken: string;
+  /** ما رآه المشتري تحت «ادفع» — لا يُخصم غيره */
+  readonly expected: { readonly total: bigint; readonly currency: string };
   readonly userId: string | null;
   readonly guestEmail?: string | null;
   readonly guestPhone?: string | null;
@@ -55,6 +59,8 @@ export interface OrderResult {
   readonly subOrderCount: number;
   readonly actionUrl?: string;
   readonly failure?: { code: string; message: string };
+  /** لطلب الضيف وحده: يُرسل في x-order-key لقراءة حالته (guestOrderKey) */
+  readonly accessKey?: string;
 }
 
 /**
@@ -118,6 +124,19 @@ export class CheckoutService {
     if (quote.blockers.length > 0) {
       throw new ConflictError('لا يمكن إتمام الطلب بعد.', { blockers: quote.blockers });
     }
+    /**
+     * التسعير يُعاد هنا بعنوان الطلب وسلّته الآن، وقد يختلف عمّا رآه المشتري:
+     * غيّر العنوان بعد «احسب الشحن»، أو تغيّر سعر أو سعر شحن أو كوبون، أو
+     * عدّل السلة من تبويب آخر. خصم المبلغ الجديد بصمت خصمٌ لما لم يوافق عليه —
+     * فيُرفض قبل أي حجز أو مال، ومعه الإجمالي الصحيح ليراه ويؤكّده.
+     */
+    if (quote.totals.total !== input.expected.total || cart.currency !== input.expected.currency) {
+      throw new ConflictError('تغيّر الإجمالي منذ حسبته. راجع المبلغ الجديد ثم اضغط «ادفع».', {
+        reason: 'TOTAL_CHANGED',
+        total: quote.totals.total.toString(),
+        currency: cart.currency,
+      });
+    }
 
     // 1 · الحجز — يرمي InsufficientStockError باسم المنتج قبل أي مال
     const lines = quote.subOrders.flatMap((s) => s.lines);
@@ -130,36 +149,45 @@ export class CheckoutService {
     // 2 · الطلب الأب بلقطته
     let order: { id: string; orderNumber: string };
     try {
-      order = await this.prisma.order.create({
-        data: {
-          orderNumber: orderNumber(new Date()),
-          customerUserId: input.userId,
-          guestEmail: input.userId ? null : (input.guestEmail ?? null),
-          guestPhone: input.userId ? null : (input.guestPhone ?? null),
-          idempotencyKey: input.idempotencyKey,
-          currency: quote.currency,
-          itemsSubtotalMinorUnits: quote.totals.items,
-          shippingTotalMinorUnits: quote.totals.shipping,
-          discountTotalMinorUnits: quote.totals.discount,
-          taxTotalMinorUnits: quote.totals.tax,
-          grandTotalMinorUnits: quote.totals.total,
-          status: 'pending_payment',
-          shippingAddressSnapshot: { ...input.address } as Prisma.InputJsonValue,
-          customerNote: input.note?.trim() || null,
-          pricingSnapshot: toSnapshot(quote) as unknown as Prisma.InputJsonValue,
-          reservationIds,
-          payment: {
-            create: {
-              provider: this.provider.name,
-              amountMinorUnits: quote.totals.total,
-              currency: quote.currency,
-              method: 'card',
-              status: 'pending',
+      // الطلب وحجز الكوبون معاً: كوبون استُنفد أو تجاوز حدّ صاحبه يُسقط الطلب قبل أي مال
+      order = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            orderNumber: orderNumber(new Date()),
+            customerUserId: input.userId,
+            guestEmail: input.userId ? null : (input.guestEmail ?? null),
+            guestPhone: input.userId ? null : (input.guestPhone ?? null),
+            idempotencyKey: input.idempotencyKey,
+            currency: quote.currency,
+            itemsSubtotalMinorUnits: quote.totals.items,
+            shippingTotalMinorUnits: quote.totals.shipping,
+            discountTotalMinorUnits: quote.totals.discount,
+            taxTotalMinorUnits: quote.totals.tax,
+            grandTotalMinorUnits: quote.totals.total,
+            status: 'pending_payment',
+            shippingAddressSnapshot: { ...input.address } as Prisma.InputJsonValue,
+            customerNote: input.note?.trim() || null,
+            pricingSnapshot: toSnapshot(quote) as unknown as Prisma.InputJsonValue,
+            reservationIds,
+            payment: {
+              create: {
+                provider: this.provider.name,
+                amountMinorUnits: quote.totals.total,
+                currency: quote.currency,
+                method: 'card',
+                status: 'pending',
+              },
             },
           },
-        },
-        select: { id: true, orderNumber: true },
-      });
+          select: { id: true, orderNumber: true },
+        });
+        if (quote.coupon) {
+          await this.reserveCoupon(tx, quote.coupon.code, created.id, input.userId ?? null, quote.coupon.discountMinor);
+        }
+        return created;
+        // انتظار قفل الكوبون تحت ضغط يتجاوز مهلة Prisma الافتراضية (2ث للاتصال و5ث للمعاملة)
+        // فيسقط الطلب بخطأ داخلي — المهل نفسها التي تعطيها وحدة المخزون لأقفالها
+      }, { maxWait: 10_000, timeout: 20_000 });
     } catch (err) {
       // لا طلب بلا صاحب ولا حجز بلا طلب: فشل الإنشاء يحرّر الحجز فوراً
       await this.inventory.release(reservationIds);
@@ -208,8 +236,12 @@ export class CheckoutService {
 
     switch (outcome.status) {
       case 'captured':
-        await this.markPaid(orderId);
-        if (cartId) await this.carts.clear(cartId).catch(() => undefined);
+        if (await this.markPaid(orderId)) {
+          if (cartId) await this.carts.clear(cartId).catch(() => undefined);
+          return;
+        }
+        // لم يُقسَّم: إمّا دُفع من قبل (إشعار مكرّر) وإمّا أُغلق قبل أن يصل المال
+        await this.refundLateCapture(orderId, outcome.intentId);
         return;
       case 'failed':
         await this.markFailed(orderId, outcome.code, outcome.message);
@@ -234,189 +266,346 @@ export class CheckoutService {
    */
   async markPaid(orderId: string): Promise<boolean> {
     try {
-      return await this.prisma.$transaction(
-        async (tx) => {
-          const { count } = await tx.order.updateMany({
-            where: { id: orderId, status: 'pending_payment' },
-            data: { status: 'processing', paidAt: new Date() },
-          });
-          if (count === 0) return false;
-
-          const order = await tx.order.findUniqueOrThrow({
-            where: { id: orderId },
-            select: {
-              id: true,
-              orderNumber: true,
-              customerUserId: true,
-              reservationIds: true,
-              pricingSnapshot: true,
-            },
-          });
-
-          await this.inventory.commit(order.reservationIds, { orderId }, tx);
-
-          const snapshot = order.pricingSnapshot as unknown as Snapshot;
-          const posted: { id: string; vendorId: string }[] = [];
-          let n = 0;
-          for (const so of snapshot.subOrders) {
-            n++;
-            const sub = await tx.subOrder.create({
-              data: {
-                orderId,
-                vendorId: so.vendorId,
-                subOrderNumber: `${order.orderNumber}-${n}`,
-                settlementCurrency: so.currency,
-                fxRateSnapshot: so.fxRateSnapshot,
-                itemsSubtotalMinorUnits: BigInt(so.vendor.items),
-                shippingMinorUnits: BigInt(so.vendor.shipping),
-                discountMinorUnits: BigInt(so.vendor.discount),
-                taxMinorUnits: BigInt(so.vendor.tax),
-                totalMinorUnits: BigInt(so.vendor.total),
-                commissionRateBpsSnapshot: so.lines[0]?.commissionBps ?? 0,
-                commissionMinorUnits: BigInt(so.commissionMinor),
-                vendorNetMinorUnits: BigInt(so.vendorNetMinor),
-                chargeTotalMinorUnits: BigInt(so.charge.total),
-                status: 'awaiting_vendor',
-              },
-              select: { id: true },
-            });
-
-            await tx.orderItem.createMany({
-              data: so.lines.map((l) => ({
-                subOrderId: sub.id,
-                orderId,
-                vendorId: so.vendorId,
-                variantId: l.variantId,
-                productId: l.productId,
-                productNameSnapshotAr: l.nameAr,
-                variantLabelSnapshot: l.variantLabel,
-                skuSnapshot: l.sku,
-                imageKeySnapshot: l.imageKey,
-                unitPriceMinorUnits: BigInt(l.unitPriceMinor),
-                qty: l.qty,
-                lineSubtotalMinorUnits: BigInt(l.lineSubtotal),
-                lineDiscountMinorUnits: BigInt(l.lineDiscount),
-                lineTaxMinorUnits: BigInt(l.lineTax),
-                lineTotalMinorUnits: BigInt(l.lineTotal),
-                commissionBpsSnapshot: l.commissionBps,
-                commissionMinorUnits: BigInt(l.commissionMinor),
-              })),
-            });
-
-            await tx.subOrderStatusHistory.create({
-              data: { subOrderId: sub.id, fromStatus: null, toStatus: 'awaiting_vendor', reason: 'نجح الدفع' },
-            });
-            posted.push({ id: sub.id, vendorId: so.vendorId });
-          }
-
-          // قيود البيع في معاملة التقسيم نفسها (ADR-005): فرعي بلا قيد لا يوجد.
-          // بترتيب البائع لتُقفل المحافظ بترتيب ثابت — لا تعطّل متبادل بين طلبين
-          for (const p of [...posted].sort((a, b) => a.vendorId.localeCompare(b.vendorId))) {
-            await this.ledger.postSale(tx, p.id);
-          }
-
-          // الإشعارات في الصندوق الصادر ضمن المعاملة نفسها — تُرسل بعد الالتزام
-          const paid = await tx.order.findUniqueOrThrow({
-            where: { id: orderId },
-            select: { grandTotalMinorUnits: true, currency: true, customer: { select: { fullName: true } } },
-          });
-          const deadline = await tx.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } });
-          await this.notifications.enqueue(
-            {
-              code: 'order_placed',
-              userId: order.customerUserId,
-              vars: {
-                name: (paid.customer?.fullName ?? 'عميلنا').split(/s+/)[0]!,
-                order_number: order.orderNumber,
-                amount: formatMoney(money(paid.grandTotalMinorUnits, paid.currency)),
-                store_count: String(snapshot.subOrders.length),
-                link: `/account/orders/${order.orderNumber}`,
-              },
-            },
-            tx,
-          );
-          for (const [i, so] of snapshot.subOrders.entries()) {
-            await this.notifications.enqueueVendor(
-              {
-                code: 'vendor_new_order',
-                vendorId: so.vendorId,
-                vars: {
-                  order_number: `${order.orderNumber}-${i + 1}`,
-                  amount: formatMoney(money(BigInt(so.vendor.total), so.currency)),
-                  deadline_hours: String(Number(deadline?.valueJson) || 48),
-                  link: '/vendor/orders',
-                },
-              },
-              tx,
-            );
-          }
-
-          await tx.payment.update({
-            where: { orderId },
-            data: { status: 'captured', authorizedAt: new Date(), capturedAt: new Date() },
-          });
-
-          if (snapshot.coupon) {
-            const coupon = await tx.coupon.findUnique({ where: { code: snapshot.coupon.code } });
-            if (coupon) {
-              await tx.couponRedemption.create({
-                data: {
-                  couponId: coupon.id,
-                  orderId,
-                  userId: order.customerUserId,
-                  discountMinorUnits: BigInt(snapshot.coupon.discountMinor),
-                },
-              });
-              await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
-            }
-          }
-          return true;
-        },
-        { timeout: 20_000 },
-      );
+      return await this.prisma.$transaction((tx) => this.split(tx, orderId), { timeout: 20_000 });
     } catch (err) {
       if (err instanceof ReservationExpiredError) return this.paidAfterExpiry(orderId);
       throw err;
     }
   }
 
+  /** جسم التقسيم داخل معاملة المستدعي — markPaid، أو إعادة الحجز بعد دفع متأخر (paidAfterExpiry) */
+  private async split(tx: Prisma.TransactionClient, orderId: string): Promise<boolean> {
+    const { count } = await tx.order.updateMany({
+      where: { id: orderId, status: 'pending_payment' },
+      data: { status: 'processing', paidAt: new Date() },
+    });
+    if (count === 0) return false;
+
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: {
+        id: true,
+        orderNumber: true,
+        customerUserId: true,
+        reservationIds: true,
+        pricingSnapshot: true,
+      },
+    });
+
+    await this.inventory.commit(order.reservationIds, { orderId }, tx);
+
+    const snapshot = order.pricingSnapshot as unknown as Snapshot;
+    const posted: { id: string; vendorId: string }[] = [];
+    let n = 0;
+    for (const so of snapshot.subOrders) {
+      n++;
+      const sub = await tx.subOrder.create({
+        data: {
+          orderId,
+          vendorId: so.vendorId,
+          subOrderNumber: `${order.orderNumber}-${n}`,
+          settlementCurrency: so.currency,
+          fxRateSnapshot: so.fxRateSnapshot,
+          itemsSubtotalMinorUnits: BigInt(so.vendor.items),
+          shippingMinorUnits: BigInt(so.vendor.shipping),
+          discountMinorUnits: BigInt(so.vendor.discount),
+          taxMinorUnits: BigInt(so.vendor.tax),
+          totalMinorUnits: BigInt(so.vendor.total),
+          commissionRateBpsSnapshot: so.lines[0]?.commissionBps ?? 0,
+          commissionMinorUnits: BigInt(so.commissionMinor),
+          vendorNetMinorUnits: BigInt(so.vendorNetMinor),
+          chargeTotalMinorUnits: BigInt(so.charge.total),
+          status: 'awaiting_vendor',
+        },
+        select: { id: true },
+      });
+
+      await tx.orderItem.createMany({
+        data: so.lines.map((l) => ({
+          subOrderId: sub.id,
+          orderId,
+          vendorId: so.vendorId,
+          variantId: l.variantId,
+          productId: l.productId,
+          productNameSnapshotAr: l.nameAr,
+          variantLabelSnapshot: l.variantLabel,
+          skuSnapshot: l.sku,
+          imageKeySnapshot: l.imageKey,
+          unitPriceMinorUnits: BigInt(l.unitPriceMinor),
+          qty: l.qty,
+          lineSubtotalMinorUnits: BigInt(l.lineSubtotal),
+          lineDiscountMinorUnits: BigInt(l.lineDiscount),
+          lineTaxMinorUnits: BigInt(l.lineTax),
+          lineTotalMinorUnits: BigInt(l.lineTotal),
+          commissionBpsSnapshot: l.commissionBps,
+          commissionMinorUnits: BigInt(l.commissionMinor),
+        })),
+      });
+
+      await tx.subOrderStatusHistory.create({
+        data: { subOrderId: sub.id, fromStatus: null, toStatus: 'awaiting_vendor', reason: 'نجح الدفع' },
+      });
+      posted.push({ id: sub.id, vendorId: so.vendorId });
+    }
+
+    // قيود البيع في معاملة التقسيم نفسها (ADR-005): فرعي بلا قيد لا يوجد.
+    // بترتيب البائع لتُقفل المحافظ بترتيب ثابت — لا تعطّل متبادل بين طلبين
+    for (const p of [...posted].sort((a, b) => a.vendorId.localeCompare(b.vendorId))) {
+      await this.ledger.postSale(tx, p.id);
+    }
+
+    // الإشعارات في الصندوق الصادر ضمن المعاملة نفسها — تُرسل بعد الالتزام
+    const paid = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { grandTotalMinorUnits: true, currency: true, customer: { select: { fullName: true } } },
+    });
+    const deadline = await tx.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } });
+    await this.notifications.enqueue(
+      {
+        code: 'order_placed',
+        userId: order.customerUserId,
+        vars: {
+          name: (paid.customer?.fullName ?? 'عميلنا').split(/s+/)[0]!,
+          order_number: order.orderNumber,
+          amount: formatMoney(money(paid.grandTotalMinorUnits, paid.currency)),
+          store_count: String(snapshot.subOrders.length),
+          link: `/account/orders/${order.orderNumber}`,
+        },
+      },
+      tx,
+    );
+    for (const [i, so] of snapshot.subOrders.entries()) {
+      await this.notifications.enqueueVendor(
+        {
+          code: 'vendor_new_order',
+          vendorId: so.vendorId,
+          vars: {
+            order_number: `${order.orderNumber}-${i + 1}`,
+            amount: formatMoney(money(BigInt(so.vendor.total), so.currency)),
+            deadline_hours: String(Number(deadline?.valueJson) || 48),
+            link: '/vendor/orders',
+          },
+        },
+        tx,
+      );
+    }
+
+    await tx.payment.update({
+      where: { orderId },
+      data: { status: 'captured', authorizedAt: new Date(), capturedAt: new Date() },
+    });
+
+    // الكوبون حُجز عند إنشاء الطلب (reserveCoupon) — يُسجَّل هنا لطلب سبق ذلك وحده
+    if (snapshot.coupon) {
+      const coupon = await tx.coupon.findUnique({ where: { code: snapshot.coupon.code }, select: { id: true } });
+      const reserved = coupon
+        ? await tx.couponRedemption.findUnique({ where: { couponId_orderId: { couponId: coupon.id, orderId } } })
+        : null;
+      if (coupon && !reserved) {
+        await tx.couponRedemption.create({
+          data: { couponId: coupon.id, orderId, userId: order.customerUserId, discountMinorUnits: BigInt(snapshot.coupon.discountMinor) },
+        });
+        await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
+      }
+    }
+    return true;
+  }
+
+  // ============================================================= الكوبون
+
+  /**
+   * حجز استعمال الكوبون مع إنشاء الطلب، تحت قفل صفّه.
+   *
+   * كان الحدّ يُقرأ عند التسعير ويُزاد العدّاد بعد الدفع بلا شرط: عشرة طلبات
+   * متزامنة ترى «بقي استعمال» كلها فتمرّ كلها. والحدّ لكل مستخدم يُتخطّى بالشراء
+   * ضيفاً — لا هوية فيُعدّ عليها. الآن:
+   *   · القفل يسلسل الطلبات على الكوبون الواحد، والعدّ بعده يرى من سبق
+   *   · الاستعمال يُحجز بسطر redemption وزيادة العدّاد في معاملة الطلب نفسها،
+   *     ويُحرَّر إن فشل الدفع أو أُلغي الطلب قبله (releaseCoupon)
+   *   · كوبون بحدّ لكل مستخدم يطلب حساباً: الضيف يبدّل بريده كما يشاء، فلا
+   *     حدّ يُفرض عليه
+   */
+  private async reserveCoupon(
+    tx: Prisma.TransactionClient,
+    code: string,
+    orderId: string,
+    userId: string | null,
+    discountMinor: bigint,
+  ): Promise<void> {
+    const [c] = await tx.$queryRaw<
+      { id: string; usageLimitTotal: number | null; usageLimitPerUser: number | null; usedCount: number }[]
+    >`SELECT "id", "usageLimitTotal", "usageLimitPerUser", "usedCount" FROM "coupons" WHERE "code" = ${code} FOR UPDATE`;
+    if (!c) throw new ConflictError('الكوبون غير صالح. أزله من السلة وأكمل الطلب.');
+    if (c.usageLimitTotal !== null && c.usedCount >= c.usageLimitTotal) {
+      throw new ConflictError('استُنفد الكوبون للتوّ. أزله من السلة وأكمل الطلب.', { code });
+    }
+    if (c.usageLimitPerUser !== null) {
+      if (!userId) {
+        throw new ConflictError('هذا الكوبون بعدد استعمالات لكل حساب — سجّل الدخول لتستعمله.', { code });
+      }
+      const used = await tx.couponRedemption.count({ where: { couponId: c.id, userId } });
+      if (used >= c.usageLimitPerUser) {
+        throw new ConflictError('استعملت هذا الكوبون بعدد مرّاته المسموح. أزله من السلة وأكمل الطلب.', { code });
+      }
+    }
+    await tx.couponRedemption.create({
+      data: { couponId: c.id, orderId, userId, discountMinorUnits: discountMinor },
+    });
+    await tx.coupon.update({ where: { id: c.id }, data: { usedCount: { increment: 1 } } });
+  }
+
+  /** طلب لم يُدفع (فشل أو أُلغي قبل الدفع) يعيد استعمال كوبونه — لا يُحسب على صاحبه ولا على الحدّ */
+  private async releaseCoupon(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
+    const held = await tx.couponRedemption.findMany({ where: { orderId }, select: { id: true, couponId: true } });
+    for (const r of held) {
+      const { count } = await tx.couponRedemption.deleteMany({ where: { id: r.id } });
+      if (count > 0) {
+        await tx.coupon.updateMany({ where: { id: r.couponId, usedCount: { gt: 0 } }, data: { usedCount: { decrement: 1 } } });
+      }
+    }
+  }
+
   /**
    * دُفع بعد انتهاء الحجز — المزوّد تأخّر أكثر من مهلة الحجز. المال عندنا
-   * والقطع ربما بيعت لغيره. يُعاد الحجز: إن توفّر أُكمل الطلب، وإلا يُردّ
-   * المال ويُلغى الطلب بسببه. **لا يبقى مدفوع بلا طلبات فرعية** (المنظر
-   * audit_paid_without_split يثبت ذلك).
+   * والقطع ربما بيعت لغيره. يُعاد الحجز: إن توفّر أُكمل الطلب، وإلا يُلغى
+   * ويُردّ المال. **لا يبقى مدفوع بلا طلبات فرعية** (audit_paid_without_split).
+   *
+   * إشعاران متزامنان يصلان هنا معاً. كان كلٌّ يحجز ويقسّم أو يردّ وحده: يُكمل
+   * الأول الطلب بالقطع الأخيرة، فيجد الثاني المخزون نافداً فيردّ المال ويختم
+   * الدفع «مردوداً» بلا شرط — والطلب مدفوع والبائع يشحن. الآن:
+   *   · قفل صف الطلب، وإعادة الحجز والتقسيم في معاملته — الثاني ينتظر ثم يجد
+   *     الطلب محسوماً فيخرج بلا أثر
+   *   · النفاد وحده يُلغي — خطأ قاعدة بيانات يُرمى فتعيد البوابة الإشعار، لا يُردّ
+   *     المال لأن اتصالاً انقطع
+   *   · الإلغاء شرطيّ على pending_payment تحت القفل نفسه، والردّ بمسار الدفع
+   *     المتأخر: حجزٌ ثم مفتاح عدم تكرار، ولا «مردود» قبل أن يُردّ فعلاً
    */
   private async paidAfterExpiry(orderId: string): Promise<boolean> {
-    const order = await this.prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { pricingSnapshot: true, payment: { select: { providerIntentId: true, amountMinorUnits: true } } },
-    });
-    const snapshot = order.pricingSnapshot as unknown as Snapshot;
-    const lines = snapshot.subOrders.flatMap((s) => s.lines);
+    const lockOrder = async (tx: Prisma.TransactionClient) => {
+      const [row] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT "status" FROM "orders" WHERE "id" = ${orderId}::uuid FOR UPDATE`;
+      return row?.status ?? null;
+    };
+
     try {
-      const fresh = await this.inventory.reserve({
-        lines: lines.map((l) => ({ variantId: l.variantId, qty: l.qty, label: l.nameAr })),
-        orderId,
-      });
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: { reservationIds: fresh.reservations.map((r) => r.id) },
-      });
-      return this.markPaid(orderId);
+      return await this.prisma.$transaction(
+        async (tx) => {
+          if ((await lockOrder(tx)) !== 'pending_payment') return false;
+          const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { pricingSnapshot: true } });
+          const lines = (order.pricingSnapshot as unknown as Snapshot).subOrders.flatMap((s) => s.lines);
+          const fresh = await this.inventory.reserve(
+            { lines: lines.map((l) => ({ variantId: l.variantId, qty: l.qty, label: l.nameAr })), orderId },
+            tx,
+          );
+          await tx.order.update({ where: { id: orderId }, data: { reservationIds: fresh.reservations.map((r) => r.id) } });
+          return this.split(tx, orderId);
+        },
+        { timeout: 20_000 },
+      );
     } catch (err) {
-      this.logger.error(`الطلب ${orderId} دُفع بعد نفاد مخزونه — يُردّ المال`, err as Error);
-      if (order.payment?.providerIntentId) {
-        await this.provider.refund(order.payment.providerIntentId, order.payment.amountMinorUnits);
-      }
-      await this.prisma.$transaction([
-        this.prisma.order.updateMany({
-          where: { id: orderId, status: 'pending_payment' },
-          data: { status: 'canceled', canceledAt: new Date() },
-        }),
-        this.prisma.payment.updateMany({ where: { orderId }, data: { status: 'refunded' } }),
-      ]);
-      return false;
+      if (!(err instanceof InsufficientStockError)) throw err;
     }
+
+    // نفد المخزون: المعاملة أُرجعت كلها. الإلغاء تحت قفل جديد وبشرط الحالة —
+    // مسار متزامن ربما أكمل الطلب بين المعاملتين
+    const canceled = await this.prisma.$transaction(async (tx) => {
+      if ((await lockOrder(tx)) !== 'pending_payment') return false;
+      await tx.order.update({ where: { id: orderId }, data: { status: 'canceled', canceledAt: new Date() } });
+      await this.releaseCoupon(tx, orderId);
+      return true;
+    });
+    if (canceled) {
+      this.logger.warn(`الطلب ${orderId} دُفع بعد نفاد مخزونه — أُلغي ويُردّ المال`);
+      const payment = await this.prisma.payment.findUnique({ where: { orderId }, select: { providerIntentId: true } });
+      await this.refundLateCapture(orderId, payment?.providerIntentId ?? undefined);
+    }
+    return false;
+  }
+
+  // ========================================================== الدفع المتأخر
+
+  /**
+   * نجاح وصل لطلب أُغلق قبله — انتهت مهلة التحقق، أو حسمته المصالحة فاشلاً.
+   * كان يُرمى بصمت (markPaid يشترط pending_payment): المال خُصم بلا طلب ولا ردّ.
+   *
+   * لا يُحيا الطلب: المشتري رأى «فشل» وربما طلب من جديد، وإحياؤه يشحن له
+   * مرتين. يُردّ المال كله ويُبلَّغ. والشرط `paidAt IS NULL` هو الفاصل: طلب دُفع
+   * ثم أُلغيت متاجره كلها صار canceled أيضاً، لكن ماله رُدّ بمساره — ردّه هنا ثانيةً
+   * دفعٌ مرتين.
+   *
+   * مسار واحد يردّ: `lateCaptureAt` يُحجز بكتابة شرطية (إشعار ومصالحة معاً
+   * يحجز أحدهما). ثم الردّ بمفتاح عدم تكرار، فإعادته بعد سقوطٍ لا تردّ مرتين.
+   */
+  private async refundLateCapture(orderId: string, intentId: string | undefined): Promise<void> {
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { status: true, paidAt: true, payment: { select: { id: true, capturedAt: true, providerIntentId: true } } },
+      });
+      const payment = order?.payment;
+      if (!order || !payment || order.paidAt || payment.capturedAt) return null;
+      if (order.status !== 'payment_failed' && order.status !== 'canceled') return null;
+      const { count } = await tx.payment.updateMany({
+        where: { id: payment.id, lateCaptureAt: null, capturedAt: null },
+        data: { lateCaptureAt: new Date(), ...(intentId && !payment.providerIntentId ? { providerIntentId: intentId } : {}) },
+      });
+      if (count === 0) return null;
+      await tx.auditLog.create({
+        data: {
+          action: 'payment.late_capture',
+          entityType: 'Order',
+          entityId: orderId,
+          afterJson: { orderStatus: order.status, intentId: intentId ?? payment.providerIntentId ?? null },
+        },
+      });
+      return payment.id;
+    });
+    if (!claimed) return;
+    this.logger.warn(`الطلب ${orderId} دُفع بعد إغلاقه (${intentId ?? '—'}) — يُردّ المال كله`);
+    await this.settleLateRefund(claimed);
+  }
+
+  /** يردّ دفعاً متأخراً محجوزاً — ويُعاد بلا خطر من المصالحة إن سقط قبل أن يتمّ */
+  private async settleLateRefund(paymentId: string): Promise<void> {
+    const p = await this.prisma.payment.findUniqueOrThrow({
+      where: { id: paymentId },
+      select: {
+        providerIntentId: true,
+        amountMinorUnits: true,
+        currency: true,
+        lateRefundId: true,
+        order: { select: { id: true, orderNumber: true, customerUserId: true } },
+      },
+    });
+    if (p.lateRefundId) return;
+    if (!p.providerIntentId) throw new Error(`دفع متأخر بلا تفويض — الطلب ${p.order.id}`);
+
+    // المفتاح ثابت للدفعة: الإعادة بعد انقطاع تعيد الردّ الأول عند البوابة
+    const { refundId } = await this.provider.refund(p.providerIntentId, p.amountMinorUnits, `late-capture:${paymentId}`);
+
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.payment.updateMany({
+        where: { id: paymentId, lateRefundId: null },
+        data: { lateRefundId: refundId, status: 'refunded' },
+      });
+      if (count === 0) return;
+      await tx.auditLog.create({
+        data: {
+          action: 'payment.late_capture_refunded',
+          entityType: 'Order',
+          entityId: p.order.id,
+          afterJson: { refundId, amount: p.amountMinorUnits.toString(), currency: p.currency },
+        },
+      });
+      await this.notifications.enqueue(
+        {
+          code: 'late_payment_refunded',
+          userId: p.order.customerUserId,
+          vars: { order_number: p.order.orderNumber, amount: formatMoney(money(p.amountMinorUnits, p.currency)) },
+        },
+        tx,
+      );
+    });
   }
 
   // =============================================================== الفشل
@@ -439,6 +628,7 @@ export class CheckoutService {
         where: { orderId },
         data: { status: 'failed', failureCode: code, failureMessage: message },
       });
+      await this.releaseCoupon(tx, orderId);
       return true;
     });
   }
@@ -487,7 +677,23 @@ export class CheckoutService {
         this.logger.error(`تعذّرت مصالحة الطلب ${o.id}`, err as Error),
       );
     }
-    return stale.length;
+
+    return stale.length + (await this.settleLateRefunds(now));
+  }
+
+  /** دفعات متأخرة حُجزت ولم يتمّ ردّها (سقطت البوابة أو الخادم بينهما) — المفتاح يمنع الردّ مرتين */
+  async settleLateRefunds(now: Date = new Date()): Promise<number> {
+    const unsettled = await this.prisma.payment.findMany({
+      where: { lateCaptureAt: { not: null, lt: new Date(now.getTime() - 60_000) }, lateRefundId: null },
+      select: { id: true },
+      take: 50,
+    });
+    for (const p of unsettled) {
+      await this.settleLateRefund(p.id).catch((err: unknown) =>
+        this.logger.error(`تعذّر ردّ الدفع المتأخر ${p.id}`, err as Error),
+      );
+    }
+    return unsettled.length;
   }
 
   // ============================================================ القراءة
@@ -501,6 +707,7 @@ export class CheckoutService {
         status: true,
         currency: true,
         grandTotalMinorUnits: true,
+        customerUserId: true,
         _count: { select: { subOrders: true } },
         payment: { select: { status: true, providerIntentId: true, failureCode: true, failureMessage: true } },
       },
@@ -516,6 +723,8 @@ export class CheckoutService {
       outcome,
       total: { minorUnits: order.grandTotalMinorUnits.toString(), currency: order.currency },
       subOrderCount: order._count.subOrders,
+      // تصل النتيجة من وضع الطلب (أو أعاده بمفتاح عدم التكرار نفسه) أو من أثبت المفتاح
+      ...(order.customerUserId ? {} : { accessKey: guestOrderKey(order.id, loadEnv().jwtAccessSecret) }),
       ...(outcome === 'requires_action' && order.payment?.providerIntentId
         ? { actionUrl: `/checkout/verify?intent=${order.payment.providerIntentId}` }
         : {}),

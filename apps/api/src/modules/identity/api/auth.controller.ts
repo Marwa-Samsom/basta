@@ -1,12 +1,14 @@
-import { Body, Controller, Get, Post, Req, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, Req, Res, HttpCode, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { FastifyReply } from 'fastify';
 import type { Actor } from '../../../common/security/actor';
 import { AuthService } from '../application/auth.service';
 import { AllowLimited, CurrentActor, Public } from '../../../common/security/decorators';
 import { AuthLimited } from '../../../common/security/throttle';
-import { LoginDto, RefreshDto, RegisterDto, TotpCodeDto, TotpConfirmDto, TotpDisableDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto, TotpCodeDto, TotpConfirmDto, TotpDisableDto, TotpSetupDto } from './dto/auth.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/account.dto';
 import { RecoveryService } from '../application/recovery.service';
+import { clearedRefreshCookie, readRefreshCookie } from './session-cookie';
 
 interface RawReq {
   headers: Record<string, string | undefined>;
@@ -25,8 +27,9 @@ export class AuthController {
   static meta(req: RawReq) {
     return {
       userAgent: req.headers['user-agent'],
-      // خلف وسيط عكسي، العنوان الحقيقي في X-Forwarded-For لا في ip
-      ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() ?? req.ip,
+      // req.ip يحسبه Fastify من X-Forwarded-For عبر الوسطاء الموثوقين وحدهم (TRUST_PROXY).
+      // قراءة الترويسة باليد كانت تسجّل في التدقيق أي عنوان يكتبه الطالب
+      ip: req.ip,
     };
   }
 
@@ -69,20 +72,30 @@ export class AuthController {
     return this.recovery.resetPassword(dto, AuthController.meta(req));
   }
 
+  /**
+   * رمز التحديث من الكوكي وحده (session-cookie.ts) — لا يُقبل في الجسم: رمز
+   * يصل في الجسم مصدره سكربت قرأه، وهذا ما أُغلق. الرمز الجديد يعود كوكياً.
+   */
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'تدوير رمز الجلسة — الرمز يُستعمل مرة واحدة' })
-  refresh(@Body() dto: RefreshDto, @Req() req: RawReq) {
-    return this.auth.refresh(dto.refreshToken, AuthController.meta(req));
+  @ApiCookieAuth()
+  @ApiOperation({ summary: 'تدوير رمز الجلسة — الرمز يُستعمل مرة واحدة، ويصل ويعود كوكياً' })
+  refresh(@Req() req: RawReq) {
+    const presented = readRefreshCookie(req.headers['cookie']);
+    if (!presented) throw new UnauthorizedException('انتهت جلستك. سجّل الدخول من جديد.');
+    return this.auth.refresh(presented, AuthController.meta(req));
   }
 
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'إنهاء الجلسة الحالية' })
-  async logout(@Body() dto: RefreshDto): Promise<void> {
-    await this.auth.logout(dto.refreshToken);
+  @ApiCookieAuth()
+  @ApiOperation({ summary: 'إنهاء الجلسة الحالية ومسح كوكيها' })
+  async logout(@Req() req: RawReq, @Res({ passthrough: true }) reply: FastifyReply): Promise<void> {
+    const presented = readRefreshCookie(req.headers['cookie']);
+    if (presented) await this.auth.logout(presented);
+    reply.header('set-cookie', clearedRefreshCookie());
   }
 
   @ApiBearerAuth()
@@ -106,10 +119,15 @@ export class AuthController {
    */
   @ApiBearerAuth()
   @AllowLimited()
+  @AuthLimited()
   @Post('totp/setup')
-  @ApiOperation({ summary: 'بدء تهيئة التحقق الثنائي' })
-  beginTotp(@CurrentActor() actor: Actor) {
-    return this.auth.beginTotpSetup(actor.userId);
+  @ApiOperation({ summary: 'بدء تهيئة التحقق الثنائي — أو تغيير الجهاز بكلمة المرور ورمز حالي' })
+  beginTotp(@CurrentActor() actor: Actor, @Body() dto: TotpSetupDto, @Req() req: RawReq) {
+    return this.auth.beginTotpSetup(
+      actor.userId,
+      { password: dto?.password, code: dto?.code },
+      AuthController.meta(req),
+    );
   }
 
   @ApiBearerAuth()
@@ -118,8 +136,12 @@ export class AuthController {
   @Post('totp/confirm')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'تأكيد التهيئة — يُعيد رموز الاستعادة مرة واحدة ويُبطل الجلسات السابقة' })
-  confirmTotp(@CurrentActor() actor: Actor, @Body() dto: TotpConfirmDto): Promise<{ recoveryCodes: string[] }> {
-    return this.auth.confirmTotpSetup(actor.userId, dto.token);
+  confirmTotp(
+    @CurrentActor() actor: Actor,
+    @Body() dto: TotpConfirmDto,
+    @Req() req: RawReq,
+  ): Promise<{ recoveryCodes: string[] }> {
+    return this.auth.confirmTotpSetup(actor.userId, dto.token, AuthController.meta(req));
   }
 
   @ApiBearerAuth()

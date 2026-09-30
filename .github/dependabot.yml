@@ -1,0 +1,8 @@
+# الإجراءات في CI مثبّتة على commit — بلا هذا تتجمّد على نسخة قديمة بثغراتها.
+# Dependabot يفتح طلب دمج بالـ SHA الجديد ووسمه في التعليق، فيُراجَع التحديث ولا يدخل وحده.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -15,10 +15,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
+import { LedgerService } from '../finance/public';
+import { NotificationsService } from '../notifications/public';
 import { FakePaymentProvider } from '../payments/public';
 import { TrackingService } from '../shipping/public';
 import { toCharge } from './domain/refunds';
 import { OrderLifecycleService, OrderScheduler } from './public';
+import { REFUND_STALE_MS, stalledRefund } from './application/order-lifecycle.service';
 
 const prisma = new PrismaClient();
 let app: NestFastifyApplication;
@@ -94,7 +97,9 @@ async function placeOrder(qty: [number, number]) {
     const r = await call('POST', '/cart/items', undefined, { variantId: v.variantId, qty: qty[i] }, { 'x-cart-token': token });
     expect(r.statusCode, r.body).toBe(201);
   }
-  const res = await call('POST', '/checkout', buyer.token, { address: ADDRESS, paymentToken: 'tok_success' }, {
+  // الإجمالي كما يراه المشتري تحت «ادفع» — يُرسل مع الطلب ولا يُخصم غيره
+  const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, { 'x-cart-token': token })).json();
+  const res = await call('POST', '/checkout', buyer.token, { address: ADDRESS, paymentToken: 'tok_success', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
     'x-cart-token': token,
     'idempotency-key': randomUUID(),
   });
@@ -369,6 +374,22 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     expect((await vendorMove(0, a.id, 'preparing')).statusCode).toBe(200);
   });
 
+  it('تفاصيل الطلب في الإدارة بصلاحية orders.manage — لا بالدور وحده', async () => {
+    if (!dbUp) return;
+    const { order } = await placeOrder([1, 1]);
+    const c = await user('content-admin', 'admin', ['content.manage']);
+    const content = await login(c.email, generateSync({ strategy: 'totp', secret: adminTotpSecret, crypto: totpCrypto, base32: totpBase32 }));
+
+    const denied = await call('GET', `/admin/orders/${order.orderNumber}`, content);
+    expect(denied.statusCode).toBe(403);
+    expect(denied.body).not.toContain(ADDRESS.street);
+    expect(denied.body).not.toContain(ADDRESS.phone);
+    expect((await call('GET', `/admin/orders/${order.orderNumber}`, stranger.token)).statusCode).toBe(403);
+
+    const ok = await call('GET', `/admin/orders/${order.orderNumber}`, admin.token);
+    expect(ok.statusCode, ok.body).toBe(200);
+  });
+
   it('الإدارة تلغي بصلاحية orders.cancel وحدها، وبسبب مكتوب', async () => {
     if (!dbUp) return;
     const { a, b } = await placeOrder([1, 1]);
@@ -384,11 +405,13 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     if (!dbUp) return;
     const { a, b } = await placeOrder([1, 1]);
     await vendorMove(1, b.id, 'accepted');
-    // قاعدة التطوير تحمل طلبات قديمة من تشغيلات سابقة: المهمة تعالج الأقدم أولاً
+    // يُعمَّر طلب هذا الاختبار وحده (49 ساعة) بدل تقديم الساعة للجميع: المهمة بساعة
+    // مقدَّمة كانت تلغي طلبات ملفات الاختبار الأخرى الجارية معاً في القاعدة نفسها.
+    // وقاعدة التطوير تحمل طلبات قديمة من تشغيلات سابقة: المهمة تعالج الأقدم أولاً
     // مئةً مئة، فتُدار حتى يصل دور طلب هذا الاختبار — كما تفعل دوراتها المتتالية
-    const future = new Date(Date.now() + 49 * 3_600_000);
+    await prisma.subOrder.update({ where: { id: a.id }, data: { placedAt: new Date(Date.now() - 49 * 3_600_000) } });
     for (let i = 0; i < 50 && (await statusOf(a.id)) !== 'refunded'; i++) {
-      if ((await scheduler.cancelUnaccepted(future)) === 0) break;
+      if ((await scheduler.cancelUnaccepted(new Date())) === 0) break;
     }
     expect(await statusOf(a.id)).toBe('refunded');
     expect(await statusOf(b.id)).toBe('accepted');
@@ -455,6 +478,35 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect(await tracking.record(trk, 'in_transit')).toBe(false);
   });
 
+  it('رقم التتبّع لشحنته وحدها: لا يُنسخ لشركة الشحن، والتوصيل الذاتي لا يُظهر شحنة غيره', async () => {
+    if (!dbUp) return;
+    const { a, b } = await placeOrder([1, 1]);
+    const trk = await deliver(0, a.id);
+    for (const to of ['accepted', 'preparing', 'ready_to_ship']) expect((await vendorMove(1, b.id, to)).statusCode).toBe(200);
+
+    // بائع آخر يكتب رقم شحنة غيره لشركة الشحن نفسها: فريد لكل شركة — 409 ولا يُشحن
+    const hijack = await vendorMove(1, b.id, 'shipped', { tracking: trk, carrierCode: 'basta-express' });
+    expect(hijack.statusCode, hijack.body).toBe(409);
+    expect((await prisma.subOrder.findUniqueOrThrow({ where: { id: b.id } })).status).toBe('ready_to_ship');
+
+    // وللتوصيل الذاتي مرجعه يكتبه كما يشاء — ولو طابق رقماً لشركة
+    expect((await vendorMove(1, b.id, 'shipped', { tracking: trk })).statusCode).toBe(200);
+
+    // التتبّع العام يعرض شحنة الشركة لا الذاتية
+    const res = await call('GET', `/track/${trk}`);
+    expect(res.json().carrierCode).toBe('basta-express');
+    expect(res.json().events).toHaveLength(4);
+
+    // مرجع توصيل ذاتي ليس رقماً لشركة: لا يُتتبَّع علناً، وحدث «سُلّم» باسم الشركة لا يصيبه
+    const { b: c } = await placeOrder([1, 1]);
+    for (const to of ['accepted', 'preparing', 'ready_to_ship']) expect((await vendorMove(1, c.id, to)).statusCode).toBe(200);
+    const ref = `SELF-${randomUUID().slice(0, 8)}`;
+    expect((await vendorMove(1, c.id, 'shipped', { tracking: ref })).statusCode).toBe(200);
+    expect((await call('GET', `/track/${ref}`)).statusCode).toBe(404);
+    await expect(tracking.record(ref, 'delivered')).rejects.toThrow(/رقم تتبّع غير معروف/);
+    expect((await prisma.subOrder.findUniqueOrThrow({ where: { id: c.id } })).status).toBe('shipped');
+  });
+
   it('نزاع مفتوح يجمّد الإكمال، والتصعيد يصل الإدارة، والحسم يفكّه', async () => {
     if (!dbUp) return;
     const { a, b } = await placeOrder([1, 1]);
@@ -497,5 +549,177 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     const list = await call('GET', `/products/${item.productId}/reviews`);
     expect(list.json().count).toBeGreaterThanOrEqual(1);
     expect(list.json().items[0].verified).toBe(true);
+  });
+});
+
+describe('الاسترداد يُعاد بلا دفع مرتين', () => {
+  it('نجحت البوابة ثم سقطت معاملتنا: الإعادة تكمل التسجيل ولا تردّ المال ثانيةً', async () => {
+    if (!dbUp) return;
+    const { a, order } = await placeOrder([1, 1]);
+    const notifications = app.get(NotificationsService);
+    const original = notifications.enqueue.bind(notifications);
+    let broken = true;
+    // سقوط بعد البوابة وقبل الالتزام — إشعار «رُدّ مالك» داخل معاملة التسجيل
+    notifications.enqueue = (async (input, db) => {
+      if (broken && input.code === 'refund_issued') {
+        broken = false;
+        throw new Error('انقطع الاتصال بالقاعدة');
+      }
+      return original(input, db);
+    }) as typeof notifications.enqueue;
+    try {
+      const cancel = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/cancel`, buyer.token, {});
+      expect(cancel.statusCode, cancel.body).toBe(200);
+    } finally {
+      notifications.enqueue = original;
+    }
+
+    const refund = await prisma.refund.findFirstOrThrow({ where: { subOrderId: a.id } });
+    // عاد معلّقاً لتعيده المهمة — لكن أثر المال الخارج مسجَّل
+    expect(refund.status).toBe('pending');
+    expect(refund.providerRefundId).toBeTruthy();
+    const intent = order.payment!.providerIntentId!;
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+
+    expect(await lifecycle.executeRefund(refund.id)).toBe(true);
+    const done = await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } });
+    expect(done.status).toBe('succeeded');
+    expect(done.providerRefundId).toBe(refund.providerRefundId);
+    // البوابة ردّت مرة واحدة — الإعادة سمعت الردّ الأول بالمفتاح نفسه
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+    expect(await statusOf(a.id)).toBe('refunded');
+  });
+});
+
+describe('استرداد عالق في processing — سقط منفّذه فيُعاد', () => {
+  /** إلغاء يسجّل استرداداً بلا تنفيذه، ثم يُترك كما يتركه خادم سقط بعد حجزه */
+  async function stuckRefund(claimedMsAgo: number) {
+    const { a, order } = await placeOrder([1, 1]);
+    const original = lifecycle.executeRefund.bind(lifecycle);
+    lifecycle.executeRefund = async () => false;
+    try {
+      expect((await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/cancel`, buyer.token, {})).statusCode).toBe(200);
+    } finally {
+      lifecycle.executeRefund = original;
+    }
+    const refund = await prisma.refund.findFirstOrThrow({ where: { subOrderId: a.id } });
+    await prisma.refund.update({
+      where: { id: refund.id },
+      data: { status: 'processing', claimedAt: new Date(Date.now() - claimedMsAgo) },
+    });
+    return { a, refund, intent: order.payment!.providerIntentId! };
+  }
+  const isDue = async (id: string, now = new Date()) =>
+    (await prisma.refund.count({ where: { id, ...stalledRefund(now) } })) === 1;
+
+  it('سقط قبل البوابة: بعد المهلة تلتقطه المهمة وتردّ المال مرة', async () => {
+    if (!dbUp) return;
+    const { a, refund, intent } = await stuckRefund(REFUND_STALE_MS + 60_000);
+    expect(await isDue(refund.id)).toBe(true);
+    expect(await lifecycle.executeRefund(refund.id)).toBe(true);
+    expect((await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } })).status).toBe('succeeded');
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+    expect(await statusOf(a.id)).toBe('refunded');
+  });
+
+  it('سقط بعد البوابة وقبل التسجيل: الإعادة تسمع الردّ الأول ولا تردّ ثانيةً', async () => {
+    if (!dbUp) return;
+    const { refund, intent } = await stuckRefund(REFUND_STALE_MS + 60_000);
+    // ما فعله المنفّذ الساقط قبل سقوطه: البوابة ردّت بمفتاح الاسترداد
+    const first = await fake.refund(intent, refund.amountMinorUnits, `refund:${refund.id}`);
+    expect(await lifecycle.executeRefund(refund.id)).toBe(true);
+    const done = await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } });
+    expect(done.status).toBe('succeeded');
+    expect(done.providerRefundId).toBe(first.refundId);
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+  });
+
+  it('تنفيذ حيّ قبل انقضاء المهلة لا يُنتزع', async () => {
+    if (!dbUp) return;
+    const { refund, intent } = await stuckRefund(30_000);
+    expect(await isDue(refund.id)).toBe(false);
+    expect(await lifecycle.executeRefund(refund.id)).toBe(false);
+    expect((await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } })).status).toBe('processing');
+    expect(fake.refundsOf(intent)).toEqual([]);
+  });
+
+  it('مُعيدان معاً على العالق نفسه: ردّ واحد وإشعار واحد', async () => {
+    if (!dbUp) return;
+    const { refund, intent } = await stuckRefund(REFUND_STALE_MS + 60_000);
+    const results = await Promise.all([lifecycle.executeRefund(refund.id), lifecycle.executeRefund(refund.id)]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
+    const order = await prisma.subOrder.findUniqueOrThrow({ where: { id: refund.subOrderId }, select: { order: { select: { customerUserId: true, orderNumber: true } } } });
+    const notes = await prisma.notification.findMany({
+      where: { userId: order.order.customerUserId!, templateCode: 'refund_issued', channel: 'in_app' },
+      select: { payloadJson: true },
+    });
+    expect(notes.filter((n) => (n.payloadJson as Record<string, string>)['order_number'] === order.order.orderNumber)).toHaveLength(1);
+  });
+});
+
+describe('حسم النزاع لصالح المشتري يردّ ماله — ولا يُحرَّر للبائع', () => {
+  const pendingNet = async (subId: string) =>
+    (await prisma.ledgerEntry.findMany({ where: { refType: 'sub_order', refId: subId, bucket: 'pending' } })).reduce(
+      (a, r) => a + (r.direction === 'credit' ? r.amountMinorUnits : -r.amountMinorUnits),
+      0n,
+    );
+  async function disputed() {
+    const { a, order } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_as_described', message: 'وصلت القطعة مكسورة تماماً' });
+    expect(opened.statusCode, opened.body).toBe(201);
+    return { a, order, id: opened.json().id as string };
+  }
+  const resolveForCustomer = (id: string) =>
+    call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'customer', resolution: 'القطعة مكسورة بالصور — يُردّ المبلغ كاملاً' });
+
+  it('يُردّ ما دفعه المشتري للمتجر كله، ويصير الفرعي مسترَداً، ولا يبقى للبائع معلّق', async () => {
+    if (!dbUp) return;
+    const { a, order, id } = await disputed();
+    expect(await pendingNet(a.id)).toBeGreaterThan(0n);
+
+    const r = await resolveForCustomer(id);
+    expect(r.statusCode, r.body).toBe(204);
+
+    expect((await prisma.dispute.findUniqueOrThrow({ where: { id } })).status).toBe('resolved_customer');
+    expect(await statusOf(a.id)).toBe('refunded');
+    const refund = await prisma.refund.findFirstOrThrow({ where: { subOrderId: a.id } });
+    expect(refund.status).toBe('succeeded');
+    expect(refund.amountMinorUnits).toBe(a.chargeTotalMinorUnits);
+    expect(fake.refundsOf(order.payment!.providerIntentId!)).toContain(a.chargeTotalMinorUnits);
+    // مال البائع عن هذا الفرعي عُكس — لا شيء يحرّره الإغلاق
+    expect(await pendingNet(a.id)).toBe(0n);
+  });
+
+  it('فشل تسجيل الاسترداد يُبقي النزاع مفتوحاً والمال مجمّداً', async () => {
+    if (!dbUp) return;
+    const { a, id } = await disputed();
+    const ledger = app.get(LedgerService);
+    const original = ledger.postFullRefund.bind(ledger);
+    ledger.postFullRefund = async () => {
+      throw new Error('انقطع الاتصال بالقاعدة');
+    };
+    try {
+      expect((await resolveForCustomer(id)).statusCode).toBe(500);
+    } finally {
+      ledger.postFullRefund = original;
+    }
+    expect((await prisma.dispute.findUniqueOrThrow({ where: { id } })).status).toBe('open');
+    expect(await statusOf(a.id)).toBe('delivered');
+    expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(0);
+
+    // وتصحّ الإعادة بعدها
+    expect((await resolveForCustomer(id)).statusCode).toBe(204);
+    expect(await statusOf(a.id)).toBe('refunded');
+  });
+
+  it('مسار الانتقال العام لا يجعل الفرعي «مسترَداً» بلا ردّ — ولو بصلاحية orders.manage', async () => {
+    if (!dbUp) return;
+    const { a } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const r = await call('POST', `/admin/orders/stores/${a.id}/transition`, admin.token, { to: 'refunded' });
+    expect(r.statusCode).toBeGreaterThanOrEqual(400);
+    expect(await statusOf(a.id)).toBe('delivered');
   });
 });

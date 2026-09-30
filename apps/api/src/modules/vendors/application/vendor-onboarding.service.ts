@@ -12,6 +12,7 @@ import { AuditService, AuthService, TokenService, type TokenPair } from '../../i
 import { VendorDocumentStorage } from '../infrastructure/document-storage';
 import {
   assertCurrencyChangeable,
+  currencyLocked,
   assertDocumentFile,
   assertSettlementCurrency,
   assertSlug,
@@ -277,7 +278,7 @@ export class VendorOnboardingService {
       submittedAt: vendor.submittedAt?.toISOString() ?? null,
       approvedAt: vendor.approvedAt?.toISOString() ?? null,
       settlementCurrency: vendor.settlementCurrency,
-      settlementCurrencyLocked: vendor.settlementCurrencyLockedAt !== null,
+      settlementCurrencyLocked: currencyLocked(vendor.settlementCurrencyLockedAt, vendor.status as VendorLifecycle),
       descriptionAr: vendor.descriptionAr,
       descriptionEn: vendor.descriptionEn,
       shippingPolicyAr: vendor.shippingPolicyAr,
@@ -293,7 +294,7 @@ export class VendorOnboardingService {
 
   // ------------------------------------------------------------ التعديل
 
-  /** بيانات المتجر الأساسية تُعدَّل ما دام الطلب لم يُعتمد. */
+  /** بيانات المتجر الأساسية تُعدَّل في المسوّدة والطلب المرفوض وحدهما. */
   async updateShop(
     scope: VendorScope,
     input: {
@@ -499,15 +500,28 @@ export class VendorOnboardingService {
     const vendor = await this.require(scope.vendorId);
     const code = currency.trim().toUpperCase();
     assertSettlementCurrency(code);
-    assertCurrencyChangeable(vendor.settlementCurrencyLockedAt);
+    const [variants, rates, orders] = await Promise.all([
+      this.prisma.productVariant.count({ where: { vendorId: scope.vendorId } }),
+      this.prisma.shippingRate.count({ where: { zone: { vendorId: scope.vendorId } } }),
+      this.prisma.subOrder.count({ where: { vendorId: scope.vendorId } }),
+    ]);
+    // العملة نفسها لا تغيّر معنى سعر — التثبيت وحده مسموح ولو وُجد المسعَّر
+    const changing = code !== vendor.settlementCurrency;
+    assertCurrencyChangeable({
+      lockedAt: vendor.settlementCurrencyLockedAt,
+      status: vendor.status as VendorLifecycle,
+      priced: changing && variants + rates + orders > 0,
+    });
 
-    await this.prisma.vendor.update({
-      where: { id: scope.vendorId },
+    // الشروط نفسها داخل الكتابة: اعتماد أو تثبيت متزامن لا يمرّ معه تغيير
+    const { count } = await this.prisma.vendor.updateMany({
+      where: { id: scope.vendorId, settlementCurrencyLockedAt: null, status: { in: ['pending', 'rejected'] } },
       data: {
         settlementCurrency: code,
         ...(options.lock ? { settlementCurrencyLockedAt: new Date() } : {}),
       },
     });
+    if (count === 0) throw new ConflictError('تغيّرت حالة المتجر أو عملته. حدّث الصفحة.', { vendorId: scope.vendorId });
     return this.view(scope.vendorId);
   }
 
@@ -561,16 +575,30 @@ export class VendorOnboardingService {
     return vendor;
   }
 
-  /** ما يُرسَل للمراجعة يُجمَّد: تعديله بعد الإرسال يعني مراجعة على بيانات غير التي قُرئت. */
+  /**
+   * بيانات التسجيل تُعدَّل في المسوّدة والطلب المرفوض **وحدهما**. ما يُرسَل
+   * للمراجعة يُجمَّد: تعديله بعدها يعني مراجعة على بيانات غير التي قُرئت.
+   *
+   * والمعتمد أشدّ: كان يمرّ من هنا بلا مراجعة ولا إعادة مصادقة ولا تدقيق ولا
+   * إشعار — فيبدّل اسم المتجر، ويستبدل وثائق KYC (وتُحذف المقبولة)، ويكتب
+   * آيبان جديداً فوق الافتراضي الذي تُحوَّل إليه الأرباح. بعد الاعتماد:
+   * الحساب البنكي من الإعدادات (إعادة مصادقة، وتوثيق من الإدارة، وتنبيه
+   * فوري)، واسم المتجر ووثائقه من الدعم.
+   */
   private assertEditable(status: VendorLifecycle): void {
+    if (status === 'pending' || status === 'rejected') return;
     if (status === 'in_review') {
       throw new ConflictError(
         'طلبك قيد المراجعة الآن ولا يقبل التعديل. انتظر النتيجة أو راسل الدعم.',
         { status },
       );
     }
-    if (status === 'banned' || status === 'suspended') {
-      throw new ConflictError('حساب المتجر موقوف. راسل الدعم.', { status });
+    if (status === 'approved') {
+      throw new ConflictError(
+        'متجرك معتمد: اسمه ورابطه ووثائقه مثبّتة كما رُوجعت، ولتغييرها راسل الدعم. الحساب البنكي يُضاف من الإعدادات.',
+        { status },
+      );
     }
+    throw new ConflictError('حساب المتجر موقوف. راسل الدعم.', { status });
   }
 }

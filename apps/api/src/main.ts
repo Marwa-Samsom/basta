@@ -8,14 +8,22 @@ loadEnv();
 initSentry();
 
 import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { configureApp } from './app.setup';
+import { configureApp, createHttpAdapter } from './app.setup';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  const { trustProxy } = loadEnv();
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, createHttpAdapter(trustProxy));
+  if (trustProxy === false && process.env['NODE_ENV'] === 'production') {
+    // لا يُرفض: خادم مكشوف مباشرةً بلا وسيط صحيح هكذا. لكن خلف وسيط يشترك كل الزوار في عنوانه
+    Logger.warn(
+      'TRUST_PROXY غير مضبوط: كل عنوان يُقرأ من الاتصال نفسه. إن كان أمام الخادم وسيط عكسي فكل الزوار عنوان واحد لحدّ المعدّل والتدقيق — اضبطه بعدد الوسطاء أو عناوينهم.',
+      'Bootstrap',
+    );
+  }
 
   await configureApp(app);
 
@@ -30,7 +38,10 @@ async function bootstrap() {
   if (docs) SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
 
   const port = Number(process.env.PORT ?? 4000);
-  await app.listen({ port, host: '0.0.0.0' });
+  // التطوير على «::» — IPv4 و IPv6 معاً: الواجهة تنادي الـ API باسم المضيف الذي
+  // فُتحت به (localhost أو 127.0.0.1) ليكون كوكي الجلسة من «الموقع» نفسه، و
+  // localhost يُترجم ::1 أولاً. الإنتاج باقٍ على IPv4: حاوية بلا IPv6 ترفض «::»
+  await app.listen({ port, host: process.env['NODE_ENV'] === 'production' ? '0.0.0.0' : '::' });
   Logger.log(`API على http://localhost:${port}/api/v1${docs ? ' · التوثيق /api/docs' : ''}`, 'Bootstrap');
 }
 

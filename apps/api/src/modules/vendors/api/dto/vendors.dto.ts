@@ -153,12 +153,12 @@ export class ReviewQueueQueryDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
+  @Matches(/^\d{1,4}$/, { message: 'الحدّ رقم صحيح.' })
   limit?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
+  @Matches(/^\d{1,6}$/, { message: 'الإزاحة رقم صحيح.' })
   offset?: string;
 }
 

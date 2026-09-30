@@ -8,8 +8,19 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { privilegeReport, privilegeViolations } from './least-privilege';
+import { PrismaService } from './prisma.service';
 
+/** مستخدم التشغيل — ما يتصل به التطبيق */
 const prisma = new PrismaClient();
+/**
+ * مالك المخطط: طبقة المشغّلات تُختبر به، لأن مستخدم التشغيل يُرفض قبلها
+ * بالصلاحيات — والحارس يجب أن يصمد ولو سقطت الطبقة الأخرى.
+ */
+const ownerUrl = process.env['DATABASE_MIGRATE_URL'];
+const owner = ownerUrl ? new PrismaClient({ datasourceUrl: ownerUrl }) : prisma;
+const TRIGGER = /للإضافة فقط/;
+const DENIED = /permission denied|42501/i;
 let dbUp = false;
 
 beforeAll(async () => {
@@ -24,6 +35,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.$disconnect();
+  if (owner !== prisma) await owner.$disconnect();
 });
 
 const dbIt: typeof it = ((name: string, fn: never) =>
@@ -32,29 +44,29 @@ const dbIt: typeof it = ((name: string, fn: never) =>
     return (fn as (...a: never[]) => unknown)(...args);
   })) as never;
 
-describe('ADR-005 · دفتر الأستاذ للإضافة فقط', () => {
+describe('ADR-005 · دفتر الأستاذ للإضافة فقط — طبقة المشغّلات (ولو بمالك المخطط)', () => {
   dbIt('يرفض UPDATE على ledger_entries', async () => {
     await expect(
-      prisma.$executeRawUnsafe(`UPDATE "ledger_entries" SET "memo" = 'tampered'`),
-    ).rejects.toThrow();
+      owner.$executeRawUnsafe(`UPDATE "ledger_entries" SET "memo" = 'tampered'`),
+    ).rejects.toThrow(TRIGGER);
   });
 
   dbIt('يرفض DELETE على ledger_entries', async () => {
     await expect(
-      prisma.$executeRawUnsafe(`DELETE FROM "ledger_entries"`),
-    ).rejects.toThrow();
+      owner.$executeRawUnsafe(`DELETE FROM "ledger_entries"`),
+    ).rejects.toThrow(TRIGGER);
   });
 
   dbIt('يرفض التعديل على سجل التدقيق وحركات المخزون وأسعار الصرف', async () => {
     await expect(
-      prisma.$executeRawUnsafe(`UPDATE "audit_logs" SET "action" = 'x'`),
-    ).rejects.toThrow();
+      owner.$executeRawUnsafe(`UPDATE "audit_logs" SET "action" = 'x'`),
+    ).rejects.toThrow(TRIGGER);
     await expect(
-      prisma.$executeRawUnsafe(`DELETE FROM "inventory_movements"`),
-    ).rejects.toThrow();
+      owner.$executeRawUnsafe(`DELETE FROM "inventory_movements"`),
+    ).rejects.toThrow(TRIGGER);
     await expect(
-      prisma.$executeRawUnsafe(`UPDATE "exchange_rates" SET "rate" = 1`),
-    ).rejects.toThrow();
+      owner.$executeRawUnsafe(`UPDATE "exchange_rates" SET "rate" = 1`),
+    ).rejects.toThrow(TRIGGER);
   });
 
   /**
@@ -70,8 +82,8 @@ describe('ADR-005 · دفتر الأستاذ للإضافة فقط', () => {
       'exchange_rates',
     ]) {
       await expect(
-        prisma.$executeRawUnsafe(`TRUNCATE TABLE "${table}"`),
-      ).rejects.toThrow();
+        owner.$executeRawUnsafe(`TRUNCATE TABLE "${table}"`),
+      ).rejects.toThrow(TRIGGER);
     }
   });
 
@@ -82,8 +94,58 @@ describe('ADR-005 · دفتر الأستاذ للإضافة فقط', () => {
   dbIt('يرفض الجملة ولو لم تمسّ صفاً واحداً', async () => {
     // WHERE 1=0 لا يطابق شيئاً مهما امتلأ الجدول — منذ المرحلة 10 لم يعد الدفتر فارغاً
     await expect(
-      prisma.$executeRawUnsafe(`DELETE FROM "ledger_entries" WHERE 1=0`),
-    ).rejects.toThrow();
+      owner.$executeRawUnsafe(`DELETE FROM "ledger_entries" WHERE 1=0`),
+    ).rejects.toThrow(TRIGGER);
+  });
+});
+
+/**
+ * الطبقة الثانية: التطبيق لا يحمل مفتاح الحارس. المالك يعطّل المشغّلات بأمر
+ * واحد؛ مستخدم التشغيل لا يملك شيئاً، ولا UPDATE/DELETE له على جداول الإضافة
+ * فقط — فحقن SQL في مسار مالي لا يعطّل الحارس ولا يمرّ من تحته.
+ */
+describe('ADR-005 · مستخدم التشغيل — أقلّ صلاحية', () => {
+  dbIt('التطبيق لا يتصل بمالك المخطط، ولا يكتب في المخطط، ولا يعدّل جداول الإضافة', async () => {
+    const report = await privilegeReport(prisma);
+    expect(privilegeViolations(report)).toEqual([]);
+    expect(report.ownedTables).toEqual([]);
+  });
+
+  dbIt('لا يعطّل الحارس ولا يغيّر المخطط — ليس مالكاً', async () => {
+    await expect(
+      prisma.$executeRawUnsafe(`ALTER TABLE "ledger_entries" DISABLE TRIGGER ALL`),
+    ).rejects.toThrow(/must be owner|42501/i);
+    await expect(prisma.$executeRawUnsafe(`CREATE TABLE "x_probe" ("id" int)`)).rejects.toThrow(DENIED);
+  });
+
+  dbIt('يُرفض بالصلاحية قبل أن يبلغ المشغّل: UPDATE وDELETE وTRUNCATE على الدفتر', async () => {
+    await expect(prisma.$executeRawUnsafe(`UPDATE "ledger_entries" SET "memo" = 'x' WHERE 1=0`)).rejects.toThrow(DENIED);
+    await expect(prisma.$executeRawUnsafe(`DELETE FROM "platform_ledger_entries" WHERE 1=0`)).rejects.toThrow(DENIED);
+    await expect(prisma.$executeRawUnsafe(`TRUNCATE TABLE "wallets"`)).rejects.toThrow(DENIED);
+  });
+
+  dbIt('الإنتاج يرفض الإقلاع متصلاً بمالك المخطط، ويُقلع بمستخدم التشغيل', async () => {
+    if (!ownerUrl) return;
+    const saved = { url: process.env['DATABASE_URL'], env: process.env['NODE_ENV'] };
+    process.env['NODE_ENV'] = 'production';
+    try {
+      process.env['DATABASE_URL'] = ownerUrl;
+      const asOwner = new PrismaService();
+      await expect(asOwner.onModuleInit()).rejects.toThrow(/أوسع صلاحية/);
+      await asOwner.$disconnect();
+
+      process.env['DATABASE_URL'] = saved.url;
+      const asApp = new PrismaService();
+      await expect(asApp.onModuleInit()).resolves.toBeUndefined();
+      await asApp.$disconnect();
+    } finally {
+      process.env['DATABASE_URL'] = saved.url;
+      process.env['NODE_ENV'] = saved.env;
+    }
+  });
+
+  dbIt('ولا يرى سجل المهاجرات', async () => {
+    await expect(prisma.$queryRawUnsafe(`SELECT 1 FROM "_prisma_migrations" LIMIT 1`)).rejects.toThrow(DENIED);
   });
 });
 

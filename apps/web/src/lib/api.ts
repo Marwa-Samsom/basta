@@ -7,6 +7,10 @@
  * 2. **تجديد الرمز مرة واحدة عند 401** ثم إعادة الطلب — انتهاء صلاحية رمز
  *    الوصول أثناء ملء نموذج لا يجوز أن يُفقد ما كُتب.
  * 3. **الرموز في مكان واحد** (`session`)، فلا ينسخها كل استدعاء.
+ *
+ * رمز الوصول وحده في localStorage — عمره ربع ساعة ويُفحص مع القاعدة في كل طلب.
+ * رمز التحديث (ثلاثون يوماً) كوكي HttpOnly يضعه الخادم ولا يراه سكربت هنا أبداً:
+ * ثغرة XSS تأخذ ربع ساعة على الأكثر لا جلسة شهر.
  */
 
 /**
@@ -16,30 +20,45 @@
  */
 export const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://127.0.0.1:4000/api/v1';
 
+/**
+ * عنوان الـ API لطلبات الجلسة من المتصفّح. كوكي التحديث SameSite=Strict لا
+ * يُرسل إلا إلى «الموقع» نفسه، و localhost و 127.0.0.1 موقعان مختلفان في عين
+ * المتصفّح: صفحة على localhost:3000 تنادي 127.0.0.1:4000 فلا يصل الكوكي. في
+ * التطوير يأخذ الطلب اسم المضيف الذي فُتحت به الصفحة. الإنتاج لا يمسّه.
+ */
+function sessionBase(): string {
+  if (typeof window === 'undefined') return API_BASE;
+  const loopback = /^(localhost|127\.0\.0\.1)$/;
+  const url = new URL(API_BASE);
+  const page = window.location.hostname;
+  if (!loopback.test(url.hostname) || !loopback.test(page) || url.hostname === page) return API_BASE;
+  url.hostname = page;
+  return url.href.replace(/\/$/, '');
+}
+
 const ACCESS_KEY = 'basta.access';
-const REFRESH_KEY = 'basta.refresh';
+/** كان رمز التحديث يُحفظ هنا — يُمسح من كل متصفّح بقي فيه */
+const LEGACY_REFRESH_KEY = 'basta.refresh';
 
 export interface Tokens {
   accessToken: string;
-  refreshToken: string;
 }
 
 export const session = {
   read(): Tokens | null {
     if (typeof window === 'undefined') return null;
+    window.localStorage.removeItem(LEGACY_REFRESH_KEY);
     const accessToken = window.localStorage.getItem(ACCESS_KEY);
-    const refreshToken = window.localStorage.getItem(REFRESH_KEY);
-    return accessToken && refreshToken ? { accessToken, refreshToken } : null;
+    return accessToken ? { accessToken } : null;
   },
   write(tokens: Tokens): void {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    window.localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
   },
   clear(): void {
     if (typeof window === 'undefined') return;
     window.localStorage.removeItem(ACCESS_KEY);
-    window.localStorage.removeItem(REFRESH_KEY);
+    window.localStorage.removeItem(LEGACY_REFRESH_KEY);
   },
   /**
    * أدوار الرمز الحالي — قراءة بلا تحقق من التوقيع، لقرارات العرض وحدها
@@ -116,9 +135,11 @@ async function raw(path: string, options: RequestOptions, token: string | null):
 
   if (token) headers['authorization'] = `Bearer ${token}`;
 
-  return fetch(`${API_BASE}${path}`, {
+  // include: ردّ الدخول يضع كوكي التحديث، والمتصفّح لا يحفظ كوكي ردّ من أصل آخر بدونه
+  return fetch(`${sessionBase()}${path}`, {
     method: options.method ?? 'GET',
     headers,
+    credentials: 'include',
     ...(body !== undefined ? { body } : {}),
   });
 }
@@ -133,26 +154,51 @@ async function raw(path: string, options: RequestOptions, token: string | null):
  */
 let inFlight: Promise<Tokens | null> | null = null;
 
-function refresh(): Promise<Tokens | null> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * والتبويبات تتشارك كوكي التحديث ورمز الوصول، فوعد التبويب الواحد لا يكفي: قفل
+ * باسم واحد (Web Locks) يسلسل التجديد بينها. من يدخل القفل ثانياً يجد أن
+ * رمز الوصول تغيّر عمّا رآه حين فشل طلبه — جدّده أخوه — فيأخذه ولا يجدّد ثانيةً.
+ * ومتصفّح بلا Web Locks يسمع من الخادم 409 «جُدّد للتوّ» فينتظر ما يكتبه أخوه.
+ * رمز التحديث نفسه لا يُقرأ هنا: الكوكي يذهب ويعود وحده.
+ */
+function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  // نوع lib.dom يلفّ ردّ الدالة غير المتزامنة بوعد ثانٍ؛ القفل يعيد قيمتها المنتظَرة فعلاً
+  return locks ? (locks.request('basta.refresh', fn) as unknown as Promise<T>) : fn();
+}
+
+function refresh(seen: string | null): Promise<Tokens | null> {
   if (inFlight) return inFlight;
 
-  inFlight = (async () => {
+  inFlight = withRefreshLock(async () => {
     const current = session.read();
     if (!current) return null;
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ refreshToken: current.refreshToken }),
-    });
+    // تبويب آخر جدّد بعد أن فشل طلبنا وقبل أن ندخل القفل
+    if (seen && current.accessToken !== seen) return current;
+    const res = await fetch(`${sessionBase()}/auth/refresh`, { method: 'POST', credentials: 'include' });
+    if (res.status === 409) {
+      // دوّره تبويب آخر في اللحظة نفسها — الجلسة سليمة، وخلفه يُكتب الآن
+      for (let i = 0; i < 20; i++) {
+        const now = session.read();
+        if (!now) return null;
+        if (now.accessToken !== current.accessToken) return now;
+        await sleep(100);
+      }
+      // لم يكتب أحد خلفاً: ضاع ردّ التجديد الأول في الطريق (انقطاع، إغلاق، إعادة
+      // تحميل) والخادم دوّر الرمز. البقاء على رمز ميت أسوأ من دخول جديد
+      session.clear();
+      return null;
+    }
     if (!res.ok) {
       session.clear();
       return null;
     }
-    const data = (await res.json()) as { tokens?: Tokens } & Partial<Tokens>;
-    const tokens = data.tokens ?? (data as Tokens);
-    session.write(tokens);
-    return tokens;
-  })().finally(() => {
+    const tokens = (await res.json()) as Tokens;
+    session.write({ accessToken: tokens.accessToken });
+    return session.read();
+  }).finally(() => {
     inFlight = null;
   });
 
@@ -161,12 +207,13 @@ function refresh(): Promise<Tokens | null> {
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const needsAuth = options.auth !== false;
-  let token = needsAuth ? (session.read()?.accessToken ?? null) : null;
+  const before = needsAuth ? session.read() : null;
+  let token = before?.accessToken ?? null;
 
   let res = await raw(path, options, token);
 
   if (res.status === 401 && needsAuth) {
-    const renewed = await refresh();
+    const renewed = await refresh(before?.accessToken ?? null);
     if (renewed) {
       token = renewed.accessToken;
       res = await raw(path, options, token);
@@ -178,12 +225,32 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   return (await res.json()) as T;
 }
 
+/**
+ * الخروج — الخادم أولاً: يُبطل رمز التحديث ويمسح كوكيه، فيسقط رمز الوصول معه
+ * في الطلب التالي (يُفحص مع القاعدة). المسح المحلي وحده كان يُخفي الجلسة عن
+ * الواجهة ويتركها حيّة ثلاثين يوماً على جهاز قد يكون مشتركاً.
+ *
+ * تعذّر الطلب يُرمى ولا يُمسح شيء: جهاز يظنّ صاحبه أنه خرج وجلسته حيّة أسوأ
+ * من رسالة تقول «حاول مرة أخرى».
+ */
+export async function logout(): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${sessionBase()}/auth/logout`, { method: 'POST', credentials: 'include' });
+  } catch {
+    throw new ApiError(0, 'تعذّر الخروج — لا اتصال بالخادم. تحقّق من الشبكة وحاول مرة أخرى.');
+  }
+  if (!res.ok) throw await ApiError.from(res);
+  session.clear();
+}
+
 /** ملف من الخادم بجلسة المستخدم — كشف الحساب CSV. التنزيل يبقى في المتصفّح */
 export async function apiBlob(path: string): Promise<Blob> {
-  let token = session.read()?.accessToken ?? null;
+  const before = session.read();
+  let token = before?.accessToken ?? null;
   let res = await raw(path, {}, token);
   if (res.status === 401) {
-    const renewed = await refresh();
+    const renewed = await refresh(before?.accessToken ?? null);
     if (renewed) {
       token = renewed.accessToken;
       res = await raw(path, {}, token);

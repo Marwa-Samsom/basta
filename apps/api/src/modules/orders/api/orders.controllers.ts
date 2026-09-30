@@ -35,6 +35,7 @@ import { CurrentActor, RequirePermission, Roles } from '../../../common/security
 import { OrderLifecycleService } from '../application/order-lifecycle.service';
 import { OrderQueryService } from '../application/order-query.service';
 import type { SubOrderStatus } from '../domain/state-machine';
+import { SubOrderStatus as SubOrderStatuses } from '@prisma/client';
 
 const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('الطلب غير موجود.') });
 
@@ -74,6 +75,7 @@ export class TransitionDto {
 export class VendorOrdersQueryDto {
   @IsOptional()
   @IsString()
+  @IsIn(Object.values(SubOrderStatuses), { message: 'حالة الطلب غير معروفة.' })
   status?: string;
 
   @IsOptional()
@@ -243,7 +245,13 @@ export class AdminOrdersController {
     private readonly lifecycle: OrderLifecycleService,
   ) {}
 
+  /**
+   * التفاصيل بالصلاحية نفسها التي تفتح قائمتها (orders.manage): عنوان الشحن
+   * وحالة الدفع والمبالغ بيانات مشترٍ. كانت بالدور وحده، فمدير التسويق أو
+   * المحتوى يقرأ عنوان أي مشترٍ برقم طلبه.
+   */
   @Get(':number')
+  @RequirePermission('orders.manage')
   detail(@Param('number') number: string) {
     return this.query.adminDetail(number);
   }

@@ -26,6 +26,16 @@ export interface EventDef {
   readonly audience: 'customer' | 'vendor';
   readonly variables: readonly string[];
   readonly sample: Readonly<Record<string, string>>;
+  /**
+   * نصّه وقنواته من الكود وحده — لا تحرير ولا إيقاف ولا قناة جديدة من الإدارة.
+   * لقوالب الرموز: من يملك `content.manage` كان يكتب `{{code}}` في العنوان،
+   * ويطلب استعادة لحساب غيره، ويقرأ الرمز من السجل، فيستولي على الحساب.
+   */
+  readonly locked?: true;
+  /** تنبيه أمن: يُحرَّر نصّه ولا يُوقف — إيقافه يُخفي عن الضحية أن حسابها يُسرق */
+  readonly mandatory?: true;
+  /** متغيّرات سرّية: تُمحى من الإشعار المخزَّن بعد الإرسال، فلا يقرأها السجل */
+  readonly secret?: readonly string[];
 }
 
 export const EVENTS: readonly EventDef[] = [
@@ -56,6 +66,14 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['name', 'order_number', 'store_name', 'reason', 'link'],
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', reason: 'نفدت الكمية لدى البائع', link: '/account/orders/BST-260921-A1B2C3' },
+  },
+  {
+    // نجاح وصل من البوابة بعد أن أُغلق الطلب فاشلاً — رُدّ كله، ولم يُنشأ طلب
+    code: 'late_payment_refunded',
+    labelAr: 'دفع متأخر رُدّ',
+    audience: 'customer',
+    variables: ['order_number', 'amount'],
+    sample: { order_number: 'BST-260921-A1B2C3', amount: '125.500 د.أ' },
   },
   {
     code: 'refund_issued',
@@ -131,6 +149,8 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['name', 'code', 'minutes'],
     sample: { name: 'سارة', code: '482913', minutes: '10' },
+    locked: true,
+    secret: ['code'],
   },
   {
     code: 'password_reset_code',
@@ -138,6 +158,8 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['name', 'code', 'minutes'],
     sample: { name: 'سارة', code: '482913', minutes: '10' },
+    locked: true,
+    secret: ['code'],
   },
   /**
    * تنبيهات أمن الحساب — تصل صاحبه أياً كان من فعلها: رمز استعادة استُعمل
@@ -149,6 +171,15 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['left'],
     sample: { left: '9' },
+    mandatory: true,
+  },
+  {
+    code: 'totp_rotated',
+    labelAr: 'تغيّر جهاز التحقق بخطوتين',
+    audience: 'customer',
+    variables: [],
+    sample: {},
+    mandatory: true,
   },
   {
     code: 'totp_reset_by_admin',
@@ -156,6 +187,7 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['reason'],
     sample: { reason: 'فقد صاحب الحساب هاتفه ورموز الاستعادة، وتحقّقنا من هويته.' },
+    mandatory: true,
   },
   /**
    * الرسائل — ST-28 و VD-15. تنبيه واحد لكل دفعة غير مقروءة لا لكل رسالة:
@@ -185,6 +217,7 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'vendor',
     variables: ['store_name', 'bank', 'iban_tail', 'link'],
     sample: { store_name: 'متجر الورد', bank: 'مصرف الراجحي', iban_tail: '1180', link: '/vendor/settings' },
+    mandatory: true,
   },
   {
     code: 'bank_account_verified',
@@ -249,6 +282,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'استرداد {{amount}} عن الطلب {{order_number}}'),
   t('refund_issued', 'in_app', 'رددنا {{amount}} إلى وسيلة دفعك عن الطلب {{order_number}}.'),
 
+  t('late_payment_refunded', 'email',
+    'وصلنا تأكيد دفعك للطلب {{order_number}} بعد أن كان قد أُغلق دون إتمام، فلم يُنشأ الطلب.\n\nرددنا المبلغ كاملاً، {{amount}}، إلى وسيلة دفعك. قد يستغرق ظهوره في كشف بطاقتك بضعة أيام عمل حسب البنك.\n\nإن كنت ما زلت تريد المنتجات فاطلبها من جديد.\n\nبسطة',
+    'رددنا {{amount}} عن الطلب {{order_number}}'),
+  t('late_payment_refunded', 'in_app', 'وصل دفعك للطلب {{order_number}} بعد إغلاقه، فرددنا {{amount}} كاملاً إلى وسيلة دفعك.'),
+
   t('dispute_message', 'email',
     'مرحباً {{name}}،\n\nوصلتك رسالة جديدة في النزاع على الطلب {{order_number}}. اقرأها وردّ من هنا: {{link}}\n\nبسطة',
     'رسالة جديدة في نزاع الطلب {{order_number}}'),
@@ -269,6 +307,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'استُعمل للتوّ أحد رموز الاستعادة لدخول حسابك في بسطة بدل رمز تطبيق المصادقة. الرموز الباقية: {{left}}.\n\nإن كنت أنت فلا شيء عليك؛ أنشئ رموزاً جديدة من صفحة الأمان إن قاربت على النفاد.\n\nإن لم تكن أنت فغيّر كلمة مرورك فوراً وأنهِ الجلسات الأخرى من صفحة حسابك.\n\nبسطة',
     'استُعمل رمز استعادة لدخول حسابك'),
   t('recovery_code_used', 'in_app', 'استُعمل رمز استعادة لدخول حسابك. الرموز الباقية: {{left}}.'),
+
+  t('totp_rotated', 'email',
+    'رُبط التحقق بخطوتين على حسابك في بسطة بجهاز مصادقة جديد، وأُصدرت رموز استعادة جديدة أبطلت القديمة، وأُنهيت كل جلساتك.\n\nإن كنت أنت فلا شيء عليك.\n\nإن لم تكن أنت فكلمة مرورك ورمزك معروفان لغيرك: استعد كلمة المرور فوراً وراسلنا.\n\nبسطة',
+    'تغيّر جهاز التحقق بخطوتين'),
+  t('totp_rotated', 'in_app', 'رُبط التحقق بخطوتين بجهاز جديد وأُصدرت رموز استعادة جديدة. إن لم تكن أنت فراسلنا فوراً.'),
 
   t('totp_reset_by_admin', 'email',
     'أعاد فريق الدعم ضبط التحقق بخطوتين على حسابك في بسطة، وأُنهيت كل جلساتك. السبب: {{reason}}\n\nحسابك الآن يُفتح بكلمة المرور وحدها — فعّل التحقق بخطوتين من جديد من صفحة الأمان.\n\nإن لم تطلب ذلك فراسلنا فوراً.\n\nبسطة',
@@ -359,3 +402,16 @@ export function render(text: string, vars: Readonly<Record<string, string>>): st
 }
 
 export const eventOf = (code: string): EventDef | undefined => EVENTS.find((e) => e.code === code);
+
+/** ما يحلّ محلّ المتغيّر السرّي في كل ما يُخزَّن بعد الإرسال */
+export const REDACTED = '••••••';
+
+/** نسخة من المتغيّرات بلا أسرار الحدث — لما يبقى في القاعدة ويقرؤه السجل */
+export function redactVars(code: string, vars: Readonly<Record<string, string>>): Record<string, string> {
+  const secret = eventOf(code)?.secret ?? [];
+  return Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, secret.includes(k) ? REDACTED : v]));
+}
+
+/** القالب كما في الكود — مصدر القوالب المقفولة الوحيد، ولو عُبث بصفّها في القاعدة */
+export const defaultTemplate = (code: string, channel: Channel): TemplateSeed | undefined =>
+  DEFAULT_TEMPLATES.find((t) => t.code === code && t.channel === channel);

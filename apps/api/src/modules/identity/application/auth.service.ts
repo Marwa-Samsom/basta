@@ -3,11 +3,13 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Role } from '../../../common/security/actor';
 import { NotificationsService } from '../../notifications/public';
+import { isLegacyPlain, openTotpSecret, sealTotpSecret } from '../infrastructure/secret-box';
 import { AuditService } from '../infrastructure/audit.service';
 import { hashPassword, verifyPassword } from '../domain/password';
 import { generateRecoveryCodes, looksLikeRecoveryCode, normalizeRecoveryCode } from '../domain/recovery-codes';
 import { adminNeedsTotpSetup, generateTotpSecret, totpUri, verifyTotpStep } from '../domain/totp';
 import { TokenService, type AccessClaims, type TokenPair } from './token.service';
+import { normalizeEmail } from '../../../common/email';
 
 export interface RequestMeta {
   /** قد تغيب فعلاً: عميل بلا ترويسة، أو طلب داخلي */
@@ -21,6 +23,31 @@ export interface LoginResult {
   requiresTotpSetup: boolean;
   /** إداري فعّل 2FA ولم يقدّم رمزه بعد */
   requiresTotp: boolean;
+}
+
+/** ما تُبنى منه المطالبات — مشترك بين الإصدار والتحقق مع كل طلب */
+const CLAIMS_SELECT = {
+  status: true,
+  deletedAt: true,
+  totpEnabledAt: true,
+  roles: { select: { role: true } },
+  permissions: { select: { permission: true } },
+  vendors: { select: { id: true } },
+} as const;
+
+function claimsOf(
+  userId: string,
+  user: Prisma.UserGetPayload<{ select: typeof CLAIMS_SELECT }>,
+): AccessClaims {
+  const roles = user.roles.map((r) => r.role as Role);
+  const claims: AccessClaims = {
+    sub: userId,
+    roles,
+    permissions: user.permissions.map((p) => p.permission),
+    ...(user.vendors[0] ? { vendorId: user.vendors[0].id } : {}),
+  };
+  // القاعدة التي لا تُخرَق: إداري بلا 2FA لا يحصل على رمز كامل
+  return adminNeedsTotpSetup(roles, user.totpEnabledAt) ? { ...claims, limited: true } : claims;
 }
 
 @Injectable()
@@ -37,25 +64,45 @@ export class AuthService {
   async buildClaims(userId: string): Promise<AccessClaims> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { roles: true, permissions: true, vendors: { select: { id: true } } },
+      select: CLAIMS_SELECT,
     });
     if (!user || user.status !== 'active' || user.deletedAt) {
       throw new UnauthorizedException('الحساب غير متاح.');
     }
+    return claimsOf(userId, user);
+  }
 
-    const roles = user.roles.map((r) => r.role as Role);
-    const claims: AccessClaims = {
-      sub: user.id,
-      roles,
-      permissions: user.permissions.map((p) => p.permission),
-      ...(user.vendors[0] ? { vendorId: user.vendors[0].id } : {}),
-    };
-
-    // القاعدة التي لا تُخرَق: إداري بلا 2FA لا يحصل على رمز كامل
-    if (adminNeedsTotpSetup(roles, user.totpEnabledAt)) {
-      return { ...claims, limited: true };
+  /**
+   * الفاعل كما هو الآن في القاعدة، لا كما كان حين وُقِّع الرمز.
+   *
+   * رمز الوصول يعيش 15 دقيقة، وكانت مطالباته تُصدَّق كما هي: الموقوف، والمدير
+   * الذي سُحبت صلاحياته، ومن غيّر كلمة مروره (فأُنهيت جلساته) — كلهم يعملون
+   * حتى ينتهي الرمز. الآن يُقرأ مع كل طلب، باستعلام واحد: الحساب فعّال،
+   * والجلسة (عائلة رمز التحديث، `sid`) حيّة، والأدوار والصلاحيات من القاعدة.
+   * كل ما يُنهي جلسة — الخروج، تغيير كلمة المرور، الإيقاف، سحب الصلاحيات،
+   * كشف السرقة — يسري إذن في الطلب التالي لا بعد ربع ساعة.
+   */
+  async liveClaims(token: AccessClaims): Promise<AccessClaims> {
+    const sid = typeof token.sid === 'string' ? token.sid : null;
+    if (!sid) throw new UnauthorizedException('انتهت جلستك. سجّل الدخول من جديد.');
+    const user = await this.prisma.user.findUnique({
+      where: { id: token.sub },
+      select: {
+        ...CLAIMS_SELECT,
+        refreshTokens: {
+          where: { familyId: sid, revokedAt: null, expiresAt: { gt: new Date() } },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (!user || user.status !== 'active' || user.deletedAt) {
+      throw new UnauthorizedException('الحساب غير متاح.');
     }
-    return claims;
+    if (user.refreshTokens.length === 0) {
+      throw new UnauthorizedException('انتهت جلستك. سجّل الدخول من جديد.');
+    }
+    return { ...claimsOf(token.sub, user), sid };
   }
 
   // ---------------------------------------------------------------- التسجيل
@@ -64,9 +111,13 @@ export class AuthService {
     input: { email: string; password: string; fullName: string; phone?: string },
     meta: RequestMeta,
   ): Promise<{ userId: string }> {
+    const email = normalizeEmail(input.email);
     const passwordHash = await hashPassword(input.password);
 
-    const existing = await this.prisma.user.findUnique({ where: { email: input.email } });
+    // الهاتف فريد كالبريد — كان المكرّر يصل القيد في القاعدة فيرمي 500، والرسالة نفسها لا تكشف أيّهما
+    const existing =
+      (await this.prisma.user.findUnique({ where: { email } })) ??
+      (input.phone ? await this.prisma.user.findUnique({ where: { phone: input.phone } }) : null);
     if (existing) {
       /**
        * الرد نفسه للبريد المستعمل وغير المستعمل من ناحية المستخدم
@@ -81,7 +132,7 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        email: input.email,
+        email,
         phone: input.phone ?? null,
         passwordHash,
         fullName: input.fullName,
@@ -109,7 +160,7 @@ export class AuthService {
     meta: RequestMeta,
   ): Promise<LoginResult> {
     const user = await this.prisma.user.findUnique({
-      where: { email: input.email },
+      where: { email: normalizeEmail(input.email) },
       include: { roles: true },
     });
 
@@ -205,12 +256,17 @@ export class AuthService {
       }
       return;
     }
-    const step = verifyTotpStep(submitted, user.totpSecretEnc, user.totpLastStep);
+    const secret = openTotpSecret(user.totpSecretEnc, user.id);
+    const step = verifyTotpStep(submitted, secret, user.totpLastStep);
     if (step === null) throw new UnauthorizedException('رمز التحقق الثنائي مطلوب وصحيح.');
     // الحجز شرطيّ: دخولان متزامنان بالرمز نفسه لا ينجحان معاً (المرحلة 12)
     const claimed = await this.prisma.user.updateMany({
       where: { id: user.id, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] },
-      data: { totpLastStep: step },
+      data: {
+        totpLastStep: step,
+        // سرّ قديم كُتب نصّاً يُشفَّر عند أول استعمال ناجح (وسكربت totp:seal لما بقي)
+        ...(isLegacyPlain(user.totpSecretEnc) ? { totpSecretEnc: sealTotpSecret(secret, user.id) } : {}),
+      },
     });
     if (claimed.count === 0) throw new UnauthorizedException('رمز التحقق الثنائي استُعمل. انتظر الرمز التالي.');
   }
@@ -268,48 +324,75 @@ export class AuthService {
   }
 
   /**
-   * بدء التهيئة **لمن لم يفعّله بعد وحده**. كانت تكتب سرّاً جديداً وتصفّر
-   * `totpEnabledAt` لأي مستخدم — فمن سرق جلسةً عطّل بها التحقق الثنائي بصمت.
-   * تغيير الجهاز يمرّ بالتعطيل، والتعطيل يطلب كلمة المرور والرمز معاً.
+   * بدء التهيئة — أو تغيير الجهاز. السرّ الجديد يُكتب في `totpPendingSecretEnc`
+   * وحده ولا يمسّ المفعَّل: لا يسري إلا بعد رمز صحيح منه. كانت تكتب فوق السرّ
+   * وتصفّر `totpEnabledAt`، فمجرّد فتح الصفحة بجلسة مسروقة ينزع الحماية.
+   *
+   * من لم يفعّله يبدأ بلا إثبات (الإداري الجديد لا يملك إلا الرمز المحدود).
+   * ومن فعّله يُثبت بكلمة المرور **و**رمز من الجهاز الحالي — وهو طريق الإداري
+   * الوحيد لتبديل هاتفه، إذ التعطيل ممنوع عليه.
    */
-  async beginTotpSetup(userId: string): Promise<{ secret: string; uri: string }> {
+  async beginTotpSetup(
+    userId: string,
+    proof: { password?: string | undefined; code?: string | undefined },
+    meta: RequestMeta,
+  ): Promise<{ secret: string; uri: string }> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (user.totpEnabledAt) {
-      throw new ConflictException(
-        'التحقق بخطوتين مفعَّل على حسابك. لتغيير الجهاز عطّله أولاً بكلمة المرور ورمز التحقق، ثم فعّله من جديد.',
-      );
+      if (!proof.password || !proof.code) {
+        throw new ConflictException(
+          'التحقق بخطوتين مفعَّل على حسابك. لتغيير الجهاز أدخل كلمة المرور ورمزاً من الجهاز الحالي.',
+        );
+      }
+      await this.reauthenticate(userId, { password: proof.password, code: proof.code }, meta);
     }
     const secret = generateTotpSecret();
-
-    // يُخزَّن غير مفعَّل: لا يصير ساري المفعول قبل إثبات أن المستخدم نسخه
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { totpSecretEnc: secret, totpEnabledAt: null },
-    });
-
+    // يُعرض لصاحبه مرة هنا، ولا يُخزَّن إلا مشفّراً
+    await this.prisma.user.update({ where: { id: userId }, data: { totpPendingSecretEnc: sealTotpSecret(secret, userId) } });
     return { secret, uri: totpUri(secret, user.email ?? user.id) };
   }
 
-  /** يفعّل ويُعيد رموز الاستعادة العشرة — تُعرض مرة واحدة ولا سبيل لقراءتها بعدها */
-  async confirmTotpSetup(userId: string, token: string): Promise<{ recoveryCodes: string[] }> {
+  /**
+   * يؤكّد السرّ المنتظر برمز منه فيصير هو السرّ الساري، ويُعيد رموز استعادة
+   * عشرة جديدة — تُعرض مرة واحدة ولا سبيل لقراءتها بعدها. على تحقق مفعَّل
+   * (تغيير جهاز) يُبلَّغ صاحب الحساب: إن لم يكن هو فحسابه في خطر.
+   */
+  async confirmTotpSetup(userId: string, token: string, meta: RequestMeta): Promise<{ recoveryCodes: string[] }> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    if (user.totpEnabledAt) throw new ConflictException('التحقق بخطوتين مفعَّل بالفعل.');
-    const step = user.totpSecretEnc ? verifyTotpStep(token, user.totpSecretEnc, user.totpLastStep) : null;
+    const pending = user.totpPendingSecretEnc;
+    if (!pending) throw new ConflictException('لا تهيئة قيد الانتظار. ابدأ التهيئة أولاً.');
+    // السرّ جديد فلا خطوة سابقة له — خطوة السرّ القديم لا تحجب رمز الجهاز الجديد
+    const step = verifyTotpStep(token, openTotpSecret(pending, userId));
     if (step === null) {
       throw new UnauthorizedException('الرمز غير صحيح. تأكد من وقت جهازك وأعد المحاولة.');
     }
+    const rotating = user.totpEnabledAt !== null;
 
     const recoveryCodes = await this.prisma.$transaction(async (tx) => {
-      // الشرط يمنع تأكيدين متزامنين من إصدار دفعتي رموز
+      // الشرط على السرّ المنتظر نفسه: تأكيدان متزامنان، أو تهيئة بُدئت من جديد
+      // بينهما، لا يُصدران دفعتي رموز ولا يُفعّلان سرّاً غير الذي تحقّق منه
       const { count } = await tx.user.updateMany({
-        where: { id: userId, totpEnabledAt: null },
-        data: { totpEnabledAt: new Date(), totpLastStep: step },
+        where: { id: userId, totpPendingSecretEnc: pending, totpEnabledAt: rotating ? { not: null } : null },
+        data: {
+          totpSecretEnc: pending,
+          totpPendingSecretEnc: null,
+          totpLastStep: step,
+          ...(rotating ? {} : { totpEnabledAt: new Date() }),
+        },
       });
-      if (count === 0) throw new ConflictException('التحقق بخطوتين مفعَّل بالفعل.');
+      if (count === 0) throw new ConflictException('تغيّرت التهيئة أثناء التأكيد. ابدأ من جديد.');
       const codes = await this.replaceRecoveryCodes(tx, userId);
       await tx.auditLog.create({
-        data: { actorUserId: userId, action: 'auth.totp_enabled', entityType: 'User', entityId: userId },
+        data: {
+          actorUserId: userId,
+          action: rotating ? 'auth.totp_rotated' : 'auth.totp_enabled',
+          entityType: 'User',
+          entityId: userId,
+          ip: meta.ip ?? null,
+          userAgent: meta.userAgent ?? null,
+        },
       });
+      if (rotating) await this.notifications.enqueue({ code: 'totp_rotated', userId, vars: {} }, tx);
       return codes;
     });
 
@@ -384,7 +467,7 @@ export class AuthService {
     await this.secondFactor(user, input.code, meta);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { totpSecretEnc: null, totpEnabledAt: null } });
+      await tx.user.update({ where: { id: userId }, data: { totpSecretEnc: null, totpPendingSecretEnc: null, totpEnabledAt: null } });
       await tx.totpRecoveryCode.deleteMany({ where: { userId } });
       await tx.auditLog.create({
         data: {

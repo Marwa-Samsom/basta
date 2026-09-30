@@ -1,10 +1,21 @@
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { ValidationPipe } from '@nestjs/common';
-import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { mkdirSync } from 'node:fs';
+import { loadEnv, type TrustProxy } from './common/config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { IMAGE_MAX_BYTES, UPLOADS_ROOT, UPLOADS_URL_PREFIX } from './modules/catalog/public';
+import { IMAGE_MAX_BYTES, ProductImageGate, UPLOADS_ROOT, UPLOADS_URL_PREFIX } from './modules/catalog/public';
+
+/**
+ * محوّل HTTP بالوسطاء الموثوقين (TRUST_PROXY): منه وحده يُحسب `req.ip` الذي
+ * يُعدّ به حدّ المعدّل ويُسجَّل في التدقيق. لا يقرأ أحد X-Forwarded-For بيده.
+ */
+export function createHttpAdapter(trustProxy: TrustProxy = loadEnv().trustProxy): FastifyAdapter {
+  // عدد الوسطاء دالة بمعنى Fastify نفسه (يُصدَّق أقرب n) — أنواع محوّل Nest لا تقبل الرقم
+  const trust = typeof trustProxy === 'number' ? (_addr: string, hop: number) => hop < trustProxy : trustProxy;
+  return new FastifyAdapter({ trustProxy: trust });
+}
 
 /**
  * تهيئة التطبيق المشتركة بين الإقلاع واختبارات الواجهة البرمجية.
@@ -39,7 +50,7 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     // رمز السلة ومفتاح عدم التكرار ترويستان مخصّصتان — غيابهما هنا يُسقط الدفع من المتصفّح وحده
-    allowedHeaders: ['authorization', 'content-type', 'x-cart-token', 'idempotency-key'],
+    allowedHeaders: ['authorization', 'content-type', 'x-cart-token', 'idempotency-key', 'x-order-key'],
   });
 
   // الحد العام أعلى حدود المسارات؛ كل مسار يضيّقه لنفسه (الاستيراد 5 م.ب)
@@ -47,7 +58,16 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
     limits: { fileSize: IMAGE_MAX_BYTES, files: 1, fields: 10, fieldSize: 16 * 1024 },
   });
 
-  // صور المنتجات محتوى عام لا يمرّ بحارس المصادقة — كصفحة المنتج نفسها
+  // صور المنتجات تمرّ ببوابتها قبل الملف: منتج ظاهر، أو صورة في طلب، أو رابط موقَّع
+  // لواجهتي البائع والإدارة — وما سواها (مرفوض، محذوف، مسودّة) 404. قبل تسجيل
+  // المجلد: الخطّاف يسري على ما يُسجَّل بعده
+  const gate = app.get(ProductImageGate, { strict: false });
+  app.getHttpAdapter().getInstance().addHook('onRequest', async (req: { url: string }, reply: { code: (c: number) => { send: (b: unknown) => unknown } }) => {
+    if ((await gate.allows(req.url)) === false) {
+      return reply.code(404).send({ code: 'NOT_FOUND', message: 'الصورة غير موجودة.' });
+    }
+  });
+
   mkdirSync(UPLOADS_ROOT, { recursive: true });
   await app.register(fastifyStatic as never, {
     root: UPLOADS_ROOT,

@@ -33,6 +33,9 @@ import {
 } from '../../payments/public';
 import { CartService } from '../../cart/public';
 import { CheckoutService } from '../application/checkout.service';
+import { NormalizeEmail } from '../../../common/email';
+import { guestOrderKeyMatches } from '../domain/snapshot';
+import { loadEnv } from '../../../common/config/env';
 
 export class AddressDto {
   @IsString()
@@ -83,7 +86,18 @@ export class PlaceOrderDto {
   @Length(3, 120)
   paymentToken!: string;
 
+  /**
+   * الإجمالي الذي رآه المشتري تحت «ادفع» — بالوحدات الصغرى وعملته، كما أعاده
+   * /checkout/quote. الخادم يعيد التسعير ولا يخصم مبلغاً غيره (409، reason TOTAL_CHANGED).
+   */
+  @Matches(/^[0-9]{1,19}$/, { message: 'أرسل الإجمالي الذي رأيته قبل الدفع.' })
+  expectedTotal!: string;
+
+  @Matches(/^[A-Z]{3}$/, { message: 'أرسل عملة الإجمالي الذي رأيته.' })
+  expectedCurrency!: string;
+
   @IsOptional()
+  @NormalizeEmail()
   @IsEmail({}, { message: 'البريد غير صالح.' })
   guestEmail?: string;
 
@@ -148,6 +162,7 @@ export class CheckoutController {
       idempotencyKey,
       address: dto.address,
       paymentToken: dto.paymentToken,
+      expected: { total: BigInt(dto.expectedTotal), currency: dto.expectedCurrency },
       userId: actor?.userId ?? null,
       guestEmail: dto.guestEmail ?? null,
       guestPhone: dto.guestPhone ?? null,
@@ -160,13 +175,23 @@ export class CheckoutController {
    * «pending» تُطلب المصالحة، فيعرف المشتري النتيجة لا يدفع ثانيةً.
    */
   @Get('orders/:orderNumber')
-  async status(@Param('orderNumber') orderNumber: string, @MaybeActor() actor: Actor | null) {
+  async status(
+    @Param('orderNumber') orderNumber: string,
+    @MaybeActor() actor: Actor | null,
+    @Headers('x-order-key') accessKey: string | undefined,
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { orderNumber },
       select: { id: true, status: true, customerUserId: true },
     });
-    // رقم الطلب ليس سرّاً كافياً: طلب مسجَّل لا يُعرض لغير صاحبه
-    if (!order || (order.customerUserId && order.customerUserId !== actor?.userId)) {
+    // رقم الطلب ليس سرّاً: طلب مسجَّل لصاحبه وحده، وطلب الضيف بمفتاحه — وإلا 404
+    // كأنه غير موجود، والمصالحة (نداء للبوابة) لا تُطلق قبل الإذن
+    const allowed = order
+      ? order.customerUserId
+        ? order.customerUserId === actor?.userId
+        : guestOrderKeyMatches(order.id, loadEnv().jwtAccessSecret, accessKey)
+      : false;
+    if (!order || !allowed) {
       throw new NotFoundError('الطلب غير موجود.', {});
     }
     if (order.status === 'pending_payment') await this.checkout.reconcile(order.id);

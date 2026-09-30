@@ -157,8 +157,15 @@ describe('عملة التسوية', () => {
     expect(defaultCurrencyFor('FR')).toBe('USD');
   });
 
-  it('تتغيّر قبل التثبيت وتُمنع بعده — ADR-013', () => {
-    expect(() => assertCurrencyChangeable(null)).not.toThrow();
-    expect(() => assertCurrencyChangeable(new Date())).toThrow(/مثبَّتة/);
+  it('تتغيّر في التأهيل وحده وبلا شيء مسعَّر، وتُمنع بعد التثبيت — ADR-013', () => {
+    const open = { lockedAt: null, status: 'pending', priced: false } as const;
+    expect(() => assertCurrencyChangeable(open)).not.toThrow();
+    expect(() => assertCurrencyChangeable({ ...open, status: 'rejected' })).not.toThrow();
+    expect(() => assertCurrencyChangeable({ ...open, lockedAt: new Date() })).toThrow(/مثبَّتة/);
+    // غير مثبَّتة لكن المتجر تجاوز التأهيل — متاجر ما قبل التثبيت التلقائي
+    for (const status of ['in_review', 'approved', 'suspended', 'banned'] as const) {
+      expect(() => assertCurrencyChangeable({ ...open, status })).toThrow(/قبل إرسال الطلب/);
+    }
+    expect(() => assertCurrencyChangeable({ ...open, priced: true })).toThrow(/مكتوبة بالعملة الحالية/);
   });
 });

@@ -27,6 +27,8 @@ interface Statement {
   opening: { pendingMinorUnits: string; availableMinorUnits: string };
   closing: { pendingMinorUnits: string; availableMinorUnits: string };
   rows: Row[];
+  /** الكشف صفحات (500 قيد) — المؤشّر يجلب التالية، null حين لا تالية */
+  nextCursor: string | null;
 }
 
 /**
@@ -71,6 +73,7 @@ export default function StatementPage() {
   const [type, setType] = useState('all');
   const [data, setData] = useState<Statement | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -106,6 +109,20 @@ export default function StatementPage() {
       alive = false;
     };
   }, [currency, from, to]);
+
+  // الصفحة التالية تُلحق بما جُلب: الرصيد بعد كل سطر يكمل من آخر سطر، والافتتاحي والختامي للمدة كلها
+  const loadMore = async () => {
+    if (!data?.nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const next = await api<Statement>(`/vendor/finance/statement?${query()}&cursor=${data.nextCursor}`);
+      setData({ ...next, rows: [...data.rows, ...next.rows] });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const download = async () => {
     try {
@@ -299,6 +316,16 @@ export default function StatementPage() {
               </table>
             </div>
           )}
+          {data?.nextCursor ? (
+            <div className="vm-more">
+              <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void loadMore()}>
+                {loadingMore ? 'جارٍ الجلب…' : 'حمّل القيود التالية'}
+              </button>
+              <span className="vm-muted">
+                جُلب <span className="num">{data.rows.length}</span> قيداً — التصفية بالنوع على المجلوب، والتصدير يشمل المدة كلها
+              </span>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </div>
