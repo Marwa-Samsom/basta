@@ -44,6 +44,11 @@ export class ApplyVendorDto {
   @IsOptional()
   @IsUUID()
   mainCategoryId?: string;
+
+  @ApiPropertyOptional({ enum: SETTLEMENT_CURRENCIES, description: 'اختيار صريح — بدونه تُقترح عملة البلد ويُطلب اختيارها قبل الإرسال' })
+  @IsOptional()
+  @IsIn(SETTLEMENT_CURRENCIES as unknown as string[], { message: 'العملة غير مدعومة للتسوية.' })
+  settlementCurrency?: string;
 }
 
 export class UpdateShopDto {

@@ -274,6 +274,8 @@ export interface OnboardingSnapshot {
   readonly nameAr: string;
   readonly slug: string;
   readonly country: string;
+  /** اختار البائع عملة التسوية صراحةً (VD-04) — المقترحة من البلد لا تكفي */
+  readonly currencyChosen: boolean;
   readonly documents: readonly { type: string; status: string; rejectReason: string | null }[];
   readonly bank: { iban: string; holderName: string } | null;
 }
@@ -290,6 +292,15 @@ export function submissionBlockers(snapshot: OnboardingSnapshot): readonly Block
       code: 'name_missing',
       message: 'اسم المتجر بالعربية مطلوب.',
       field: 'nameAr',
+    });
+  }
+
+  // الاعتماد يثبّتها ولا تتغيّر بعده — فلا تُرسل بعملة لم يرها صاحبها
+  if (!snapshot.currencyChosen) {
+    blockers.push({
+      code: 'currency_unchosen',
+      message: 'اختر عملة التسوية — تُسعَّر بها منتجاتك وتُحوَّل بها مستحقاتك، ولا تتغيّر بعد اعتماد متجرك.',
+      field: 'settlementCurrency',
     });
   }
 

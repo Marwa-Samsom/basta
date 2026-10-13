@@ -22,6 +22,7 @@ const snapshot = (over: Partial<OnboardingSnapshot> = {}): OnboardingSnapshot =>
   nameAr: 'دار القطن',
   slug: 'dar-alqutn',
   country: 'JO',
+  currencyChosen: true,
   documents: [
     { type: 'commercial_register', status: 'pending', rejectReason: null },
     { type: 'national_id', status: 'accepted', rejectReason: null },
@@ -91,6 +92,13 @@ describe('الوثائق', () => {
 describe('موانع الإرسال', () => {
   it('لا مانع حين تكتمل الوثائق والحساب', () => {
     expect(submissionBlockers(snapshot())).toHaveLength(0);
+  });
+
+  it('عملة لم يخترها البائع مانع — المقترحة من بلده لا تكفي', () => {
+    const blockers = submissionBlockers(snapshot({ currencyChosen: false }));
+    expect(blockers.map((b) => b.code)).toEqual(['currency_unchosen']);
+    expect(blockers[0]!.field).toBe('settlementCurrency');
+    expect(blockers[0]!.message).toMatch(/لا تتغيّر بعد اعتماد متجرك/);
   });
 
   it('تُعدّ الموانع مجتمعة لا واحداً واحداً', () => {

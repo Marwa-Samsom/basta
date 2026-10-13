@@ -163,11 +163,14 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
 
     expect(view.status).toBe('pending');
     expect(view.slug).toBe(`dar-alqutn-${SUFFIX}`);
-    // العملة تُقترح من البلد ولا تُترك فارغة — ADR-013
+    // العملة تُقترح من البلد ولا تُترك فارغة — ADR-013. لكنها اقتراح لا اختيار:
+    // الإرسال ممنوع حتى يختارها البائع صراحةً (VD-04)
     expect(view.settlementCurrency).toBe('JOD');
     expect(view.settlementCurrencyLocked).toBe(false);
-    // أربعة موانع للوثائق وواحد للحساب البنكي
-    expect(view.blockers).toHaveLength(5);
+    expect(view.settlementCurrencyChosen).toBe(false);
+    // العملة، وأربع وثائق، والحساب البنكي
+    expect(view.blockers).toHaveLength(6);
+    expect(view.blockers[0].code).toBe('currency_unchosen');
     expect(view.canSubmit).toBe(false);
 
     const roles = await prisma.userRole.findMany({ where: { userId: sellerUserId } });
@@ -180,6 +183,9 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     const sar = await put({ currency: 'SAR' });
     expect(sar.statusCode, sar.body).toBe(200);
     expect(sar.json().settlementCurrency).toBe('SAR');
+    // الاختيار يرفع مانع العملة — ما بقي الوثائق والحساب
+    expect(sar.json().settlementCurrencyChosen).toBe(true);
+    expect(sar.json().blockers.map((b: { code: string }) => b.code)).not.toContain('currency_unchosen');
     expect((await put({ currency: 'JOD' })).statusCode).toBe(200);
 
     // سعر شحن مكتوب بالدينار: تغيير العملة يغيّر معناه — يُمنع
@@ -207,6 +213,32 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
       available: false,
       suggestion: `dar-alqutn-${SUFFIX}-2`,
     });
+  });
+
+  it('VD-01: عملة يختارها عند التسجيل تُحفظ اختياراً — ولا مانع عملة بعدها', async () => {
+    if (!dbUp) return;
+    const email = `chooser.${SUFFIX}@basta.test`;
+    await registerUser(email, ['customer']);
+    const token = await login(email);
+    const res = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/apply', token),
+      payload: { nameAr: 'متجر يختار عملته', nameEn: `Chooser ${SUFFIX}`, country: 'QA', settlementCurrency: 'SAR' },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const view = res.json().vendor;
+    createdVendorIds.push(view.id);
+    // قطر بلا عملة تسوية خاصة بها — كانت تُفرض عليه الدولار بصمت
+    expect(view.settlementCurrency).toBe('SAR');
+    expect(view.settlementCurrencyChosen).toBe(true);
+    expect(view.blockers.map((b: { code: string }) => b.code)).not.toContain('currency_unchosen');
+
+    const bad = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/apply', await login(`seller.${SUFFIX}@basta.test`)),
+      payload: { nameAr: 'عملة مجهولة', country: 'JO', settlementCurrency: 'XYZ' },
+    });
+    expect(bad.statusCode).toBe(400);
   });
 
   it('لا متجرين على حساب واحد', async () => {

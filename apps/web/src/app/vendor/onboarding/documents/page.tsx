@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { Alert, StatusBadge, TextInput, type Blocker } from '@/components/ui';
 import { Icon } from '@/components/icons';
-import { useOnboarding, type Onboarding, type OnboardingDocument } from '@/lib/vendor';
+import { CURRENCIES, useOnboarding, type Onboarding, type OnboardingDocument } from '@/lib/vendor';
 import { OnboardingError, OnboardingFrame, OnboardingHead, OnboardingLoading } from '../onboarding-chrome';
 
 /** ما يُطلب في كل مستند — تحت عنوانه وداخل منطقة الإسقاط */
@@ -35,14 +35,14 @@ export default function DocumentsPage() {
   }
   if (loading && !data) {
     return (
-      <OnboardingFrame step={3}>
+      <OnboardingFrame step={4}>
         <OnboardingLoading />
       </OnboardingFrame>
     );
   }
   if (error || !data) {
     return (
-      <OnboardingFrame step={3}>
+      <OnboardingFrame step={4}>
         <OnboardingError message={error ?? 'تعذّر تحميل حالة المتجر.'} onRetry={() => void reload()} />
       </OnboardingFrame>
     );
@@ -58,17 +58,31 @@ export default function DocumentsPage() {
       return data?.documents.find((d) => d.type === type)?.label ?? 'المستند';
     }
     if (field.startsWith('bank.')) return 'الحساب البنكي';
+    if (field === 'settlementCurrency') return 'عملة التسوية';
     return 'بيانات المتجر';
   }
 
   return (
-    <OnboardingFrame step={3} status={data.status}>
+    <OnboardingFrame step={4} status={data.status}>
       <OnboardingHead
         title="ارفع مستندات المتجر"
         lead="أربعة مستندات وحساب بنكي باسم النشاط. الصيغ المقبولة PDF أو صورة JPEG أو PNG، حتى 10 ميغابايت للملف."
       />
       <p className="vo-ident">
-        {data.nameAr} · <span className="num">basta.com/s/{data.slug}</span>
+        {data.nameAr} · <span className="num">basta.com/s/{data.slug}</span> · عملة التسوية:{' '}
+        {data.settlementCurrencyChosen ? (
+          <>
+            {CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameAr ?? data.settlementCurrency}
+            {data.settlementCurrencyLocked ? null : (
+              <>
+                {' '}
+                <Link href="/vendor/onboarding/currency">غيّرها</Link>
+              </>
+            )}
+          </>
+        ) : (
+          <Link href="/vendor/onboarding/currency">لم تخترها بعد — اخترها</Link>
+        )}
       </p>
 
       {data.status === 'in_review' ? (
@@ -114,8 +128,13 @@ export default function DocumentsPage() {
         vendor={data}
         onSubmitted={set}
         targetLabel={targetLabel}
-        onBack={() => router.push('/vendor/register')}
+        onBack={() => router.push('/vendor/onboarding/currency')}
         onGo={(field) => {
+          // العملة في خطوتها لا في هذه الصفحة
+          if (field === 'settlementCurrency') {
+            router.push('/vendor/onboarding/currency');
+            return;
+          }
           const target = document.getElementById(field.replaceAll('.', '-'));
           target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           target?.focus({ preventScroll: true });
