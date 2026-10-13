@@ -11,9 +11,9 @@ const DATE = new Intl.DateTimeFormat('ar-JO-u-nu-latn', { dateStyle: 'medium', t
 
 /** الخطوة في شريط التأهيل تتبع ما بقي فعلاً، لا اسم الصفحة */
 function stepOf(vendor: Onboarding): number {
-  if (vendor.status === 'pending') return 3;
-  if (vendor.status === 'in_review' || vendor.status === 'rejected') return 4;
-  return vendor.settlementCurrencyLocked ? 6 : 5;
+  if (vendor.status === 'pending') return vendor.settlementCurrencyChosen ? 4 : 3;
+  if (vendor.status === 'in_review' || vendor.status === 'rejected') return 5;
+  return 6;
 }
 
 const TITLE: Record<string, string> = {
@@ -41,14 +41,14 @@ export default function StatusPage() {
   }
   if (loading && !data) {
     return (
-      <OnboardingFrame step={4}>
+      <OnboardingFrame step={5}>
         <OnboardingLoading label="جارٍ تحميل حالة طلبك…" />
       </OnboardingFrame>
     );
   }
   if (error || !data) {
     return (
-      <OnboardingFrame step={4}>
+      <OnboardingFrame step={5}>
         <OnboardingError message={error ?? 'تعذّر تحميل حالة المتجر.'} onRetry={() => void reload()} />
       </OnboardingFrame>
     );
@@ -118,10 +118,17 @@ export default function StatusPage() {
             <section className="card vo-verdict">
               <StatusBadge status={data.status} />
               <h2 className="vo-verdict__head">أكمل طلبك وأرسله للمراجعة</h2>
-              <p className="vo-verdict__body">أكمل الوثائق وبيانات الحساب البنكي ثم أرسل الطلب للمراجعة.</p>
+              <p className="vo-verdict__body">
+                {data.settlementCurrencyChosen
+                  ? 'أكمل الوثائق وبيانات الحساب البنكي ثم أرسل الطلب للمراجعة.'
+                  : 'اختر عملة التسوية، ثم أكمل الوثائق وبيانات الحساب البنكي وأرسل الطلب للمراجعة.'}
+              </p>
               <div className="vo-actions">
-                <Link className="btn btn--primary" href="/vendor/onboarding/documents">
-                  أكمل الطلب
+                <Link
+                  className="btn btn--primary"
+                  href={data.settlementCurrencyChosen ? '/vendor/onboarding/documents' : '/vendor/onboarding/currency'}
+                >
+                  {data.settlementCurrencyChosen ? 'أكمل الطلب' : 'اختر عملة التسوية'}
                   <Icon name="next" size={16} mirror />
                 </Link>
               </div>
@@ -132,24 +139,13 @@ export default function StatusPage() {
             <section className="card vo-verdict" data-tone="success">
               <StatusBadge status={data.status} />
               <h2 className="vo-verdict__head">اعتُمد متجرك — بقي القليل قبل أول بيع</h2>
-              {/* النص يتبع ما بقي فعلاً: بائع ثبّت عملته لا يُقال له «ثبّت عملتك» */}
-              <p className="vo-verdict__body">
-                {data.settlementCurrencyLocked
-                  ? 'جهّز ملف متجرك وأضف منتجاتك لتبدأ البيع.'
-                  : 'تستطيع الآن تثبيت عملة التسوية ثم تجهيز ملف متجرك ومنتجاتك.'}
-              </p>
+              {/* العملة اختيرت قبل الإرسال وثبّتها الاعتماد — بقي الملف والمنتجات */}
+              <p className="vo-verdict__body">جهّز ملف متجرك وأضف منتجاتك لتبدأ البيع.</p>
               <div className="vo-actions">
-                {!data.settlementCurrencyLocked ? (
-                  <Link className="btn btn--primary" href="/vendor/onboarding/currency">
-                    اختر عملة التسوية
-                    <Icon name="next" size={16} mirror />
-                  </Link>
-                ) : (
-                  <Link className="btn btn--primary" href="/vendor/store">
-                    جهّز ملف المتجر
-                    <Icon name="next" size={16} mirror />
-                  </Link>
-                )}
+                <Link className="btn btn--primary" href="/vendor/store">
+                  جهّز ملف المتجر
+                  <Icon name="next" size={16} mirror />
+                </Link>
                 <Link className="btn btn--secondary" href="/vendor/products">
                   منتجاتي
                 </Link>

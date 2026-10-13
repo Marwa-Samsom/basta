@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
@@ -9,11 +10,12 @@ import { CURRENCIES, formatAmount, useOnboarding, type Onboarding } from '@/lib/
 import { OnboardingError, OnboardingFrame, OnboardingHead, OnboardingLoading } from '../onboarding-chrome';
 
 /**
- * VD-04 — عملة التسوية.
+ * VD-04 — عملة التسوية، الخطوة الثالثة: بعد بيانات المتجر وقبل المستندات.
  *
- * قرار لا رجعة فيه (ADR-013)، فالشاشة تعامله كذلك: تحذير صريح، ومثال يتغيّر
- * مع الاختيار بخانات العملة نفسها، وإقرار قبل التفعيل، ثم نافذة تأكيد.
- * لا نجعله سهلاً — نجعله مفهوماً.
+ * الاعتماد يثبّتها ولا تتغيّر بعده (ADR-013)، فالشاشة تعاملها كقرار: تحذير صريح،
+ * ومثال يتغيّر مع الاختيار بخانات العملة نفسها، وإقرار، ثم نافذة تأكيد. لا نجعله
+ * سهلاً — نجعله مفهوماً. الاختيار يبقى قابلاً للتغيير حتى الإرسال، والخادم يمنع
+ * الإرسال بلا اختيار صريح: المقترحة من البلد اقتراح لا اختيار.
  */
 export default function CurrencyPage() {
   const router = useRouter();
@@ -42,14 +44,14 @@ export default function CurrencyPage() {
   }
   if (loading && !data) {
     return (
-      <OnboardingFrame step={5}>
+      <OnboardingFrame step={3}>
         <OnboardingLoading />
       </OnboardingFrame>
     );
   }
   if (error || !data) {
     return (
-      <OnboardingFrame step={5}>
+      <OnboardingFrame step={3}>
         <OnboardingError message={error ?? 'تعذّر تحميل حالة المتجر.'} onRetry={() => void reload()} />
       </OnboardingFrame>
     );
@@ -59,17 +61,26 @@ export default function CurrencyPage() {
   const currency = CURRENCIES.find((c) => c.code === selected) ?? CURRENCIES[0]!;
 
   if (data.settlementCurrencyLocked) {
+    // أُرسل الطلب أو اعتُمد: العملة لا تتغيّر من هنا — والوجهة التالية بحسب الحال
+    const reviewing = data.status === 'in_review';
+    const onward = reviewing
+      ? { href: '/vendor/onboarding/status', label: 'تابع حالة طلبك' }
+      : data.status === 'approved' || data.status === 'suspended'
+        ? { href: '/vendor/store', label: 'جهّز ملف المتجر' }
+        : { href: '/vendor/onboarding/documents', label: 'المستندات' };
     return (
-      <OnboardingFrame step={6} status={data.status}>
+      <OnboardingFrame step={reviewing ? 5 : 6} status={data.status}>
         <OnboardingHead title="عملة التسوية" />
-        <Alert tone="info" title={`عملتك مثبَّتة: ${currency.nameAr}`}>
-          تُسعّر منتجاتك بها وتستلم مستحقاتك بها. تغييرها يتطلّب تسوية رصيدك الحالي — راسل الدعم عند الحاجة.
+        <Alert tone="info" title={`عملتك: ${currency.nameAr}`}>
+          {reviewing
+            ? 'طلبك قيد المراجعة، والعملة لا تتغيّر أثناءها. يثبّتها اعتماد متجرك.'
+            : 'تُسعّر منتجاتك بها وتستلم مستحقاتك بها. تغييرها يتطلّب تسوية رصيدك الحالي — راسل الدعم عند الحاجة.'}
         </Alert>
         <div className="vo-actions">
-          <a className="btn btn--primary" href="/vendor/store">
-            جهّز ملف المتجر
+          <Link className="btn btn--primary" href={onward.href}>
+            {onward.label}
             <Icon name="next" size={16} mirror />
-          </a>
+          </Link>
         </div>
       </OnboardingFrame>
     );
@@ -81,20 +92,21 @@ export default function CurrencyPage() {
     try {
       const next = await api<Onboarding>('/vendor/onboarding/settlement-currency', {
         method: 'PUT',
-        body: { currency: selected, lock: true },
+        // اختيار لا تثبيت: يتغيّر حتى الإرسال، والاعتماد يثبّته
+        body: { currency: selected },
       });
       set(next);
       setConfirming(false);
-      router.push('/vendor/store');
+      router.push('/vendor/onboarding/documents');
     } catch (err) {
-      setFailure(err instanceof Error ? err.message : 'تعذّر تثبيت العملة.');
+      setFailure(err instanceof Error ? err.message : 'تعذّر حفظ العملة.');
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <OnboardingFrame step={5} status={data.status}>
+    <OnboardingFrame step={3} status={data.status}>
       <OnboardingHead
         title="اختر عملة التسوية"
         lead="العملة التي تُسعّر بها منتجاتك وتستلم بها مستحقاتك. يرى المشتري السعر محوَّلاً إلى عملته، وتبقى مستحقاتك بعملتك."
@@ -103,8 +115,10 @@ export default function CurrencyPage() {
       <div className="vo-callout vo-callout--warning" role="note">
         <Icon name="alert" size={19} />
         <div className="vo-callout__text">
-          <p className="vo-callout__title">تُثبَّت العملة عند اعتماد متجرك — ولا تتغيّر بعد أن تسعّر بها منتجاً أو شحناً</p>
-          <p className="vo-callout__body">اختر العملة التي تتعامل بها فعلياً مع بنكك.</p>
+          <p className="vo-callout__title">تُثبَّت العملة عند اعتماد متجرك — ولا تتغيّر بعده</p>
+          <p className="vo-callout__body">
+            اختر العملة التي تتعامل بها فعلياً مع بنكك. تستطيع تغييرها حتى ترسل طلبك للمراجعة، ما لم تسعّر بها منتجاً أو شحناً.
+          </p>
         </div>
       </div>
 
@@ -173,7 +187,7 @@ export default function CurrencyPage() {
             <span className="vo-ack__box" aria-hidden>
               <Icon name="check" size={14} />
             </span>
-            <span>فهمت أن العملة لا تتغيّر بعد أول عملية بيع.</span>
+            <span>فهمت أن العملة تُثبَّت عند اعتماد متجري ولا تتغيّر بعده.</span>
           </label>
 
           <button
@@ -182,12 +196,20 @@ export default function CurrencyPage() {
             disabled={!acknowledged}
             onClick={() => setConfirming(true)}
           >
-            ثبّت {currency.nameAr}
+            اختر {currency.nameAr}
             <Icon name="next" size={16} mirror />
           </button>
           <p className="vo-commit__hint">
-            {acknowledged ? 'تُسأل مرة واحدة فقط قبل التأكيد.' : 'علّم «فهمت» لتتابع.'}
+            {data.settlementCurrencyChosen
+              ? `اخترت ${CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameAr ?? data.settlementCurrency} من قبل — تستطيع تغييرها حتى ترسل طلبك.`
+              : acknowledged
+                ? 'تُسأل مرة واحدة فقط قبل التأكيد.'
+                : 'علّم «فهمت» لتتابع.'}
           </p>
+          <Link className="btn btn--secondary btn--block" href="/vendor/register">
+            <Icon name="back" size={16} mirror />
+            رجوع إلى بيانات المتجر
+          </Link>
         </section>
       </div>
 
@@ -216,7 +238,8 @@ export default function CurrencyPage() {
             {currency.nameAr} · {currency.symbol}
           </span>
           <p>
-            سنثبّت <strong>{currency.nameAr}</strong> عملةً لمتجرك. لا يمكن التراجع عن هذا لاحقاً.
+            ستكون <strong>{currency.nameAr}</strong> عملة متجرك. تستطيع تغييرها حتى ترسل طلبك، ويثبّتها اعتماد المتجر
+            فلا تتغيّر بعده.
           </p>
           {failure ? <Alert tone="danger">{failure}</Alert> : null}
         </div>
@@ -226,7 +249,7 @@ export default function CurrencyPage() {
           </button>
           <button className="btn btn--primary" type="button" disabled={busy} onClick={() => void confirm()}>
             {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
-            {busy ? 'جارٍ التثبيت…' : 'نعم، ثبّتها'}
+            {busy ? 'جارٍ الحفظ…' : 'نعم، وتابع إلى المستندات'}
           </button>
         </div>
       </dialog>

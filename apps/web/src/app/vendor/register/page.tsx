@@ -130,7 +130,8 @@ export default function VendorRegisterPage() {
             businessType: form.businessType,
           },
         });
-        router.push('/vendor/onboarding/documents');
+        // من اختار عملته يكمل إلى المستندات؛ ومن لم يختر يمرّ بها أولاً
+        router.push(existing.settlementCurrencyChosen ? '/vendor/onboarding/documents' : '/vendor/onboarding/currency');
         return;
       }
       const res = await api<{ vendor: Onboarding; tokens: Tokens }>('/vendor/onboarding/apply', {
@@ -145,7 +146,8 @@ export default function VendorRegisterPage() {
       });
       // الرمز الجديد يحمل دور البائع — بدونه ترتدّ الخطوة التالية 403
       session.write(res.tokens);
-      router.push('/vendor/onboarding/documents');
+      // العملة قبل المستندات: الاعتماد يثبّتها، فتُختار قبل أن يُرسل الطلب
+      router.push('/vendor/onboarding/currency');
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         router.push('/login?next=/vendor/register');
@@ -189,8 +191,8 @@ export default function VendorRegisterPage() {
         title={existing ? 'بيانات متجرك' : 'سجّل متجرك على بسطة'}
         lead={
           existing
-            ? 'عدّل ما تريد ثم تابع إلى المستندات. ما رفعته منها محفوظ.'
-            : 'بيانات متجرك الأساسية أولاً، والمستندات في الخطوة التالية.'
+            ? 'عدّل ما تريد ثم تابع. ما رفعته من المستندات محفوظ.'
+            : 'بيانات متجرك الأساسية أولاً، ثم عملة التسوية، ثم المستندات.'
         }
       />
 
@@ -307,7 +309,13 @@ export default function VendorRegisterPage() {
                 disabled={busy || form.nameAr.trim().length < 2 || check?.available === false}
               >
                 {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
-                {busy ? (existing ? 'جارٍ الحفظ…' : 'جارٍ التسجيل…') : 'التالي: المستندات'}
+                {busy
+                  ? existing
+                    ? 'جارٍ الحفظ…'
+                    : 'جارٍ التسجيل…'
+                  : existing?.settlementCurrencyChosen
+                    ? 'التالي: المستندات'
+                    : 'التالي: عملة التسوية'}
                 {busy ? null : <Icon name="next" size={16} mirror />}
               </button>
             </div>

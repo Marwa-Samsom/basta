@@ -32,6 +32,8 @@ export interface Onboarding {
   approvedAt: string | null;
   settlementCurrency: string;
   settlementCurrencyLocked: boolean;
+  /** اختارها البائع صراحةً (VD-04) — وإلا فهي المقترحة من بلده، والإرسال ممنوع حتى يختار */
+  settlementCurrencyChosen: boolean;
   descriptionAr: string | null;
   descriptionEn: string | null;
   shippingPolicyAr: string | null;

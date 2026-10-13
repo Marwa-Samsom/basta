@@ -58,6 +58,8 @@ export interface OnboardingView {
   readonly approvedAt: string | null;
   readonly settlementCurrency: string;
   readonly settlementCurrencyLocked: boolean;
+  /** اختارها البائع صراحةً — وإلا فهي المقترحة من بلده، والإرسال ممنوع حتى يختار */
+  readonly settlementCurrencyChosen: boolean;
   readonly descriptionAr: string | null;
   readonly descriptionEn: string | null;
   readonly shippingPolicyAr: string | null;
@@ -111,6 +113,8 @@ export class VendorOnboardingService {
       country: string;
       businessType?: string | null;
       mainCategoryId?: string | null;
+      /** اختيار صريح من البائع — بدونه تُقترح عملة بلده ويُطلب اختيارها قبل الإرسال */
+      settlementCurrency?: string | null;
     },
     meta: { ip?: string | null; userAgent?: string | null } = {},
   ): Promise<{ vendor: OnboardingView; tokens: TokenPair }> {
@@ -136,6 +140,9 @@ export class VendorOnboardingService {
       throw new InvalidInputError('نوع النشاط: فرد أو شركة.', { businessType: input.businessType });
     }
 
+    const chosen = input.settlementCurrency?.trim().toUpperCase() || null;
+    if (chosen) assertSettlementCurrency(chosen);
+
     const vendorId = randomUUID();
     await this.prisma.$transaction(async (tx) => {
       await tx.vendor.create({
@@ -148,7 +155,8 @@ export class VendorOnboardingService {
           country,
           businessType: input.businessType ?? null,
           mainCategoryId: input.mainCategoryId ?? null,
-          settlementCurrency: defaultCurrencyFor(country),
+          settlementCurrency: chosen ?? defaultCurrencyFor(country),
+          settlementCurrencyChosenAt: chosen ? new Date() : null,
           status: 'pending',
         },
       });
@@ -241,6 +249,7 @@ export class VendorOnboardingService {
       nameAr: vendor.nameAr,
       slug: vendor.slug,
       country: vendor.country,
+      currencyChosen: vendor.settlementCurrencyChosenAt !== null,
       documents: vendor.documents.map((d) => ({
         type: d.type,
         status: d.status,
@@ -279,6 +288,7 @@ export class VendorOnboardingService {
       approvedAt: vendor.approvedAt?.toISOString() ?? null,
       settlementCurrency: vendor.settlementCurrency,
       settlementCurrencyLocked: currencyLocked(vendor.settlementCurrencyLockedAt, vendor.status as VendorLifecycle),
+      settlementCurrencyChosen: vendor.settlementCurrencyChosenAt !== null,
       descriptionAr: vendor.descriptionAr,
       descriptionEn: vendor.descriptionEn,
       shippingPolicyAr: vendor.shippingPolicyAr,
@@ -513,11 +523,13 @@ export class VendorOnboardingService {
       priced: changing && variants + rates + orders > 0,
     });
 
-    // الشروط نفسها داخل الكتابة: اعتماد أو تثبيت متزامن لا يمرّ معه تغيير
+    // الشروط نفسها داخل الكتابة: اعتماد أو تثبيت متزامن لا يمرّ معه تغيير.
+    // والإرسال بالعملة نفسها اختيار أيضاً: من أكّد المقترحة اختارها
     const { count } = await this.prisma.vendor.updateMany({
       where: { id: scope.vendorId, settlementCurrencyLockedAt: null, status: { in: ['pending', 'rejected'] } },
       data: {
         settlementCurrency: code,
+        settlementCurrencyChosenAt: new Date(),
         ...(options.lock ? { settlementCurrencyLockedAt: new Date() } : {}),
       },
     });
