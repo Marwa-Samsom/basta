@@ -127,6 +127,8 @@ export function loadEnv(): Env {
   }
   const totpKey = totpKeyOf(production);
   if (typeof totpKey === 'string') problems.push(totpKey);
+  const smtpProblem = smtpUrlProblem(process.env['SMTP_URL']);
+  if (smtpProblem) problems.push(smtpProblem);
   if (problems.length > 0) throw new EnvError(problems);
 
   cached = {
@@ -145,6 +147,23 @@ export function loadEnv(): Env {
     meiliIndex: process.env['MEILI_INDEX'] ?? 'products',
   };
   return cached;
+}
+
+/**
+ * عنوان SMTP للبريد (notifications/infrastructure/channels) — اختياري: بدونه يُكتب
+ * البريد ملفات في الصندوق المحلي. عنوان فاسد يُرفض عند الإقلاع لا عند أول رسالة،
+ * فلا تفشل رموز الاستعادة كلها بصمت في الصندوق الصادر.
+ */
+export function smtpUrlProblem(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'smtp:' && u.protocol !== 'smtps:') return 'SMTP_URL (يبدأ بـ smtp:// أو smtps://)';
+    if (!u.hostname) return 'SMTP_URL (بلا مضيف)';
+    return null;
+  } catch {
+    return 'SMTP_URL (عنوان غير صالح — رمّز @ و: في المستخدم وكلمة المرور بـ %40 و %3A)';
+  }
 }
 
 /**
