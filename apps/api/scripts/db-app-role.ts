@@ -18,11 +18,22 @@ import { appendOnlyTables, privilegeReport, privilegeViolations } from '../src/c
 const IDENT = /^[a-z_][a-z0-9_]{0,62}$/;
 const literal = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
+/**
+ * مجمّع اتصالات Supabase (Supavisor) يطلب المستخدم بصيغة «الدور.مرجع_المشروع»،
+ * والدور في القاعدة هو ما قبل النقطة. اسم دور بنقطة لا يمرّ IDENT أصلاً، فالقطع آمن.
+ */
 function credentialsOf(url: string | undefined, name: string): { user: string; password: string } {
   if (!url) throw new Error(`${name} غير معرَّف.`);
   const u = new URL(url);
-  return { user: decodeURIComponent(u.username), password: decodeURIComponent(u.password) };
+  const user = decodeURIComponent(u.username);
+  return { user: user.split('.')[0] ?? user, password: decodeURIComponent(u.password) };
 }
+
+/**
+ * أدوار واجهة Supabase (Data API): تمنحها Supabase كل جدول جديد في public افتراضياً،
+ * فيقرأ ويكتب بها أي حامل للمفتاح العلني بلا المرور بالـ API — ولا RLS عندنا. تُنزع منها كلها.
+ */
+const SUPABASE_API_ROLES = ['anon', 'authenticated'];
 
 async function main(): Promise<void> {
   const app = credentialsOf(process.env['DATABASE_URL'], 'DATABASE_URL');
@@ -65,6 +76,29 @@ async function main(): Promise<void> {
       if (ops) await db.$executeRawUnsafe(`REVOKE ${ops} ON TABLE "${g.table}" FROM ${role}`);
     }
     console.log(`✓ ${app.user}: قراءة وكتابة بلا ملكية، و${guarded.length} جداول للإضافة فقط بلا UPDATE/DELETE.`);
+
+    const apiRoles = await db.$queryRawUnsafe<{ rolname: string }[]>(
+      `SELECT rolname FROM pg_roles WHERE rolname = ANY($1::text[])`,
+      SUPABASE_API_ROLES,
+    );
+    for (const { rolname } of apiRoles) {
+      const r = `"${rolname}"`;
+      await db.$executeRawUnsafe(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${r}`);
+      await db.$executeRawUnsafe(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${r}`);
+      await db.$executeRawUnsafe(`REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM ${r}`);
+      await db.$executeRawUnsafe(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM ${r}`);
+      await db.$executeRawUnsafe(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM ${r}`);
+      await db.$executeRawUnsafe(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM ${r}`);
+    }
+    if (apiRoles.length) {
+      const [{ leaks }] = await db.$queryRawUnsafe<{ leaks: number }[]>(
+        `SELECT count(*)::int AS leaks FROM information_schema.role_table_grants
+          WHERE table_schema = 'public' AND grantee = ANY($1::text[])`,
+        SUPABASE_API_ROLES,
+      );
+      if (leaks) throw new Error(`أدوار واجهة Supabase ما زالت تملك ${leaks} صلاحية على جداول public.`);
+      console.log(`✓ Supabase: نُزعت صلاحيات ${apiRoles.map((a) => a.rolname).join(' و ')} عن كل جداول public.`);
+    }
   } finally {
     await db.$disconnect();
   }
