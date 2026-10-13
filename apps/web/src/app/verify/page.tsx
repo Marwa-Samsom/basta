@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
 import { api, ApiError, session } from '@/lib/api';
-import { safeNext } from '@/lib/safe-path';
+import { safeNext, withNext } from '@/lib/safe-path';
 
 interface Status {
   email: string | null;
@@ -73,7 +73,8 @@ function VerifyForm() {
 
   useEffect(() => {
     if (!session.read()) {
-      router.replace(`/login?next=${encodeURIComponent(`/verify?next=${next}`)}`);
+      // الوجهة الداخلية مرمَّزة هي أيضاً — `&` أو `?` فيها كان يقطع الرابط الخارجي
+      router.replace(withNext('/login', withNext('/verify', next)));
       return;
     }
     let alive = true;
