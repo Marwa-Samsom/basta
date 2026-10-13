@@ -274,11 +274,13 @@ describe('بوابة 08 · البند 2 — الفشل لا يستهلك مخز�
 
   it('نقص المخزون يُكتشف قبل أي مال — لا طلب يُنشأ أصلاً', async () => {
     if (!dbUp) return;
-    const count = await prisma.order.count();
+    // طلبات هذا المشتري وحده: ملفات الاختبار الأخرى تنشئ طلباتها في اللحظة نفسها
+    const mine = () => prisma.order.count({ where: { customerUserId: buyerId } });
+    const count = await mine();
     const token = await cartWith([{ variantId: variantIds[1]!, qty: 50 }]);
     const res = await pay(token, 'tok_success');
     expect(res.statusCode).toBe(409);
-    expect(await prisma.order.count()).toBe(count);
+    expect(await mine()).toBe(count);
   });
 });
 

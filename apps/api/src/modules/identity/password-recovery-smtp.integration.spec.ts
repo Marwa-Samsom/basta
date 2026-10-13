@@ -27,13 +27,31 @@ const NEW = 'كلمة-مرور-جديدة-أطول';
 
 const call = (url: string, payload: object) => app.inject({ method: 'POST', url: `/api/v1${url}`, payload });
 
-/** يرسل الصندوق الصادر حتى يخرج بريد هذا المستخدم — المرسِل الدوري قد يكون في دورة */
-async function drain(userId: string): Promise<void> {
-  for (let i = 0; i < 20; i++) {
-    await dispatch(500);
-    const left = await prisma.notification.count({ where: { userId, status: { in: ['queued', 'sending'] } } });
-    if (left === 0) return;
-    await new Promise((r) => setTimeout(r, 100));
+/**
+ * «نسيت كلمة المرور» حتى يخرج الرمز **عبر SMTP هذا الاختبار**. ملفات الاختبار
+ * الأخرى تعمل معاً على القاعدة نفسها، ومرسِل أيٍّ منها يلتقط أي إشعار ينتظر —
+ * فيكتبه ملفاً لأن SMTP_URL ليس في عمليته. والرمز يُمحى من الإشعار بعد أول تسليم
+ * (لا يبقى في السجل)، فما التقطه غيرنا لا يُعاد: يُطلب رمز جديد كما يفعل المستخدم.
+ */
+async function forgotThroughSmtp(userId: string): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    // رمز جديد لا يُصدر قبل دقيقة من سابقه — المحاولة الثانية تقدّم عمر السابق بدل الانتظار
+    if (attempt > 0) {
+      await prisma.otpCode.updateMany({ where: { userId, purpose: 'reset' }, data: { createdAt: new Date(Date.now() - 61_000) } });
+    }
+    const started = new Date();
+    expect((await call('/auth/password/forgot', { email: EMAIL })).statusCode).toBe(200);
+    for (let i = 0; i < 30; i++) {
+      await dispatch(500);
+      const row = await prisma.notification.findFirst({
+        where: { userId, templateCode: 'password_reset_code', channel: 'email', createdAt: { gte: started } },
+        orderBy: { createdAt: 'desc' },
+        select: { status: true, deliveryRef: true },
+      });
+      if (row?.status === 'sent' && row.deliveryRef?.startsWith('smtp:')) return;
+      if (row?.status === 'sent' || row?.status === 'failed') break; // سلّمه غيرنا — رمز جديد
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
 }
 
@@ -88,16 +106,19 @@ describe('استعادة كلمة المرور بالبريد الحقيقي (SM
     expect((await call('/auth/register', { email: EMAIL, password: OLD, fullName: 'من نسي كلمته' })).statusCode).toBe(201);
     const { id: userId } = await prisma.user.findUniqueOrThrow({ where: { email: EMAIL }, select: { id: true } });
 
-    expect((await call('/auth/password/forgot', { email: EMAIL })).statusCode).toBe(200);
-    await drain(userId);
+    await forgotThroughSmtp(userId);
 
-    // وصل البريد الخادم — الموضوع والرمز فيه، ومختوم «أُرسل» بمرجع SMTP لا بملف
+    // وصل البريد الخادم — الموضوع والرمز فيه، ومختوم «أُرسل» بمرجع SMTP لا بملف.
+    // آخر بريد استعادة وصله هو رمزه الساري (طلب جديد يُبطل ما قبله)
     const delivered = inbox.filter((m) => m.to.includes(EMAIL));
     const mails = await Promise.all(delivered.map((m) => simpleParser(m.raw)));
-    const reset = mails.find((m) => /\b\d{6}\b/.test(m.text ?? '') && /كلمة المرور/.test(`${m.subject} ${m.text}`));
+    const reset = mails.filter((m) => /\d{6}/.test(m.text ?? '') && /كلمة المرور/.test(`${m.subject} ${m.text}`)).at(-1);
     expect(reset, mails.map((m) => m.subject).join(' | ')).toBeDefined();
-    const code = /\b(\d{6})\b/.exec(reset!.text!)![1]!;
-    const row = await prisma.notification.findFirstOrThrow({ where: { userId, templateCode: 'password_reset_code', channel: 'email' } });
+    const code = /(\d{6})/.exec(reset!.text!)![1]!;
+    const row = await prisma.notification.findFirstOrThrow({
+      where: { userId, templateCode: 'password_reset_code', channel: 'email' },
+      orderBy: { createdAt: 'desc' },
+    });
     expect(row.status).toBe('sent');
     expect(row.deliveryRef).toMatch(/^smtp:<.+>$/);
 
