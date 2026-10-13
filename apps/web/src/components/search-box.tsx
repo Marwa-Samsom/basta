@@ -3,8 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
-
-const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://127.0.0.1:4000/api/v1';
+import { apiBase } from '@/lib/api';
 
 /**
  * صندوق البحث — ST-06.
@@ -40,7 +39,7 @@ function SearchBoxInner() {
         return;
       }
       try {
-        const res = await fetch(`${API_BASE}/storefront/suggest?q=${encodeURIComponent(value)}`, { signal: abort.signal });
+        const res = await fetch(`${apiBase()}/storefront/suggest?q=${encodeURIComponent(value)}`, { signal: abort.signal });
         if (res.status === 429) pausedUntil.current = Date.now() + 10_000;
         const data = res.ok ? ((await res.json()) as { suggestions?: unknown }) : null;
         const list = Array.isArray(data?.suggestions) ? data.suggestions.filter((s): s is string => typeof s === 'string') : [];

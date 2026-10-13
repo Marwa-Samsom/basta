@@ -106,6 +106,9 @@ export function loadEnv(): Env {
         throw new EnvError([`${k} (أقصر من 32 محرفاً)`]);
       }
     }
+    // اختياري — لكن من يعرفه يكتب لكل طلب العنوان الذي يُحسب عليه حدّ التخمين (app.setup)
+    const edge = process.env['EDGE_PROXY_SECRET'];
+    if (edge && edge.length < 32) throw new EnvError(['EDGE_PROXY_SECRET (أقصر من 32 محرفاً)']);
   }
 
   // المزوّدان الوهميان يُفحصان معاً: إقلاع إنتاج يرى كل ما ينقصه في رسالة واحدة

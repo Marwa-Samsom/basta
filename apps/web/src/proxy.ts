@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 /**
  * سياسة المحتوى — المرحلة 12، OWASP A03/A05. لا مصدر خارجي في الموقع أصلاً
  * (الخطوط والصور محلية)، فالسياسة تقول ذلك صراحةً: السكربت من الموقع نفسه،
- * والصور والطلبات من الموقع وخادم الـ API وحده.
+ * والطلبات من الموقع وحده (الـ API يمرّ من /api/v1 — app/api/v1/[...path])،
+ * والصور من الموقع وخادم الـ API.
  *
  * السكربت بـ nonce جديد لكل طلب لا بـ 'unsafe-inline': Next يحقن بيانات
  * التهيئة سطرياً، وكان 'unsafe-inline' يسمح معها بأي سكربت يُحقن في الصفحة —
@@ -26,7 +27,7 @@ export function contentSecurityPolicy(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${api}`,
     "font-src 'self' data:",
-    `connect-src 'self' ${api}${dev ? ' ws: http://localhost:* http://127.0.0.1:*' : ''}`,
+    `connect-src 'self'${dev ? ' ws: http://localhost:* http://127.0.0.1:*' : ''}`,
     "manifest-src 'self'",
     "worker-src 'self'",
     "frame-ancestors 'none'",
@@ -52,8 +53,9 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      // الصفحات وحدها: ملفات البناء والأيقونات وعامل الخدمة لا تنفّذ سكربتاً سطرياً
-      source: '/((?!_next/static|_next/image|icons/|sw\\.js|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest).*)',
+      // الصفحات وحدها: ملفات البناء والأيقونات وعامل الخدمة لا تنفّذ سكربتاً سطرياً،
+      // وممرّ الـ API (api/) يعيد ردود الـ API بترويساتها — ولا يُحمَّل جسمه في الوسيط
+      source: '/((?!api/|_next/static|_next/image|icons/|sw\\.js|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest).*)',
       // الجلب المسبق يجلب بيانات لا صفحة — ولا يُرسم فلا يحتاج nonce
       missing: [
         { type: 'header', key: 'next-router-prefetch' },

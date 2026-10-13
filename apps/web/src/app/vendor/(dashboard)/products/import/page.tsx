@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
-import { api, API_BASE, ApiError, session } from '@/lib/api';
+import { api, apiBase, ApiError, session } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { num } from '@/lib/catalog';
 import { csvCell } from '@/lib/csv';
@@ -71,7 +71,7 @@ export default function ImportPage() {
 
   async function downloadTemplate(): Promise<void> {
     const token = session.read()?.accessToken;
-    const res = await fetch(`${API_BASE}/vendor/catalog/import/template`, {
+    const res = await fetch(`${apiBase()}/vendor/catalog/import/template`, {
       headers: token ? { authorization: `Bearer ${token}` } : {},
     });
     const blob = await res.blob();

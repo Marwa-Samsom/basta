@@ -17,7 +17,8 @@ async function signIn(page: Page, email: string, next: string): Promise<string> 
 
 async function expectSignedOut(page: Page, userId: string, copiedAccess: string) {
   expect(await page.evaluate(() => localStorage.getItem('basta.access'))).toBeNull();
-  const cookies = await page.context().cookies(`${API}/auth/refresh`);
+  // الكوكي على نطاق الواجهة — المتصفّح يكلّم الـ API عبر /api/v1 منها
+  const cookies = await page.context().cookies(new URL('/api/v1/auth/refresh', page.url()).href);
   expect(cookies.find((c) => c.name === 'basta_rt')).toBeUndefined();
   expect(await prisma.refreshToken.count({ where: { userId, revokedAt: null } })).toBe(0);
   const replay = await fetch(`${API}/me/account`, { headers: { authorization: `Bearer ${copiedAccess}` } });
