@@ -1,24 +1,25 @@
 'use client';
 
 import '@/styles/screens/account-area.css';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
-import { Alert, Field, PageHead, TextInput } from '@/components/ui';
+import { Alert, Field, PageHead, Spinner, TextInput } from '@/components/ui';
 import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
 import { cartApi, cartHeaders, type CartView } from '@/lib/cart';
 import { attemptKey, definitive, endAttempt } from '@/lib/checkout-attempt';
-import { rememberOrderKey } from '@/lib/order-key';
+import { withNext } from '@/lib/safe-path';
 import { imageUrl } from '@/lib/storefront';
 
 interface OrderResult {
   orderId: string;
   orderNumber: string;
   outcome: 'paid' | 'failed' | 'requires_action' | 'pending';
-  /** لطلب الضيف: مفتاح قراءة حالته */
-  accessKey?: string;
 }
+
+const HERE = '/checkout';
 
 /** بطاقات المزوّد الوهمي — كل واحدة تصنع حالة من حالات البوابة (ADR-012) */
 const TEST_CARDS = [
@@ -92,15 +93,56 @@ function Section({ n, title, state, children }: { n: number; title: string; stat
  * **مفتاح عدم التكرار يولَّد مرة لكل محاولة ويبقى حتى تنتهي.** الضغط مرتين
  * على «ادفع»، أو إعادة الإرسال بعد انقطاع، يعيد الطلب نفسه لا طلباً ثانياً
  * (ADR-011). ويتجدّد فقط بعد فشل معروف — فمحاولة ببطاقة أخرى طلب جديد.
+ *
+ * **الشراء بحساب** (محسوم 13 أكتوبر 2026): طلب الضيف لا يُتابَع ولا يُلغى ولا
+ * يُرجَع، والبريد الذي يحمل رابطه لا يصل بعد. من لم يدخل يرى بوابة الدخول هنا،
+ * ويعود إلى الصفحة نفسها بعد الدخول أو التسجيل — والسلة برمزها فتبقى كما هي.
  */
 export default function CheckoutPage() {
-  const router = useRouter();
-  // الخادم لا يعرف الجلسة: لقطته «ضيف»، والمتصفّح يصحّحها بعد الإماهة بلا عدم تطابق
-  const signedIn = useSyncExternalStore(
+  // الخادم لا يعرف الجلسة: لقطته «لا يُعرف»، فلا تومض بوابة الدخول لمن دخل
+  const auth = useSyncExternalStore(
     () => () => undefined,
-    () => session.read() !== null,
-    () => false,
+    () => (session.read() !== null ? 'in' : 'out'),
+    () => 'unknown',
   );
+  if (auth === 'unknown') return <Spinner label="جارٍ فتح الدفع…" />;
+  if (auth === 'out') return <SignInFirst />;
+  return <CheckoutForm />;
+}
+
+/** بوابة الدخول — لماذا يُطلب الحساب، وأن السلة لا تضيع */
+function SignInFirst() {
+  return (
+    <div className="sp-page sp-page--narrow">
+      <PageHead title="إتمام الشراء" />
+      <section className="sp-hero sp-hero--info">
+        <span className="sp-hero__icon" aria-hidden>
+          <Icon name="user" size={28} />
+        </span>
+        <h2 className="sp-hero__title">ادخل لتكمل الشراء</h2>
+        <p className="sp-hero__text">
+          سلّتك محفوظة كما هي. بحسابك تتابع طلبك من أي جهاز، وتلغيه أو ترجعه، وتراسل البائع — وتعود إلى هنا بعد
+          الدخول مباشرةً.
+        </p>
+        <div className="sp-hero__actions">
+          <Link className="btn btn--primary" href={withNext('/login', HERE)}>
+            ادخل
+          </Link>
+          <Link className="btn btn--secondary" href={withNext('/register', HERE)}>
+            أنشئ حساباً
+          </Link>
+          <Link className="btn btn--ghost" href="/cart">
+            عُد إلى السلة
+          </Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CheckoutForm() {
+  // البوابة فوقه لا تعرضه إلا لمن دخل
+  const router = useRouter();
 
   const [address, setAddress] = useState({
     recipientName: '',
@@ -111,7 +153,6 @@ export default function CheckoutPage() {
     street: '',
     building: '',
   });
-  const [email, setEmail] = useState('');
   const [card, setCard] = useState<string>('tok_success');
   /**
    * الإجمالي محسوب لعنوان بعينه: الشحن والضريبة ببلده ومنطقته ومدينته. تغيير
@@ -153,7 +194,6 @@ export default function CheckoutPage() {
   };
 
   useEffect(() => {
-    if (!signedIn) return;
     let alive = true;
     api<{ items: SavedAddress[] }>('/me/addresses')
       .then(({ items }) => {
@@ -171,7 +211,7 @@ export default function CheckoutPage() {
     return () => {
       alive = false;
     };
-  }, [signedIn]);
+  }, []);
 
   async function calculate(): Promise<void> {
     setBusy(true);
@@ -205,15 +245,18 @@ export default function CheckoutPage() {
           // ما يراه تحت «ادفع» — الخادم لا يخصم غيره
           expectedTotal: quote.totals.total.minorUnits,
           expectedCurrency: quote.currency,
-          ...(signedIn ? {} : { guestEmail: email }),
         },
       });
       // الخادم أجاب بطلب معروف — مدفوعاً أو مرفوضاً أو معلّقاً تحسمه المصالحة.
       // الشراء التالية (بطاقة أخرى، أو سلة جديدة) محاولة جديدة بمفتاح جديد
       endAttempt();
-      rememberOrderKey(result.orderNumber, result.accessKey);
       router.push(`/orders/${result.orderNumber}`);
     } catch (err) {
+      // انتهت الجلسة ولم يُجدَّدها الرمز: لا طلب أُنشئ، فيعود بعد الدخول بالمحاولة نفسها
+      if (err instanceof ApiError && err.status === 401) {
+        router.push(withNext('/login', HERE));
+        return;
+      }
       if (err instanceof ApiError && Array.isArray(err.details?.['blockers'])) {
         setBlockers(err.details['blockers'] as string[]);
       }
@@ -235,8 +278,8 @@ export default function CheckoutPage() {
     }
   }
 
-  const contactOk = address.phone.trim() !== '' && (signedIn || email.includes('@'));
-  const ready = quote !== null && blockers.length === 0 && (signedIn || email.includes('@'));
+  const contactOk = address.phone.trim() !== '';
+  const ready = quote !== null && blockers.length === 0;
 
   // الخطوة الحالية: أوّل خطوة لم تكتمل. الدفع مختار دائماً، فحين يُحسب الشحن بلا موانع تصير المراجعة هي الحالية
   const step = !contactOk ? 1 : quote === null ? 2 : blockers.length > 0 ? 3 : 5;
@@ -261,16 +304,6 @@ export default function CheckoutPage() {
         <div className="sp-main">
           <Section n={1} title="بيانات التواصل" state={stateOf(1)}>
             <div className="sp-fields">
-              {!signedIn ? (
-                <TextInput
-                  label="البريد الإلكتروني"
-                  hint="نرسل إليه تأكيد الطلب ورابط تتبّعه — تشتري ضيفاً بلا حساب."
-                  type="email"
-                  dir="ltr"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              ) : null}
               <TextInput label="الهاتف" dir="ltr" inputMode="tel" value={address.phone} onChange={set('phone')} />
             </div>
             <p className="sp-note sp-note--xs">
@@ -280,7 +313,7 @@ export default function CheckoutPage() {
           </Section>
 
           <Section n={2} title="عنوان التوصيل" state={stateOf(2)}>
-            {signedIn && saved.length > 0 ? (
+            {saved.length > 0 ? (
               <fieldset className="aa-pick-set">
                 <legend>عناوينك المحفوظة</legend>
                 <div className="aa-picks">

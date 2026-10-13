@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { PrismaClient } from '@prisma/client';
 import { NobleCryptoPlugin, ScureBase32Plugin, generateSecret, generateSync } from 'otplib';
 
@@ -22,6 +23,18 @@ export async function register(email: string, fullName: string): Promise<string>
   });
   if (!res.ok) throw new Error(`تسجيل ${email}: ${res.status} ${await res.text()}`);
   return (await prisma.user.findUniqueOrThrow({ where: { email } })).id;
+}
+
+/** مشترٍ بحساب، داخلٌ في هذه الصفحة من نموذج الدخول نفسه — الشراء بحساب */
+export async function signInBuyer(page: Page, t = tag()): Promise<{ email: string; userId: string }> {
+  const email = `buyer.${t}@basta.test`;
+  const userId = await register(email, `مشترٍ ${t}`);
+  await page.goto('/login?next=/account');
+  await page.getByLabel('البريد الإلكتروني').fill(email);
+  await page.getByLabel('كلمة المرور').fill(PASSWORD);
+  await page.getByRole('button', { name: 'دخول' }).click();
+  await page.waitForURL((u) => u.pathname === '/account');
+  return { email, userId };
 }
 
 export async function makeVendor(t: string) {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { makeVendor, prisma, tag } from './fixtures';
+import { makeVendor, prisma, signInBuyer, tag } from './fixtures';
 
 /**
  * ما يُخصم هو الإجمالي الذي رآه المشتري تحت «ادفع»:
@@ -18,7 +18,6 @@ async function toCheckout(page: Page, productSlug: string) {
   await page.getByLabel('المحافظة / المنطقة').fill('الرياض');
   await page.getByLabel('المدينة').fill('الرياض');
   await page.getByLabel('الشارع ورقم البناء').fill('طريق الملك فهد 10');
-  await page.getByLabel('البريد الإلكتروني').fill('e2e-total@basta.test');
 }
 
 async function calculate(page: Page): Promise<string> {
@@ -31,6 +30,7 @@ const payButton = (page: Page) => page.getByRole('button', { name: 'ادفع' })
 
 test('تغيير العنوان بعد حساب الشحن يُسقط الإجمالي ويوقف الدفع حتى يُحسب من جديد', async ({ page }) => {
   const v = await makeVendor(tag());
+  await signInBuyer(page);
   await toCheckout(page, v.productSlug);
   await calculate(page);
   await expect(page.locator('.sp-sum__total')).toBeVisible();
@@ -48,6 +48,7 @@ test('تغيير العنوان بعد حساب الشحن يُسقط الإجم
 
 test('تغيّر السعر بعد الحساب: لا خصم، يُعرض الإجمالي الجديد، ويُخصم هو بعد التأكيد', async ({ page }) => {
   const v = await makeVendor(tag());
+  const { userId } = await signInBuyer(page);
   await toCheckout(page, v.productSlug);
   const before = await calculate(page);
 
@@ -58,7 +59,7 @@ test('تغيّر السعر بعد الحساب: لا خصم، يُعرض الإ
   const after = (await (await requoted).json()).totals.total.minorUnits as string;
   expect(BigInt(after)).toBeGreaterThan(BigInt(before));
   expect(page.url()).toContain('/checkout');
-  expect(await prisma.order.count({ where: { guestEmail: 'e2e-total@basta.test', grandTotalMinorUnits: BigInt(before) } })).toBe(0);
+  expect(await prisma.order.count({ where: { customerUserId: userId, grandTotalMinorUnits: BigInt(before) } })).toBe(0);
 
   await payButton(page).click();
   await page.waitForURL(/\/orders\//);
