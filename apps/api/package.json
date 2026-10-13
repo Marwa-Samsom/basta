@@ -17,6 +17,8 @@
     "db:studio": "dotenv -e ../../.env -- prisma studio",
     "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force && npm run db:app-role",
     "admin:grant": "dotenv -e ../../.env -- tsx scripts/grant-admin.ts",
+    "admin:recover": "dotenv -e ../../.env -- tsx scripts/recover-admin.ts",
+    "admin:transfer-owner": "dotenv -e ../../.env -- tsx scripts/transfer-ownership.ts",
     "totp:seal": "dotenv -e ../../.env -- tsx scripts/seal-totp-secrets.ts",
     "demo:seed": "dotenv -e ../../.env -- tsx scripts/seed-demo.ts",
     "images:backfill": "dotenv -e ../../.env -- tsx scripts/backfill-medium.ts",
