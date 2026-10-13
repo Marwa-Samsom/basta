@@ -12,7 +12,8 @@ function formatUpdated(iso: string): string | null {
 /** ST-30 — صفحة محتوى من AD-18. مكوّن خادم، والنص يُعرض بفقراته كما كُتب */
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const page = await getPage((await params).slug);
-  return { title: `${page.titleAr} — بسطة` };
+  // «· بسطة» يضيفه قالب العنوان في app/layout.tsx
+  return { title: page.titleAr };
 }
 
 export default async function ContentPage({ params }: { params: Promise<{ slug: string }> }) {
