@@ -25,6 +25,15 @@ async function bootstrap() {
     );
   }
 
+  if (!process.env['SMTP_URL'] && process.env['NODE_ENV'] === 'production') {
+    // لا يُرفض — الموقع يُعرض بلا بريد. لكن رموز الاستعادة والتأكيد تُكتب ملفات على قرص
+    // الخادم ولا تصل أحداً، فمن نسي كلمة مروره لا يعود إلى حسابه
+    Logger.warn(
+      'SMTP_URL غير مضبوط: البريد يُكتب ملفات في صندوق محلي ولا يصل أحداً — استعادة كلمة المرور وتأكيد البريد وتنبيهات البائعين معطّلة.',
+      'Bootstrap',
+    );
+  }
+
   await configureApp(app);
 
   const config = new DocumentBuilder()

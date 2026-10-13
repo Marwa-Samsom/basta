@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { EnvError, loadEnv, parseTrustProxy, resetEnvCache } from './env';
+import { EnvError, loadEnv, parseTrustProxy, resetEnvCache, smtpUrlProblem } from './env';
 
 const LONG = 'x'.repeat(32);
 
@@ -161,5 +161,15 @@ describe('سرّ خادم الواجهة (EDGE_PROXY_SECRET)', () => {
   it('خارج الإنتاج لا يُفحص طوله', () => {
     production({ NODE_ENV: 'development', EDGE_PROXY_SECRET: 'dev', PAYMENT_WEBHOOK_SECRET: undefined });
     expect(() => loadEnv()).not.toThrow();
+  });
+});
+
+describe('عنوان SMTP (SMTP_URL)', () => {
+  it('اختياري، وإن وُجد فـ smtp:// أو smtps:// بمضيف', () => {
+    expect(smtpUrlProblem(undefined)).toBeNull();
+    expect(smtpUrlProblem('smtps://me%40gmail.com:app-pass@smtp.gmail.com:465')).toBeNull();
+    expect(smtpUrlProblem('smtp://login:key@smtp-relay.brevo.com:587')).toBeNull();
+    expect(smtpUrlProblem('https://smtp.gmail.com')).toMatch(/smtp:\/\//);
+    expect(smtpUrlProblem('me@gmail.com:pass@smtp.gmail.com')).toMatch(/SMTP_URL/);
   });
 });
