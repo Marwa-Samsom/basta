@@ -51,7 +51,10 @@ export interface ProductImage {
   id: string;
   variantId: string | null;
   altAr: string | null;
+  width: number | null;
+  height: number | null;
   sort: number;
+  /** full.webp · full.avif · medium.webp · medium.avif · thumb.webp — مسارات موقَّعة */
   urls: Record<string, string>;
 }
 

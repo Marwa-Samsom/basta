@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { api, API_BASE, ApiError } from '@/lib/api';
+import { api, ApiError, mediaUrl } from '@/lib/api';
 import { Alert, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { MAX_IMAGES, ProductImages } from '@/components/product-images';
 import {
   PRODUCT_STATUS,
   num,
@@ -224,6 +225,17 @@ export function ProductEditor({ productId }: { productId?: string }) {
     }
   }
 
+  /**
+   * بعد عملية على الصور: المنتج يُقرأ من جديد — الصور وحالته (إضافة صورة لمنشور تعيده
+   * للمراجعة). الحقول لا تُمسّ: ما كتبه البائع ولم يحفظه يبقى كما هو.
+   */
+  async function refreshProduct(): Promise<void> {
+    if (!product) return;
+    const fresh = await api<ProductDetail>(`/vendor/products/${product.id}`);
+    setProduct(fresh);
+    setBlockers([]);
+  }
+
   async function publish(): Promise<void> {
     if (!product) return;
     setBusy(true);
@@ -321,7 +333,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
       {product?.status === 'active' ? (
         <div className="vp-banner vp-banner--info">
           <Icon name="info" size={16} className="vp-banner__glyph" />
-          <p>تعديل المحتوى (الاسم، الوصف، الفئة، السمات) يعيد المنتج إلى المراجعة. السعر والمخزون لا يعيدانه.</p>
+          <p>
+            تعديل المحتوى (الاسم، الوصف، الفئة، السمات، الصور أو الصورة الرئيسية) يعيد المنتج إلى المراجعة. السعر
+            والمخزون لا يعيدانه.
+          </p>
         </div>
       ) : null}
 
@@ -344,7 +359,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
               />
             </div>
             <div className="vp-grid-2">
-              <Field label="الفئة *" hint="تغيير الفئة يغيّر السمات المطلوبة في القسم 3.">
+              <Field label="الفئة *" hint="تغيير الفئة يغيّر السمات المطلوبة في القسم 4.">
                 {(props) => (
                   <select
                     className="field__control"
@@ -384,9 +399,28 @@ export function ProductEditor({ productId }: { productId?: string }) {
             />
           </Section>
 
+          <Section
+            n={3}
+            title="الصور"
+            meta={
+              <>
+                <span className="vp-sec__count num">
+                  {num(product?.images.length ?? 0)} / {num(MAX_IMAGES)}
+                </span>
+                <span className="vp-sec__meta">JPEG أو PNG أو WebP · حتى 10 م.ب · أقصر ضلع 300 بكسل</span>
+              </>
+            }
+          >
+            <ProductImages
+              productId={product?.id ?? null}
+              images={product?.images ?? []}
+              onChanged={refreshProduct}
+            />
+          </Section>
+
           {plain.length > 0 ? (
             <Section
-              n={3}
+              n={4}
               title="سمات الفئة"
               meta={
                 <span className="vp-sec__meta">
@@ -409,7 +443,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
           ) : null}
 
           <Section
-            n={plain.length > 0 ? 4 : 3}
+            n={plain.length > 0 ? 5 : 4}
             title="المتغيّرات"
             meta={
               <span className="vp-sec__count num">
@@ -763,7 +797,7 @@ function decimalsOf(currency: string): number {
  * وإلا أيقونة: لا صورة بديلة تتظاهر بأنها صورة المنتج.
  */
 export function ProductThumb({ src, size = 'md' }: { src: string | null; size?: 'sm' | 'md' }) {
-  const url = src ? (/^https?:\/\//.test(src) ? src : `${API_BASE.replace(/\/api\/v1\/?$/, '')}${src}`) : null;
+  const url = mediaUrl(src);
   return (
     <span className={`vp-thumb vp-thumb--${size}`} aria-hidden>
       {url ? (

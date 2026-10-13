@@ -31,6 +31,15 @@ export function apiBase(): string {
   return typeof window === 'undefined' ? API_BASE : '/api/v1';
 }
 
+/**
+ * مسار ملف من خادم الرفع (`/uploads/…?s=…`) عنواناً كاملاً. الصور لا تمرّ بممرّ
+ * /api/v1: لا كوكي فيها، وتُحمَّل من أصل الـ API مباشرةً (img-src في proxy.ts).
+ */
+export function mediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  return /^https?:\/\//.test(path) ? path : `${API_BASE.replace(/\/api\/v1\/?$/, '')}${path}`;
+}
+
 const ACCESS_KEY = 'basta.access';
 /** كان رمز التحديث يُحفظ هنا — يُمسح من كل متصفّح بقي فيه */
 const LEGACY_REFRESH_KEY = 'basta.refresh';

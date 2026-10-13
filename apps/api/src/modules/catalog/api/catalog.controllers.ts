@@ -41,6 +41,7 @@ import {
   ListProductsQueryDto,
   MoveCategoryDto,
   RejectProductDto,
+  ReorderImagesDto,
   ApproveProductDto,
   AttributeValueCreateDto,
   UpdateCategoryDto,
@@ -310,6 +311,12 @@ export class VendorCatalogController {
       altAr: fields['altAr'] ?? null,
       altEn: fields['altEn'] ?? null,
     });
+  }
+
+  @Put('products/:id/images/order')
+  @ApiOperation({ summary: 'ترتيب صور المنتج — كلها بالترتيب الجديد، والأولى هي الرئيسية' })
+  reorderImages(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string, @Body() dto: ReorderImagesDto) {
+    return this.images.reorder(scopeOf(actor), id, dto.imageIds);
   }
 
   @Delete('products/:id/images/:imageId')
