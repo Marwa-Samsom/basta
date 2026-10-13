@@ -1,16 +1,18 @@
 import { Prisma } from '@prisma/client';
-import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { OrderLifecycleService } from '../../orders/public';
 import {
+  CARRIER,
+  SELF_DELIVERY,
   TRACKING_LABELS,
   TRACKING_ORDER,
   nextCode,
+  type CarrierProvider,
   type TrackingCode,
   type Waybill,
 } from '../domain/carrier';
-import { FakeCarrier } from '../infrastructure/fake-carrier';
 
 const EVERY_TEN_MINUTES = 600_000;
 
@@ -19,6 +21,9 @@ const EVERY_TEN_MINUTES = 600_000;
  *
  * حدث «سُلّم» من شركة الشحن يمرّ عبر آلة الحالات بفاعل `carrier` — لا
  * يكتب الحالة مباشرة، فيُرفض كما يُرفض أي انتقال غير مسموح.
+ *
+ * بلا شركة موصولة (SHIPPING_CARRIER=none) التوصيل ذاتي وحده: لا بوليصة، ولا
+ * أحداث شركة، ولا مهمة تتقدّم بالشحنات — البائع يؤكّد التسليم بنفسه.
  */
 @Injectable()
 export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -27,12 +32,13 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly carrier: FakeCarrier,
+    @Inject(CARRIER) private readonly carrier: CarrierProvider | null,
     private readonly lifecycle: OrderLifecycleService,
   ) {}
 
   onApplicationBootstrap(): void {
-    if (process.env['VITEST'] || process.env['DISABLE_SCHEDULERS'] === 'true') return;
+    // لا شركة = لا مهمة تعلّم شحنة مستلمة لم يسلّمها أحد
+    if (!this.carrier || process.env['VITEST'] || process.env['DISABLE_SCHEDULERS'] === 'true') return;
     this.timer = setInterval(() => void this.advanceAll().catch((e) => this.logger.error(e)), EVERY_TEN_MINUTES);
     this.timer.unref();
   }
@@ -43,13 +49,17 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
 
   carriers(): { code: string; nameAr: string }[] {
     return [
-      { code: this.carrier.code, nameAr: this.carrier.nameAr },
-      { code: 'self', nameAr: 'توصيل ذاتي' },
+      ...(this.carrier ? [{ code: this.carrier.code, nameAr: this.carrier.nameAr }] : []),
+      { code: SELF_DELIVERY, nameAr: 'توصيل ذاتي' },
     ];
   }
 
   /** بوليصة لطلب جاهز أو قيد التجهيز — لطلب البائع نفسه وحده */
   async createWaybill(vendorId: string, subOrderId: string): Promise<Waybill> {
+    const carrier = this.carrier;
+    if (!carrier) {
+      throw new ConflictError('لا شركة شحن موصولة — التوصيل ذاتي: اكتب مرجع توصيلك وأكّد الشحن.', { subOrderId });
+    }
     const sub = await this.prisma.subOrder.findFirst({
       where: { id: subOrderId, vendorId },
       select: { subOrderNumber: true, status: true, order: { select: { shippingAddressSnapshot: true } } },
@@ -61,7 +71,7 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
     const addr = (sub.order.shippingAddressSnapshot ?? {}) as Record<string, string>;
     // الرقم فريد لكل شركة (shipments_carrier_tracking_key): تصادم نادر يُعاد برقم جديد
     for (let attempt = 0; ; attempt++) {
-      const waybill = await this.carrier.createWaybill({
+      const waybill = await carrier.createWaybill({
         subOrderNumber: sub.subOrderNumber,
         recipient: addr['recipientName'] ?? '',
         city: addr['city'] ?? '',
@@ -85,6 +95,7 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
    * ينقلان الفرعي عبر آلة الحالات.
    */
   async record(trackingNumber: string, code: TrackingCode, at: Date = new Date(), location?: string): Promise<boolean> {
+    if (!this.carrier) throw new NotFoundError('لا شركة شحن موصولة تُرسل أحداثاً.', { trackingNumber });
     // حدث الشركة لشحنتها هي: رقم يكتبه بائع لتوصيله الذاتي قد يطابق رقمها
     const shipment = await this.prisma.shipment.findFirst({
       where: { trackingNumber, carrierCode: this.carrier.code },
@@ -111,6 +122,7 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
 
   /** مهمة الشركة الوهمية: كل شحنة مشحونة تتقدّم خطوة */
   async advanceAll(): Promise<number> {
+    if (!this.carrier) return 0;
     const moving = await this.prisma.shipment.findMany({
       where: { carrierCode: this.carrier.code, subOrder: { status: 'shipped' } },
       select: { trackingNumber: true, events: { select: { code: true }, orderBy: { occurredAt: 'desc' }, take: 1 } },
@@ -129,7 +141,7 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
     // التتبّع العام لشحنات الشركات: رقم التوصيل الذاتي مرجع البائع، يتكرّر بين البائعين
     // فيُظهر شحنة غيرك — ولا أحداث له من شركة أصلاً
     const s = await this.prisma.shipment.findFirst({
-      where: { trackingNumber, carrierCode: { not: 'self' } },
+      where: { trackingNumber, carrierCode: { not: SELF_DELIVERY } },
       select: {
         carrierCode: true,
         trackingNumber: true,

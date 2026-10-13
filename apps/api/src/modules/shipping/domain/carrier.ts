@@ -28,6 +28,15 @@ export interface CarrierProvider {
   createWaybill(input: { subOrderNumber: string; recipient: string; city: string }): Promise<Waybill>;
 }
 
+/**
+ * رمز حقن شركة الشحن الموصولة — أو `null` حين لا شركة (SHIPPING_CARRIER=none):
+ * التوصيل ذاتي وحده، ولا بوليصة، ولا مهمة تتبّع تعلّم شيئاً مستلَماً.
+ */
+export const CARRIER = Symbol('CARRIER');
+
+/** رمز التوصيل الذاتي — مرجع يكتبه البائع لنفسه، لا شركة وراءه */
+export const SELF_DELIVERY = 'self';
+
 /** الحدث التالي في المسار أو null إن وصل النهاية */
 export function nextCode(current: TrackingCode | null): TrackingCode | null {
   if (current === 'delivered' || current === 'failed') return null;

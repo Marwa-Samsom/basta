@@ -29,12 +29,16 @@ export const PAYMENT_PROVIDERS = ['fake'] as const;
 export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
 /**
- * شركات الشحن التي يعرف الخادم وصلها. الوهمية وحدها، وهي **ممنوعة في الإنتاج**
- * كالدفع الوهمي: مهمتها تقدّم كل شحنة خطوة كل عشر دقائق حتى «سُلّم» (نحو أربعين
- * دقيقة)، والتسليم يبدأ فترة الإرجاع ثم يحرّر مال البائع — تسليم لم يحدث يحرّر
- * مالاً عن بضاعة لم تصل.
+ * شركات الشحن التي يعرف الخادم وصلها.
+ *
+ * - `fake` للتطوير والاختبار، وهي **ممنوعة في الإنتاج** كالدفع الوهمي: مهمتها تقدّم
+ *   كل شحنة خطوة كل عشر دقائق حتى «سُلّم» (نحو أربعين دقيقة)، والتسليم يبدأ فترة
+ *   الإرجاع ثم يحرّر مال البائع — تسليم لم يحدث يحرّر مالاً عن بضاعة لم تصل.
+ * - `none` بلا شركة: التوصيل ذاتي وحده. البائع يكتب مرجع توصيله ويؤكّد التسليم بنفسه،
+ *   ولا مهمة تعلّم شيئاً مستلَماً. المشتري يرى «تم التسليم» ويفتح نزاعاً خلال فترة
+ *   التعليق إن لم يصله شيء، فلا يُحرَّر المال قبلها. للإطلاق قبل ربط شركة حقيقية.
  */
-export const SHIPPING_CARRIERS = ['fake'] as const;
+export const SHIPPING_CARRIERS = ['fake', 'none'] as const;
 export type ShippingCarrierName = (typeof SHIPPING_CARRIERS)[number];
 
 /**
@@ -123,7 +127,9 @@ export function loadEnv(): Env {
   if (!(SHIPPING_CARRIERS as readonly string[]).includes(shippingCarrier)) {
     problems.push(`SHIPPING_CARRIER (شركة غير معروفة: ${shippingCarrier})`);
   } else if (production && shippingCarrier === 'fake') {
-    problems.push('SHIPPING_CARRIER (شركة الشحن الوهمية ممنوعة في الإنتاج — تعلّم كل شحنة مستلمة فتحرّر مال البائع)');
+    problems.push(
+      'SHIPPING_CARRIER (شركة الشحن الوهمية ممنوعة في الإنتاج — تعلّم كل شحنة مستلمة فتحرّر مال البائع. اضبط none للتوصيل الذاتي حتى تُربط شركة حقيقية)',
+    );
   }
   const totpKey = totpKeyOf(production);
   if (typeof totpKey === 'string') problems.push(totpKey);

@@ -26,6 +26,7 @@
   - **المشكلة:** `apps/api/src/common/config/env.ts:107-118` يرفض الإقلاع إذا كان `NODE_ENV=production` ومعه `PAYMENT_PROVIDER=fake` أو `SHIPPING_CARRIER=fake`.
   - **ما لا يصلح:** تشغيل الإنتاج بـ `development` يُسقط Secure cookies و HSTS و CORS الصارم وفحص أقل الصلاحيات، ويفتح `/api/docs`.
   - **الحل:** متغيّر صريح مثل `ALLOW_FAKE_PROVIDERS=demo`.
+  - **الشحن حُلّ في 13 أكتوبر 2026:** `SHIPPING_CARRIER=none` مقبولة في الإنتاج (توصيل ذاتي، بلا شركة وهمية تعلّم شيئاً مستلَماً). يبقى الدفع وحده.
 
 - [ ] **2. لافتة «متجر تجريبي» ثابتة في كل الصفحات، وتعديل الدفع**
   - **المشكلة:** صفحة الدفع `apps/web/src/app/.../checkout/page.tsx:23-29` و`:399-416` تعرض البطاقات التجريبية الخمس.
