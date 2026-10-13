@@ -24,8 +24,9 @@ test('رابط الدخول المصنوع يبقى في الموقع بعد ا�
     await page.getByLabel('البريد الإلكتروني').fill(email);
     await page.getByLabel('كلمة المرور').fill(PASSWORD);
     await page.getByRole('button', { name: 'دخول' }).click();
-    // الوجهة الافتراضية بعد الدخول — لا الموقع الآخر
-    await page.waitForURL((u) => u.pathname === '/vendor/onboarding/status' || u.host !== home);
+    // الوجهة المصنوعة تُسقط فيصل المشتري بيته (حسابه) — لا الموقع الآخر
+    await page.waitForURL((u) => u.pathname === '/account' || u.host !== home);
     expect(new URL(page.url()).host, JSON.stringify(next)).toBe(home);
+    expect(new URL(page.url()).pathname).toBe('/account');
   }
 });

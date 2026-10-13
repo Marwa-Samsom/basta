@@ -29,6 +29,10 @@ let dbUp = false;
 const SUFFIX = `co${Date.now()}`;
 const vendorIds: string[] = [];
 const variantIds: string[] = [];
+/** الشراء بحساب: مشترٍ يدفع، وآخر لا يرى طلبه */
+let buyerToken = '';
+let buyerId = '';
+let strangerToken = '';
 
 const ADDRESS = {
   recipientName: 'مشترٍ تجريبي',
@@ -83,9 +87,19 @@ async function seen(cart: string): Promise<{ expectedTotal: string; expectedCurr
 
 async function pay(token: string, paymentToken: string, key = randomUUID()) {
   return call('POST', '/checkout', {
-    body: { address: ADDRESS, paymentToken, guestEmail: `buyer.${SUFFIX}@basta.test`, ...(await seen(token)) },
-    headers: { 'x-cart-token': token, 'idempotency-key': key },
+    body: { address: ADDRESS, paymentToken, ...(await seen(token)) },
+    headers: { 'x-cart-token': token, 'idempotency-key': key, authorization: `Bearer ${buyerToken}` },
   });
+}
+
+/** حساب مشترٍ حقيقي عبر التسجيل والدخول — كما يمرّ به من يشتري */
+async function account(tag: string): Promise<{ token: string; userId: string }> {
+  const email = `${tag}.${SUFFIX}@basta.test`;
+  const password = 'كلمة-مرور-اختبار-طويلة';
+  expect((await call('POST', '/auth/register', { body: { email, password, fullName: `مشترٍ ${tag}` } })).statusCode).toBe(201);
+  const token = (await call('POST', '/auth/login', { body: { email, password } })).json().tokens.accessToken as string;
+  const { id } = await prisma.user.findUniqueOrThrow({ where: { email }, select: { id: true } });
+  return { token, userId: id };
 }
 
 const stockOf = async (variantId: string) =>
@@ -107,6 +121,10 @@ beforeAll(async () => {
   await app.getHttpAdapter().getInstance().ready();
   fake = app.get(FakePaymentProvider);
   checkout = app.get(CheckoutService);
+  const buyer = await account('buyer');
+  buyerToken = buyer.token;
+  buyerId = buyer.userId;
+  strangerToken = (await account('stranger')).token;
 
   const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
 
@@ -247,7 +265,7 @@ describe('بوابة 08 · البند 2 — الفشل لا يستهلك مخز�
     });
     expect(order.status).toBe('payment_failed');
     expect(order.subOrders).toHaveLength(0);
-    expect(order.guestEmail).toBe(`buyer.${SUFFIX}@basta.test`);
+    expect(order.customerUserId).toBe(buyerId);
 
     // السلة باقية: المشتري يعيد المحاولة ببطاقة أخرى بلا إعادة تعبئة
     const cart = await call('GET', '/cart', { headers: { 'x-cart-token': token } });
@@ -342,37 +360,35 @@ describe('بوابة 08 · البند 4 — انقطاع الاتصال ينته
     // الحجز باقٍ أثناء الانتظار: لا تُباع القطعة لغيره وماله ربما خُصم
     expect(pending.reservationIds.length).toBe(1);
 
-    // رقم طلب الضيف وحده لا يفتحه ولا يطلق مصالحته: 404 كأنه غير موجود، والطلب باقٍ معلّقاً
-    for (const headers of [{}, { 'x-order-key': 'guessed-key' }]) {
+    // رقم الطلب وحده لا يفتحه ولا يطلق مصالحته — بلا دخول، أو بحساب آخر، أو بمفتاح
+    // ضيف مخمَّن: 404 كأنه غير موجود، والطلب باقٍ معلّقاً
+    for (const headers of [{}, { 'x-order-key': 'guessed-key' }, { authorization: `Bearer ${strangerToken}` }]) {
       const peek = await call('GET', `/checkout/orders/${pending.orderNumber}`, { headers });
       expect(peek.statusCode).toBe(404);
     }
     expect((await prisma.order.findUniqueOrThrow({ where: { id: pending.id } })).status).toBe('pending_payment');
 
-    // المشتري يعود لصفحة الطلب بمفتاحه — السؤال عن الحالة يطلق المصالحة
-    const key = res.json().accessKey as string;
-    expect(key).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    const status = await call('GET', `/checkout/orders/${pending.orderNumber}`, { headers: { 'x-order-key': key } });
+    // صاحبه يعود لصفحة الطلب بجلسته — السؤال عن الحالة يطلق المصالحة. طلب الحساب بلا مفتاح ضيف
+    expect(res.json().accessKey).toBeUndefined();
+    const status = await call('GET', `/checkout/orders/${pending.orderNumber}`, { headers: { authorization: `Bearer ${buyerToken}` } });
     expect(status.json().outcome).toBe('paid');
     expect(status.json().subOrderCount).toBe(1);
   });
 
-  it('رقم الطلب من مولّد معمّى بثمانية محارف، ومفتاح الضيف يُعاد لإعادة المحاولة بالمفتاح نفسه', async () => {
+  it('رقم الطلب من مولّد معمّى بثمانية محارف، وإعادة «ادفع» بالمفتاح نفسه تعيد الطلب نفسه', async () => {
     if (!dbUp) return;
     const numbers = new Set(Array.from({ length: 2000 }, () => orderNumber(new Date('2026-09-29T10:00:00Z'))));
     expect(numbers.size).toBe(2000);
     for (const n of numbers) expect(n).toMatch(/^BST-260929-[2-9A-HJ-NP-Z]{8}$/);
 
-    // إعادة «ادفع» بمفتاح عدم التكرار نفسه تعيد الطلب نفسه ومفتاحه نفسه
+    // إعادة «ادفع» بمفتاح عدم التكرار نفسه تعيد الطلب نفسه
     const cart = await cartWith([{ variantId: variantIds[0]!, qty: 1 }]);
     const idem = randomUUID();
     const first = await pay(cart, 'tok_success', idem);
     const again = await pay(cart, 'tok_success', idem);
     expect(again.json().orderId).toBe(first.json().orderId);
-    expect(again.json().accessKey).toBe(first.json().accessKey);
-    // والمفتاح لطلب واحد: مفتاح طلب آخر لا يفتحه
-    const other = await pay(await cartWith([{ variantId: variantIds[0]!, qty: 1 }]), 'tok_success');
-    const cross = await call('GET', `/checkout/orders/${first.json().orderNumber}`, { headers: { 'x-order-key': other.json().accessKey } });
+    // والطلب لصاحبه: حساب آخر لا يفتحه
+    const cross = await call('GET', `/checkout/orders/${first.json().orderNumber}`, { headers: { authorization: `Bearer ${strangerToken}` } });
     expect(cross.statusCode).toBe(404);
   });
 
@@ -583,6 +599,33 @@ describe('دفع بعد انتهاء الحجز — إشعاران متزامن�
   });
 });
 
+describe('الشراء بحساب — محسوم 13 أكتوبر 2026', () => {
+  it('سلة الضيف: «ادفع» بلا دخول يُردّ 401 بلا طلب ولا حجز، والسلة نفسها تُدفع بعد الدخول', async () => {
+    if (!dbUp) return;
+    const cart = await cartWith([{ variantId: variantIds[1]!, qty: 1 }]);
+    const before = await stockOf(variantIds[1]!);
+    const key = randomUUID();
+
+    const guest = await call('POST', '/checkout', {
+      body: { address: ADDRESS, paymentToken: 'tok_success', guestEmail: `guest.${SUFFIX}@basta.test`, ...(await seen(cart)) },
+      headers: { 'x-cart-token': cart, 'idempotency-key': key },
+    });
+    expect(guest.statusCode).toBe(401);
+    expect(guest.json().message).toBe('سجّل دخولك أو أنشئ حساباً لتكمل الشراء — سلّتك محفوظة كما هي.');
+    expect(await prisma.order.count({ where: { idempotencyKey: key } })).toBe(0);
+    expect(await stockOf(variantIds[1]!)).toEqual(before);
+
+    // السلة برمزها لا بالحساب: بعد الدخول تُدفع كما هي، والطلب باسم صاحبه
+    expect((await call('GET', '/cart', { headers: { 'x-cart-token': cart } })).json().itemCount).toBe(1);
+    const paid = await pay(cart, 'tok_success', key);
+    expect(paid.statusCode, paid.body).toBe(200);
+    expect(paid.json().outcome).toBe('paid');
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: paid.json().orderId } });
+    expect(order.customerUserId).toBe(buyerId);
+    expect(order.guestEmail).toBeNull();
+  });
+});
+
 describe('حدود الكوبون — تُحجز مع الطلب تحت قفل، ولا يتخطّاها ضيف', () => {
   let n = 0;
   /** منتج بمخزون وافر — لا يتنافس الاختبار على مخزون اختبار آخر */
@@ -616,9 +659,10 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
     expect(r.statusCode, r.body).toBe(200);
     return cart;
   }
-  const checkoutAs = async (cart: string, paymentToken: string, token?: string) =>
+  /** `null` = ضيف بلا دخول */
+  const checkoutAs = async (cart: string, paymentToken: string, token: string | null = buyerToken) =>
     call('POST', '/checkout', {
-      body: { address: ADDRESS, paymentToken, ...(token ? {} : { guestEmail: `guest.${randomUUID()}@basta.test` }), ...(await seen(cart)) },
+      body: { address: ADDRESS, paymentToken, ...(await seen(cart)) },
       headers: { 'x-cart-token': cart, 'idempotency-key': randomUUID(), ...(token ? { authorization: `Bearer ${token}` } : {}) },
     });
   async function member(tag: string): Promise<string> {
@@ -648,13 +692,13 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
     expect(await stockOf(variantId)).toEqual({ onHand: 48, reserved: 0 });
   });
 
-  it('كوبون بحدّ لكل مستخدم لا يستعمله ضيف — ولا يحبس مخزونه', async () => {
+  it('الضيف لا يدفع أصلاً — يُطلب دخوله قبل أي حجز، والكوبون لا يُستعمل', async () => {
     if (!dbUp) return;
     const variantId = await stocked();
     const c = await coupon(`ONCE-G-${SUFFIX}`.toUpperCase(), { perUser: 1 });
-    const r = await checkoutAs(await cartWithCoupon(variantId, c.code), 'tok_success');
-    expect(r.statusCode).toBe(409);
-    expect(r.json().message).toMatch(/سجّل الدخول/);
+    const r = await checkoutAs(await cartWithCoupon(variantId, c.code), 'tok_success', null);
+    expect(r.statusCode).toBe(401);
+    expect(r.json().message).toMatch(/سجّل دخولك/);
     expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(0);
     expect(await stockOf(variantId)).toEqual({ onHand: 50, reserved: 0 });
   });
@@ -729,8 +773,8 @@ describe('الإجمالي الذي رآه المشتري هو ما يُخصم �
     (await call('POST', '/checkout/quote', { body: { country: a.country, region: a.region, city: a.city }, headers: { 'x-cart-token': cart } })).json();
   const place = (cart: string, a: typeof ADDRESS, expected: { expectedTotal?: string; expectedCurrency?: string }, key = randomUUID()) =>
     call('POST', '/checkout', {
-      body: { address: a, paymentToken: 'tok_success', guestEmail: `zones.${randomUUID()}@basta.test`, ...expected },
-      headers: { 'x-cart-token': cart, 'idempotency-key': key },
+      body: { address: a, paymentToken: 'tok_success', ...expected },
+      headers: { 'x-cart-token': cart, 'idempotency-key': key, authorization: `Bearer ${buyerToken}` },
     });
 
   it('حسب الشحن للأردن ثم دفع بعنوان سعودي: 409 بالإجمالي الجديد، ولا طلب ولا حجز ولا مال', async () => {

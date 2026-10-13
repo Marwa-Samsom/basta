@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import { makeVendor, prisma, tag } from './fixtures';
+import { makeVendor, prisma, signInBuyer, tag } from './fixtures';
 
 /**
  * 502 و 504 من وسيط لا يعنيان «لم يُدفع»: الخادم خلفه قد أنشأ الطلب وخصم المال.
@@ -15,14 +15,13 @@ async function addToCart(page: Page, productSlug: string) {
   await page.waitForURL((u) => u.pathname === '/checkout');
 }
 
-async function fillAndPrice(page: Page, email: string) {
+async function fillAndPrice(page: Page) {
   await page.getByLabel('اسم المستلم').fill('مشترٍ E2E');
   await page.getByLabel('الهاتف').fill('+966500000000');
   await page.getByLabel('البلد').selectOption('SA');
   await page.getByLabel('المحافظة / المنطقة').fill('الرياض');
   await page.getByLabel('المدينة').fill('الرياض');
   await page.getByLabel('الشارع ورقم البناء').fill('طريق الملك فهد 10');
-  await page.getByLabel('البريد الإلكتروني').fill(email);
   await page.getByRole('button', { name: 'احسب الشحن' }).click();
   await expect(page.locator('.sp-sum__total')).toBeVisible();
 }
@@ -45,7 +44,7 @@ const payButton = (page: Page) => page.getByRole('button', { name: 'ادفع' })
 
 test('502 بعد أن دفع الخادم: «ادفع» ثانيةً بالمفتاح نفسه يعيد الطلب نفسه — دفعة واحدة', async ({ page }) => {
   const v = await makeVendor(tag());
-  const email = `retry502.${tag()}@basta.test`;
+  const { userId } = await signInBuyer(page);
   // الخادم يعالج الطلب كاملاً (يُنشئ ويخصم)، والوسيط يردّ على المتصفّح 502
   const keys = await interceptPay(page, async (route) => {
     await route.fetch();
@@ -53,7 +52,7 @@ test('502 بعد أن دفع الخادم: «ادفع» ثانيةً بالمف�
   });
 
   await addToCart(page, v.productSlug);
-  await fillAndPrice(page, email);
+  await fillAndPrice(page);
   await payButton(page).click();
   await expect(page.getByText('تعذّر الاتصال بالخادم')).toBeVisible();
 
@@ -61,26 +60,26 @@ test('502 بعد أن دفع الخادم: «ادفع» ثانيةً بالمف�
   await page.waitForURL(/\/orders\//);
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);
-  expect(await prisma.order.count({ where: { guestEmail: email } })).toBe(1);
+  expect(await prisma.order.count({ where: { customerUserId: userId } })).toBe(1);
 });
 
 test('504 ثم إعادة تحميل الصفحة: المفتاح نفسه يبقى في الجلسة', async ({ page }) => {
   const v = await makeVendor(tag());
-  const email = `retry504.${tag()}@basta.test`;
+  const { userId } = await signInBuyer(page);
   const keys = await interceptPay(page, (route) => route.fulfill({ status: 504, contentType: 'text/html', body: '<h1>504 Gateway Timeout</h1>' }));
 
   await addToCart(page, v.productSlug);
-  await fillAndPrice(page, email);
+  await fillAndPrice(page);
   await payButton(page).click();
   await expect(page.getByText('تعذّر الاتصال بالخادم')).toBeVisible();
 
   await page.reload();
-  await fillAndPrice(page, email);
+  await fillAndPrice(page);
   await payButton(page).click();
   await page.waitForURL(/\/orders\//);
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);
-  expect(await prisma.order.count({ where: { guestEmail: email } })).toBe(1);
+  expect(await prisma.order.count({ where: { customerUserId: userId } })).toBe(1);
 
   // والشراء التالي محاولة جديدة: المفتاح انتهى بنتيجته
   expect(await page.evaluate(() => sessionStorage.getItem('basta.checkout.attempt'))).toBeNull();

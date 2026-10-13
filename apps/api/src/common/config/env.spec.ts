@@ -137,3 +137,29 @@ describe('مفتاح أسرار التحقق الثنائي', () => {
     expect(loadEnv().totpKey.equals(first)).toBe(true);
   });
 });
+
+describe('سرّ خادم الواجهة (EDGE_PROXY_SECRET)', () => {
+  let saved: NodeJS.ProcessEnv;
+  beforeEach(() => {
+    saved = { ...process.env };
+    resetEnvCache();
+  });
+  afterEach(() => {
+    process.env = saved;
+    resetEnvCache();
+  });
+
+  it('اختياري، لكنه إن وُجد في الإنتاج فبطول 32 محرفاً على الأقل', () => {
+    // غيابه لا يُذكر — ما يُرفض هنا المزوّد الوهمي الافتراضي وحده
+    production({ EDGE_PROXY_SECRET: undefined });
+    expect(() => loadEnv()).not.toThrow(/EDGE_PROXY_SECRET/);
+    resetEnvCache();
+    production({ EDGE_PROXY_SECRET: 'short-edge-secret' });
+    expect(() => loadEnv()).toThrow(/EDGE_PROXY_SECRET/);
+  });
+
+  it('خارج الإنتاج لا يُفحص طوله', () => {
+    production({ NODE_ENV: 'development', EDGE_PROXY_SECRET: 'dev', PAYMENT_WEBHOOK_SECRET: undefined });
+    expect(() => loadEnv()).not.toThrow();
+  });
+});

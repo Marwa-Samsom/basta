@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { API, PASSWORD, register, tag } from './fixtures';
+import { PASSWORD, register, tag } from './fixtures';
 
 /**
  * ثغرة XSS لا تصير سرقة جلسة شهر:
@@ -32,7 +32,10 @@ test('سياسة المحتوى: nonce جديد لكل طلب، والسكربت
   expect(await page.evaluate(() => (window as never as { __xss?: number }).__xss)).toBeUndefined();
 });
 
-test('رمز التحديث كوكي HttpOnly لا يراه السكربت، وتجديد الجلسة يعمل به', async ({ page, context }) => {
+test('رمز التحديث كوكي HttpOnly لا يراه السكربت، وتجديد الجلسة يعمل به', async ({ page, context, baseURL }) => {
+  // الكوكي على نطاق الواجهة لا الـ API: المتصفّح يكلّم الـ API من /api/v1 على نطاقها،
+  // فيعمل على نطاقين مختلفين لا يرسل أحدهما إلى الآخر كوكي Strict
+  const refreshUrl = new URL('/api/v1/auth/refresh', baseURL).href;
   const t = tag();
   const email = `session.${t}@basta.test`;
   await register(email, `مشترٍ ${t}`);
@@ -48,7 +51,7 @@ test('رمز التحديث كوكي HttpOnly لا يراه السكربت، و�
   expect(seen.keys).toContain('basta.access');
   expect(seen.keys).not.toContain('basta.refresh');
   expect(seen.cookie).not.toContain('basta_rt');
-  const cookie = (await context.cookies(`${API}/auth/refresh`)).find((c) => c.name === 'basta_rt');
+  const cookie = (await context.cookies(refreshUrl)).find((c) => c.name === 'basta_rt');
   expect(cookie, 'الكوكي محفوظ في المتصفّح').toBeTruthy();
   expect(cookie!.httpOnly).toBe(true);
   expect(cookie!.sameSite).toBe('Strict');
@@ -57,10 +60,13 @@ test('رمز التحديث كوكي HttpOnly لا يراه السكربت، و�
   // رمز وصول منتهٍ: الطلب يرتدّ 401 فيتجدّد بالكوكي وحده، والصفحة تكمل
   await page.evaluate(() => localStorage.setItem('basta.access', 'expired.token.value'));
   const account = page.waitForResponse((r) => r.url().endsWith('/me/account') && r.status() === 200);
+  const renewal = page.waitForResponse((r) => r.url().endsWith('/auth/refresh'));
   await page.reload();
+  // التجديد ذهب إلى نطاق الواجهة نفسه — طلب إلى أصل الـ API ما كان ليحمل الكوكي في الإنتاج
+  expect((await renewal).url()).toBe(refreshUrl);
   await account;
   const renewed = await page.evaluate(() => localStorage.getItem('basta.access'));
   expect(renewed).not.toBe('expired.token.value');
-  const rotated = (await context.cookies(`${API}/auth/refresh`)).find((c) => c.name === 'basta_rt');
+  const rotated = (await context.cookies(refreshUrl)).find((c) => c.name === 'basta_rt');
   expect(rotated!.value).not.toBe(cookie!.value);
 });

@@ -21,19 +21,23 @@
 export const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://127.0.0.1:4000/api/v1';
 
 /**
- * عنوان الـ API لطلبات الجلسة من المتصفّح. كوكي التحديث SameSite=Strict لا
- * يُرسل إلا إلى «الموقع» نفسه، و localhost و 127.0.0.1 موقعان مختلفان في عين
- * المتصفّح: صفحة على localhost:3000 تنادي 127.0.0.1:4000 فلا يصل الكوكي. في
- * التطوير يأخذ الطلب اسم المضيف الذي فُتحت به الصفحة. الإنتاج لا يمسّه.
+ * عنوان الـ API لمن يطلب. المتصفّح يطلب من نطاق الواجهة نفسه (/api/v1، يمرّره
+ * خادم الواجهة — app/api/v1/[...path]/route.ts): كوكي التحديث SameSite=Strict
+ * لا يُرسل إلا إلى «الموقع» الذي فُتحت منه الصفحة، والواجهة والـ API نطاقان
+ * مختلفان في الإنتاج المجاني وفي التطوير (localhost:3000 و 127.0.0.1:4000).
+ * والخادم (تصيير الصفحات) يكلّم الـ API مباشرةً — لا كوكي هناك.
  */
-function sessionBase(): string {
-  if (typeof window === 'undefined') return API_BASE;
-  const loopback = /^(localhost|127\.0\.0\.1)$/;
-  const url = new URL(API_BASE);
-  const page = window.location.hostname;
-  if (!loopback.test(url.hostname) || !loopback.test(page) || url.hostname === page) return API_BASE;
-  url.hostname = page;
-  return url.href.replace(/\/$/, '');
+export function apiBase(): string {
+  return typeof window === 'undefined' ? API_BASE : '/api/v1';
+}
+
+/**
+ * مسار ملف من خادم الرفع (`/uploads/…?s=…`) عنواناً كاملاً. الصور لا تمرّ بممرّ
+ * /api/v1: لا كوكي فيها، وتُحمَّل من أصل الـ API مباشرةً (img-src في proxy.ts).
+ */
+export function mediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  return /^https?:\/\//.test(path) ? path : `${API_BASE.replace(/\/api\/v1\/?$/, '')}${path}`;
 }
 
 const ACCESS_KEY = 'basta.access';
@@ -135,11 +139,11 @@ async function raw(path: string, options: RequestOptions, token: string | null):
 
   if (token) headers['authorization'] = `Bearer ${token}`;
 
-  // include: ردّ الدخول يضع كوكي التحديث، والمتصفّح لا يحفظ كوكي ردّ من أصل آخر بدونه
-  return fetch(`${sessionBase()}${path}`, {
+  // same-origin: الطلب إلى نطاق الواجهة نفسه، فيذهب كوكي التحديث ويُحفظ ما يضعه الردّ
+  return fetch(`${apiBase()}${path}`, {
     method: options.method ?? 'GET',
     headers,
-    credentials: 'include',
+    credentials: 'same-origin',
     ...(body !== undefined ? { body } : {}),
   });
 }
@@ -177,7 +181,7 @@ function refresh(seen: string | null): Promise<Tokens | null> {
     if (!current) return null;
     // تبويب آخر جدّد بعد أن فشل طلبنا وقبل أن ندخل القفل
     if (seen && current.accessToken !== seen) return current;
-    const res = await fetch(`${sessionBase()}/auth/refresh`, { method: 'POST', credentials: 'include' });
+    const res = await fetch(`${apiBase()}/auth/refresh`, { method: 'POST', credentials: 'same-origin' });
     if (res.status === 409) {
       // دوّره تبويب آخر في اللحظة نفسها — الجلسة سليمة، وخلفه يُكتب الآن
       for (let i = 0; i < 20; i++) {
@@ -236,7 +240,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 export async function logout(): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(`${sessionBase()}/auth/logout`, { method: 'POST', credentials: 'include' });
+    res = await fetch(`${apiBase()}/auth/logout`, { method: 'POST', credentials: 'same-origin' });
   } catch {
     throw new ApiError(0, 'تعذّر الخروج — لا اتصال بالخادم. تحقّق من الشبكة وحاول مرة أخرى.');
   }

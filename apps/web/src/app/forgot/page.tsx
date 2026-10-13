@@ -2,19 +2,23 @@
 
 import '@/styles/screens/identity.css';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { Icon } from '@/components/icons';
 import { TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
+import { internalPath, withNext } from '@/lib/safe-path';
 import { RESET_EMAIL_KEY } from '../reset/new-password-field';
 
 /**
  * SH-04 (1) — «نسيت كلمة المرور».
  *
  * الرد واحد مسجّلاً كان البريد أو لا: الصفحة لا تقول «لا حساب بهذا البريد»
- * أبداً، فلا تصير أداةً لمعرفة من سجّل لدينا.
+ * أبداً، فلا تصير أداةً لمعرفة من سجّل لدينا. والوجهة التي جاء الزائر من أجلها
+ * (`next`) تُحمل إلى صفحة التعيين، فيصلها بعد أن يدخل بكلمته الجديدة.
  */
-export default function ForgotPage() {
+function ForgotForm() {
+  const next = internalPath(useSearchParams().get('next'));
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
@@ -64,7 +68,7 @@ export default function ForgotPage() {
               <Icon name="msg" size={24} />
             </span>
             <p className="id-sent__text">{sent} تحقّق من مجلّد البريد غير المرغوب أيضاً.</p>
-            <Link href="/reset" className="btn btn--primary btn--block ac-auth__cta">
+            <Link href={withNext('/reset', next)} className="btn btn--primary btn--block ac-auth__cta">
               أدخل الرمز وكلمة جديدة
             </Link>
             <button type="button" className="ac-link-btn" onClick={() => setSent(null)}>
@@ -90,7 +94,7 @@ export default function ForgotPage() {
             <button className="btn btn--primary btn--block ac-auth__cta" type="submit" disabled={busy}>
               {busy ? 'جارٍ الإرسال…' : 'أرسل رمز الاستعادة'}
             </button>
-            <Link href="/login" className="ac-link-btn">
+            <Link href={withNext('/login', next)} className="ac-link-btn">
               عُد إلى الدخول
             </Link>
           </form>
@@ -98,9 +102,17 @@ export default function ForgotPage() {
 
         <p className="ac-auth__foot">
           <span>معك الرمز من قبل؟</span>
-          <Link href="/reset">عيّن كلمة جديدة</Link>
+          <Link href={withNext('/reset', next)}>عيّن كلمة جديدة</Link>
         </p>
       </div>
     </main>
+  );
+}
+
+export default function ForgotPage() {
+  return (
+    <Suspense fallback={<main className="ac-auth" />}>
+      <ForgotForm />
+    </Suspense>
   );
 }

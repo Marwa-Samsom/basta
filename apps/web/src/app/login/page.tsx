@@ -7,7 +7,7 @@ import { Suspense, useState } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { Field, TextInput } from '@/components/ui';
-import { safeNext } from '@/lib/safe-path';
+import { homeFor, internalPath, withNext } from '@/lib/safe-path';
 
 interface LoginResponse {
   tokens: Tokens;
@@ -65,9 +65,10 @@ function PasswordField({
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  // الوجهة من الرابط: مسار داخلي وإلا فالافتراضي — لا `?next=https://…` يخرج بالمستخدم بعد الدخول
-  const next = safeNext(params.get('next'), '/vendor/onboarding/status');
-  const isAdmin = next.startsWith('/admin');
+  // الوجهة من الرابط: مسار داخلي وإلا فلا — لا `?next=https://…` يخرج بالمستخدم بعد الدخول.
+  // بلا وجهة يقرّرها الدور بعد الدخول (homeFor)، لا وجهة ثابتة واحدة للجميع
+  const next = internalPath(params.get('next'));
+  const isAdmin = next?.startsWith('/admin') ?? false;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,7 +89,7 @@ function LoginForm() {
         body: { email, password, ...(totp ? { totp } : {}) },
       });
       session.write(res.tokens);
-      router.push(res.requiresTotpSetup ? '/account/2fa' : next);
+      router.push(res.requiresTotpSetup ? '/account/2fa' : (next ?? homeFor(session.roles())));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'تعذّر تسجيل الدخول.';
       // الخادم يطلب رمز التحقق الثنائي ممّن فعّله — الحقل يظهر عندها لا قبلها.
@@ -205,7 +206,7 @@ function LoginForm() {
               />
               <PasswordField value={password} onChange={setPassword} />
               {/* رابط لا تسمية: البحث بالتسمية «كلمة المرور» يبقى يجد الحقل وحده */}
-              <Link href="/forgot" className="id-forgot">
+              <Link href={withNext('/forgot', next)} className="id-forgot">
                 نسيت كلمة المرور؟
               </Link>
             </>
@@ -225,7 +226,7 @@ function LoginForm() {
         {isAdmin ? null : (
           <p className="ac-auth__foot">
             <span>ليس لديك حساب؟</span>
-            <Link href="/register">أنشئ حساباً</Link>
+            <Link href={withNext('/register', next)}>أنشئ حساباً</Link>
           </p>
         )}
       </div>

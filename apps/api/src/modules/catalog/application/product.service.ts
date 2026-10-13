@@ -660,6 +660,8 @@ export class ProductService {
     }
     if (!category?.isActive) reasons.push('الفئة موقوفة — انقل المنتج إلى فئة فعّالة');
     if (!product.variants.some((v) => v.isActive)) reasons.push('لا متغيّر فعّال يحمل سعراً');
+    // المشتري يشتري ما يراه — منتج بلا صورة لا يصل المراجعة أصلاً
+    if (product.images.length === 0) reasons.push('أضف صورة واحدة على الأقل — الأولى هي الرئيسية في المتجر');
 
     const missing = missingRequiredAttributes(
       effective.filter((a) => a.isRequired).map((a) => ({ attributeId: a.attributeId, nameAr: a.nameAr })),

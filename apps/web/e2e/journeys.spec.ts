@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { PASSWORD, auditViews, makeAdmin, makeVendor, prisma, tag } from './fixtures';
+import { PASSWORD, auditViews, makeAdmin, makeVendor, prisma, register, tag } from './fixtures';
 
 /**
  * E2E — المرحلة 12: مسار الشراء ومسار التسوية كاملين، في متصفّح حقيقي، من
@@ -19,7 +19,15 @@ async function login(page: Page, email: string, next: string, totp?: () => strin
   await page.waitForURL((u) => u.pathname.startsWith(next.split('?')[0]!));
 }
 
-async function guestBuys(page: Page, productSlug: string, productName: string): Promise<string> {
+/**
+ * زائر يتسوّق بلا حساب، ويُطلب دخوله عند الدفع (الشراء بحساب) — يدخل من البوابة
+ * نفسها فيعود إلى الدفع وسلّته كما هي، ثم يدفع.
+ */
+async function shopperBuys(page: Page, productSlug: string, productName: string): Promise<string> {
+  const t = tag();
+  const email = `buyer.${t}@basta.test`;
+  await register(email, `مشترٍ ${t}`);
+
   await page.goto(`/p/${encodeURIComponent(productSlug)}`);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(productName);
   await page.getByRole('button', { name: 'أضف إلى السلة' }).click();
@@ -29,13 +37,22 @@ async function guestBuys(page: Page, productSlug: string, productName: string): 
   await expect(page.getByText(productName, { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'إتمام الشراء' }).click();
 
+  // بوابة الدخول، ثم العودة إلى الدفع نفسه
+  await expect(page.getByRole('heading', { name: 'ادخل لتكمل الشراء' })).toBeVisible();
+  await page.getByRole('link', { name: 'ادخل', exact: true }).click();
+  await page.getByLabel('البريد الإلكتروني').fill(email);
+  await page.getByLabel('كلمة المرور').fill(PASSWORD);
+  await page.getByRole('button', { name: 'دخول' }).click();
+  await page.waitForURL((u) => u.pathname === '/checkout');
+  // السلة نجت من الدخول — الدفع لا يعرض القطع قبل حساب الشحن، والرأس يعدّها
+  await expect(page.getByRole('link', { name: 'السلة — 1' })).toBeVisible();
+
   await page.getByLabel('اسم المستلم').fill('مشترٍ E2E');
   await page.getByLabel('الهاتف').fill('+966500000000');
   await page.getByLabel('البلد').selectOption('SA');
   await page.getByLabel('المحافظة / المنطقة').fill('الرياض');
   await page.getByLabel('المدينة').fill('الرياض');
   await page.getByLabel('الشارع ورقم البناء').fill('طريق الملك فهد 10');
-  await page.getByLabel('البريد الإلكتروني').fill('e2e-buyer@basta.test');
   await page.getByRole('button', { name: 'احسب الشحن' }).click();
   await expect(page.getByText('الإجمالي').first()).toBeVisible();
   await page.getByRole('button', { name: 'ادفع' }).click();
@@ -45,9 +62,9 @@ async function guestBuys(page: Page, productSlug: string, productName: string): 
   return decodeURIComponent(page.url().split('/orders/')[1]!);
 }
 
-test('مسار الشراء: ضيف من صفحة المنتج إلى تأكيد الطلب، والمخزون يُستهلك مرة واحدة', async ({ page }) => {
+test('مسار الشراء: زائر من صفحة المنتج، يدخل عند الدفع وسلّته كما هي، إلى تأكيد الطلب — والمخزون يُستهلك مرة واحدة', async ({ page }) => {
   const v = await makeVendor(tag());
-  const number = await guestBuys(page, v.productSlug, v.productName);
+  const number = await shopperBuys(page, v.productSlug, v.productName);
 
   const order = await prisma.order.findUniqueOrThrow({ where: { orderNumber: number }, include: { subOrders: true, payment: true } });
   expect(order.status).toBe('processing');
@@ -64,7 +81,7 @@ test('مسار التسوية: البائع يشحن ← يتحرّر رصيده
   const admin = await makeAdmin(t);
 
   const buyerPage = await (await browser.newContext()).newPage();
-  const number = await guestBuys(buyerPage, v.productSlug, v.productName);
+  const number = await shopperBuys(buyerPage, v.productSlug, v.productName);
   const sub = await prisma.subOrder.findFirstOrThrow({ where: { order: { orderNumber: number } } });
 
   // --------------------------------------------------- البائع ينفّذ الطلب

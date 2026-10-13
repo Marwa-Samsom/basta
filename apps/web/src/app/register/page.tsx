@@ -1,22 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { api, session, type Tokens } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { TextInput } from '@/components/ui';
+import { internalPath, withNext } from '@/lib/safe-path';
 import { NewPasswordField } from '../reset/new-password-field';
-
-/** بعد التأكيد أو تخطّيه — وجهة التسجيل كما كانت قبل صفحة الرمز */
-const AFTER_VERIFY = '/vendor/register';
 
 /**
  * SH-02 — إنشاء حساب. يليه الدخول مباشرةً فلا يُطلب إدخال البيانات مرتين،
  * ثم SH-03 تأكيد البريد — ومعها «تخطَّ الآن»: التأكيد لا يحجب الحساب.
+ *
+ * الوجهة بعد التأكيد ما جاء الزائر من أجله (`next`) — بائع من «ابدأ البيع» يُكمل
+ * إلى تسجيل متجره — وإلا فحسابه. كانت ثابتة على تسجيل المتجر، فيصل كل مشترٍ جديد
+ * إلى نموذج فتح متجر.
  */
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const next = internalPath(useSearchParams().get('next'));
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '' });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,7 +48,7 @@ export default function RegisterPage() {
         body: { email: form.email, password: form.password },
       });
       session.write(login.tokens);
-      router.push(`/verify?next=${encodeURIComponent(AFTER_VERIFY)}`);
+      router.push(withNext('/verify', next ?? '/account'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذّر إنشاء الحساب.');
     } finally {
@@ -109,9 +112,17 @@ export default function RegisterPage() {
 
         <p className="ac-auth__foot">
           <span>لديك حساب بالفعل؟</span>
-          <Link href="/login">ادخل</Link>
+          <Link href={withNext('/login', next)}>ادخل</Link>
         </p>
       </div>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<main className="ac-auth" />}>
+      <RegisterForm />
+    </Suspense>
   );
 }

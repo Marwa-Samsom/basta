@@ -9,6 +9,7 @@ import {
   Param,
   Post,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -96,6 +97,7 @@ export class PlaceOrderDto {
   @Matches(/^[A-Z]{3}$/, { message: 'أرسل عملة الإجمالي الذي رأيته.' })
   expectedCurrency!: string;
 
+  /** لا يُستعمل: الشراء بحساب (place). يبقى مقبولاً كي لا يرتدّ 400 من نسخة واجهة قديمة في متصفّح */
   @IsOptional()
   @NormalizeEmail()
   @IsEmail({}, { message: 'البريد غير صالح.' })
@@ -125,8 +127,9 @@ export class QuoteDto {
 }
 
 /**
- * إتمام الشراء — ST-15. للضيف والمسجَّل.
+ * إتمام الشراء — ST-15.
  * مفتاح عدم التكرار في الترويسة `idempotency-key` كما تطلبه البوابات الحقيقية.
+ * التسعير مفتوح للضيف (يرى الشحن قبل أن يدخل)، و«ادفع» لصاحب حساب وحده.
  */
 @ApiTags('checkout')
 @OptionalAuth()
@@ -155,6 +158,13 @@ export class CheckoutController {
     @Body() dto: PlaceOrderDto,
     @MaybeActor() actor: Actor | null,
   ) {
+    /**
+     * الشراء بحساب — محسوم 13 أكتوبر 2026. طلب الضيف لا يُتابَع ولا يُلغى ولا يُرجَع ولا
+     * يُراسَل فيه البائع، والبريد الذي يحمل رابطه لا يصل بعد — فيبقى المال عالقاً بلا
+     * صاحب يُعرف. صاحب الحساب يجد كل ذلك في صفحة طلباته. والسلة برمزها لا بالحساب،
+     * فتبقى كما هي بعد الدخول. طلبات الضيف القديمة تُقرأ بمفتاحها كما كانت (status).
+     */
+    if (!actor) throw new UnauthorizedException('سجّل دخولك أو أنشئ حساباً لتكمل الشراء — سلّتك محفوظة كما هي.');
     if (!cartToken) throw new InvalidInputError('أرسل رمز السلة في الترويسة x-cart-token.');
     if (!idempotencyKey) throw new InvalidInputError('أرسل مفتاح عدم التكرار في الترويسة idempotency-key.');
     return this.checkout.place({
@@ -163,9 +173,7 @@ export class CheckoutController {
       address: dto.address,
       paymentToken: dto.paymentToken,
       expected: { total: BigInt(dto.expectedTotal), currency: dto.expectedCurrency },
-      userId: actor?.userId ?? null,
-      guestEmail: dto.guestEmail ?? null,
-      guestPhone: dto.guestPhone ?? null,
+      userId: actor.userId,
       note: dto.note ?? null,
     });
   }

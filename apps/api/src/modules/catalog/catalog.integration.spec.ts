@@ -138,6 +138,7 @@ function as(tag: Tag) {
     get: (path: string) => app.inject({ method: 'GET', url: url(path), headers }),
     post: (path: string, payload?: object) => app.inject({ method: 'POST', url: url(path), headers, ...(payload ? { payload } : {}) }),
     patch: (path: string, payload: object) => app.inject({ method: 'PATCH', url: url(path), headers, payload }),
+    put: (path: string, payload: object) => app.inject({ method: 'PUT', url: url(path), headers, payload }),
     delete: (path: string) => app.inject({ method: 'DELETE', url: url(path), headers }),
     upload: (path: string, file: { name: string; type: string; data: Buffer }, fields: Record<string, string> = {}) => {
       const boundary = `----basta${randomBytes(8).toString('hex')}`;
@@ -205,6 +206,14 @@ async function simpleProduct(tag: Tag, sku: string, categoryId = menClothing) {
   });
   expect(res.statusCode).toBe(201);
   return res.json() as { id: string; variants: VariantJson[] };
+}
+
+/** صورة حقيقية للمنتج — الإرسال للمراجعة يشترط صورة واحدة على الأقل */
+async function withImage(tag: Tag, productId: string): Promise<string> {
+  const png = await sharp({ create: { width: 400, height: 400, channels: 3, background: { r: 120, g: 60, b: 40 } } }).png().toBuffer();
+  const up = await as(tag).upload(`/vendor/products/${productId}/images`, { name: 'p.png', type: 'image/png', data: png });
+  expect(up.statusCode, up.body).toBe(201);
+  return up.json().id as string;
 }
 
 // ============================================================================
@@ -297,6 +306,7 @@ describe('بوابة 05 · البند الأول — دورة حياة منتج 
     expect(both.statusCode).toBe(400);
 
     // ---- النشر طلب مراجعة (Q-15)، والمعتمد لا يُفرَّغ من سماته الإلزامية
+    await withImage('a', product.id);
     const submitted = await A.post(`/vendor/products/${product.id}/publish`);
     expect(submitted.statusCode).toBe(200);
     expect(submitted.json().status).toBe('pending_review');
@@ -394,7 +404,7 @@ describe('ADR-010 · عزل البائعين عبر الواجهة', () => {
 
 // ============================================================================
 describe('النشر', () => {
-  dbIt('يُمنع بكل أسبابه معاً: متجر غير معتمد وسمة إلزامية ناقصة', async () => {
+  dbIt('يُمنع بكل أسبابه معاً: متجر غير معتمد وسمة إلزامية ناقصة ولا صورة', async () => {
     const P = as('pending');
     const created = await P.post('/vendor/products', {
       categoryId: fashion,
@@ -407,9 +417,23 @@ describe('النشر', () => {
     expect(res.statusCode).toBe(409);
     const body = res.json();
     expect(body.code).toBe('PUBLISH_BLOCKED');
-    expect(body.details.reasons).toHaveLength(2);
+    expect(body.details.reasons).toHaveLength(3);
     expect(body.message).toContain('لم يُعتمد');
     expect(body.message).toContain('الخامة');
+    expect(body.message).toContain('صورة واحدة على الأقل');
+  });
+
+  dbIt('الصورة شرط للإرسال: بلا صورة يُمنع، وبصورة يصل المراجعة', async () => {
+    const A = as('a');
+    const product = await simpleProduct('a', `NOIMG-${SUFFIX}`);
+    const blocked = await A.post(`/vendor/products/${product.id}/publish`);
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().details.reasons).toEqual(['أضف صورة واحدة على الأقل — الأولى هي الرئيسية في المتجر']);
+
+    await withImage('a', product.id);
+    const submitted = await A.post(`/vendor/products/${product.id}/publish`);
+    expect(submitted.statusCode, submitted.body).toBe(200);
+    expect(submitted.json().status).toBe('pending_review');
   });
 
   dbIt('سمة متغيّرات لا تخصّ الفئة تُرفض: «المقاس» على بقالة', async () => {
@@ -432,6 +456,7 @@ describe('مراجعة المنتجات قبل النشر — Q-15', () => {
     const A = as('a');
     const service = app.get(ProductService);
     const product = await simpleProduct('a', `REVIEW-${SUFFIX}`);
+    await withImage('a', product.id);
 
     const submitted = await A.post(`/vendor/products/${product.id}/publish`);
     expect(submitted.json().status).toBe('pending_review');
@@ -472,6 +497,7 @@ describe('مراجعة المنتجات قبل النشر — Q-15', () => {
     const A = as('a');
     const service = app.get(ProductService);
     const product = await simpleProduct('a', `REREAD-${SUFFIX}`);
+    await withImage('a', product.id);
     await A.post(`/vendor/products/${product.id}/publish`);
 
     // المراجِع يفتحه: النسخة في تفاصيله
@@ -499,6 +525,7 @@ describe('مراجعة المنتجات قبل النشر — Q-15', () => {
     const sku = `REV-IMG-${SUFFIX}`;
     const product = await simpleProduct('a', sku);
     const variantId = product.variants[0]?.id as string;
+    await withImage('a', product.id);
     await A.post(`/vendor/products/${product.id}/publish`);
     const r0 = await revOf(product.id);
 
@@ -521,6 +548,7 @@ describe('مراجعة المنتجات قبل النشر — Q-15', () => {
   dbIt('المسودة لم تُرسل فلا تُعتمد ولا تُرفض، والطابور لا يحوي إلا ما ينتظر', async () => {
     const service = app.get(ProductService);
     const draft = await simpleProduct('a', `DRAFT-${SUFFIX}`);
+    await withImage('a', draft.id);
 
     await expect(service.approve(draft.id, await revOf(draft.id))).rejects.toBeInstanceOf(InvalidStateTransitionError);
     await expect(service.reject(draft.id, 'سبب كافٍ للرفض')).rejects.toBeInstanceOf(InvalidStateTransitionError);
@@ -560,6 +588,7 @@ describe('تعديل المنشور — Q-16', () => {
       await service.approve(product.id, await revOf(product.id));
       expect(await status()).toBe('active');
     };
+    await withImage('a', product.id);
     await publish();
 
     // السعر والمخزون تشغيل يومي لا محتوى — يبقى منشوراً
@@ -757,6 +786,67 @@ describe('صور المنتجات', () => {
     expect((await A.delete(`/vendor/products/${product.id}/images/${image.id}`)).statusCode).toBe(204);
     expect((await app.inject({ method: 'GET', url: image.urls['full.webp'] })).statusCode).toBe(404);
     expect((await A.get(`/vendor/products/${product.id}`)).json().images).toEqual([]);
+  }, 60_000);
+
+  dbIt('الترتيب: الأولى هي الرئيسية، والمجموعة كاملة أو 409، وتغيير الرئيسية وحده يعيد المنشور للمراجعة', async () => {
+    const A = as('a');
+    const service = app.get(ProductService);
+    const product = await simpleProduct('a', `ORDER-${SUFFIX}`);
+    const order = async () => ((await A.get(`/vendor/products/${product.id}`)).json().images as { id: string; sort: number }[]);
+    const status = async () => (await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status;
+
+    const i1 = await withImage('a', product.id);
+    const i2 = await withImage('a', product.id);
+    const i3 = await withImage('a', product.id);
+    // بعد حذف صورة لا تتساوى صورتان في الترتيب — كان ترتيب الجديدة عدد الصور فيساوي آخر باقية
+    expect((await A.delete(`/vendor/products/${product.id}/images/${i1}`)).statusCode).toBe(204);
+    const i4 = await withImage('a', product.id);
+    const before = await order();
+    expect(before.map((i) => i.id)).toEqual([i2, i3, i4]);
+    expect(new Set(before.map((i) => i.sort)).size).toBe(3);
+
+    await A.post(`/vendor/products/${product.id}/publish`);
+    await service.approve(product.id, await revOf(product.id));
+    const r0 = await revOf(product.id);
+
+    // الترتيب نفسه، أو تبديل ما بعد الرئيسية: لا محتوى جديد ويبقى منشوراً
+    expect((await A.put(`/vendor/products/${product.id}/images/order`, { imageIds: [i2, i3, i4] })).statusCode).toBe(200);
+    const swapped = await A.put(`/vendor/products/${product.id}/images/order`, { imageIds: [i2, i4, i3] });
+    expect(swapped.statusCode, swapped.body).toBe(200);
+    expect(swapped.json().map((i: { id: string }) => i.id)).toEqual([i2, i4, i3]);
+    expect(await status()).toBe('active');
+    expect(await revOf(product.id)).toBe(r0);
+
+    // الرئيسية تغيّرت: محتوى يراه المشتري — يعود للمراجعة بنسخة جديدة
+    expect((await A.put(`/vendor/products/${product.id}/images/order`, { imageIds: [i4, i2, i3] })).statusCode).toBe(200);
+    expect((await order()).map((i) => i.id)).toEqual([i4, i2, i3]);
+    expect(await status()).toBe('pending_review');
+    expect(await revOf(product.id)).toBe(r0 + 1);
+
+    // المجموعة كاملة وإلا 409، والمكرّر 400، وبائع آخر لا يرى المنتج
+    expect((await A.put(`/vendor/products/${product.id}/images/order`, { imageIds: [i4, i2] })).statusCode).toBe(409);
+    expect((await A.put(`/vendor/products/${product.id}/images/order`, { imageIds: [i4, i2, randomUUID()] })).statusCode).toBe(409);
+    expect((await A.put(`/vendor/products/${product.id}/images/order`, { imageIds: [i4, i4, i2] })).statusCode).toBe(400);
+    expect((await as('b').put(`/vendor/products/${product.id}/images/order`, { imageIds: [i4, i2, i3] })).statusCode).toBe(404);
+    expect((await order()).map((i) => i.id)).toEqual([i4, i2, i3]);
+  }, 60_000);
+
+  dbIt('الصورة الوحيدة للمنتج المعروض لا تُحذف، وللمسودة تُحذف', async () => {
+    const A = as('a');
+    const product = await simpleProduct('a', `ONLY-${SUFFIX}`);
+    const only = await withImage('a', product.id);
+    await A.post(`/vendor/products/${product.id}/publish`);
+
+    const refused = await A.delete(`/vendor/products/${product.id}/images/${only}`);
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json().message).toContain('الوحيدة');
+    // بعد إضافة غيرها تُحذف
+    await withImage('a', product.id);
+    expect((await A.delete(`/vendor/products/${product.id}/images/${only}`)).statusCode).toBe(204);
+
+    const draft = await simpleProduct('a', `ONLY-DRAFT-${SUFFIX}`);
+    const draftImage = await withImage('a', draft.id);
+    expect((await A.delete(`/vendor/products/${draft.id}/images/${draftImage}`)).statusCode).toBe(204);
   }, 60_000);
 });
 

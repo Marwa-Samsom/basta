@@ -2,11 +2,12 @@
 
 import '@/styles/screens/identity.css';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState, useSyncExternalStore } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
 import { TextInput } from '@/components/ui';
 import { api, session, type Tokens } from '@/lib/api';
+import { homeFor, internalPath, withNext } from '@/lib/safe-path';
 import { MIN_PASSWORD, NewPasswordField, RESET_EMAIL_KEY } from './new-password-field';
 
 /**
@@ -26,8 +27,9 @@ function savedEmail(): string {
   }
 }
 
-export default function ResetPage() {
+function ResetForm() {
   const router = useRouter();
+  const next = internalPath(useSearchParams().get('next'));
   // البريد من خطوة «نسيت» إن وُجد — الخادم يصيّر فارغاً والمتصفّح يقرؤه بلا تعارض
   const saved = useSyncExternalStore(noSubscribe, savedEmail, () => '');
   const [typed, setEmail] = useState<string | null>(null);
@@ -76,7 +78,8 @@ export default function ResetPage() {
         body: { email: email.trim(), password },
       });
       session.write(login.tokens);
-      router.push(login.requiresTotpSetup ? '/account/2fa' : '/account');
+      // ما جاء من أجله، وإلا بيته بحسب دوره — البائع لوحته لا صفحة المشتري
+      router.push(login.requiresTotpSetup ? '/account/2fa' : (next ?? homeFor(session.roles())));
     } catch {
       // من فعّل التحقق بخطوتين يحتاج رمزه ليدخل — الكلمة حُدّثت، والدخول من صفحته.
       // الاستعادة لا تتخطّى التحقق الثنائي: كلمة المرور وحدها لا تكفي بعدها أيضاً.
@@ -102,7 +105,7 @@ export default function ResetPage() {
               <Icon name="check-circle" size={16} />
               <span>حُدّثت كلمة المرور، وأُنهيت كل الجلسات المفتوحة على حسابك.</span>
             </div>
-            <Link href="/login" className="btn btn--primary btn--block ac-auth__cta">
+            <Link href={withNext('/login', next)} className="btn btn--primary btn--block ac-auth__cta">
               ادخل بكلمتك الجديدة
             </Link>
           </section>
@@ -158,9 +161,17 @@ export default function ResetPage() {
 
         <p className="ac-auth__foot">
           <span>لم يصلك رمز؟</span>
-          <Link href="/forgot">اطلب رمزاً جديداً</Link>
+          <Link href={withNext('/forgot', next)}>اطلب رمزاً جديداً</Link>
         </p>
       </div>
     </main>
+  );
+}
+
+export default function ResetPage() {
+  return (
+    <Suspense fallback={<main className="ac-auth" />}>
+      <ResetForm />
+    </Suspense>
   );
 }

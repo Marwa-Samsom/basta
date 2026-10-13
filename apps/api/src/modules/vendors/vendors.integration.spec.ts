@@ -12,6 +12,7 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
@@ -42,11 +43,15 @@ const api = (url: string, token?: string) => ({
 });
 
 /** طلب multipart بملف واحد — كما ترسله الشاشة من المتصفّح */
-function multipart(fileName: string, content: Buffer): { payload: Buffer; headers: Record<string, string> } {
+function multipart(
+  fileName: string,
+  content: Buffer,
+  type = 'application/pdf',
+): { payload: Buffer; headers: Record<string, string> } {
   const boundary = `----basta${randomUUID()}`;
   const head = Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
-      `Content-Type: application/pdf\r\n\r\n`,
+      `Content-Type: ${type}\r\n\r\n`,
   );
   const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
   return {
@@ -424,6 +429,17 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     });
     expect(create.statusCode, create.body).toBe(201);
     const productId = create.json().id;
+
+    // الصورة شرط الإرسال — يرفعها من المحرّر كما يرفعها المتصفّح
+    const png = await sharp({ create: { width: 600, height: 600, channels: 3, background: { r: 140, g: 30, b: 50 } } }).png().toBuffer();
+    const photo = multipart('shirt.png', png, 'image/png');
+    const uploaded = await app.inject({
+      method: 'POST',
+      ...api(`/vendor/products/${productId}/images`, sellerToken),
+      headers: { authorization: `Bearer ${sellerToken}`, ...photo.headers },
+      payload: photo.payload,
+    });
+    expect(uploaded.statusCode, uploaded.body).toBe(201);
 
     const publish = await app.inject({
       method: 'POST',

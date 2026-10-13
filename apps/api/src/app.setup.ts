@@ -2,7 +2,9 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { loadEnv, type TrustProxy } from './common/config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { IMAGE_MAX_BYTES, ProductImageGate, UPLOADS_ROOT, UPLOADS_URL_PREFIX } from './modules/catalog/public';
@@ -18,6 +20,38 @@ export function createHttpAdapter(trustProxy: TrustProxy = loadEnv().trustProxy)
 }
 
 /**
+ * الزائر خلف خادم الواجهة. المتصفّح لا يكلّم الـ API مباشرةً: خادم الواجهة يمرّر
+ * /api/v1 من نطاقه (apps/web/src/app/api/v1/[...path]/route.ts) لأن كوكي التحديث
+ * SameSite=Strict لا يعبر بين نطاقين. فيصل كل طلب من عنوان خادم الواجهة، ويشترك
+ * الزوار كلهم في حدّ التخمين — عشر محاولات خاطئة من أي أحد تقفل الدخول عن الموقع.
+ *
+ * خادم الواجهة يضع عنوان الزائر في ترويسة ومعها سرّ مشترك (EDGE_PROXY_SECRET).
+ * بالسرّ وحده يصير العنوان `req.ip` — في حدّ المعدّل وفي التدقيق. وبدونه تُحذف
+ * الترويستان: من يكلّم الـ API مباشرةً لا يختار العنوان الذي يُحسب عليه.
+ */
+export const EDGE_SECRET_HEADER = 'x-basta-edge-secret';
+export const EDGE_CLIENT_IP_HEADER = 'x-basta-client-ip';
+
+type EdgeRequest = { raw: { headers: Record<string, string | string[] | undefined> } };
+
+export function trustEdgeProxy(app: NestFastifyApplication, secret: string | undefined): void {
+  // بصمتا السرّين بطول واحد — timingSafeEqual يرمي على طولين مختلفين، والطول نفسه تسريب
+  const digest = (s: string) => createHash('sha256').update(s).digest();
+  const expected = secret ? digest(secret) : null;
+  app.getHttpAdapter().getInstance().addHook('onRequest', async (req: EdgeRequest) => {
+    const headers = req.raw.headers;
+    const given = headers[EDGE_SECRET_HEADER];
+    const ip = headers[EDGE_CLIENT_IP_HEADER];
+    delete headers[EDGE_SECRET_HEADER];
+    delete headers[EDGE_CLIENT_IP_HEADER];
+    if (!expected || typeof given !== 'string' || typeof ip !== 'string' || !isIP(ip)) return;
+    if (!timingSafeEqual(digest(given), expected)) return;
+    // ip في Fastify قارئ على النموذج الأصلي — خاصية الكائن نفسه تحجبه لهذا الطلب وحده
+    Object.defineProperty(req, 'ip', { value: ip, enumerable: true });
+  });
+}
+
+/**
  * تهيئة التطبيق المشتركة بين الإقلاع واختبارات الواجهة البرمجية.
  * اختبار يُقلع تطبيقاً مهيّأً بطريقة أخرى يثبت سلوك تطبيق آخر.
  */
@@ -27,6 +61,8 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
   app.useGlobalFilters(new AllExceptionsFilter());
+  // أول خطّاف: كل ما بعده (حدّ المعدّل، التدقيق) يقرأ req.ip بعد أن يُحسم
+  trustEdgeProxy(app, process.env['EDGE_PROXY_SECRET']);
   /**
    * الأفعال تُسمّى صراحةً: محوّل Fastify يسمح افتراضياً بـ GET و HEAD و POST
    * وحدها، فكان كل PUT و PATCH و DELETE يرتدّ من المتصفّح بـ ERR_FAILED بعد

@@ -419,6 +419,16 @@ export class ListProductsQueryDto {
   pageSize?: number;
 }
 
+export class ReorderImagesDto {
+  /** كل صور المنتج بترتيبها الجديد — الأولى هي الرئيسية */
+  @ApiProperty({ type: [String], example: ['3f1c…', '9a2e…'] })
+  @IsArray({ message: 'أرسل معرّفات الصور بترتيبها.' })
+  @ArrayMinSize(1, { message: 'أرسل معرّفات الصور بترتيبها.' })
+  @ArrayMaxSize(10, { message: 'للمنتج عشر صور على الأكثر.' })
+  @IsUUID('4', { each: true, message: 'معرّف صورة غير صالح.' })
+  imageIds!: string[];
+}
+
 export class ApproveProductDto {
   /** نسخة المحتوى التي فتحها المراجِع (contentRevision في تفاصيل المنتج) */
   @ApiProperty({ example: 3 })
