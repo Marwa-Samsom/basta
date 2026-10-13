@@ -78,6 +78,15 @@ describe('شركة الشحن في الإنتاج', () => {
     }
   });
 
+  it('none مقبولة في الإنتاج — التوصيل ذاتي بلا شركة — والرفض يدلّ عليها', () => {
+    // الدفع الوهمي ما زال ممنوعاً هنا؛ ما يُفحص أن الشحن لا يُذكر في الرفض
+    production({ SHIPPING_CARRIER: 'none' });
+    expect(() => loadEnv()).not.toThrow(/SHIPPING_CARRIER/);
+    resetEnvCache();
+    production({ SHIPPING_CARRIER: 'fake' });
+    expect(() => loadEnv()).toThrow(/اضبط none/);
+  });
+
   it('يذكر الدفع والشحن معاً في رسالة واحدة', () => {
     production({ PAYMENT_PROVIDER: 'fake', SHIPPING_CARRIER: 'fake' });
     expect(() => loadEnv()).toThrow(/PAYMENT_PROVIDER.*SHIPPING_CARRIER/);

@@ -68,6 +68,26 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
   const [tracking, setTracking] = useState('');
   const [carrier, setCarrier] = useState('self');
   const [waybill, setWaybill] = useState<Waybill | null>(null);
+  /**
+   * شركات الشحن الموصولة من الخادم: بلا شركة (SHIPPING_CARRIER=none) التوصيل ذاتي
+   * وحده — زرّ البوليصة كان يوحي بمندوب يأتي، ولا أحد يأتي.
+   */
+  const [carriers, setCarriers] = useState<{ code: string; nameAr: string }[] | null>(null);
+  const hasCarrier = carriers?.some((c) => c.code !== 'self') ?? false;
+
+  useEffect(() => {
+    let alive = true;
+    api<{ code: string; nameAr: string }[]>('/vendor/shipping/carriers')
+      .then((list) => {
+        if (alive) setCarriers(list);
+      })
+      .catch(() => {
+        if (alive) setCarriers([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -422,13 +442,28 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
 
             {order.actions.includes('shipped') ? (
               <div className="vm-subpanel">
-                <p className="vm-hint">أصدر بوليصة من شركة الشحن، أو أدخل رقم تتبّع توصيلك الذاتي.</p>
-                <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void issueWaybill()}>
-                  <Icon name="file" size={16} />
-                  إصدار بوليصة
-                </button>
-                {waybill ? <pre className="vm-waybill">{waybill.labelText}</pre> : null}
-                <TextInput label="رقم التتبّع" className="field__control vm-mono" value={tracking} onChange={(e) => setTracking(e.target.value)} dir="ltr" />
+                {hasCarrier ? (
+                  <>
+                    <p className="vm-hint">أصدر بوليصة من شركة الشحن، أو أدخل رقم تتبّع توصيلك الذاتي.</p>
+                    <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void issueWaybill()}>
+                      <Icon name="file" size={16} />
+                      إصدار بوليصة
+                    </button>
+                    {waybill ? <pre className="vm-waybill">{waybill.labelText}</pre> : null}
+                  </>
+                ) : (
+                  <p className="vm-hint">
+                    التوصيل ذاتي: سلّم الطلب بنفسك أو بمندوبك، واكتب مرجعاً تعرفه به (رقم إيصال أو اسم المندوب). بعد أن
+                    يستلمه المشتري أكّد التسليم — يُبلَّغ المشتري، وله فتح نزاع قبل أن يُحرَّر مالك.
+                  </p>
+                )}
+                <TextInput
+                  label={hasCarrier ? 'رقم التتبّع' : 'مرجع التوصيل'}
+                  className="field__control vm-mono"
+                  value={tracking}
+                  onChange={(e) => setTracking(e.target.value)}
+                  dir="ltr"
+                />
                 <button
                   type="button"
                   className="btn btn--primary"

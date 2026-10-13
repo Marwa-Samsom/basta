@@ -32,6 +32,8 @@ import {
   type Actor,
 } from '../../../common/security/actor';
 import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
+import { loadEnv } from '../../../common/config/env';
+import { InvalidInputError } from '../../../common/errors/domain-error';
 import { OrderLifecycleService } from '../application/order-lifecycle.service';
 import { OrderQueryService } from '../application/order-query.service';
 import type { SubOrderStatus } from '../domain/state-machine';
@@ -155,6 +157,13 @@ export class VendorOrdersController {
   @ApiOperation({ summary: 'قبول، رفض، تجهيز، شحن، تسليم، استلام مرتجع — الجدول يحكم' })
   async transition(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string, @Body() dto: TransitionDto) {
     const vendorId = vendorIdOf(actor);
+    // بلا شركة موصولة لا شحنة باسم شركة: شاشة قديمة أو طلب مباشر كان ينشئ شحنة
+    // «بسطة إكسبرس» لا تتقدّم ويُعرض رقمها في التتبّع العام كأن وراءه شركة
+    if (dto.to === 'shipped' && loadEnv().shippingCarrier === 'none' && (dto.carrierCode ?? 'self') !== 'self') {
+      throw new InvalidInputError('لا شركة شحن موصولة — التوصيل ذاتي: اكتب مرجع توصيلك وأكّد الشحن.', {
+        carrierCode: dto.carrierCode,
+      });
+    }
     // الهدف خارج قائمة البائع يمرّ إلى الجدول فيُرفض هناك — مصدر رفض واحد
     await this.lifecycle.transition(
       id,
