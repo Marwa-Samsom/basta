@@ -1144,6 +1144,7 @@ export class ProductService {
       images: row.images.map((img) => ({
         id: img.id,
         variantId: img.variantId,
+        optionValueId: img.optionValueId,
         altAr: img.altAr,
         altEn: img.altEn,
         width: img.width,

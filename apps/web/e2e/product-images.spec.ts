@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { deflateSync } from 'node:zlib';
-import { PASSWORD, makeVendor, prisma, tag } from './fixtures';
+import { PASSWORD, makeVendor, png, prisma, tag } from './fixtures';
 
 /**
  * البائع يرفع صور منتجه من المحرّر: كانت الواجهة بلا مكان للصور أصلاً، والإرسال لا
@@ -54,36 +53,3 @@ test('صور المنتج: الإرسال يُمنع بلا صورة، ثم تُ
   await expect(page.getByText('هذه الصورة الوحيدة للمنتج')).toBeVisible();
   await expect(gallery.getByRole('img')).toHaveCount(1);
 });
-
-/** PNG بلون واحد بلا مكتبة — يكفي الخادم ليقرأه ويعيد كتابته */
-function png(width: number, height: number, [r, g, b]: [number, number, number]): Buffer {
-  const row = Buffer.alloc(1 + width * 3);
-  for (let x = 0; x < width; x++) row.set([r, g, b], 1 + x * 3);
-  const chunk = (type: string, data: Buffer) => {
-    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
-    const out = Buffer.alloc(12 + data.length);
-    out.writeUInt32BE(data.length, 0);
-    body.copy(out, 4);
-    out.writeUInt32BE(crc32(body), 8 + data.length);
-    return out;
-  };
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(width, 0);
-  header.writeUInt32BE(height, 4);
-  header.set([8, 2, 0, 0, 0], 8); // 8 بت، RGB
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk('IHDR', header),
-    chunk('IDAT', deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
-
-function crc32(data: Buffer): number {
-  let c = ~0;
-  for (const byte of data) {
-    c ^= byte;
-    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
-  }
-  return ~c >>> 0;
-}

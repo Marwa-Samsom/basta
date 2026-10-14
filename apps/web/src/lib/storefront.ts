@@ -77,7 +77,7 @@ export interface ProductPage {
     ratingAvg: number;
     ratingCount: number;
   };
-  images: { id: string; variantId: string | null; altAr: string | null; urls: Record<string, string> }[];
+  images: { id: string; variantId: string | null; optionValueId: string | null; altAr: string | null; urls: Record<string, string> }[];
   attributes: {
     attributeId: string;
     nameAr: string;

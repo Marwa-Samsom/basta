@@ -64,6 +64,8 @@ export interface ProductAttributeView {
 export interface ProductImageView {
   readonly id: string;
   readonly variantId: string | null;
+  /** قيمة الخيار التي تظهر معها الصورة (اللون الأحمر) — أو null للجميع */
+  readonly optionValueId: string | null;
   readonly altAr: string | null;
   readonly altEn: string | null;
   readonly width: number | null;

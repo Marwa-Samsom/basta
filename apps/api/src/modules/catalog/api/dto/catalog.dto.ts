@@ -419,6 +419,19 @@ export class ListProductsQueryDto {
   pageSize?: number;
 }
 
+/** مع أي خيار تظهر الصورة — قيمة (اللون الأحمر) أو متغيّر بعينه أو لا شيء (للجميع) */
+export class LinkImageDto {
+  @ApiPropertyOptional({ nullable: true, description: 'قيمة خيار — تظهر الصورة مع كل متغيّر يحملها' })
+  @IsOptional()
+  @IsUUID('4', { message: 'قيمة الخيار غير صالحة.' })
+  optionValueId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'متغيّر بعينه' })
+  @IsOptional()
+  @IsUUID('4', { message: 'المتغيّر غير صالح.' })
+  variantId?: string | null;
+}
+
 export class ReorderImagesDto {
   /** كل صور المنتج بترتيبها الجديد — الأولى هي الرئيسية */
   @ApiProperty({ type: [String], example: ['3f1c…', '9a2e…'] })
