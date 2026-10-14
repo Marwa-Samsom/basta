@@ -83,6 +83,36 @@ export const EVENTS: readonly EventDef[] = [
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', amount: '42.000 د.أ', link: '/account/orders/BST-260921-A1B2C3' },
   },
   {
+    // الدفع بتحويل يدوي: الطلب محجوز ولم يُدفع بعد — كيف يحوّل وإلى متى
+    code: 'order_awaiting_transfer',
+    labelAr: 'طلب بانتظار التحويل',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'amount', 'pay_to', 'deadline', 'link'],
+    sample: {
+      name: 'سارة',
+      order_number: 'BST-260921-A1B2C3',
+      amount: '125.500 د.أ',
+      pay_to: 'كليك: BASTA\nالمستفيد: شركة بسطة',
+      deadline: '16 أكتوبر 2026، 3:00 م',
+      link: '/account/orders/BST-260921-A1B2C3',
+    },
+  },
+  {
+    code: 'transfer_expired',
+    labelAr: 'إلغاء طلب لم يصل تحويله',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'hours', 'link'],
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', hours: '48', link: '/account/orders/BST-260921-A1B2C3' },
+  },
+  {
+    // ردّ بتحويل يدوي — يُرسل بعد أن تسجّل الإدارة مرجع التحويل الصادر، لا قبله
+    code: 'refund_transferred',
+    labelAr: 'ردّ المبلغ بتحويل',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'amount', 'reference', 'link'],
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', amount: '42.000 د.أ', reference: 'CLQ-88123', link: '/account/orders/BST-260921-A1B2C3' },
+  },
+  {
     code: 'return_requested',
     labelAr: 'طلب إرجاع للبائع',
     audience: 'vendor',
@@ -281,6 +311,21 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'مرحباً {{name}}،\n\nرددنا {{amount}} إلى وسيلة دفعك عن الطلب {{order_number}}. قد يستغرق ظهوره في كشف بطاقتك بضعة أيام عمل حسب البنك.\n\n{{link}}\n\nبسطة',
     'استرداد {{amount}} عن الطلب {{order_number}}'),
   t('refund_issued', 'in_app', 'رددنا {{amount}} إلى وسيلة دفعك عن الطلب {{order_number}}.'),
+
+  t('order_awaiting_transfer', 'email',
+    'مرحباً {{name}}،\n\nحجزنا لك طلبك رقم {{order_number}}، وبقي التحويل. حوّل {{amount}} بالضبط إلى:\n\n{{pay_to}}\n\nواكتب رقم الطلب {{order_number}} في ملاحظة التحويل لنعرف أنه لك.\n\nالقطع محجوزة لك حتى {{deadline}}. نؤكّد وصول تحويلك ونرسل الطلب للمتاجر، ونبلغك حينها. إن لم يصل حتى ذلك الموعد يُلغى الطلب تلقائياً.\n\nالتفاصيل وإلغاء الطلب من هنا: {{link}}\n\nبسطة',
+    'حوّل {{amount}} لتأكيد طلبك {{order_number}}'),
+  t('order_awaiting_transfer', 'in_app', 'طلبك {{order_number}} محجوز حتى {{deadline}} — حوّل {{amount}} واكتب رقم الطلب في ملاحظة التحويل.'),
+
+  t('transfer_expired', 'email',
+    'مرحباً {{name}}،\n\nأُلغي طلبك رقم {{order_number}} لأن تحويله لم يصلنا خلال {{hours}} ساعة، وأعدنا القطع للمتجر.\n\nإن كنت حوّلت فعلاً فراسلنا بمرجع التحويل لنردّه لك، أو اطلب من جديد.\n\n{{link}}\n\nبسطة',
+    'أُلغي طلبك {{order_number}} — لم يصل التحويل'),
+  t('transfer_expired', 'in_app', 'أُلغي طلبك {{order_number}}: لم يصل تحويله خلال {{hours}} ساعة.'),
+
+  t('refund_transferred', 'email',
+    'مرحباً {{name}}،\n\nحوّلنا لك {{amount}} عن الطلب {{order_number}}. مرجع التحويل: {{reference}}.\n\nقد يستغرق ظهوره في حسابك يوم عمل حسب البنك.\n\n{{link}}\n\nبسطة',
+    'حوّلنا لك {{amount}} عن الطلب {{order_number}}'),
+  t('refund_transferred', 'in_app', 'حوّلنا لك {{amount}} عن الطلب {{order_number}} — مرجع التحويل {{reference}}.'),
 
   t('late_payment_refunded', 'email',
     'وصلنا تأكيد دفعك للطلب {{order_number}} بعد أن كان قد أُغلق دون إتمام، فلم يُنشأ الطلب.\n\nرددنا المبلغ كاملاً، {{amount}}، إلى وسيلة دفعك. قد يستغرق ظهوره في كشف بطاقتك بضعة أيام عمل حسب البنك.\n\nإن كنت ما زلت تريد المنتجات فاطلبها من جديد.\n\nبسطة',

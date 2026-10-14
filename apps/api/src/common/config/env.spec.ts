@@ -57,6 +57,14 @@ describe('بوابة الدفع في الإنتاج', () => {
     production({ NODE_ENV: 'development', PAYMENT_PROVIDER: 'fake', PAYMENT_WEBHOOK_SECRET: undefined });
     expect(loadEnv().paymentProvider).toBe('fake');
   });
+
+  it('التحويل اليدوي مقبول في الإنتاج، بلا سرّ إشعارات — ورفض الوهمي يدلّ عليه', () => {
+    production({ PAYMENT_PROVIDER: 'manual', PAYMENT_WEBHOOK_SECRET: undefined, SHIPPING_CARRIER: 'none' });
+    expect(() => loadEnv()).not.toThrow(/PAYMENT_PROVIDER|PAYMENT_WEBHOOK_SECRET/);
+    resetEnvCache();
+    production({ PAYMENT_PROVIDER: 'fake' });
+    expect(() => loadEnv()).toThrow(/اضبط manual/);
+  });
 });
 
 describe('شركة الشحن في الإنتاج', () => {

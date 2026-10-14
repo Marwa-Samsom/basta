@@ -405,6 +405,18 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     const trail = await call('GET', `/admin/audit?action=setting.update&entityId=hold_period_days`, admin.token);
     expect(trail.json().items[0].beforeJson).toEqual({ value: hold.value });
 
+    // بيانات التحويل نصّ بصيغته: IBAN برمز بلده، والاسم المستعار لاتيني — الخطأ يُرفض قبل أن يراه مشترٍ
+    expect((await call('PUT', '/admin/settings/transfer_iban', admin.token, { value: '1234' })).statusCode).toBe(400);
+    expect((await call('PUT', '/admin/settings/transfer_cliq_alias', admin.token, { value: 'بسطة' })).statusCode).toBe(400);
+    expect((await call('PUT', '/admin/settings/transfer_beneficiary', admin.token, { value: 42 })).statusCode).toBe(400);
+    expect((await call('PUT', '/admin/settings/transfer_bank', admin.token, { value: 'x'.repeat(81) })).statusCode).toBe(400);
+    const bank = s.json().settings.find((x: { key: string }) => x.key === 'transfer_bank');
+    expect(bank.kind).toBe('text');
+    expect((await call('PUT', '/admin/settings/transfer_bank', admin.token, { value: '  بنك الاختبار  ' })).statusCode).toBe(204);
+    expect((await prisma.setting.findUniqueOrThrow({ where: { key: 'transfer_bank' } })).valueJson).toBe('بنك الاختبار');
+    if (bank.value === null) await prisma.setting.delete({ where: { key: 'transfer_bank' } });
+    else await prisma.setting.update({ where: { key: 'transfer_bank' }, data: { valueJson: bank.value } });
+
     expect((await call('PUT', '/admin/taxes/KW', admin.token, { rateBps: 0, isPriceInclusive: true })).statusCode).toBe(204);
     const kw = await prisma.taxRate.findMany({ where: { country: 'KW' } });
     expect(kw.filter((t) => t.effectiveTo === null)).toHaveLength(1);

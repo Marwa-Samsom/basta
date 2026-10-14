@@ -436,6 +436,9 @@
 .sp-pay:has(input:checked) { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); }
 .sp-pay:hover { border-color: var(--border-strong); }
 .sp-pay:has(input:checked):hover { border-color: var(--brand); }
+/* وسيلة واحدة لا اختيار فيها (التحويل): تُعرض مختارةً بلا زرّ */
+.sp-pay--static,
+.sp-pay--static:hover { cursor: default; border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); }
 
 .sp-review__lead { font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--text-strong); }
 
@@ -511,6 +514,77 @@
 .sp-reasons li .icon { flex: none; color: var(--text-muted); margin-block-start: 3px; }
 
 .sp-links { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+/* ------------------------------------------ الدفع بتحويل يدوي — كيف يحوّل المشتري */
+
+.sp-hero--warning { border-color: var(--warning); }
+.sp-hero--warning .sp-hero__icon { background: var(--warning-subtle); color: var(--warning-text); }
+.sp-hero--warning .sp-hero__title { font-size: var(--text-xl); }
+
+.sp-transfer {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+.sp-transfer__title { font-size: var(--text-base); font-weight: var(--weight-bold); color: var(--text-strong); }
+.sp-transfer__rows { margin: 0; display: grid; gap: 0; }
+.sp-transfer__row {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-block: 10px;
+  border-block-end: 1px solid var(--border-subtle);
+}
+.sp-transfer__row:last-child { border-block-end: 0; }
+.sp-transfer__row dt { font-size: var(--text-xs); color: var(--text-muted); }
+.sp-transfer__row dd { margin: 0; display: grid; gap: 2px; min-width: 0; }
+.sp-transfer__value {
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.sp-transfer__hint { font-size: var(--text-xs); color: var(--text-muted); }
+.sp-transfer__row .icon-btn { inline-size: 36px; block-size: 36px; }
+.sp-transfer__steps {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  display: grid;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  line-height: 1.7;
+}
+.sp-transfer__deadline {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-subtle);
+  color: var(--text-body);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+.sp-transfer__deadline .icon { flex: none; color: var(--warning-text); margin-block-start: 4px; }
+
+@media (max-width: 480px) {
+  .sp-transfer__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .sp-transfer__row dt { grid-column: 1 / -1; }
+}
+
+.sp-order__note {
+  display: block;
+  padding: 10px var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
 
 /* ------------------------------------------------------------- ST-18 طلباتي */
 

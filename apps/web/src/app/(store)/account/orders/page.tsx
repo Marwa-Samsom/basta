@@ -15,6 +15,7 @@ interface Row {
   currency: string;
   grandTotalMinorUnits: string;
   placedAt: string;
+  payment?: { status: string; failureCode: string | null; expiresAt: string | null } | null;
   stores: {
     vendor: string;
     status: string;
@@ -40,6 +41,28 @@ const PARENT_TONE: Record<string, string> = {
 
 const thumbOf = (key: string | null | undefined): string | null =>
   key ? imageUrl(`/uploads/${key}/thumb.webp`) : null;
+
+/** طلب بتحويل لم يُقسَّم بعد: ينتظر تحويله، أو أُلغي قبله — حالته من الدفعة لا من المتاجر */
+function transferState(o: Row): { label: string; tone: string; note: string } | null {
+  if (o.status === 'pending_payment' && o.payment?.status === 'awaiting_transfer') {
+    return {
+      label: 'بانتظار تحويلك',
+      tone: 'badge--warning',
+      note: o.payment.expiresAt
+        ? `حوّل المبلغ قبل ${when(o.payment.expiresAt)} ليصل طلبك إلى المتاجر.`
+        : 'حوّل المبلغ ليصل طلبك إلى المتاجر.',
+    };
+  }
+  if (o.status === 'payment_failed') {
+    const code = o.payment?.failureCode;
+    return {
+      label: code === 'canceled_by_customer' ? 'ألغيته قبل التحويل' : 'أُلغي',
+      tone: 'badge--rejected',
+      note: code === 'transfer_expired' ? 'لم يصلنا التحويل خلال المهلة، فأُلغي وعادت القطع للمتاجر.' : 'لم يُدفع، ولم يصل إلى المتاجر.',
+    };
+  }
+  return null;
+}
 
 /**
  * ST-18 — طلباتي.
@@ -98,20 +121,23 @@ export default function MyOrdersPage() {
       ) : null}
       {rows && rows.length > 0 ? (
         <ul className="sp-orders">
-          {rows.map((o) => (
+          {rows.map((o) => {
+            const transfer = transferState(o);
+            return (
             <li key={o.number}>
               <Link href={`/account/orders/${o.number}`} className="sp-order">
                 <span className="sp-order__head">
                   <span className="tile-icon sp-tile" aria-hidden>
-                    <Icon name="package" size={15} />
+                    <Icon name={transfer && o.status === 'pending_payment' ? 'clock' : 'package'} size={15} />
                   </span>
                   <span className="sp-order__no num">{o.number}</span>
                   <span className="sp-order__date">{when(o.placedAt)}</span>
-                  <span className={`badge ${PARENT_TONE[o.status] ?? 'badge--pending'}`}>
-                    {PARENT_LABEL[o.status] ?? o.status}
+                  <span className={`badge ${transfer?.tone ?? PARENT_TONE[o.status] ?? 'badge--pending'}`}>
+                    {transfer?.label ?? PARENT_LABEL[o.status] ?? o.status}
                   </span>
                   <span className="sp-order__total money num">{money(o.grandTotalMinorUnits, o.currency)}</span>
                 </span>
+                {transfer ? <span className="sp-order__note">{transfer.note}</span> : null}
                 <span className="sp-order__stores">
                   {o.stores.map((s, i) => (
                     <span key={i} className="sp-order__store">
@@ -144,12 +170,13 @@ export default function MyOrdersPage() {
                   ))}
                 </span>
                 <span className="sp-order__foot">
-                  التفاصيل والتتبّع
+                  {transfer && o.status === 'pending_payment' ? 'كيف تحوّل' : 'التفاصيل والتتبّع'}
                   <Icon name="chev-end" size={14} mirror />
                 </span>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
     </div>

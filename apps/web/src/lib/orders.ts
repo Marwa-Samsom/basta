@@ -68,6 +68,15 @@ export const ACTION_LABEL: Partial<Record<SubOrderStatus, string>> = {
   canceled_by_customer: 'إلغاء هذا المتجر',
 };
 
+/** حال الردّ للإدارة — «بانتظار التحويل» مالٌ لم يخرج بعد: الإدارة تحوّله وتسجّل مرجعه */
+export const REFUND_STATUS: Readonly<Record<string, string>> = {
+  pending: 'قيد التنفيذ',
+  processing: 'قيد التنفيذ',
+  awaiting_transfer: 'بانتظار التحويل',
+  succeeded: 'تمّ',
+  failed: 'فشل',
+};
+
 export const money = (minor: string | number | bigint, currency: string): string =>
   formatMoney(BigInt(minor), currency);
 
@@ -124,7 +133,7 @@ export interface SubOrderView {
   history: HistoryRow[];
   shipment: ShipmentView | null;
   returns: { id: string; itemsJson: { orderItemId: string; qty: number }[]; reasonCode: string; description: string | null; status: string; requestedAt: string }[];
-  refunds: { id: string; amountMinorUnits: string; reason: string; status: string; createdAt: string }[];
+  refunds: { id: string; amountMinorUnits: string; reason: string; status: string; transferReference?: string | null; createdAt: string }[];
   disputes: { id: string; reasonCode: string; status: string; createdAt: string }[];
 }
 

@@ -13,10 +13,40 @@ import { LedgerService } from '../../finance/public';
 import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
-import { PAYMENT_PROVIDER, type ChargeOutcome, type PaymentProvider } from '../../payments/public';
+import {
+  PAYMENT_PROVIDER,
+  TransferDetailsService,
+  type ChargeOutcome,
+  type PaymentProvider,
+  type TransferDetails,
+} from '../../payments/public';
 import { PricingService } from '../../pricing/public';
 import { guestOrderKey, orderNumber, toSnapshot, type Snapshot } from '../domain/snapshot';
 import { loadEnv } from '../../../common/config/env';
+
+/**
+ * طلبات مفتوحة بانتظار التحويل لكل مشترٍ. كل طلب منها يحجز قطعه طوال المهلة (يومان
+ * افتراضياً)، فبلا حدّ يحجز حسابٌ واحد مخزون متجر كامل بطلبات لا يحوّل ثمنها.
+ */
+export const MAX_OPEN_TRANSFERS = 3;
+
+const DEADLINE_FORMAT = new Intl.DateTimeFormat('ar-JO-u-nu-latn', {
+  dateStyle: 'long',
+  timeStyle: 'short',
+  timeZone: 'Asia/Amman',
+});
+
+/** وجهة التحويل كما تُكتب في رسالة المشتري — سطر لكل ما ضُبط */
+export function payToLines(d: TransferDetails): string {
+  return [
+    d.cliqAlias ? `كليك: ${d.cliqAlias}` : null,
+    d.iban ? `IBAN: ${d.iban}` : null,
+    d.bank ? `البنك: ${d.bank}` : null,
+    d.beneficiary ? `المستفيد: ${d.beneficiary}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
 export interface CheckoutAddress {
   readonly recipientName: string;
@@ -48,8 +78,21 @@ export type OrderOutcome =
   | 'paid'
   | 'failed'
   | 'requires_action'
+  /** محجوز بانتظار تحويل المشتري — لا مال بعد، والإدارة تؤكّد الوصول */
+  | 'awaiting_transfer'
   /** لا نعرف بعد — المصالحة تحسمها. لا يُعرض للمشتري «فشل» ولا «نجح» */
   | 'pending';
+
+/** ما يحتاجه المشتري ليحوّل: المبلغ بالضبط، والوجهة، والمرجع، والموعد */
+export interface TransferInstructions {
+  readonly reference: string;
+  readonly expiresAt: Date | null;
+  readonly windowHours: number;
+  readonly beneficiary: string | null;
+  readonly bank: string | null;
+  readonly iban: string | null;
+  readonly cliqAlias: string | null;
+}
 
 export interface OrderResult {
   readonly orderId: string;
@@ -59,6 +102,7 @@ export interface OrderResult {
   readonly subOrderCount: number;
   readonly actionUrl?: string;
   readonly failure?: { code: string; message: string };
+  readonly transfer?: TransferInstructions;
   /** لطلب الضيف وحده: يُرسل في x-order-key لقراءة حالته (guestOrderKey) */
   readonly accessKey?: string;
 }
@@ -91,6 +135,7 @@ export class CheckoutService {
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
     private readonly ledger: LedgerService,
     private readonly notifications: NotificationsService,
+    private readonly transfers: TransferDetailsService,
   ) {}
 
   // ================================================================ الطلب
@@ -110,6 +155,8 @@ export class CheckoutService {
     if (!input.userId && !input.guestEmail && !input.guestPhone) {
       throw new InvalidInputError('الضيف يحتاج بريداً أو هاتفاً لنبلغه بطلبه.');
     }
+
+    if (this.provider.method === 'bank_transfer') await this.assertTransferOpen(input.userId);
 
     const cart = await this.carts.lines(input.cartToken);
     if (cart.items.length === 0) throw new InvalidInputError('السلة فارغة.');
@@ -174,7 +221,7 @@ export class CheckoutService {
                 provider: this.provider.name,
                 amountMinorUnits: quote.totals.total,
                 currency: quote.currency,
-                method: 'card',
+                method: this.provider.method,
                 status: 'pending',
               },
             },
@@ -252,9 +299,225 @@ export class CheckoutService {
           data: { status: 'requires_action' },
         });
         return;
+      case 'awaiting_transfer':
+        await this.awaitTransfer(orderId);
+        // الطلب محجوز باسمه: سلّة ممتلئة بعده تدعوه ليطلب القطع نفسها مرتين
+        if (cartId) await this.carts.clear(cartId).catch(() => undefined);
+        return;
       case 'unknown':
         return; // المصالحة تحسمها
     }
+  }
+
+  // ======================================================= التحويل اليدوي
+
+  /**
+   * قبل أي حجز: بيانات الحساب مضبوطة (وإلا يحجز الطلب ولا يعرف المشتري أين يحوّل)،
+   * والمشتري تحت حدّ الطلبات المفتوحة.
+   */
+  private async assertTransferOpen(userId: string | null): Promise<void> {
+    const details = await this.transfers.read();
+    if (!details.ready) {
+      this.logger.error('الدفع بالتحويل بلا بيانات حساب — اضبطها من الإدارة ← الإعدادات');
+      throw new ConflictError('الدفع غير متاح الآن — نضبط بيانات التحويل. جرّب بعد قليل.', { reason: 'TRANSFER_NOT_CONFIGURED' });
+    }
+    if (!userId) return;
+    const open = await this.prisma.order.count({
+      where: { customerUserId: userId, status: 'pending_payment', payment: { is: { status: 'awaiting_transfer' } } },
+    });
+    if (open >= MAX_OPEN_TRANSFERS) {
+      throw new ConflictError(
+        `لديك ${MAX_OPEN_TRANSFERS} طلبات بانتظار التحويل. حوّل ثمن أحدها أو ألغِه من «طلباتي» قبل طلب جديد.`,
+        { reason: 'TOO_MANY_OPEN_TRANSFERS' },
+      );
+    }
+  }
+
+  /**
+   * الطلب ينتظر التحويل: موعد على الدفعة، وحجز القطع ممدود إليه، ورسالة بكيف يحوّل.
+   * شرطيّ على «pending» — الإعادة (مفتاح عدم التكرار، المصالحة) لا تمدّ ولا تراسل مرتين.
+   */
+  private async awaitTransfer(orderId: string): Promise<void> {
+    const details = await this.transfers.read();
+    const order = await this.prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: {
+        orderNumber: true,
+        placedAt: true,
+        reservationIds: true,
+        customerUserId: true,
+        grandTotalMinorUnits: true,
+        currency: true,
+        customer: { select: { fullName: true } },
+      },
+    });
+    const expiresAt = new Date(order.placedAt.getTime() + details.windowHours * 3_600_000);
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.payment.updateMany({
+        where: { orderId, status: 'pending' },
+        data: { status: 'awaiting_transfer', expiresAt },
+      });
+      if (count === 0) return;
+      await this.inventory.extend(order.reservationIds, expiresAt, tx);
+      await this.notifications.enqueue(
+        {
+          code: 'order_awaiting_transfer',
+          userId: order.customerUserId,
+          vars: {
+            name: firstName(order.customer?.fullName),
+            order_number: order.orderNumber,
+            amount: formatMoney(money(order.grandTotalMinorUnits, order.currency)),
+            pay_to: payToLines(details),
+            deadline: DEADLINE_FORMAT.format(expiresAt),
+            link: `/account/orders/${order.orderNumber}`,
+          },
+        },
+        tx,
+      );
+    });
+  }
+
+  /**
+   * وصل التحويل — تؤكّده الإدارة بمرجعه من كشف البنك وبالمبلغ الذي وصل. هذا التأكيد
+   * يقوم مقام إشعار البوابة: يقسّم الطلب ويقيّد للبائعين ويبلّغ الجميع، في معاملة
+   * واحدة مع كتابة المرجع وسطر التدقيق. قبله لا رصيد لبائع من مال لم يُقبض.
+   *
+   * لا يُؤكَّد ما انتهت مهلته: الطلب يُلغى وقطعه عادت أو ستعود للمخزون، وإحياؤه
+   * يبيع ما ربما بيع لغيره. يُردّ ذلك التحويل للمشتري من البنك.
+   */
+  async confirmTransfer(
+    orderNumber: string,
+    adminUserId: string,
+    input: { reference: string; note?: string | null; receivedMinor: bigint },
+    now: Date = new Date(),
+  ): Promise<OrderResult> {
+    const order = await this.prisma.order.findUnique({
+      where: { orderNumber },
+      select: {
+        id: true,
+        status: true,
+        grandTotalMinorUnits: true,
+        currency: true,
+        reservationIds: true,
+        pricingSnapshot: true,
+        payment: { select: { id: true, status: true, expiresAt: true, transferReference: true } },
+      },
+    });
+    if (!order?.payment) throw new NotFoundError('لا طلب بهذا الرقم.', { orderNumber });
+    if (order.payment.transferReference) {
+      throw new ConflictError(`أُكّد تحويل هذا الطلب من قبل بالمرجع ${order.payment.transferReference}.`);
+    }
+    if (order.payment.status !== 'awaiting_transfer' || order.status !== 'pending_payment') {
+      throw new ConflictError('هذا الطلب لا ينتظر تحويلاً.', { status: order.status });
+    }
+    if (!order.payment.expiresAt || order.payment.expiresAt <= now) {
+      throw new ConflictError(
+        'انتهت مهلة هذا الطلب ويُلغى، والقطع تعود للمخزون. ردّ التحويل للمشتري من البنك، أو اطلب منه أن يطلب من جديد.',
+        { reason: 'TRANSFER_EXPIRED' },
+      );
+    }
+    if (input.receivedMinor !== order.grandTotalMinorUnits) {
+      throw new InvalidInputError(
+        `المبلغ الواصل لا يطابق الطلب (${formatMoney(money(order.grandTotalMinorUnits, order.currency))}). لا تؤكّد إلا تحويلاً بالمبلغ كاملاً.`,
+        { reason: 'AMOUNT_MISMATCH' },
+      );
+    }
+    const reference = input.reference.trim();
+    const note = input.note?.trim() || null;
+    const paymentId = order.payment.id;
+
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          const { count } = await tx.payment.updateMany({
+            where: { id: paymentId, status: 'awaiting_transfer', transferReference: null },
+            data: { transferReference: reference, transferNote: note, confirmedBy: adminUserId, confirmedAt: now },
+          });
+          if (count === 0) throw new ConflictError('تغيّرت حالة الطلب للتوّ. حدّث الصفحة.');
+
+          // حجز سقط قبل أن يُمدّ (خادم سقط بين الإنشاء والتمديد): يُحجز من جديد، والنقص يوقف التأكيد
+          const active = await tx.stockReservation.count({ where: { id: { in: order.reservationIds }, status: 'active' } });
+          if (active !== order.reservationIds.length) {
+            await this.inventory.release(order.reservationIds, tx);
+            const lines = (order.pricingSnapshot as unknown as Snapshot).subOrders.flatMap((s) => s.lines);
+            const fresh = await this.inventory.reserve(
+              { lines: lines.map((l) => ({ variantId: l.variantId, qty: l.qty, label: l.nameAr })), orderId: order.id },
+              tx,
+            );
+            await tx.order.update({ where: { id: order.id }, data: { reservationIds: fresh.reservations.map((r) => r.id) } });
+          }
+
+          if (!(await this.split(tx, order.id))) throw new ConflictError('تغيّرت حالة الطلب للتوّ. حدّث الصفحة.');
+          await tx.auditLog.create({
+            data: {
+              actorUserId: adminUserId,
+              actorRole: 'admin',
+              action: 'payment.transfer_confirmed',
+              entityType: 'Order',
+              entityId: order.id,
+              beforeJson: { paymentStatus: 'awaiting_transfer' },
+              afterJson: {
+                reference,
+                note,
+                amount: order.grandTotalMinorUnits.toString(),
+                currency: order.currency,
+              },
+            },
+          });
+        },
+        { timeout: 20_000 },
+      );
+    } catch (err) {
+      if (err instanceof InsufficientStockError) {
+        const product = String(err.details?.['productName'] ?? '');
+        throw new ConflictError(
+          `لم يبقَ ما يكفي من «${product}» لهذا الطلب — لا تؤكّده. ردّ التحويل للمشتري من البنك.`,
+          { reason: 'OUT_OF_STOCK' },
+        );
+      }
+      throw err;
+    }
+    return this.result(order.id);
+  }
+
+  /** المشتري يلغي طلبه قبل أن يحوّل — قطعه تعود فوراً لا بعد يومين */
+  async cancelAwaitingTransfer(orderNumber: string, userId: string): Promise<OrderResult> {
+    const order = await this.prisma.order.findUnique({
+      where: { orderNumber },
+      select: { id: true, customerUserId: true, status: true, payment: { select: { status: true } } },
+    });
+    if (!order || order.customerUserId !== userId) throw new NotFoundError('الطلب غير موجود.', { orderNumber });
+    if (order.status !== 'pending_payment' || order.payment?.status !== 'awaiting_transfer') {
+      throw new ConflictError('هذا الطلب لا ينتظر تحويلاً — إلغاؤه من صفحة الطلب لكل متجر.', { status: order.status });
+    }
+    if (!(await this.markFailed(order.id, 'canceled_by_customer', 'ألغيت الطلب قبل التحويل.'))) {
+      throw new ConflictError('تغيّرت حالة الطلب للتوّ. حدّث الصفحة.');
+    }
+    return this.result(order.id);
+  }
+
+  /** انقضت المهلة بلا تحويل: يُختم الطلب، وتعود القطع والكوبون، ويُبلَّغ المشتري — مرة واحدة */
+  private async expireTransfer(orderId: string): Promise<void> {
+    const { windowHours } = await this.transfers.read();
+    await this.markFailed(orderId, 'transfer_expired', `لم يصل التحويل خلال ${windowHours} ساعة، فأُلغي الطلب وعادت القطع للمخزون.`, async (tx) => {
+      const o = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        select: { orderNumber: true, customerUserId: true, customer: { select: { fullName: true } } },
+      });
+      await this.notifications.enqueue(
+        {
+          code: 'transfer_expired',
+          userId: o.customerUserId,
+          vars: {
+            name: firstName(o.customer?.fullName),
+            order_number: o.orderNumber,
+            hours: String(windowHours),
+            link: `/account/orders/${o.orderNumber}`,
+          },
+        },
+        tx,
+      );
+    });
   }
 
   // ============================================================== النجاح
@@ -365,7 +628,7 @@ export class CheckoutService {
         code: 'order_placed',
         userId: order.customerUserId,
         vars: {
-          name: (paid.customer?.fullName ?? 'عميلنا').split(/s+/)[0]!,
+          name: firstName(paid.customer?.fullName),
           order_number: order.orderNumber,
           amount: formatMoney(money(paid.grandTotalMinorUnits, paid.currency)),
           store_count: String(snapshot.subOrders.length),
@@ -581,7 +844,10 @@ export class CheckoutService {
     if (!p.providerIntentId) throw new Error(`دفع متأخر بلا تفويض — الطلب ${p.order.id}`);
 
     // المفتاح ثابت للدفعة: الإعادة بعد انقطاع تعيد الردّ الأول عند البوابة
-    const { refundId } = await this.provider.refund(p.providerIntentId, p.amountMinorUnits, `late-capture:${paymentId}`);
+    const outcome = await this.provider.refund(p.providerIntentId, p.amountMinorUnits, `late-capture:${paymentId}`);
+    // التحويل اليدوي لا دفع متأخراً فيه: ما انتهت مهلته لا يُؤكَّد (confirmTransfer)
+    if (outcome.status !== 'succeeded') throw new Error(`ردّ الدفع المتأخر ${paymentId} لا يتمّ آلياً عند ${this.provider.name}`);
+    const { refundId } = outcome;
 
     await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.payment.updateMany({
@@ -610,8 +876,16 @@ export class CheckoutService {
 
   // =============================================================== الفشل
 
-  /** الفشل يحرّر الحجز ويختم الطلب — لا مخزون مستهلك ولا طلب معلّق بلا صاحب */
-  async markFailed(orderId: string, code: string, message: string): Promise<boolean> {
+  /**
+   * الفشل يحرّر الحجز ويختم الطلب — لا مخزون مستهلك ولا طلب معلّق بلا صاحب.
+   * `after` يجري في المعاملة نفسها لمن ختمها فعلاً (إشعار انتهاء المهلة مرة واحدة).
+   */
+  async markFailed(
+    orderId: string,
+    code: string,
+    message: string,
+    after?: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.order.updateMany({
         where: { id: orderId, status: 'pending_payment' },
@@ -629,6 +903,7 @@ export class CheckoutService {
         data: { status: 'failed', failureCode: code, failureMessage: message },
       });
       await this.releaseCoupon(tx, orderId);
+      if (after) await after(tx);
       return true;
     });
   }
@@ -643,13 +918,24 @@ export class CheckoutService {
   async reconcile(orderId: string, now: Date = new Date()): Promise<OrderOutcome> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { status: true, placedAt: true, payment: { select: { providerIntentId: true } } },
+      select: {
+        status: true,
+        placedAt: true,
+        payment: { select: { providerIntentId: true, status: true, expiresAt: true, provider: true } },
+      },
     });
     if (!order) throw new NotFoundError('الطلب غير موجود.', { orderId });
     if (order.status !== 'pending_payment') return this.outcomeOf(order.status);
 
     const intentId = order.payment?.providerIntentId;
-    if (intentId) {
+    if (order.payment?.status === 'awaiting_transfer') {
+      // لا طرف يُسأل: الوصول تؤكّده الإدارة، والمصالحة تحسم انقضاء المهلة وحده
+      if (order.payment.expiresAt && order.payment.expiresAt <= now) await this.expireTransfer(orderId);
+    } else if (intentId && order.payment?.provider !== this.provider.name) {
+      // تفويض عند مزوّد غير الموصول: لا يُسأل عنه غيره، ولا يُخمَّن — يبقى حتى يُوصل.
+      // سؤال الموصول كان يعيد «بانتظار التحويل» لدفعة بطاقة فيقلبها طلبَ تحويل
+      this.logger.warn(`الطلب ${orderId} معلّق عند ${order.payment?.provider} والموصول ${this.provider.name}`);
+    } else if (intentId) {
       const truth = await this.provider.retrieve(intentId);
       if (truth.status === 'captured' || truth.status === 'failed') {
         await this.apply(orderId, truth);
@@ -661,15 +947,25 @@ export class CheckoutService {
       }
     }
 
-    const after = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } });
-    return this.outcomeOf(after.status);
+    const after = await this.prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { status: true, payment: { select: { status: true } } },
+    });
+    return after.status === 'pending_payment' && after.payment?.status === 'awaiting_transfer'
+      ? 'awaiting_transfer'
+      : this.outcomeOf(after.status);
   }
 
-  /** كل الطلبات المعلّقة أقدم من دقيقة — مهمة دورية (payment_reconcile_minutes) */
+  /**
+   * كل الطلبات المعلّقة أقدم من دقيقة — مهمة دورية (payment_reconcile_minutes).
+   * ما ينتظر تحويلاً ولم تنقضِ مهلته لا يُمرّ عليه: لا جديد عنده، ومئات منه
+   * (يومان لكل طلب) كانت ستملأ الدفعة فتحجب «لا نعرف» الذي ينتظر الحسم.
+   */
   async reconcilePending(now: Date = new Date()): Promise<number> {
     const stale = await this.prisma.order.findMany({
-      where: { status: 'pending_payment', placedAt: { lt: new Date(now.getTime() - 60_000) } },
+      where: pendingToReconcile(now),
       select: { id: true },
+      orderBy: { placedAt: 'asc' },
       take: 200,
     });
     for (const o of stale) {
@@ -709,13 +1005,13 @@ export class CheckoutService {
         grandTotalMinorUnits: true,
         customerUserId: true,
         _count: { select: { subOrders: true } },
-        payment: { select: { status: true, providerIntentId: true, failureCode: true, failureMessage: true } },
+        payment: { select: { status: true, providerIntentId: true, failureCode: true, failureMessage: true, expiresAt: true } },
       },
     });
-    const outcome =
-      order.payment?.status === 'requires_action' && order.status === 'pending_payment'
-        ? 'requires_action'
-        : this.outcomeOf(order.status);
+    const waiting = order.status === 'pending_payment' ? order.payment?.status : null;
+    const outcome: OrderOutcome =
+      waiting === 'requires_action' ? 'requires_action' : waiting === 'awaiting_transfer' ? 'awaiting_transfer' : this.outcomeOf(order.status);
+    const details = outcome === 'awaiting_transfer' ? await this.transfers.read() : null;
 
     return {
       orderId: order.id,
@@ -731,6 +1027,19 @@ export class CheckoutService {
       ...(outcome === 'failed' && order.payment?.failureCode
         ? { failure: { code: order.payment.failureCode, message: order.payment.failureMessage ?? '' } }
         : {}),
+      ...(details
+        ? {
+            transfer: {
+              reference: order.orderNumber,
+              expiresAt: order.payment?.expiresAt ?? null,
+              windowHours: details.windowHours,
+              beneficiary: details.beneficiary,
+              bank: details.bank,
+              iban: details.iban,
+              cliqAlias: details.cliqAlias,
+            },
+          }
+        : {}),
     };
   }
 
@@ -745,3 +1054,15 @@ export class CheckoutService {
     return Number(row?.valueJson ?? 15);
   }
 }
+
+/** ما تمرّ عليه المصالحة الدورية: معلّق أقدم من دقيقة، إلا ما ينتظر تحويلاً ولم تنقضِ مهلته */
+export function pendingToReconcile(now: Date): Prisma.OrderWhereInput {
+  return {
+    status: 'pending_payment',
+    placedAt: { lt: new Date(now.getTime() - 60_000) },
+    NOT: { payment: { is: { status: 'awaiting_transfer', expiresAt: { gt: now } } } },
+  };
+}
+
+/** الاسم الأول للتحية — `\s` لا `s`: كان يقصّ «Thomas» عند أول حرف s */
+const firstName = (full: string | null | undefined): string => (full ?? '').trim().split(/\s+/)[0] || 'عميلنا';

@@ -11,6 +11,15 @@
       "port": 4000
     },
     {
+      "name": "api-manual",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set PAYMENT_PROVIDER=manual&& npm run dev:api"
+      ],
+      "port": 4000
+    },
+    {
       "name": "web",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

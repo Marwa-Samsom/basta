@@ -11,7 +11,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsEmail,
@@ -26,14 +26,16 @@ import type { FastifyRequest } from 'fastify';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor } from '../../../common/security/actor';
-import { MaybeActor, OptionalAuth, Public } from '../../../common/security/decorators';
+import { CurrentActor, MaybeActor, OptionalAuth, Public, RequirePermission, Roles } from '../../../common/security/decorators';
 import {
   PAYMENT_PROVIDER,
   PaymentEventsService,
+  TransferDetailsService,
   type PaymentProvider,
 } from '../../payments/public';
 import { CartService } from '../../cart/public';
 import { CheckoutService } from '../application/checkout.service';
+import { TransferQueueService } from '../application/transfer-queue.service';
 import { NormalizeEmail } from '../../../common/email';
 import { guestOrderKeyMatches } from '../domain/snapshot';
 import { loadEnv } from '../../../common/config/env';
@@ -113,6 +115,23 @@ export class PlaceOrderDto {
   note?: string;
 }
 
+export class ConfirmTransferDto {
+  /** المرجع كما في كشف البنك أو إشعار كليك — به يُعرف التحويل عند أي مراجعة */
+  @IsString()
+  @Length(3, 80, { message: 'اكتب مرجع التحويل كما في كشف البنك (3 أحرف على الأقل).' })
+  reference!: string;
+
+  /** المبلغ الذي وصل بالوحدات الصغرى — يُطابَق بمبلغ الطلب، فلا يُؤكَّد طلبٌ بتحويل غيره */
+  @Matches(/^[0-9]{1,19}$/, { message: 'اكتب المبلغ الذي وصل.' })
+  receivedMinorUnits!: string;
+
+  /** اسم المحوِّل أو حسابه — إليه يُردّ المال إن أُلغي شيء لاحقاً */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  note?: string;
+}
+
 export class QuoteDto {
   @Matches(/^[A-Za-z]{2}$/)
   country!: string;
@@ -139,7 +158,20 @@ export class CheckoutController {
     private readonly checkout: CheckoutService,
     private readonly carts: CartService,
     private readonly prisma: PrismaService,
+    @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
+    private readonly transfers: TransferDetailsService,
   ) {}
+
+  /**
+   * كيف يدفع المشتري — تعرضه صفحة الدفع قبل «ادفع». بيانات الحساب لا تُكشف هنا: تظهر
+   * لصاحب الطلب بعد أن يحجزه (result)، لا لكل زائر.
+   */
+  @Get('payment-method')
+  async paymentMethod() {
+    if (this.provider.method !== 'bank_transfer') return { method: this.provider.method };
+    const d = await this.transfers.read();
+    return { method: this.provider.method, windowHours: d.windowHours, ready: d.ready, cliq: d.cliqAlias !== null };
+  }
 
   /** تسعير بالعنوان: الشحن لكل بائع والضريبة ببلد المشتري — قبل «ادفع» */
   @Post('quote')
@@ -204,6 +236,47 @@ export class CheckoutController {
     }
     if (order.status === 'pending_payment') await this.checkout.reconcile(order.id);
     return this.checkout.result(order.id);
+  }
+
+  /** إلغاء طلب ينتظر التحويل قبل أن يحوّل — قطعه تعود فوراً لا بعد انقضاء المهلة */
+  @Post('orders/:orderNumber/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancelAwaiting(@Param('orderNumber') orderNumber: string, @MaybeActor() actor: Actor | null) {
+    if (!actor) throw new UnauthorizedException('سجّل دخولك لتلغي طلبك.');
+    return this.checkout.cancelAwaitingTransfer(orderNumber, actor.userId);
+  }
+}
+
+/**
+ * التحويلات الواردة — الإدارة تطابق كشف البنك بالطلبات وتؤكّد ما وصل. صلاحية السحوبات
+ * نفسها: كلاهما يحرّك مالاً، والتأكيد يُنشئ رصيداً للبائعين.
+ */
+@ApiTags('admin-payments')
+@ApiBearerAuth()
+@Roles('admin')
+@Controller('admin/payments/transfers')
+export class AdminTransfersController {
+  constructor(
+    private readonly checkout: CheckoutService,
+    private readonly queue: TransferQueueService,
+  ) {}
+
+  @Get()
+  @RequirePermission('payouts.approve')
+  list() {
+    return this.queue.list();
+  }
+
+  @Post(':orderNumber/confirm')
+  @RequirePermission('payouts.approve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'وصل التحويل — بمرجعه ومبلغه، فيُقسَّم الطلب ويصل المتاجر' })
+  confirm(@CurrentActor() actor: Actor, @Param('orderNumber') orderNumber: string, @Body() dto: ConfirmTransferDto) {
+    return this.checkout.confirmTransfer(orderNumber, actor.userId, {
+      reference: dto.reference,
+      note: dto.note ?? null,
+      receivedMinor: BigInt(dto.receivedMinorUnits),
+    });
   }
 }
 

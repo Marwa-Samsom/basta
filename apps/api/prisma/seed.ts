@@ -44,6 +44,7 @@ const SETTINGS = [
   ['base_currency',               'USD'],    // ADR-013
   ['fx_spread_bps',               200],      // Q-13
   ['coupon_default_funded_by',    'platform'], // Q-06
+  ['transfer_window_hours',       48],       // الدفع بتحويل يدوي — UX-OPS-AUDIT البند 8
 ] as const;
 
 // Q-01: شبكة العمولات الفئوية فوق القاعدة العامة

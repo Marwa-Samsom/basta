@@ -46,6 +46,9 @@ export interface TransitionInput {
  */
 export const REFUND_STALE_MS = 5 * 60_000;
 
+/** ردّ لا يخرج آلياً (تحويل يدوي): ينتظر أن تحوّله الإدارة وتسجّل مرجعه — المهمة لا تعيده */
+export const AWAITING_TRANSFER = 'awaiting_transfer';
+
 /** «عالق»: processing حُجز قبل المهلة — أو بلا وقت حجز (صفوف ما قبل claimedAt) وقديم */
 export function stalledRefund(now: Date): Prisma.RefundWhereInput {
   const before = new Date(now.getTime() - REFUND_STALE_MS);
@@ -413,7 +416,7 @@ export class OrderLifecycleService {
   async executeRefund(refundId: string, now: Date = new Date()): Promise<boolean> {
     const refund = await this.prisma.refund.findUnique({
       where: { id: refundId },
-      include: { payment: { select: { providerIntentId: true, amountMinorUnits: true, id: true } } },
+      include: { payment: { select: { providerIntentId: true, amountMinorUnits: true, id: true, provider: true, method: true } } },
     });
     if (!refund || (refund.status !== 'pending' && refund.status !== 'processing')) return false;
 
@@ -426,10 +429,30 @@ export class OrderLifecycleService {
     if (claimed.count === 0) return false;
 
     try {
+      /**
+       * المال يعود من حيث جاء، لا من المزوّد الموصول الآن: ما دُفع بتحويل يُردّ بتحويل
+       * ولو وُصلت بوابة بعده، وما دُفع عند بوابة لا يُرسل إلى غيرها (تفويضها لا يعرفه
+       * سواها) — يبقى معلّقاً في السجل حتى تُوصل. بدّلت بيئة التطوير المزوّد مرة فصارت
+       * ردود دفعات بالبطاقة «بانتظار التحويل».
+       */
+      const owed = refund.amountMinorUnits > 0n && refund.payment.providerIntentId;
+      if (owed && refund.payment.method !== 'bank_transfer' && refund.payment.provider !== this.provider.name) {
+        throw new Error(`الدفعة عند ${refund.payment.provider} والموصول ${this.provider.name} — لا يُردّ عند غير من قبضه`);
+      }
       const result =
-        refund.amountMinorUnits > 0n && refund.payment.providerIntentId
-          ? await this.provider.refund(refund.payment.providerIntentId, refund.amountMinorUnits, `refund:${refundId}`)
-          : { refundId: 'none' };
+        !owed
+          ? ({ status: 'succeeded', refundId: 'none' } as const)
+          : refund.payment.method === 'bank_transfer'
+            ? ({ status: 'manual' } as const)
+            : await this.provider.refund(refund.payment.providerIntentId!, refund.amountMinorUnits, `refund:${refundId}`);
+
+      // لا يخرج المال آلياً (تحويل يدوي): ينتظر أن تحوّله الإدارة وتسجّل مرجعه.
+      // لا إشعار ولا «مُسترَد» قبل ذلك، والمهمة لا تعيده — ليس متعثّراً بل ينتظر إنساناً
+      if (result.status === 'manual') {
+        await this.prisma.refund.updateMany({ where: { id: refundId, status: 'processing' }, data: { status: AWAITING_TRANSFER } });
+        return false;
+      }
+
       await this.prisma.refund.updateMany({
         where: { id: refundId, status: 'processing' },
         data: { providerRefundId: result.refundId },
@@ -442,50 +465,98 @@ export class OrderLifecycleService {
           data: { status: 'succeeded', providerRefundId: result.refundId },
         });
         if (count === 0) return;
-        const o = await tx.subOrder.findUniqueOrThrow({
-          where: { id: refund.subOrderId },
-          select: { order: { select: { orderNumber: true, currency: true, customerUserId: true, customer: { select: { fullName: true } } } } },
-        });
-        await this.notifications.enqueue(
-          {
-            code: 'refund_issued',
-            userId: o.order.customerUserId,
-            vars: {
-              name: firstName(o.order.customer?.fullName),
-              order_number: o.order.orderNumber,
-              amount: formatMoney(money(refund.amountMinorUnits, o.order.currency)),
-              link: `/account/orders/${o.order.orderNumber}`,
-            },
-          },
-          tx,
-        );
-        const total = await tx.refund.aggregate({
-          where: { paymentId: refund.payment.id, status: 'succeeded' },
-          _sum: { amountMinorUnits: true },
-        });
-        await tx.payment.update({
-          where: { id: refund.payment.id },
-          data: {
-            status: (total._sum.amountMinorUnits ?? 0n) >= refund.payment.amountMinorUnits ? 'refunded' : 'partially_refunded',
-          },
-        });
-
-        // الفرعي الملغى أو المرتجَع يصير «مُسترَداً» بعد نجاح الردّ فعلاً، لا قبله
-        const sub = await tx.subOrder.findUniqueOrThrow({
-          where: { id: refund.subOrderId },
-          select: { id: true, orderId: true, vendorId: true, status: true },
-        });
-        const from = sub.status as SubOrderStatus;
-        if (isCancellation(from) || from === 'returned') {
-          assertTransition(from, 'refunded', 'system');
-          await this.apply(tx, sub, from, 'refunded', { kind: 'system', userId: null }, {});
-        }
+        await this.settled(tx, refund, { code: 'refund_issued' });
       });
       return true;
     } catch (err) {
       this.logger.error(`تعذّر تنفيذ الاسترداد ${refundId}`, err as Error);
       await this.prisma.refund.updateMany({ where: { id: refundId, status: 'processing' }, data: { status: 'pending' } });
       return false;
+    }
+  }
+
+  /**
+   * الإدارة حوّلت الردّ بنفسها — تسجّل مرجع التحويل الصادر، وعندها فقط يصير الردّ
+   * «تمّ» ويُبلَّغ المشتري بالمرجع ويصير الفرعي «مُسترَداً». قبل ذلك لا يقول له شيءٌ
+   * «رُدّ المبلغ». شرطيّ على الحالة: مديران يسجّلان معاً يمرّ أحدهما.
+   */
+  async recordRefundTransfer(refundId: string, adminUserId: string, reference: string): Promise<void> {
+    const ref = reference.trim();
+    await this.prisma.$transaction(
+      async (tx) => {
+        const refund = await tx.refund.findUnique({
+          where: { id: refundId },
+          include: { payment: { select: { id: true, amountMinorUnits: true } } },
+        });
+        if (!refund) throw new NotFoundError('الاسترداد غير موجود.', { refundId });
+        const { count } = await tx.refund.updateMany({
+          where: { id: refundId, status: AWAITING_TRANSFER },
+          data: { status: 'succeeded', transferReference: ref, providerRefundId: `manual:${ref}`, approvedBy: adminUserId },
+        });
+        if (count === 0) throw new ConflictError('هذا الاسترداد لا ينتظر تحويلاً — ربما سُجّل للتوّ. حدّث الصفحة.');
+        await tx.auditLog.create({
+          data: {
+            actorUserId: adminUserId,
+            actorRole: 'admin',
+            action: 'refund.transfer_recorded',
+            entityType: 'Refund',
+            entityId: refundId,
+            beforeJson: { status: AWAITING_TRANSFER },
+            afterJson: { status: 'succeeded', reference: ref, amount: refund.amountMinorUnits.toString() },
+          },
+        });
+        await this.settled(tx, refund, { code: 'refund_transferred', reference: ref });
+      },
+      { timeout: 20_000 },
+    );
+  }
+
+  /**
+   * ما بعد خروج المال — من البوابة أو بتحويل الإدارة: إشعار المشتري، وحالة الدفعة،
+   * والفرعي الملغى أو المرتجَع يصير «مُسترَداً» بعد نجاح الردّ فعلاً، لا قبله.
+   */
+  private async settled(
+    tx: Tx,
+    refund: { subOrderId: string; amountMinorUnits: bigint; payment: { id: string; amountMinorUnits: bigint } },
+    notice: { code: 'refund_issued' } | { code: 'refund_transferred'; reference: string },
+  ): Promise<void> {
+    const o = await tx.subOrder.findUniqueOrThrow({
+      where: { id: refund.subOrderId },
+      select: { order: { select: { orderNumber: true, currency: true, customerUserId: true, customer: { select: { fullName: true } } } } },
+    });
+    await this.notifications.enqueue(
+      {
+        code: notice.code,
+        userId: o.order.customerUserId,
+        vars: {
+          name: firstName(o.order.customer?.fullName),
+          order_number: o.order.orderNumber,
+          amount: formatMoney(money(refund.amountMinorUnits, o.order.currency)),
+          link: `/account/orders/${o.order.orderNumber}`,
+          ...(notice.code === 'refund_transferred' ? { reference: notice.reference } : {}),
+        },
+      },
+      tx,
+    );
+    const total = await tx.refund.aggregate({
+      where: { paymentId: refund.payment.id, status: 'succeeded' },
+      _sum: { amountMinorUnits: true },
+    });
+    await tx.payment.update({
+      where: { id: refund.payment.id },
+      data: {
+        status: (total._sum.amountMinorUnits ?? 0n) >= refund.payment.amountMinorUnits ? 'refunded' : 'partially_refunded',
+      },
+    });
+
+    const sub = await tx.subOrder.findUniqueOrThrow({
+      where: { id: refund.subOrderId },
+      select: { id: true, orderId: true, vendorId: true, status: true },
+    });
+    const from = sub.status as SubOrderStatus;
+    if (isCancellation(from) || from === 'returned') {
+      assertTransition(from, 'refunded', 'system');
+      await this.apply(tx, sub, from, 'refunded', { kind: 'system', userId: null }, {});
     }
   }
 
@@ -617,4 +688,5 @@ export class OrderLifecycleService {
   }
 }
 
-const firstName = (full: string | null | undefined): string => (full ?? '').trim().split(/s+/)[0] || 'عميلنا';
+/** الاسم الأول للتحية — `\s` لا `s`: كان يقصّ «Thomas» عند أول حرف s */
+const firstName = (full: string | null | undefined): string => (full ?? '').trim().split(/\s+/)[0] || 'عميلنا';

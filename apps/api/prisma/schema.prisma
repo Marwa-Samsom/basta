@@ -1084,6 +1084,8 @@ model TaxRate {
 enum PaymentStatus {
   pending
   requires_action
+  /// تحويل يدوي: الطلب محجوز حتى expiresAt وينتظر أن تؤكّد الإدارة وصول المال
+  awaiting_transfer
   authorized
   captured
   partially_refunded
@@ -1099,7 +1101,7 @@ model Payment {
   providerIntentId String?
   amountMinorUnits BigInt
   currency         String        @db.Char(3)
-  method           String // card | wallet | cod
+  method           String // card | bank_transfer | wallet | cod
   status           PaymentStatus @default(pending)
   authorizedAt     DateTime?     @db.Timestamptz
   capturedAt       DateTime?     @db.Timestamptz
@@ -1109,6 +1111,14 @@ model Payment {
   lateCaptureAt    DateTime?     @db.Timestamptz
   /// معرّف ردّ ذلك النجاح عند المزوّد — وجوده يعني أن المال عاد لصاحبه
   lateRefundId     String?
+  /// آخر موعد لخطوة المشتري (التحويل): بعده يُلغى الطلب وتعود القطع للمخزون
+  expiresAt         DateTime?    @db.Timestamptz
+  /// مرجع التحويل الوارد كما في كشف البنك — تكتبه الإدارة عند تأكيد الاستلام
+  transferReference String?
+  /// ملاحظة المؤكِّد: اسم المحوِّل أو حسابه — منها يُعرف إلى أين يُردّ المال
+  transferNote      String?
+  confirmedBy       String?      @db.Uuid
+  confirmedAt       DateTime?    @db.Timestamptz
   createdAt        DateTime      @default(now()) @db.Timestamptz
 
   order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1148,6 +1158,8 @@ model Refund {
   /// متى حُجز للتنفيذ (processing) — ما طال عليه بلا نتيجة سقط منفّذه فيُعاد
   claimedAt              DateTime? @db.Timestamptz
   providerRefundId       String?
+  /// ردّ بتحويل يدوي: مرجع التحويل الصادر كما في كشف البنك — بغيره لا يُبلَّغ المشتري
+  transferReference      String?
   requestedBy            String?  @db.Uuid
   approvedBy             String?  @db.Uuid
   ledgerEntryId          String?  @db.Uuid

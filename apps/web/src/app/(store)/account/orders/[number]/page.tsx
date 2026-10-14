@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
 import { AskShop } from '@/components/ask-shop';
 import { Icon } from '@/components/icons';
+import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
 import { api, session } from '@/lib/api';
 import {
@@ -40,6 +41,13 @@ interface OrderView {
   shippingTotalMinorUnits: string;
   discountTotalMinorUnits: string;
   paymentStatus: string | null;
+  paymentMethod?: string | null;
+  /** ينتظر التحويل: كيف يحوّل — قبل أن يُقسَّم الطلب على المتاجر */
+  transfer?: TransferInstructionsView;
+  /** أُغلق قبل أن يُدفع (انقضت مهلة التحويل أو ألغاه) */
+  paymentFailure?: { code: string; message: string };
+  /** أسطر الطلب من لقطته — حين لا متاجر بعد */
+  lines?: { store: string | null; name: string; variantLabel: string | null; qty: number; imageKey: string | null }[];
   stores: Store[];
 }
 
@@ -127,17 +135,74 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
 
   const storeCount =
     order.stores.length === 1 ? 'متجر واحد' : order.stores.length === 2 ? 'متجران' : `${order.stores.length} متاجر`;
+  const unsplit = order.stores.length === 0;
+
+  const cancelTransfer = async () => {
+    if (!window.confirm('تلغي الطلب؟ تعود القطع للمتاجر ولا يُؤخذ منك شيء.')) return;
+    setError(null);
+    try {
+      await api(`/checkout/orders/${encodeURIComponent(order.number)}/cancel`, { method: 'POST' });
+      await load();
+      setNotice('ألغيت الطلب، وعادت القطع للمتاجر.');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   return (
     <div className="sp-page">
       {back}
-      <PageHead title={<span className="num">{order.number}</span>} meta={`${when(order.placedAt)} · ${storeCount}`} />
+      <PageHead
+        title={<span className="num">{order.number}</span>}
+        meta={unsplit ? when(order.placedAt) : `${when(order.placedAt)} · ${storeCount}`}
+      />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
       <div className="sp-detail">
         <div className="sp-detail__main">
+          {order.transfer ? (
+            <>
+              <Alert tone="warning" title="بانتظار تحويلك">
+                حجزنا القطع لك، ولم نأخذ شيئاً بعد. حين يصلنا التحويل نؤكّده ونرسل طلبك إلى المتاجر، ونبلغك حينها.
+              </Alert>
+              <TransferInstructions
+                transfer={order.transfer}
+                amount={money(order.grandTotalMinorUnits, order.currency)}
+                amountMinor={plainAmount(order.grandTotalMinorUnits, order.currency)}
+              />
+              <div>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => void cancelTransfer()}>
+                  ألغِ الطلب
+                </button>
+              </div>
+            </>
+          ) : null}
+          {order.paymentFailure ? (
+            <Alert tone="danger" title={order.paymentFailure.code === 'canceled_by_customer' ? 'ألغيت الطلب' : 'أُلغي الطلب'}>
+              {order.paymentFailure.code === 'transfer_expired'
+                ? 'لم يصلنا تحويلك خلال المهلة، فأُلغي الطلب وعادت القطع للمتاجر. إن كنت حوّلت فعلاً فراسلنا بمرجع التحويل لنردّه لك.'
+                : order.paymentFailure.message || 'لم يُدفع الطلب، ولم يصل إلى المتاجر.'}
+            </Alert>
+          ) : null}
+          {unsplit && order.lines?.length ? (
+            <section className="card sp-reasons" aria-label="ما طلبته">
+              <h2 className="sp-reasons__title">ما طلبته</h2>
+              <ul>
+                {order.lines.map((l, i) => (
+                  <li key={i}>
+                    <Icon name="package" size={15} />
+                    <span>
+                      {l.name}
+                      {l.variantLabel ? ` — ${l.variantLabel}` : ''} <span className="num">× {l.qty}</span>
+                      {l.store ? <span className="sp-transfer__hint"> · {l.store}</span> : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {order.stores.map((s) => (
             <StoreCard
               key={s.id}
@@ -274,7 +339,15 @@ function StoreCard({
           <Alert tone="info">
             {labelOf(s.status)}
             {s.cancelReason ? ` — «${s.cancelReason}»` : ''}
-            {s.refunds.length ? ` · رُدّ ${s.refunds.filter((r) => r.status === 'succeeded').length ? 'المبلغ' : '— قيد التنفيذ'}` : ''}
+            {s.refunds.length
+              ? ` · ${
+                  s.refunds.every((r) => r.status === 'succeeded')
+                    ? 'رُدّ المبلغ'
+                    : s.refunds.some((r) => r.status === 'awaiting_transfer')
+                      ? 'نحوّل لك المبلغ'
+                      : 'الردّ قيد التنفيذ'
+                }`
+              : ''}
           </Alert>
         ) : (
           <ol className="sp-track" aria-label="مسار الطلب">
@@ -394,7 +467,7 @@ function StoreCard({
             {s.refunds.map((r) => (
               <li key={r.id}>
                 استرداد <span className="money num">{money(r.amountMinorUnits, currency)}</span> ({r.reason}) ·{' '}
-                {r.status === 'succeeded' ? 'رُدّ إلى وسيلة دفعك' : 'قيد التنفيذ'}
+                {refundState(r)}
               </li>
             ))}
           </ul>
@@ -500,6 +573,27 @@ function StoreCard({
       </div>
     </section>
   );
+}
+
+/**
+ * حال الردّ كما يقرؤه المشتري. «رُدّ» بعد أن يخرج المال وحده: من البوابة، أو بتحويل
+ * سجّلت الإدارة مرجعه — وذلك المرجع يُعرض ليتتبّع ماله في بنكه.
+ */
+function refundState(r: { status: string; transferReference?: string | null }) {
+  if (r.status === 'succeeded') {
+    return r.transferReference ? (
+      <>
+        حوّلناه لك — مرجع التحويل{' '}
+        <bdi className="num" dir="ltr">
+          {r.transferReference}
+        </bdi>
+      </>
+    ) : (
+      'رُدّ إلى وسيلة دفعك'
+    );
+  }
+  if (r.status === 'awaiting_transfer') return 'نحوّله لحسابك — نبلغك بمرجع التحويل حين يخرج';
+  return 'قيد التنفيذ';
 }
 
 function ReasonSelect({ options, value, onChange }: { options: Record<string, string>; value: string; onChange: (v: string) => void }) {

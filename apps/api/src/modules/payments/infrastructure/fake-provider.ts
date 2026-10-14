@@ -6,6 +6,7 @@ import type {
   ChargeRequest,
   PaymentProvider,
   ProviderEvent,
+  RefundOutcome,
 } from '../domain/provider';
 
 /**
@@ -32,6 +33,7 @@ function webhookSecret(): string {
 @Injectable()
 export class FakePaymentProvider implements PaymentProvider {
   readonly name = 'fake';
+  readonly method = 'card' as const;
 
   constructor() {
     // خط الدفاع الثاني بعد loadEnv: أي إقلاع في الإنتاج — ولو من سكربت أو عامل
@@ -106,9 +108,9 @@ export class FakePaymentProvider implements PaymentProvider {
   private readonly charged = new Map<string, bigint>();
 
   /** عدم التكرار عند المزوّد: المفتاح نفسه يعيد الردّ الأول ولا يردّ المال مرتين */
-  private readonly refundByKey = new Map<string, { refundId: string }>();
+  private readonly refundByKey = new Map<string, RefundOutcome>();
 
-  async refund(intentId: string, amountMinor: bigint, idempotencyKey: string): Promise<{ refundId: string }> {
+  async refund(intentId: string, amountMinor: bigint, idempotencyKey: string): Promise<RefundOutcome> {
     const seen = this.refundByKey.get(idempotencyKey);
     if (seen) return seen;
     const result = await this.refundOnce(intentId, amountMinor);
@@ -116,7 +118,7 @@ export class FakePaymentProvider implements PaymentProvider {
     return result;
   }
 
-  private async refundOnce(intentId: string, amountMinor: bigint): Promise<{ refundId: string }> {
+  private async refundOnce(intentId: string, amountMinor: bigint): Promise<RefundOutcome> {
     // الذاكرة تُفقد عند إعادة التشغيل محلياً؛ التفويض الوهمي يُعرف من شكله
     if (!this.intents.has(intentId) && !intentId.startsWith('fake_pi_')) {
       throw new InvalidInputError('تفويض غير معروف للاسترداد.');
@@ -128,7 +130,7 @@ export class FakePaymentProvider implements PaymentProvider {
       throw new InvalidInputError('الاسترداد يتجاوز المبلغ المحصَّل.');
     }
     this.refunded.set(intentId, [...(this.refunded.get(intentId) ?? []), amountMinor]);
-    return { refundId: `fake_re_${randomUUID()}` };
+    return { status: 'succeeded', refundId: `fake_re_${randomUUID()}` };
   }
 
   refundsOf(intentId: string): readonly bigint[] {

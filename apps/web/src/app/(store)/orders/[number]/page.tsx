@@ -3,17 +3,31 @@
 import Link from 'next/link';
 import { use, useEffect, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
+import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, Spinner } from '@/components/ui';
 import { api, session } from '@/lib/api';
 import { orderKeyHeaders } from '@/lib/order-key';
 
 interface OrderResult {
   orderNumber: string;
-  outcome: 'paid' | 'failed' | 'requires_action' | 'pending';
+  outcome: 'paid' | 'failed' | 'requires_action' | 'awaiting_transfer' | 'pending';
   total: { minorUnits: string; currency: string };
   subOrderCount: number;
   failure?: { code: string; message: string };
+  transfer?: TransferInstructionsView;
 }
+
+/** طلب تحويل أُغلق قبل أن يُدفع — لا «جرّب بطاقة أخرى» لمن لم يستعمل بطاقة */
+const TRANSFER_FAILURES: Record<string, { title: string; text: string }> = {
+  transfer_expired: {
+    title: 'أُلغي الطلب — لم يصل التحويل',
+    text: 'لم يصلنا تحويلك خلال المهلة، فأُلغي الطلب وعادت القطع للمتاجر. إن كنت حوّلت فعلاً فراسلنا بمرجع التحويل لنردّه لك، أو اطلب من جديد.',
+  },
+  canceled_by_customer: {
+    title: 'ألغيت الطلب',
+    text: 'ألغيت الطلب قبل التحويل، فلم نأخذ شيئاً وعادت القطع للمتاجر.',
+  },
+};
 
 const format = (minor: string, currency: string): string => {
   const digits = ['JOD', 'KWD', 'BHD', 'OMR'].includes(currency) ? 3 : 2;
@@ -51,6 +65,8 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
   const [order, setOrder] = useState<OrderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const signedIn = useSyncExternalStore(
     () => () => undefined,
     () => session.read() !== null,
@@ -134,6 +150,75 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
             تابع التسوّق
           </Link>
         </div>
+      </div>
+    );
+  }
+
+  if (order.outcome === 'awaiting_transfer' && order.transfer) {
+    const cancel = async () => {
+      if (!window.confirm('تلغي الطلب؟ تعود القطع للمتاجر ولا يُؤخذ منك شيء.')) return;
+      setCanceling(true);
+      setActionError(null);
+      try {
+        setOrder(await api<OrderResult>(`/checkout/orders/${encodeURIComponent(order.orderNumber)}/cancel`, { method: 'POST' }));
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'تعذّر إلغاء الطلب.');
+      } finally {
+        setCanceling(false);
+      }
+    };
+    return (
+      <div className="sp-page sp-page--mid">
+        <section className="sp-hero sp-hero--warning">
+          <span className="sp-hero__icon" aria-hidden>
+            <Icon name="clock" size={28} />
+          </span>
+          <h1 className="sp-hero__title">حجزنا طلبك — بقي التحويل</h1>
+          <p className="sp-hero__text">
+            لم نأخذ منك شيئاً بعد. حوّل المبلغ كما هو أدناه، وحين يصلنا نؤكّده ونرسل طلبك إلى المتاجر.
+          </p>
+          {orderNo}
+        </section>
+        {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
+        <TransferInstructions
+          transfer={order.transfer}
+          amount={total}
+          amountMinor={plainAmount(order.total.minorUnits, order.total.currency)}
+        />
+        <div className="sp-links">
+          {signedIn ? (
+            <Link className="btn btn--primary" href={`/account/orders/${encodeURIComponent(order.orderNumber)}`}>
+              <Icon name="package" size={16} />
+              طلباتي
+            </Link>
+          ) : null}
+          <button type="button" className="btn btn--ghost" disabled={canceling} onClick={() => void cancel()}>
+            {canceling ? 'جارٍ الإلغاء…' : 'ألغِ الطلب'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const transferFailure = order.outcome === 'failed' ? TRANSFER_FAILURES[order.failure?.code ?? ''] : undefined;
+  if (transferFailure) {
+    return (
+      <div className="sp-page sp-page--narrow">
+        <section className="sp-hero sp-hero--danger">
+          <span className="sp-hero__icon" aria-hidden>
+            <Icon name="alert" size={28} />
+          </span>
+          <h1 className="sp-hero__title">{transferFailure.title}</h1>
+          <p className="sp-hero__text" role="alert">
+            {transferFailure.text}
+          </p>
+          {orderNo}
+          <div className="sp-hero__actions">
+            <Link className="btn btn--primary" href="/">
+              تابع التسوّق
+            </Link>
+          </div>
+        </section>
       </div>
     );
   }

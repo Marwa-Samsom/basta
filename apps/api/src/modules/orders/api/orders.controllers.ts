@@ -243,6 +243,47 @@ export class CustomerOrdersController {
   }
 }
 
+export class RefundTransferDto {
+  /** مرجع التحويل الصادر كما في كشف البنك — يصل المشتري معه، وبه يتتبّع ماله */
+  @IsString()
+  @Length(3, 80, { message: 'اكتب مرجع التحويل كما في كشف البنك (3 أحرف على الأقل).' })
+  reference!: string;
+}
+
+/**
+ * الردود بتحويل يدوي — ما لا يخرج آلياً تحوّله الإدارة وتسجّل مرجعه. صلاحية السحوبات
+ * نفسها: كلاهما مال يخرج من حساب المنصة.
+ */
+@ApiTags('admin-refunds')
+@ApiBearerAuth()
+@Roles('admin')
+@Controller('admin/refunds')
+export class AdminRefundsController {
+  constructor(
+    private readonly query: OrderQueryService,
+    private readonly lifecycle: OrderLifecycleService,
+  ) {}
+
+  @Get('awaiting-transfer')
+  @RequirePermission('payouts.approve')
+  awaiting() {
+    return this.query.awaitingRefunds();
+  }
+
+  @Post(':id/transfer')
+  @RequirePermission('payouts.approve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'سُجّل تحويل الردّ — يصير «تمّ» ويُبلَّغ المشتري بالمرجع' })
+  async record(
+    @CurrentActor() actor: Actor,
+    @Param('id', new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('الاسترداد غير موجود.') })) id: string,
+    @Body() dto: RefundTransferDto,
+  ) {
+    await this.lifecycle.recordRefundTransfer(id, actor.userId, dto.reference);
+    return { ok: true };
+  }
+}
+
 /** الإدارة: الإلغاء بصلاحية orders.cancel وحدها — AD-10 */
 @ApiTags('admin-orders')
 @ApiBearerAuth()
