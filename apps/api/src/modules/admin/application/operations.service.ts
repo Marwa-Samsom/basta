@@ -280,15 +280,24 @@ export class OperationsService {
     };
   }
 
-  async setSetting(actorId: string, key: string, value: unknown) {
+  async setSetting(actorId: string, key: string, raw: unknown) {
     const spec = SETTINGS_SPEC[key];
     if (!spec) throw new NotFoundError('إعداد غير قابل للتحرير.', { key });
+    const value = spec.kind === 'text' && typeof raw === 'string' ? raw.trim() : raw;
     if (spec.kind === 'int') {
       if (typeof value !== 'number' || !Number.isInteger(value) || value < (spec.min ?? 0) || value > (spec.max ?? Infinity)) {
         throw new InvalidInputError(`القيمة عدد صحيح بين ${spec.min} و ${spec.max}.`);
       }
     }
     if (spec.kind === 'enum' && !spec.options?.includes(String(value))) throw new InvalidInputError('قيمة غير مسموحة.');
+    if (spec.kind === 'text') {
+      if (typeof value !== 'string') throw new InvalidInputError('القيمة نصّ.');
+      // الفراغ يمحو القيمة (إيقاف وجهة تحويل مثلاً) — والنمط يُفحص على ما كُتب وحده
+      if (value.length > (spec.maxLength ?? 200)) throw new InvalidInputError(`أطول من ${spec.maxLength ?? 200} حرفاً.`);
+      if (value && spec.pattern && !new RegExp(spec.pattern).test(value)) {
+        throw new InvalidInputError(spec.hint ? `صيغة غير صحيحة — ${spec.hint}.` : 'صيغة غير صحيحة.');
+      }
+    }
     if (spec.kind === 'currency') {
       const c = await this.prisma.currency.findUnique({ where: { code: String(value) } });
       if (!c) throw new InvalidInputError('عملة غير معروفة.');

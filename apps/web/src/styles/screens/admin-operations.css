@@ -321,6 +321,21 @@
 .ao-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
 .ao-ref { inline-size: 11rem; min-height: var(--control-sm); font-family: var(--font-mono); font-size: var(--text-xs); }
 
+/* تأكيد تحويل وارد — المرجع والمبلغ الواصل ومن حوّل، ثم الزرّ */
+.ao-transfer-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 9rem));
+  gap: 6px;
+  align-items: center;
+}
+.ao-transfer-form .field__control { min-height: var(--control-sm); font-size: var(--text-xs); }
+.ao-transfer-form .field__control[dir='ltr'] { font-family: var(--font-mono); }
+.ao-transfer-form .field__control[aria-invalid='true'] { border-color: var(--danger); }
+.ao-transfer-form > :nth-child(3),
+.ao-transfer-form > .btn,
+.ao-transfer-form > .ao-rownote { grid-column: 1 / -1; }
+.ao-foot-note { font-size: var(--text-xs); color: var(--text-muted); }
+
 .ao-flip { transform: rotate(180deg); }
 
 /* صفّ التفاصيل تحت صفّه — طلب مفتوح، ملف عميل */
@@ -856,6 +871,7 @@
   .ao-table td[data-label=''] .ao-actions { display: flex; inline-size: 100%; }
   .ao-table td[data-label=''] .ao-actions > * { flex: 1 1 120px; }
   .ao-ref { inline-size: 100%; }
+  .ao-transfer-form { grid-template-columns: minmax(0, 1fr); inline-size: 100%; }
   .ao-table tbody tr[data-late='true'] { border-color: var(--danger); }
   .ao-detail-row > td { padding: var(--space-2); font-size: var(--density-text); font-weight: var(--weight-normal); }
   .ao-subs { grid-template-columns: minmax(0, 1fr); }

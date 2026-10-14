@@ -5,6 +5,7 @@ import { NotificationsModule } from '../notifications/public';
 import { PaymentsModule } from '../payments/public';
 import {
   AdminOrdersController,
+  AdminRefundsController,
   CustomerOrdersController,
   VendorOrdersController,
 } from './api/orders.controllers';
@@ -14,7 +15,7 @@ import { OrderScheduler } from './application/order-scheduler';
 
 @Module({
   imports: [InventoryModule, PaymentsModule, FinanceModule, NotificationsModule],
-  controllers: [VendorOrdersController, CustomerOrdersController, AdminOrdersController],
+  controllers: [VendorOrdersController, CustomerOrdersController, AdminOrdersController, AdminRefundsController],
   providers: [OrderLifecycleService, OrderQueryService, OrderScheduler],
   exports: [OrderLifecycleService, OrderQueryService, OrderScheduler],
 })

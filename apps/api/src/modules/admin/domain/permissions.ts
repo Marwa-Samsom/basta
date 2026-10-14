@@ -8,7 +8,11 @@ export const PERMISSIONS = [
   { code: 'orders.manage', labelAr: 'الطلبات', hint: 'البحث في الطلبات والتدخّل في المرتجعات المتعثّرة' },
   { code: 'orders.cancel', labelAr: 'إلغاء الطلبات', hint: 'إلغاء طلب قبل شحنه مع ردّ المبلغ للمشتري' },
   { code: 'disputes.resolve', labelAr: 'حسم النزاعات', hint: 'قرار نهائي في نزاع مصعَّد' },
-  { code: 'payouts.approve', labelAr: 'السحوبات', hint: 'الموافقة على السحب وتسجيل التحويل ورفضه — يحرّك مالاً' },
+  {
+    code: 'payouts.approve',
+    labelAr: 'السحوبات والتحويلات',
+    hint: 'سحوبات البائعين، وتأكيد وصول تحويلات المشترين، وتسجيل ردّ المبالغ لهم — يحرّك مالاً',
+  },
   { code: 'commissions.edit', labelAr: 'العمولات', hint: 'تغيير النسب — تسري على الطلبات الجديدة وحدها' },
   { code: 'coupons.manage', labelAr: 'الكوبونات', hint: 'إنشاء الكوبونات وإيقافها' },
   { code: 'content.manage', labelAr: 'المحتوى والإشعارات', hint: 'الصفحات والبانرات والمميَّز وقوالب الإشعارات ومراجعات المنتجات' },
@@ -28,7 +32,19 @@ export const PERMISSION_CODES: readonly string[] = PERMISSIONS.map((p) => p.code
  */
 export const SETTINGS_SPEC: Record<
   string,
-  { labelAr: string; kind: 'int' | 'currency' | 'enum'; min?: number; max?: number; options?: string[]; unit?: string; financial?: string }
+  {
+    labelAr: string;
+    kind: 'int' | 'currency' | 'enum' | 'text';
+    min?: number;
+    max?: number;
+    options?: string[];
+    unit?: string;
+    financial?: string;
+    /** للنصّ: أطول ما يُقبل، ونمط يُفحص به إن وُجد */
+    maxLength?: number;
+    pattern?: string;
+    hint?: string;
+  }
 > = {
   hold_period_days: { labelAr: 'تعليق رصيد البائع', kind: 'int', min: 0, max: 60, unit: 'يوم', financial: 'يسري على الطلبات التي تُسلَّم بعد الحفظ؛ ما سُلّم قبله يبقى على موعده.' },
   return_window_days: { labelAr: 'مهلة الإرجاع', kind: 'int', min: 0, max: 60, unit: 'يوم', financial: 'أقصر من فترة التعليق يعني تحرير مال قد يُطلب ردّه بعد صرفه.' },
@@ -40,4 +56,30 @@ export const SETTINGS_SPEC: Record<
   fx_spread_bps: { labelAr: 'هامش الصرف', kind: 'int', min: 0, max: 1000, unit: 'نقطة أساس', financial: 'يغيّر السعر المعروض للمشتري بين العملات من الآن؛ المستحقات السابقة على لقطتها.' },
   base_currency: { labelAr: 'عملة المحاسبة', kind: 'currency', financial: 'تغيّر عملة التقارير الموحّدة فقط — لا تمسّ أي دفتر.' },
   coupon_default_funded_by: { labelAr: 'مموّل الكوبون الافتراضي', kind: 'enum', options: ['platform', 'vendor'] },
+  // الدفع بتحويل يدوي — ما يراه المشتري بعد «أكّد الطلب». اسم المستفيد ووجهة واحدة
+  // على الأقل (كليك أو IBAN) شرطٌ لقبول أي طلب
+  transfer_window_hours: {
+    labelAr: 'مهلة التحويل',
+    kind: 'int',
+    min: 6,
+    max: 168,
+    unit: 'ساعة',
+    financial: 'القطع محجوزة للمشتري طوال المهلة، وبعدها يُلغى الطلب. تسري على الطلبات الجديدة وحدها.',
+  },
+  transfer_beneficiary: { labelAr: 'اسم المستفيد', kind: 'text', maxLength: 120, hint: 'كما يظهر للمحوِّل في تطبيق بنكه' },
+  transfer_cliq_alias: {
+    labelAr: 'الاسم المستعار على كليك',
+    kind: 'text',
+    maxLength: 40,
+    pattern: '^[A-Za-z0-9._-]{2,40}$',
+    hint: 'حروف لاتينية وأرقام، كما سجّلته في بنكك',
+  },
+  transfer_iban: {
+    labelAr: 'رقم الحساب الدولي (IBAN)',
+    kind: 'text',
+    maxLength: 42,
+    pattern: '^[A-Z]{2}[0-9]{2}[A-Z0-9 ]{10,36}$',
+    hint: 'يبدأ برمز البلد، مثل JO94…',
+  },
+  transfer_bank: { labelAr: 'البنك', kind: 'text', maxLength: 80 },
 };

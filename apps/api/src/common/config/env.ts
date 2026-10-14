@@ -21,11 +21,15 @@ export class EnvError extends Error {
 const REQUIRED = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const;
 
 /**
- * المزوّدون الذين يعرف الخادم وصلهم — ADR-012. الوهمي وحده حتى تُوصل بوابة
- * حقيقية، وهو **ممنوع في الإنتاج**: يقبل `tok_success` فيُعلَّم الطلب مدفوعاً
- * بلا خصم. فالإنتاج لا يُقلع أصلاً قبل أن يُضاف مزوّد حقيقي هنا.
+ * المزوّدون الذين يعرف الخادم وصلهم — ADR-012.
+ *
+ * - `fake` للتطوير والاختبار، وهو **ممنوع في الإنتاج**: يقبل `tok_success` فيُعلَّم
+ *   الطلب مدفوعاً بلا خصم، و«يردّ» المال ولا شيء يتحرّك.
+ * - `manual` تحويل بنكي أو كليك تؤكّده الإدارة: لا تقسيم ولا رصيد للبائع قبل أن
+ *   يُكتب مرجع التحويل الوارد، ولا «رُدّ المبلغ» قبل مرجع التحويل الصادر. للإطلاق
+ *   قبل ربط بوابة حقيقية.
  */
-export const PAYMENT_PROVIDERS = ['fake'] as const;
+export const PAYMENT_PROVIDERS = ['fake', 'manual'] as const;
 export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
 /**
@@ -103,9 +107,13 @@ export function loadEnv(): Env {
 
   const production = process.env.NODE_ENV === 'production';
 
-  // الأسرار القصيرة قابلة للكسر بالقوة الغاشمة — ترفض في الإنتاج لا تُقبل بتحذير
+  const paymentProvider = process.env['PAYMENT_PROVIDER'] || 'fake';
+
+  // الأسرار القصيرة قابلة للكسر بالقوة الغاشمة — ترفض في الإنتاج لا تُقبل بتحذير.
+  // سرّ الإشعارات لمزوّد يرسلها؛ التحويل اليدوي بلا إشعارات فلا سرّ يُطلب له
   if (production) {
-    for (const k of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'PAYMENT_WEBHOOK_SECRET'] as const) {
+    const secrets = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', ...(paymentProvider === 'manual' ? [] : ['PAYMENT_WEBHOOK_SECRET'])];
+    for (const k of secrets) {
       if ((process.env[k] ?? '').length < 32) {
         throw new EnvError([`${k} (أقصر من 32 محرفاً)`]);
       }
@@ -117,11 +125,12 @@ export function loadEnv(): Env {
 
   // المزوّدان الوهميان يُفحصان معاً: إقلاع إنتاج يرى كل ما ينقصه في رسالة واحدة
   const problems: string[] = [];
-  const paymentProvider = process.env['PAYMENT_PROVIDER'] || 'fake';
   if (!(PAYMENT_PROVIDERS as readonly string[]).includes(paymentProvider)) {
     problems.push(`PAYMENT_PROVIDER (مزوّد غير معروف: ${paymentProvider})`);
   } else if (production && paymentProvider === 'fake') {
-    problems.push('PAYMENT_PROVIDER (المزوّد الوهمي ممنوع في الإنتاج — يقبل الدفع بلا خصم)');
+    problems.push(
+      'PAYMENT_PROVIDER (المزوّد الوهمي ممنوع في الإنتاج — يقبل الدفع بلا خصم. اضبط manual للدفع بتحويل تؤكّده الإدارة حتى تُربط بوابة)',
+    );
   }
   const shippingCarrier = process.env['SHIPPING_CARRIER'] || 'fake';
   if (!(SHIPPING_CARRIERS as readonly string[]).includes(shippingCarrier)) {

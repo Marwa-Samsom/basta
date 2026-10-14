@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { TransferDetailsService } from '../../payments/public';
+import { AWAITING_TRANSFER } from './order-lifecycle.service';
 import {
   STATUS_LABELS,
   allowedFor,
@@ -50,7 +52,7 @@ const SUB_ORDER_DETAIL = {
   },
   refunds: {
     orderBy: { createdAt: 'desc' },
-    select: { id: true, amountMinorUnits: true, reason: true, status: true, createdAt: true },
+    select: { id: true, amountMinorUnits: true, reason: true, status: true, transferReference: true, createdAt: true },
   },
   disputes: {
     orderBy: { createdAt: 'desc' },
@@ -67,7 +69,64 @@ type SubOrderRow = Prisma.SubOrderGetPayload<{ include: typeof SUB_ORDER_DETAIL 
  */
 @Injectable()
 export class OrderQueryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly transfers: TransferDetailsService,
+  ) {}
+
+  // ---------------------------------------------- الإدارة: ردود بانتظار التحويل
+
+  /**
+   * الردود التي لا تخرج آلياً — الإدارة تحوّلها وتسجّل مرجعها. معها ما يلزم لتعرف
+   * إلى أين: مرجع التحويل الوارد وملاحظة من أكّده (اسم المحوِّل أو حسابه)، والمشتري.
+   * الأقدم أولاً: المشتري الذي ينتظر منذ أيام قبل من ألغى للتوّ.
+   */
+  async awaitingRefunds() {
+    const rows = await this.prisma.refund.findMany({
+      where: { status: AWAITING_TRANSFER },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+      select: {
+        id: true,
+        amountMinorUnits: true,
+        reason: true,
+        createdAt: true,
+        subOrder: {
+          select: {
+            subOrderNumber: true,
+            vendor: { select: { nameAr: true } },
+            order: {
+              select: {
+                orderNumber: true,
+                currency: true,
+                shippingAddressSnapshot: true,
+                customer: { select: { fullName: true, email: true } },
+                payment: { select: { transferReference: true, transferNote: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    return {
+      items: rows.map((r) => {
+        const o = r.subOrder.order;
+        const address = o.shippingAddressSnapshot as { phone?: string } | null;
+        return {
+          id: r.id,
+          amountMinorUnits: r.amountMinorUnits.toString(),
+          currency: o.currency,
+          reason: r.reason,
+          createdAt: r.createdAt,
+          orderNumber: o.orderNumber,
+          subOrderNumber: r.subOrder.subOrderNumber,
+          store: r.subOrder.vendor.nameAr,
+          buyer: { name: o.customer?.fullName ?? null, email: o.customer?.email ?? null, phone: address?.phone ?? null },
+          paidWith: { reference: o.payment?.transferReference ?? null, note: o.payment?.transferNote ?? null },
+        };
+      }),
+    };
+  }
 
   // ------------------------------------------------------------- البائع
 
@@ -146,7 +205,12 @@ export class OrderQueryService {
   // ------------------------------------------------------------ المشتري
 
   async customerList(userId: string, page = 1): Promise<{ items: unknown[]; total: number }> {
-    const where: Prisma.OrderWhereInput = { customerUserId: userId, status: { notIn: ['pending_payment', 'payment_failed'] } };
+    // محاولات الدفع الفاشلة لا تُعدّ طلبات — إلا طلب التحويل: حجزه المشتري وينتظر
+    // تحويله، أو أُلغي لأنه لم يحوّل، وعليه أن يرى ذلك في «طلباتي»
+    const where: Prisma.OrderWhereInput = {
+      customerUserId: userId,
+      OR: [{ status: { notIn: ['pending_payment', 'payment_failed'] } }, { payment: { is: { method: 'bank_transfer' } } }],
+    };
     const [rows, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
@@ -159,6 +223,7 @@ export class OrderQueryService {
           currency: true,
           grandTotalMinorUnits: true,
           placedAt: true,
+          payment: { select: { status: true, failureCode: true, expiresAt: true } },
           subOrders: {
             select: {
               status: true,
@@ -177,6 +242,7 @@ export class OrderQueryService {
         currency: o.currency,
         grandTotalMinorUnits: o.grandTotalMinorUnits.toString(),
         placedAt: o.placedAt,
+        payment: o.payment,
         stores: o.subOrders.map((s) => ({
           vendor: s.vendor.nameAr,
           status: s.status,
@@ -195,6 +261,8 @@ export class OrderQueryService {
     });
     if (!order) throw new NotFoundError('الطلب غير موجود.', { orderNumber });
     const returnWindowDays = await this.returnWindow();
+    const awaiting = order.status === 'pending_payment' && order.payment?.status === 'awaiting_transfer';
+    const details = awaiting ? await this.transfers.read() : null;
     return {
       number: order.orderNumber,
       status: order.status,
@@ -206,6 +274,26 @@ export class OrderQueryService {
       discountTotalMinorUnits: order.discountTotalMinorUnits.toString(),
       shippingAddress: order.shippingAddressSnapshot,
       paymentStatus: order.payment?.status ?? null,
+      paymentMethod: order.payment?.method ?? null,
+      // قبل التأكيد لا متاجر بعد: الطلب يُقسَّم حين يصل التحويل — فيُعرض كيف يحوّل
+      ...(details
+        ? {
+            transfer: {
+              reference: order.orderNumber,
+              expiresAt: order.payment?.expiresAt ?? null,
+              windowHours: details.windowHours,
+              beneficiary: details.beneficiary,
+              bank: details.bank,
+              iban: details.iban,
+              cliqAlias: details.cliqAlias,
+            },
+          }
+        : {}),
+      ...(order.status === 'payment_failed' && order.payment?.failureCode
+        ? { paymentFailure: { code: order.payment.failureCode, message: order.payment.failureMessage ?? '' } }
+        : {}),
+      // ما رآه المشتري قبل التقسيم: أسطر اللقطة، ليعرف ماذا حجز
+      ...(order.subOrders.length === 0 ? { lines: snapshotLines(order.pricingSnapshot) } : {}),
       // تتبّع لكل بائع: شحنة ومسار وحالة مستقلة — ST-19
       stores: order.subOrders.map((s) => ({
         ...present(s, 'customer'),
@@ -273,9 +361,28 @@ function present(s: SubOrderRow, audience: TransitionActor) {
     })),
     shipment: s.shipment,
     returns: s.returns,
-    refunds: s.refunds.map((r) => ({ ...r, amountMinorUnits: r.amountMinorUnits.toString() })),
+    // مرجع تحويل الردّ للمشتري والإدارة — حساب المشتري البنكي ليس شأن البائع
+    refunds: s.refunds.map(({ transferReference, ...r }) => ({
+      ...r,
+      amountMinorUnits: r.amountMinorUnits.toString(),
+      ...(audience === 'vendor' ? {} : { transferReference }),
+    })),
     disputes: s.disputes,
   };
+}
+
+/** أسطر الطلب من لقطة التسعير — لطلب لم يُقسَّم بعد (ينتظر التحويل أو أُلغي قبله) */
+function snapshotLines(snapshot: Prisma.JsonValue | null) {
+  const subs = (snapshot as { subOrders?: { vendorNameAr?: string; lines?: { nameAr: string; variantLabel?: string | null; qty: number; imageKey?: string | null }[] }[] } | null)?.subOrders ?? [];
+  return subs.flatMap((s) =>
+    (s.lines ?? []).map((l) => ({
+      store: s.vendorNameAr ?? null,
+      name: l.nameAr,
+      variantLabel: l.variantLabel ?? null,
+      qty: l.qty,
+      imageKey: l.imageKey ?? null,
+    })),
+  );
 }
 
 function recipientOf(snapshot: Prisma.JsonValue): string | null {

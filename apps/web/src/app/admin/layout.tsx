@@ -18,6 +18,7 @@ const NAV: { href: string; label: string; icon: IconName; perm?: string; group: 
   { href: '/admin/vendors', label: 'المتاجر', icon: 'store', perm: 'vendors.review', group: 'التشغيل' },
   { href: '/admin/products', label: 'مراجعة المنتجات', icon: 'package', perm: 'catalog.manage', group: 'التشغيل' },
   { href: '/admin/orders', label: 'الطلبات', icon: 'truck', perm: 'orders.manage', group: 'التشغيل' },
+  { href: '/admin/transfers', label: 'تحويلات المشترين', icon: 'cash', perm: 'payouts.approve', group: 'التشغيل' },
   { href: '/admin/payouts', label: 'طلبات التحويل', icon: 'wallet', perm: 'payouts.approve', group: 'التشغيل' },
   { href: '/admin/disputes', label: 'النزاعات', icon: 'scale', perm: 'disputes.resolve', group: 'التشغيل' },
   { href: '/admin/returns', label: 'المرتجعات', icon: 'return', perm: 'orders.manage', group: 'التشغيل' },

@@ -6,7 +6,7 @@ import { AdminHeader, Empty, Feedback, Loading, ReasonButton, Tabs } from '@/com
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { PARENT_STATUS, useAction, useAdminData } from '@/lib/admin';
-import { labelOf, money, toneOf, when, type SubOrderView } from '@/lib/orders';
+import { labelOf, money, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
 
 interface Row {
   orderNumber: string;
@@ -210,7 +210,7 @@ function OrderDetail({ number, onChange }: { number: string; onChange: () => voi
                   {s.refunds.map((r, i) => (
                     <Fragment key={i}>
                       {i ? '، ' : ''}
-                      <span className="money num">{money(r.amountMinorUnits, data.currency)}</span> ({r.status})
+                      <span className="money num">{money(r.amountMinorUnits, data.currency)}</span> ({REFUND_STATUS[r.status] ?? r.status})
                     </Fragment>
                   ))}
                 </span>

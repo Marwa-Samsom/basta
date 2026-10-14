@@ -10,12 +10,14 @@ import { when } from '@/lib/orders';
 interface Setting {
   key: string;
   labelAr: string;
-  kind: 'int' | 'currency' | 'enum';
+  kind: 'int' | 'currency' | 'enum' | 'text';
   min?: number;
   max?: number;
   unit?: string;
   options?: string[];
   financial?: string;
+  maxLength?: number;
+  hint?: string;
   value: unknown;
   updatedAt: string | null;
 }
@@ -44,7 +46,7 @@ export default function AdminSettingsPage() {
   const save = (s: Setting) => {
     const raw = draft[s.key] ?? '';
     const value = s.kind === 'int' ? Number(raw) : raw;
-    const msg = `${s.labelAr}: ${String(s.value)} ← ${raw}${s.financial ? `\n\n${s.financial}` : ''}`;
+    const msg = `${s.labelAr}: ${String(s.value ?? '—')} ← ${raw || '—'}${s.financial ? `\n\n${s.financial}` : ''}`;
     if (!window.confirm(msg)) return;
     void act.run(async () => {
       await api(`/admin/settings/${s.key}`, { method: 'PUT', body: { value } });
@@ -53,14 +55,17 @@ export default function AdminSettingsPage() {
     }, 'حُفظ الإعداد.');
   };
 
+  // بيانات التحويل معاً: ما يراه المشتري بعد «أكّد الطلب» — المستفيد ووجهة واحدة على الأقل شرطٌ لقبول الطلبات
+  const isTransfer = (s: Setting) => s.key.startsWith('transfer_');
   const groups = [
-    { title: 'إعدادات مالية', rows: data.settings.filter((s) => s.financial) },
-    { title: 'إعدادات التشغيل', rows: data.settings.filter((s) => !s.financial) },
+    { title: 'الدفع بالتحويل', rows: data.settings.filter(isTransfer) },
+    { title: 'إعدادات مالية', rows: data.settings.filter((s) => s.financial && !isTransfer(s)) },
+    { title: 'إعدادات التشغيل', rows: data.settings.filter((s) => !s.financial && !isTransfer(s)) },
   ].filter((g) => g.rows.length > 0);
   const dirty = Object.entries(draft).some(([k, v]) => String(data.settings.find((s) => s.key === k)?.value ?? '') !== v);
 
   const row = (s: Setting) => {
-    const changed = draft[s.key] !== undefined && draft[s.key] !== String(s.value);
+    const changed = draft[s.key] !== undefined && draft[s.key] !== String(s.value ?? '');
     return (
       <div key={s.key} className="ac2-setting">
         <div className="ac2-setting__row">
@@ -81,6 +86,16 @@ export default function AdminSettingsPage() {
               />
               {s.unit ? <span className="ac2-unit__suffix">{s.unit}</span> : null}
             </span>
+          ) : s.kind === 'text' ? (
+            <input
+              className="field__control ac2-setting__select"
+              dir={s.key === 'transfer_iban' || s.key === 'transfer_cliq_alias' ? 'ltr' : undefined}
+              maxLength={s.maxLength}
+              placeholder={s.hint ?? ''}
+              value={draft[s.key] ?? String(s.value ?? '')}
+              onChange={(e) => setDraft({ ...draft, [s.key]: e.target.value })}
+              aria-label={s.labelAr}
+            />
           ) : (
             <select className="field__control ac2-setting__select" value={draft[s.key] ?? String(s.value ?? '')} onChange={(e) => setDraft({ ...draft, [s.key]: e.target.value })} aria-label={s.labelAr}>
               {(s.options ?? []).map((o) => (

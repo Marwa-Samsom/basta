@@ -627,10 +627,11 @@ describe('استرداد عالق في processing — سقط منفّذه فيُ
     const { refund, intent } = await stuckRefund(REFUND_STALE_MS + 60_000);
     // ما فعله المنفّذ الساقط قبل سقوطه: البوابة ردّت بمفتاح الاسترداد
     const first = await fake.refund(intent, refund.amountMinorUnits, `refund:${refund.id}`);
+    expect(first.status).toBe('succeeded');
     expect(await lifecycle.executeRefund(refund.id)).toBe(true);
     const done = await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } });
     expect(done.status).toBe('succeeded');
-    expect(done.providerRefundId).toBe(first.refundId);
+    expect(done.providerRefundId).toBe(first.status === 'succeeded' ? first.refundId : null);
     expect(fake.refundsOf(intent)).toEqual([refund.amountMinorUnits]);
   });
 

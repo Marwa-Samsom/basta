@@ -8,7 +8,7 @@ import { Icon } from '@/components/icons';
 import { Alert, Field, PageHead, Spinner, TextInput } from '@/components/ui';
 import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
-import { cartApi, cartHeaders, type CartView } from '@/lib/cart';
+import { CART_EVENT, cartApi, cartHeaders, type CartView } from '@/lib/cart';
 import { attemptKey, definitive, endAttempt } from '@/lib/checkout-attempt';
 import { withNext } from '@/lib/safe-path';
 import { imageUrl } from '@/lib/storefront';
@@ -16,8 +16,13 @@ import { imageUrl } from '@/lib/storefront';
 interface OrderResult {
   orderId: string;
   orderNumber: string;
-  outcome: 'paid' | 'failed' | 'requires_action' | 'pending';
+  outcome: 'paid' | 'failed' | 'requires_action' | 'awaiting_transfer' | 'pending';
 }
+
+/** كيف يدفع المشتري — من الخادم: بطاقة (الوهمي في التطوير) أو تحويل تؤكّده الإدارة */
+type PaymentMethod =
+  | { method: 'card' }
+  | { method: 'bank_transfer'; windowHours: number; ready: boolean; cliq: boolean };
 
 const HERE = '/checkout';
 
@@ -154,6 +159,8 @@ function CheckoutForm() {
     building: '',
   });
   const [card, setCard] = useState<string>('tok_success');
+  const [payment, setPayment] = useState<PaymentMethod | null>(null);
+  const transfer = payment?.method === 'bank_transfer' ? payment : null;
   /**
    * الإجمالي محسوب لعنوان بعينه: الشحن والضريبة ببلده ومنطقته ومدينته. تغيير
    * أيٍّ منها بعد «احسب الشحن» كان يُبقي الإجمالي القديم معروضاً تحت «ادفع»،
@@ -192,6 +199,20 @@ function CheckoutForm() {
     setAddress((a) => ({ ...a, recipientName: '', region: '', city: '', street: '', building: '' }));
     setPicked('new');
   };
+
+  useEffect(() => {
+    let alive = true;
+    api<PaymentMethod>('/checkout/payment-method')
+      .then((m) => {
+        if (alive) setPayment(m);
+      })
+      .catch(() => {
+        // بلا ردّ تبقى البطاقة — والخادم يرفض الوسيلة الخاطئة برسالة تطلب تحديث الصفحة
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -241,7 +262,7 @@ function CheckoutForm() {
             ...address,
             ...(address.building ? {} : { building: undefined }),
           },
-          paymentToken: card,
+          paymentToken: transfer ? 'bank_transfer' : card,
           // ما يراه تحت «ادفع» — الخادم لا يخصم غيره
           expectedTotal: quote.totals.total.minorUnits,
           expectedCurrency: quote.currency,
@@ -250,6 +271,8 @@ function CheckoutForm() {
       // الخادم أجاب بطلب معروف — مدفوعاً أو مرفوضاً أو معلّقاً تحسمه المصالحة.
       // الشراء التالية (بطاقة أخرى، أو سلة جديدة) محاولة جديدة بمفتاح جديد
       endAttempt();
+      // الخادم فرّغ السلة (دُفع الطلب أو حُجز بانتظار التحويل) — الرأس يعيد قراءة عدّادها
+      window.dispatchEvent(new Event(CART_EVENT));
       router.push(`/orders/${result.orderNumber}`);
     } catch (err) {
       // انتهت الجلسة ولم يُجدَّدها الرمز: لا طلب أُنشئ، فيعود بعد الدخول بالمحاولة نفسها
@@ -279,7 +302,8 @@ function CheckoutForm() {
   }
 
   const contactOk = address.phone.trim() !== '';
-  const ready = quote !== null && blockers.length === 0;
+  // التحويل بلا بيانات حساب مضبوطة يُرفض في الخادم — الزر لا يَعِد بما لن يقبله
+  const ready = quote !== null && blockers.length === 0 && payment !== null && (!transfer || transfer.ready);
 
   // الخطوة الحالية: أوّل خطوة لم تكتمل. الدفع مختار دائماً، فحين يُحسب الشحن بلا موانع تصير المراجعة هي الحالية
   const step = !contactOk ? 1 : quote === null ? 2 : blockers.length > 0 ? 3 : 5;
@@ -429,30 +453,52 @@ function CheckoutForm() {
           </Section>
 
           <Section n={4} title="الدفع" state={stateOf(4)}>
-            <p className="sp-note sp-note--xs">
-              <Icon name="info" size={14} />
-              بيئة تجريبية: اختر كيف تتصرّف البطاقة.
-            </p>
-            <fieldset className="sp-fieldset">
-              <legend className="visually-hidden">بطاقة الدفع</legend>
-              {TEST_CARDS.map((c) => (
-                <label key={c.token} className="sp-pay">
-                  <input
-                    type="radio"
-                    name="card"
-                    value={c.token}
-                    checked={card === c.token}
-                    onChange={() => setCard(c.token)}
-                  />
-                  <Icon name="card" size={19} />
-                  <span className="sp-pay__label">{c.label}</span>
-                </label>
-              ))}
-            </fieldset>
-            <p className="sp-note">
-              <Icon name="lock" size={13} />
-              تُعالَج البطاقة عند بوّابة الدفع.
-            </p>
+            {payment === null ? (
+              <Spinner label="جارٍ تحميل طريقة الدفع…" />
+            ) : transfer ? (
+              <>
+                <div className="sp-pay sp-pay--static">
+                  <Icon name="wallet" size={19} />
+                  <span className="sp-pay__label">{transfer.cliq ? 'تحويل عبر كليك أو تحويل بنكي' : 'تحويل بنكي'}</span>
+                </div>
+                {transfer.ready ? (
+                  <ol className="sp-transfer__steps">
+                    <li>تضغط «أكّد الطلب» فنحجز لك القطع {transfer.windowHours} ساعة — بلا أي خصم.</li>
+                    <li>نعرض لك المبلغ وبيانات الحساب، فتحوّل من تطبيق بنكك وتكتب رقم الطلب في الملاحظة.</li>
+                    <li>نؤكّد وصول التحويل ونرسل طلبك إلى المتاجر، ونبلغك حينها.</li>
+                  </ol>
+                ) : (
+                  <Alert tone="warning">الدفع غير متاح الآن — نضبط بيانات التحويل. سلّتك محفوظة، جرّب بعد قليل.</Alert>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="sp-note sp-note--xs">
+                  <Icon name="info" size={14} />
+                  بيئة تجريبية: اختر كيف تتصرّف البطاقة.
+                </p>
+                <fieldset className="sp-fieldset">
+                  <legend className="visually-hidden">بطاقة الدفع</legend>
+                  {TEST_CARDS.map((c) => (
+                    <label key={c.token} className="sp-pay">
+                      <input
+                        type="radio"
+                        name="card"
+                        value={c.token}
+                        checked={card === c.token}
+                        onChange={() => setCard(c.token)}
+                      />
+                      <Icon name="card" size={19} />
+                      <span className="sp-pay__label">{c.label}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                <p className="sp-note">
+                  <Icon name="lock" size={13} />
+                  تُعالَج البطاقة عند بوّابة الدفع.
+                </p>
+              </>
+            )}
           </Section>
 
           <Section n={5} title="المراجعة" state={stateOf(5)}>
@@ -549,15 +595,19 @@ function CheckoutForm() {
               {busy ? (
                 <>
                   <span className="spinner" aria-hidden />
-                  جارٍ الدفع…
+                  {transfer ? 'جارٍ تأكيد الطلب…' : 'جارٍ الدفع…'}
                 </>
+              ) : transfer ? (
+                'أكّد الطلب'
               ) : (
                 'ادفع'
               )}
             </button>
             <p className="sp-note">
               <Icon name="lock" size={13} />
-              لا يُخصم شيء قبل أن تضغط «ادفع»، والمخزون يُحجز لك لحظتها.
+              {transfer
+                ? `لا يُخصم شيء — تحوّل أنت المبلغ بعد التأكيد، والقطع محجوزة لك ${transfer.windowHours} ساعة.`
+                : 'لا يُخصم شيء قبل أن تضغط «ادفع»، والمخزون يُحجز لك لحظتها.'}
             </p>
           </div>
         </aside>

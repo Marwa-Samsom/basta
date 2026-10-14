@@ -284,6 +284,20 @@ export class InventoryService {
   }
 
   /**
+   * يمدّ حجوزات نشطة إلى موعد — طلب بانتظار تحويل يدوي يبقى محجوزاً طوال مهلته لا ربع
+   * ساعة. لا يُقصّر حجزاً ولا يحيي منتهياً: النشط وحده يُمدّ، وإلى أبعد من موعده فقط.
+   */
+  extend(reservationIds: readonly string[], until: Date, tx?: Tx): Promise<number> {
+    return this.within(tx, async (t) => {
+      const { count } = await t.stockReservation.updateMany({
+        where: { id: { in: [...new Set(reservationIds)] }, status: 'active', expiresAt: { lt: until } },
+        data: { expiresAt: until },
+      });
+      return count;
+    });
+  }
+
+  /**
    * مهمة كل دقيقة — S-03. دفعة واحدة؛ المستدعي يكرّر ما دامت ممتلئة.
    * تشغيلها من نسختين في اللحظة نفسها آمن: شرط status = 'active' بعد القفل يحسم.
    */

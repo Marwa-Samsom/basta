@@ -5,7 +5,7 @@ import { AdminHeader, Empty, Feedback, Loading } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { TONE, useAction, useAdminData } from '@/lib/admin';
-import { labelOf, money, RETURN_REASONS, when } from '@/lib/orders';
+import { labelOf, money, REFUND_STATUS, RETURN_REASONS, when } from '@/lib/orders';
 
 interface Data {
   requests: {
@@ -134,7 +134,7 @@ export default function AdminReturnsPage() {
         </header>
         {data.refunds.length === 0 ? (
           <Empty icon="wallet" title="لا استردادات">
-            تظهر هنا المبالغ المعادة للمشترين بمرجع البوابة.
+            تظهر هنا المبالغ المعادة للمشترين بمرجع البوابة أو التحويل.
           </Empty>
         ) : (
           <div className="table-wrap" tabIndex={0} role="region" aria-label="الاستردادات">
@@ -146,7 +146,7 @@ export default function AdminReturnsPage() {
                   <th className="end">على البائع</th>
                   <th>السبب</th>
                   <th>الحالة</th>
-                  <th>مرجع البوابة</th>
+                  <th>المرجع</th>
                 </tr>
               </thead>
               <tbody>
@@ -178,10 +178,10 @@ export default function AdminReturnsPage() {
                       {r.reason}
                     </td>
                     <td data-label="الحالة">
-                      <span className={`badge ${r.status === 'succeeded' ? 'badge--approved' : 'badge--warning'}`}>{r.status === 'succeeded' ? 'تمّ' : 'قيد التنفيذ'}</span>
+                      <span className={`badge ${r.status === 'succeeded' ? 'badge--approved' : 'badge--warning'}`}>{REFUND_STATUS[r.status] ?? r.status}</span>
                     </td>
-                    <td data-label="مرجع البوابة" className="num">
-                      {r.providerRefundId ?? '—'}
+                    <td data-label="المرجع" className="num">
+                      {r.providerRefundId?.replace(/^manual:/, '') ?? '—'}
                     </td>
                   </tr>
                 ))}
