@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { api, ApiError, mediaUrl } from '@/lib/api';
+import { digitsOnly } from '@/lib/digits';
 import { Alert, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { MAX_IMAGES, ProductImages } from '@/components/product-images';
@@ -533,7 +534,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                           inputMode="numeric"
                           aria-label={`الكمية للمتغيّر ${num(i + 1)}`}
                           value={v.stock}
-                          onChange={(e) => update(i, { stock: e.target.value.replace(/\D/g, '') })}
+                          onChange={(e) => update(i, { stock: digitsOnly(e.target.value) })}
                         />
                       </td>
                       <td data-label="حدّ التنبيه">
@@ -544,7 +545,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                           aria-label={`حدّ التنبيه للمتغيّر ${num(i + 1)}`}
                           value={v.lowStockThreshold}
                           onChange={(e) =>
-                            update(i, { lowStockThreshold: e.target.value.replace(/\D/g, '') })
+                            update(i, { lowStockThreshold: digitsOnly(e.target.value) })
                           }
                         />
                       </td>

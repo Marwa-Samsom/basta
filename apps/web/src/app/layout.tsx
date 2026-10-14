@@ -17,6 +17,7 @@ import './globals.css';
 // الأقسام كلها. أنماط كل قسم تُستورد في قشرته وحدها: المشتري لا ينزّل أنماط اللوحات.
 import '@/styles/screens/account-shared.css';
 import { IconSprite } from '@/components/icons';
+import { SessionExpiredRedirect } from '@/components/session-expired';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import { SITE_URL } from '@/lib/seo';
 import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from '@/lib/theme-colors';
@@ -51,6 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <IconSprite />
         {children}
+        <SessionExpiredRedirect />
         <ServiceWorkerRegister />
       </body>
     </html>

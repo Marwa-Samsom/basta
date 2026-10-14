@@ -3,6 +3,7 @@
 import '@/styles/screens/vendor-extra.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, EmptyState, Field, PageHead, TextInput } from '@/components/ui';
+import { digitsOnly } from '@/lib/digits';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { minorUnitDigits } from '@/lib/money';
@@ -179,7 +180,7 @@ function RateFields({ draft, onChange, currency }: { draft: RateDraft; onChange:
           inputMode="numeric"
           dir="ltr"
           value={draft.minDays}
-          onChange={(e) => set({ minDays: e.target.value.replace(/\D/g, '') })}
+          onChange={(e) => set({ minDays: digitsOnly(e.target.value) })}
         />
         <TextInput
           label="إلى (أيام)"
@@ -188,7 +189,7 @@ function RateFields({ draft, onChange, currency }: { draft: RateDraft; onChange:
           dir="ltr"
           value={draft.maxDays}
           error={daysBad ? `نهاية المدى يجب أن تكون مساوية أو أكبر من بدايته (${draft.minDays} أيام).` : null}
-          onChange={(e) => set({ maxDays: e.target.value.replace(/\D/g, '') })}
+          onChange={(e) => set({ maxDays: digitsOnly(e.target.value) })}
         />
       </div>
       {draft.method === 'by_weight' ? (

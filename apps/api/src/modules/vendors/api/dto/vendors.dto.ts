@@ -1,3 +1,4 @@
+import { LatinDigits } from '../../../../common/digits';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -207,5 +208,6 @@ export class AddBankAccountDto extends BankAccountDto {
   @IsOptional()
   @IsString()
   @MaxLength(11)
+  @LatinDigits()
   code?: string;
 }

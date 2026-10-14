@@ -1,3 +1,4 @@
+import { LatinDigits } from '../../../common/digits';
 import {
   Body,
   Controller,
@@ -46,6 +47,7 @@ export class AddressDto {
   recipientName!: string;
 
   @Matches(/^\+?[0-9 ]{7,20}$/, { message: 'رقم الهاتف غير صالح.' })
+  @LatinDigits()
   phone!: string;
 
   @Matches(/^[A-Za-z]{2}$/, { message: 'البلد برمز من حرفين.' })
@@ -107,6 +109,7 @@ export class PlaceOrderDto {
 
   @IsOptional()
   @Matches(/^\+?[0-9 ]{7,20}$/)
+  @LatinDigits()
   guestPhone?: string;
 
   @IsOptional()

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
+import { digitsOnly } from '@/lib/digits';
 import { TextInput } from '@/components/ui';
 import { api, session, type Tokens } from '@/lib/api';
 import { homeFor, internalPath, withNext } from '@/lib/safe-path';
@@ -139,7 +140,7 @@ function ResetForm() {
               maxLength={6}
               required
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => setCode(digitsOnly(e.target.value))}
             />
             <NewPasswordField label="كلمة المرور الجديدة" value={password} onChange={setPassword} />
             <TextInput

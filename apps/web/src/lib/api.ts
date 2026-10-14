@@ -140,12 +140,31 @@ async function raw(path: string, options: RequestOptions, token: string | null):
   if (token) headers['authorization'] = `Bearer ${token}`;
 
   // same-origin: الطلب إلى نطاق الواجهة نفسه، فيذهب كوكي التحديث ويُحفظ ما يضعه الردّ
-  return fetch(`${apiBase()}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    credentials: 'same-origin',
-    ...(body !== undefined ? { body } : {}),
-  });
+  try {
+    return await fetch(`${apiBase()}${path}`, {
+      method: options.method ?? 'GET',
+      headers,
+      credentials: 'same-origin',
+      ...(body !== undefined ? { body } : {}),
+    });
+  } catch {
+    // انقطاع الشبكة يرفض fetch بـ TypeError «Failed to fetch» — كانت تُعرض للمشتري كما هي.
+    // الحالة 0 ليست رفضاً قاطعاً (checkout-attempt): «ادفع» ثانيةً يعيد الطلب نفسه
+    throw new ApiError(0, NETWORK_MESSAGE, 'NETWORK');
+  }
+}
+
+const NETWORK_MESSAGE = 'لا اتصال بالخادم — تحقّق من الشبكة وأعد المحاولة.';
+
+/**
+ * الجلسة انتهت ولم يجدّدها رمز التحديث — يسمعه SessionExpiredRedirect في الجذر فيعيد
+ * صاحبها إلى الدخول ثم إلى الصفحة نفسها. لا يُطلق إلا لمن كان داخلاً: 401 لزائر (كلمة
+ * مرور خاطئة عند الدخول) ردّ عادي يُعرض في مكانه.
+ */
+export const SESSION_EXPIRED_EVENT = 'basta:session-expired';
+
+function backToLogin(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
 }
 
 /**
@@ -181,7 +200,10 @@ function refresh(seen: string | null): Promise<Tokens | null> {
     if (!current) return null;
     // تبويب آخر جدّد بعد أن فشل طلبنا وقبل أن ندخل القفل
     if (seen && current.accessToken !== seen) return current;
-    const res = await fetch(`${apiBase()}/auth/refresh`, { method: 'POST', credentials: 'same-origin' });
+    // انقطاع الشبكة أثناء التجديد لا يمسّ الجلسة: يُرمى كخطأ اتصال لا «Failed to fetch»
+    const res = await fetch(`${apiBase()}/auth/refresh`, { method: 'POST', credentials: 'same-origin' }).catch(() => {
+      throw new ApiError(0, NETWORK_MESSAGE, 'NETWORK');
+    });
     if (res.status === 409) {
       // دوّره تبويب آخر في اللحظة نفسها — الجلسة سليمة، وخلفه يُكتب الآن
       for (let i = 0; i < 20; i++) {
@@ -195,6 +217,9 @@ function refresh(seen: string | null): Promise<Tokens | null> {
       session.clear();
       return null;
     }
+    // الخادم نائم أو متعطّل (5xx، ومنها 502 من خادم الواجهة) ليس رفضاً للجلسة: كانت
+    // تُمسح فيخرج كل من صادف استيقاظ الخادم المجاني. المسح لرفض رمز التحديث وحده
+    if (res.status >= 500) throw await ApiError.from(res);
     if (!res.ok) {
       session.clear();
       return null;
@@ -221,6 +246,10 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     if (renewed) {
       token = renewed.accessToken;
       res = await raw(path, options, token);
+    } else if (before) {
+      // كان داخلاً والتجديد فشل: الجلسة ماتت (refresh مسحها) — لا 401 من منطق الصفحة
+      backToLogin();
+      throw new ApiError(401, 'انتهت جلستك — ادخل من جديد لتكمل.', 'SESSION_EXPIRED');
     }
   }
 

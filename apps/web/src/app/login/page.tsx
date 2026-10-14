@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
+import { digitsOnly } from '@/lib/digits';
 import { Icon } from '@/components/icons';
 import { Field, TextInput } from '@/components/ui';
 import { homeFor, internalPath, withNext } from '@/lib/safe-path';
@@ -177,7 +178,7 @@ function LoginForm() {
                   placeholder="000000"
                   maxLength={6}
                   value={totp}
-                  onChange={(e) => setTotp(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => setTotp(digitsOnly(e.target.value))}
                 />
               )}
               <button

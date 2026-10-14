@@ -1,12 +1,12 @@
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
-import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { loadEnv, type TrustProxy } from './common/config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { arabicValidationPipe } from './common/validation-messages';
 import { IMAGE_MAX_BYTES, ProductImageGate, UPLOADS_ROOT, UPLOADS_URL_PREFIX } from './modules/catalog/public';
 
 /**
@@ -57,9 +57,8 @@ export function trustEdgeProxy(app: NestFastifyApplication, secret: string | und
  */
 export async function configureApp(app: NestFastifyApplication): Promise<void> {
   app.setGlobalPrefix('api/v1');
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-  );
+  // رسائل التحقق بالعربية — whitelist و forbidNonWhitelisted و transform كما كانت
+  app.useGlobalPipes(arabicValidationPipe());
   app.useGlobalFilters(new AllExceptionsFilter());
   // أول خطّاف: كل ما بعده (حدّ المعدّل، التدقيق) يقرأ req.ip بعد أن يُحسم
   trustEdgeProxy(app, process.env['EDGE_PROXY_SECRET']);

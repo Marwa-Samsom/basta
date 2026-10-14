@@ -10,6 +10,7 @@ import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
 import { CART_EVENT, cartApi, cartHeaders, type CartView } from '@/lib/cart';
 import { attemptKey, definitive, endAttempt } from '@/lib/checkout-attempt';
+import { digitsOnly } from '@/lib/digits';
 import { withNext } from '@/lib/safe-path';
 import { imageUrl } from '@/lib/storefront';
 
@@ -302,8 +303,18 @@ function CheckoutForm() {
   }
 
   const contactOk = address.phone.trim() !== '';
+  /**
+   * ما يرفضه الخادم لا يُرسل: الاسم والشارع حرفان فأكثر، والهاتف سبعة أرقام. كان «ادفع»
+   * يعمل والحقول فارغة، فيعود ردّ تحقّق من الخادم بدل أن تقول الصفحة ماذا ينقص.
+   */
+  const missing = [
+    address.recipientName.trim().length < 2 ? 'اسم المستلم' : null,
+    address.street.trim().length < 2 ? 'الشارع ورقم البناء' : null,
+    digitsOnly(address.phone).length < 7 ? 'الهاتف' : null,
+  ].filter((m): m is string => m !== null);
   // التحويل بلا بيانات حساب مضبوطة يُرفض في الخادم — الزر لا يَعِد بما لن يقبله
-  const ready = quote !== null && blockers.length === 0 && payment !== null && (!transfer || transfer.ready);
+  const ready =
+    quote !== null && blockers.length === 0 && missing.length === 0 && payment !== null && (!transfer || transfer.ready);
 
   // الخطوة الحالية: أوّل خطوة لم تكتمل. الدفع مختار دائماً، فحين يُحسب الشحن بلا موانع تصير المراجعة هي الحالية
   const step = !contactOk ? 1 : quote === null ? 2 : blockers.length > 0 ? 3 : 5;
@@ -603,6 +614,12 @@ function CheckoutForm() {
                 'ادفع'
               )}
             </button>
+            {quote && missing.length > 0 ? (
+              <p className="sp-note sp-note--warn" role="status">
+                <Icon name="info" size={13} />
+                أكمل قبل التأكيد: {missing.join('، ')}.
+              </p>
+            ) : null}
             <p className="sp-note">
               <Icon name="lock" size={13} />
               {transfer

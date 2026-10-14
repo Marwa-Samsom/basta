@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
+import { digitsOnly } from '@/lib/digits';
 import { RecoveryCodes } from '@/components/recovery-codes';
 import { Alert, Field, Spinner, TextInput } from '@/components/ui';
 import { api, ApiError, session } from '@/lib/api';
@@ -275,7 +276,7 @@ export default function TwoFactorSetupPage() {
                         placeholder="000000"
                         maxLength={6}
                         value={code}
-                        onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                        onChange={(e) => setCode(digitsOnly(e.target.value))}
                         {...props}
                       />
                       <button

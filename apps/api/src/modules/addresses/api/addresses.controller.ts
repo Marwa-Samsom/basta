@@ -1,3 +1,4 @@
+import { LatinDigits } from '../../../common/digits';
 import {
   Body,
   Controller,
@@ -37,6 +38,7 @@ export class CreateAddressDto {
   recipientName!: string;
 
   @Matches(PHONE, { message: 'رقم الهاتف غير صالح — أرقام فقط، ويجوز أن يبدأ بـ +.' })
+  @LatinDigits()
   phone!: string;
 
   @Matches(COUNTRY, { message: 'البلد برمز من حرفين.' })
@@ -92,6 +94,7 @@ export class UpdateAddressDto {
 
   @IsOptional()
   @Matches(PHONE, { message: 'رقم الهاتف غير صالح — أرقام فقط، ويجوز أن يبدأ بـ +.' })
+  @LatinDigits()
   phone?: string;
 
   @IsOptional()

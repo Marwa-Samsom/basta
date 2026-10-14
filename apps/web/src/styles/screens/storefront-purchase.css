@@ -54,6 +54,7 @@
 }
 .sp-note .icon { flex: none; margin-block-start: 2px; }
 .sp-note--danger { color: var(--danger-text); }
+.sp-note--warn { color: var(--warning-text); }
 .sp-note--xs { font-size: var(--text-xs); align-items: center; }
 .sp-note--xs .icon { margin-block-start: 0; }
 

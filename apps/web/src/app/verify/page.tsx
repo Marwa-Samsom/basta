@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { digitsOnly } from '@/lib/digits';
 import { api, ApiError, session } from '@/lib/api';
 import { safeNext, withNext } from '@/lib/safe-path';
 
@@ -107,7 +108,7 @@ function VerifyForm() {
   const code = digits.join('');
 
   function fill(from: number, raw: string): void {
-    const clean = raw.replace(/\D/g, '');
+    const clean = digitsOnly(raw);
     setMsg(null);
     if (clean.length > 1) {
       // لصق أو إكمال تلقائي: يتوزّع على الخانات من هذه الخانة فصاعداً
@@ -224,7 +225,7 @@ function VerifyForm() {
                       if (e.key === 'Backspace' && !digits[i] && i > 0) cells.current[i - 1]?.focus();
                     }}
                     onPaste={(e) => {
-                      const txt = e.clipboardData.getData('text').replace(/\D/g, '');
+                      const txt = digitsOnly(e.clipboardData.getData('text'));
                       if (!txt) return;
                       e.preventDefault();
                       const arr = [...EMPTY];

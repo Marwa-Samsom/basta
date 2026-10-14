@@ -1,3 +1,4 @@
+import { LatinDigits } from '../../../../common/digits';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password';
@@ -20,6 +21,7 @@ export class UpdateProfileDto {
   @IsString()
   @ValidateIf((o: UpdateProfileDto) => o.phone !== '')
   @Matches(/^\+[1-9]\d{7,14}$/, { message: 'الهاتف بصيغة دولية تبدأ بـ + ورمز الدولة.' })
+  @LatinDigits()
   phone?: string;
 }
 
@@ -38,6 +40,7 @@ export class ChangePasswordDto {
 export class VerifyCodeDto {
   @ApiProperty({ example: '482913' })
   @Matches(CODE_RULE, { message: 'الرمز ستة أرقام.' })
+  @LatinDigits()
   code!: string;
 }
 
@@ -56,6 +59,7 @@ export class ResetPasswordDto {
 
   @ApiProperty({ example: '482913' })
   @Matches(CODE_RULE, { message: 'الرمز ستة أرقام.' })
+  @LatinDigits()
   code!: string;
 
   @ApiProperty({ minLength: MIN_PASSWORD_LENGTH })

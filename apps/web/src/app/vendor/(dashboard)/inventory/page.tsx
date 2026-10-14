@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { digitsOnly } from '@/lib/digits';
 import { Alert, EmptyState, Field, PageHead, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
@@ -504,7 +505,7 @@ function AdjustDialog({
             inputMode="numeric"
             hint="يظهر «منخفض» حين ينزل المتاح إلى هذا الحد."
             value={threshold}
-            onChange={(e) => setThreshold(e.target.value.replace(/\D/g, ''))}
+            onChange={(e) => setThreshold(digitsOnly(e.target.value))}
           />
 
           {error ? <Alert tone="danger">{error}</Alert> : null}
