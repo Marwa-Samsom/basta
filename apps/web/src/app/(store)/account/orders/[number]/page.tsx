@@ -40,6 +40,8 @@ interface OrderView {
   itemsSubtotalMinorUnits: string;
   shippingTotalMinorUnits: string;
   discountTotalMinorUnits: string;
+  taxTotalMinorUnits?: string;
+  taxInclusive?: boolean;
   paymentStatus: string | null;
   paymentMethod?: string | null;
   /** ينتظر التحويل: كيف يحوّل — قبل أن يُقسَّم الطلب على المتاجر */
@@ -236,6 +238,12 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
                 <div>
                   <dt>الخصم</dt>
                   <dd className="num sp-sum__saving">− {money(order.discountTotalMinorUnits, order.currency)}</dd>
+                </div>
+              ) : null}
+              {order.taxTotalMinorUnits && order.taxTotalMinorUnits !== '0' ? (
+                <div>
+                  <dt>{order.taxInclusive ? 'الضريبة (مشمولة)' : 'الضريبة'}</dt>
+                  <dd className="num">{money(order.taxTotalMinorUnits, order.currency)}</dd>
                 </div>
               ) : null}
               <div className="sp-sum__total">

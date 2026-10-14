@@ -1,3 +1,4 @@
+import { LatinDigits } from '../../../../common/digits';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password';
@@ -27,6 +28,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ example: '+962790000000' })
   @IsOptional()
   @Matches(/^\+[1-9]\d{7,14}$/, { message: 'الهاتف بصيغة دولية تبدأ بـ + ورمز الدولة.' })
+  @LatinDigits()
   phone?: string;
 }
 
@@ -44,12 +46,14 @@ export class LoginDto {
   @ApiPropertyOptional({ description: 'رمز التحقق الثنائي (ستة أرقام) أو رمز استعادة — لمن فعّل التحقق بخطوتين' })
   @IsOptional()
   @Matches(SECOND_FACTOR, { message: 'رمز التحقق ستة أرقام، أو رمز استعادة من عشرة محارف.' })
+  @LatinDigits()
   totp?: string;
 }
 
 export class TotpCodeDto {
   @ApiProperty({ description: 'رمز التطبيق أو رمز استعادة' })
   @Matches(SECOND_FACTOR, { message: 'رمز التحقق ستة أرقام، أو رمز استعادة من عشرة محارف.' })
+  @LatinDigits()
   code!: string;
 }
 
@@ -64,6 +68,7 @@ export class TotpSetupDto {
   @ApiPropertyOptional({ description: 'رمز الجهاز الحالي أو رمز استعادة' })
   @IsOptional()
   @Matches(SECOND_FACTOR, { message: 'رمز التحقق ستة أرقام، أو رمز استعادة من عشرة محارف.' })
+  @LatinDigits()
   code?: string;
 }
 

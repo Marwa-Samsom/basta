@@ -272,6 +272,9 @@ export class OrderQueryService {
       itemsSubtotalMinorUnits: order.itemsSubtotalMinorUnits.toString(),
       shippingTotalMinorUnits: order.shippingTotalMinorUnits.toString(),
       discountTotalMinorUnits: order.discountTotalMinorUnits.toString(),
+      // الضريبة في الملخّص كما رآها عند الدفع — بدونها لا يبلغ مجموع الأسطر الإجمالي
+      taxTotalMinorUnits: order.taxTotalMinorUnits.toString(),
+      taxInclusive: (order.pricingSnapshot as { taxInclusive?: boolean } | null)?.taxInclusive ?? false,
       shippingAddress: order.shippingAddressSnapshot,
       paymentStatus: order.payment?.status ?? null,
       paymentMethod: order.payment?.method ?? null,
