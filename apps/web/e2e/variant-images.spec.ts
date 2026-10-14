@@ -35,19 +35,20 @@ test('البائع يربط صورة باللون، فتقفز إليها الص
   await prisma.inventory.create({ data: { variantId: blueVariant.id, onHand: 10, reserved: 0 } });
   await prisma.inventoryMovement.create({ data: { variantId: blueVariant.id, delta: 10, reason: 'import' } });
 
-  // 1 · البائع يرفع صورتين ويربط الثانية بالأزرق
+  // 1 · البائع يرفع ثلاث صور (غلاف، وصورة عامة، وصورة الأزرق) ويربط الثالثة بالأزرق
   await page.goto(`/login?next=${encodeURIComponent(`/vendor/products/${product.id}`)}`);
   await page.getByLabel('البريد الإلكتروني').fill(v.email);
   await page.getByLabel('كلمة المرور').fill(PASSWORD);
   await page.getByRole('button', { name: 'دخول' }).click();
   await page.locator('input[type=file]').setInputFiles([
     { name: 'غلاف.png', mimeType: 'image/png', buffer: png(500, 500, [180, 30, 40]) },
+    { name: 'تفصيل.png', mimeType: 'image/png', buffer: png(500, 500, [200, 190, 170]) },
     { name: 'أزرق.png', mimeType: 'image/png', buffer: png(500, 500, [30, 60, 170]) },
   ]);
   const gallery = page.getByRole('list', { name: 'صور المنتج' });
-  await expect(gallery.getByRole('img')).toHaveCount(2);
-  await page.getByLabel('الصورة 2 تظهر مع').selectOption({ label: 'اللون: أزرق' });
-  const [cover, blueImage] = await prisma.productImage.findMany({ where: { productId: product.id }, orderBy: { sort: 'asc' } });
+  await expect(gallery.getByRole('img')).toHaveCount(3);
+  await page.getByLabel('الصورة 3 تظهر مع').selectOption({ label: 'اللون: أزرق' });
+  const [cover, detail, blueImage] = await prisma.productImage.findMany({ where: { productId: product.id }, orderBy: { sort: 'asc' } });
   await expect.poll(async () => (await prisma.productImage.findUniqueOrThrow({ where: { id: blueImage!.id } })).optionValueId).toBe(blue.id);
   // الربط لا يعيد المنتج للمراجعة ولا يغيّر شيئاً غير الصورة
   expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('draft');
@@ -55,13 +56,27 @@ test('البائع يربط صورة باللون، فتقفز إليها الص
   // نُشر (اعتمده المراجِع)
   await prisma.product.update({ where: { id: product.id }, data: { status: 'active', publishedAt: new Date() } });
 
-  // 2 · المشتري: الغلاف أولاً، واختيار الأزرق يقفز إلى صورته، والأحمر لا صورة له فيبقى ما يراه
+  // 2 · المشتري: الغلاف أولاً، واختيار الأزرق يقفز إلى صورته
   await page.goto(`/p/${encodeURIComponent(v.productSlug)}`);
   const stage = page.locator('.sd-gallery__stage img');
+  const blueButton = page.getByRole('button', { name: 'أزرق', exact: true });
+  const redButton = page.getByRole('button', { name: 'أحمر', exact: true });
   await expect(stage).toHaveAttribute('src', new RegExp(cover!.fileKey));
-  await page.getByRole('button', { name: 'أزرق', exact: true }).click();
+  await blueButton.click();
   await expect(stage).toHaveAttribute('src', new RegExp(blueImage!.fileKey));
-  await expect(page.getByRole('button', { name: 'صورة 2 من 2' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'صورة 3 من 3' })).toHaveAttribute('aria-pressed', 'true');
+
+  // الأحمر لا صورة له: صورة الأزرق لا تبقى معه — تعود الصفحة إلى الغلاف
+  await redButton.click();
+  await expect(stage).toHaveAttribute('src', new RegExp(cover!.fileKey));
+
+  // أما صورة عامة فتحها المشتري بنفسه فتبقى حين يختار لوناً بلا صورة
+  await blueButton.click();
+  await page.getByRole('button', { name: 'صورة 2 من 3' }).click();
+  await redButton.click();
+  await expect(stage).toHaveAttribute('src', new RegExp(detail!.fileKey));
+  await blueButton.click();
+  await expect(stage).toHaveAttribute('src', new RegExp(blueImage!.fileKey));
 
   // 3 · في السلة صورة الأزرق لا الغلاف
   await page.getByRole('button', { name: 'أضف إلى السلة' }).click();

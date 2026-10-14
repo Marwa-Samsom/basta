@@ -284,6 +284,23 @@ export function imageIndexFor(images: readonly GalleryImage[], variantId: string
 }
 
 /**
+ * الصورة بعد تغيير الاختيار: صورة المتغيّر إن وُجدت. وإلا فالصورة العامة التي يتصفّحها
+ * المشتري تبقى، أما صورة مربوطة بلون آخر فتعود إلى أول صورة عامة — لا أحمر بصورة زرقاء.
+ */
+export function nextImageIndex(
+  images: readonly GalleryImage[],
+  current: number,
+  variantId: string,
+  valueIds: readonly string[],
+): number {
+  const own = imageIndexFor(images, variantId, valueIds);
+  if (own >= 0) return own;
+  const shown = images[current];
+  if (!shown?.variantId && !shown?.optionValueId) return current;
+  return Math.max(0, images.findIndex((img) => !img.variantId && !img.optionValueId));
+}
+
+/**
  * معرض صور المنتج — ST-07: مصغّرات في عمود وصورة كبيرة 4:5.
  *
  * يُصيَّر في الخادم بالغلاف محدّداً، فالصورة الكبيرة (LCP) في مصدر HTML
@@ -308,11 +325,10 @@ export function ProductGallery({
   const shared = useContext(SelectionContext);
   const [seen, setSeen] = useState(shared?.selected ?? '');
   // ضبط الحالة حين يتغيّر الاختيار (أثناء التصيير لا في أثر): اختيار لون له صورة يقفز إليها،
-  // ولون بلا صورة يُبقي ما يتصفّحه المشتري
+  // ولون بلا صورة يُبقي الصورة العامة التي يتصفّحها المشتري ويترك صورة لون آخر
   if (shared && shared.selected !== seen) {
     setSeen(shared.selected);
-    const i = imageIndexFor(images, shared.selected, variantValues[shared.selected] ?? []);
-    if (i >= 0) setIndex(i);
+    setIndex(nextImageIndex(images, index, shared.selected, variantValues[shared.selected] ?? []));
   }
   const shown = images[index] ?? images[0];
 
