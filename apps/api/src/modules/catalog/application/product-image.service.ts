@@ -132,9 +132,61 @@ export class ProductImageService {
     return imageIds.map((id, sort) => this.view({ ...byId.get(id)!, sort }));
   }
 
+  /**
+   * مع أي خيار تظهر الصورة: لقيمة (اللون الأحمر — مع كل متغيّر يحملها، أحمر بأي مقاس)،
+   * أو لمتغيّر واحد بعينه، أو للجميع (كلاهما فارغ). الصفحة تقفز إليها حين يختار المشتري
+   * ذلك الخيار، والسلة والطلب يعرضانها لما اختاره.
+   *
+   * لا يعيد المنشور للمراجعة ولا يغيّر نسخة محتواه (Q-16): الصور نفسها معتمدة، ولم يتغيّر
+   * إلا أيّها يظهر مع أي لون — كما لا يعيده ترتيبٌ لا يمسّ الرئيسية.
+   */
+  async link(
+    scope: VendorScope,
+    productId: string,
+    imageId: string,
+    target: { variantId: string | null; optionValueId: string | null },
+  ): Promise<ProductImageView> {
+    if (target.variantId && target.optionValueId) {
+      throw new InvalidInputError('الصورة لخيار واحد: قيمة (مثل الأحمر) أو متغيّر بعينه، لا الاثنان.');
+    }
+    const product = await new ScopedRepository(this.prisma.product as never, scope, 'المنتج').findFirst({
+      where: { id: productId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundError('المنتج غير موجود.', { productId });
+    const image = await this.prisma.productImage.findFirst({ where: { id: imageId, productId } });
+    if (!image) throw new NotFoundError('الصورة غير موجودة.', { imageId });
+
+    if (target.variantId) {
+      const variant = await this.prisma.productVariant.findFirst({
+        where: { id: target.variantId, productId, archivedAt: null },
+        select: { id: true },
+      });
+      if (!variant) throw new NotFoundError('المتغيّر غير موجود في هذا المنتج.', { variantId: target.variantId });
+    }
+    // القيمة يحملها متغيّر حيّ من هذا المنتج — لا لون من منتج آخر ولا من خيار حُذف
+    if (target.optionValueId) {
+      const used = await this.prisma.variantOptionValue.count({
+        where: { attributeValueId: target.optionValueId, variant: { productId, archivedAt: null } },
+      });
+      if (used === 0) {
+        throw new InvalidInputError('هذه القيمة ليست بين خيارات المنتج — احفظ الخيارات أولاً ثم اربط الصورة.', {
+          optionValueId: target.optionValueId,
+        });
+      }
+    }
+
+    const updated = await this.prisma.productImage.update({
+      where: { id: imageId },
+      data: { variantId: target.variantId, optionValueId: target.optionValueId },
+    });
+    return this.view(updated);
+  }
+
   private view(image: {
     id: string;
     variantId: string | null;
+    optionValueId: string | null;
     altAr: string | null;
     altEn: string | null;
     width: number | null;
@@ -145,6 +197,7 @@ export class ProductImageService {
     return {
       id: image.id,
       variantId: image.variantId,
+      optionValueId: image.optionValueId,
       altAr: image.altAr,
       altEn: image.altEn,
       width: image.width,

@@ -41,6 +41,7 @@ import {
   ListProductsQueryDto,
   MoveCategoryDto,
   RejectProductDto,
+  LinkImageDto,
   ReorderImagesDto,
   ApproveProductDto,
   AttributeValueCreateDto,
@@ -317,6 +318,20 @@ export class VendorCatalogController {
   @ApiOperation({ summary: 'ترتيب صور المنتج — كلها بالترتيب الجديد، والأولى هي الرئيسية' })
   reorderImages(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string, @Body() dto: ReorderImagesDto) {
     return this.images.reorder(scopeOf(actor), id, dto.imageIds);
+  }
+
+  @Put('products/:id/images/:imageId/link')
+  @ApiOperation({ summary: 'مع أي خيار تظهر الصورة — قيمة (الأحمر) أو متغيّر أو الجميع. لا يعيد المنشور للمراجعة' })
+  linkImage(
+    @CurrentActor() actor: Actor,
+    @Param('id', uuidParam) id: string,
+    @Param('imageId', uuidParam) imageId: string,
+    @Body() dto: LinkImageDto,
+  ) {
+    return this.images.link(scopeOf(actor), id, imageId, {
+      variantId: dto.variantId ?? null,
+      optionValueId: dto.optionValueId ?? null,
+    });
   }
 
   @Delete('products/:id/images/:imageId')

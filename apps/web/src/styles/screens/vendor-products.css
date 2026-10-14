@@ -369,6 +369,28 @@ a.vp-prod__name:hover { color: var(--brand-text); }
 .vp-image__btn:disabled,
 .vp-image__remove:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* «تظهر مع» — اللون الذي تُظهره الصورة؛ صفّ تحت أزرارها */
+.vp-image__link {
+  display: grid;
+  gap: 2px;
+  padding: 0 6px 6px;
+  cursor: default;
+}
+.vp-image__link-label { font-size: var(--text-2xs); color: var(--text-muted); }
+.vp-image__select {
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: 28px;
+  padding-inline: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-body);
+  font: inherit;
+  font-size: var(--text-xs);
+}
+.vp-image__select:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .vp-images__add {
   inline-size: 100%;
   aspect-ratio: 1;

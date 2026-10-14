@@ -8,7 +8,7 @@ import { RecordView } from '@/components/recent';
 import { Crumbs } from '@/components/listing';
 import { ProductGrid } from '@/components/product-card';
 import { getProduct, getShop, imageUrl, num } from '@/lib/storefront';
-import { ProductGallery, VariantPicker, type GalleryImage } from '@/components/variant-picker';
+import { ProductGallery, ProductSelection, VariantPicker, type GalleryImage } from '@/components/variant-picker';
 import { WishHeart } from '@/components/wish-heart';
 import { JsonLd, SITE_URL, breadcrumbJsonLd, productJsonLd } from '@/lib/seo';
 
@@ -57,7 +57,11 @@ export default async function ProductPage({ params }: Params) {
     avif: imageUrl(img.urls['avif'] ?? null),
     medium: imageUrl(img.urls['medium'] ?? null),
     mediumAvif: imageUrl(img.urls['mediumAvif'] ?? null),
+    variantId: img.variantId,
+    optionValueId: img.optionValueId,
   }));
+  // قيم كل متغيّر — المعرض يقفز إلى صورة اللون المختار إن ربطها البائع به
+  const variantValues = Object.fromEntries(product.variants.map((v) => [v.id, v.options.map((o) => o.valueId)]));
 
   // ST-24 و ST-10: ما يُحفظ في الجهاز — المعرّف والاسم والصورة، لا السعر
   const thumb = product.images[0]?.urls['thumb'] ?? null;
@@ -83,8 +87,10 @@ export default async function ProductPage({ params }: Params) {
         ]}
       />
 
+      {/* الاختيار والمعرض يتشاركان المتغيّر المختار — بينهما محتوى خادم يبقى خادماً */}
+      <ProductSelection initial={product.variants[0]?.id ?? ''}>
       <div className="sd-pdp__layout">
-        <ProductGallery images={images} name={product.nameAr} soldOut={product.isSoldOut} />
+        <ProductGallery images={images} name={product.nameAr} soldOut={product.isSoldOut} variantValues={variantValues} />
 
         <div className="sd-pdp__info">
           <div className="sd-pdp__titles">
@@ -162,6 +168,7 @@ export default async function ProductPage({ params }: Params) {
           />
         </div>
       </div>
+      </ProductSelection>
 
       {product.descriptionAr ? (
         <section className="sd-pdp__block" aria-labelledby="sd-desc">

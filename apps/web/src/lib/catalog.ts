@@ -50,6 +50,8 @@ export interface ProductAttribute {
 export interface ProductImage {
   id: string;
   variantId: string | null;
+  /** قيمة الخيار التي تظهر معها الصورة (اللون الأحمر) — أو null للجميع */
+  optionValueId: string | null;
   altAr: string | null;
   width: number | null;
   height: number | null;

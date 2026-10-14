@@ -439,7 +439,7 @@ export class StorefrontService implements OnModuleInit {
         },
         category: { select: { id: true, slug: true, nameAr: true, path: true } },
         brand: { select: { id: true, nameAr: true } },
-        images: { orderBy: { sort: 'asc' }, select: { id: true, fileKey: true, altAr: true, variantId: true } },
+        images: { orderBy: { sort: 'asc' }, select: { id: true, fileKey: true, altAr: true, variantId: true, optionValueId: true } },
         attrValues: {
           select: {
             attributeId: true,
@@ -516,6 +516,7 @@ export class StorefrontService implements OnModuleInit {
       images: product.images.map((i) => ({
         id: i.id,
         variantId: i.variantId,
+        optionValueId: i.optionValueId,
         altAr: i.altAr,
         urls: {
           thumb: `/uploads/${i.fileKey}/thumb.webp`,

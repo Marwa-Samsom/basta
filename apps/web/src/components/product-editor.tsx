@@ -415,6 +415,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
             <ProductImages
               productId={product?.id ?? null}
               images={product?.images ?? []}
+              variants={product?.variants ?? []}
               onChanged={refreshProduct}
             />
           </Section>

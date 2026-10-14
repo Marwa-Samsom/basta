@@ -71,7 +71,8 @@ export class PricingService {
             nameAr: true,
             categoryId: true,
             vendorId: true,
-            images: { take: 1, orderBy: { sort: 'asc' }, select: { fileKey: true } },
+            // كل الصور (عشر على الأكثر) لا الأولى: صورة اللون المختار تسبق الرئيسية في السلة والطلب
+            images: { orderBy: { sort: 'asc' }, select: { fileKey: true, variantId: true, optionValueId: true } },
           },
         },
         optionValues: { include: { attributeValue: { select: { valueAr: true } } } },
@@ -116,7 +117,7 @@ export class PricingService {
       nameAr: v.product.nameAr,
       variantLabel: v.optionValues.map((o) => o.attributeValue.valueAr).join(' / ') || null,
       sku: v.sku,
-      imageKey: v.product.images[0]?.fileKey ?? null,
+      imageKey: imageFor(v)?.fileKey ?? null,
       unitPriceMinor: v.priceMinorUnits,
       qty: merged.get(v.id) ?? 0,
       weightGrams: v.weightGrams,
@@ -304,4 +305,22 @@ export class PricingService {
       fundedBy: c.fundedBy as 'platform' | 'vendor',
     };
   }
+}
+
+/**
+ * صورة السطر في السلة والطلب: صورة المتغيّر بعينه، ثم صورة إحدى قيمه (اللون الأحمر)، ثم
+ * الرئيسية. من اشترى الأزرق يرى الأزرق في طلبه لا صورة الغلاف الحمراء.
+ */
+export function imageFor(v: {
+  id: string;
+  optionValues: readonly { attributeValueId: string }[];
+  product: { images: readonly { fileKey: string; variantId: string | null; optionValueId: string | null }[] };
+}): { fileKey: string } | undefined {
+  const values = new Set(v.optionValues.map((o) => o.attributeValueId));
+  const images = v.product.images;
+  return (
+    images.find((i) => i.variantId === v.id) ??
+    images.find((i) => i.optionValueId !== null && values.has(i.optionValueId)) ??
+    images[0]
+  );
 }

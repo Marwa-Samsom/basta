@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { cartApi } from '@/lib/cart';
 import type { ProductPage } from '@/lib/storefront';
@@ -10,6 +10,18 @@ type Variant = ProductPage['variants'][number];
 
 /** «بقي N فقط» تحت هذا العدد — ما فوقه «متوفّر» */
 const LOW_STOCK = 3;
+
+/**
+ * المتغيّر المختار مشتركاً بين الاختيار والمعرض — يفصل بينهما في الصفحة محتوى خادم
+ * (الاسم والبائع)، فالسياق يلفّهما معاً بلا نقل الصفحة كلها إلى العميل.
+ */
+const SelectionContext = createContext<{ selected: string; setSelected: (id: string) => void } | null>(null);
+
+export function ProductSelection({ initial, children }: { initial: string; children: ReactNode }) {
+  const [selected, setSelected] = useState(initial);
+  const value = useMemo(() => ({ selected, setSelected }), [selected]);
+  return <SelectionContext.Provider value={value}>{children}</SelectionContext.Provider>;
+}
 
 /**
  * اختيار المتغيّر — لون ومقاس.
@@ -22,7 +34,11 @@ const LOW_STOCK = 3;
  * — تبقى ظاهرة حين ينفد الخيار أيضاً.
  */
 export function VariantPicker({ variants, actions }: { variants: Variant[]; actions?: ReactNode }) {
-  const [selected, setSelected] = useState<string>(variants[0]?.id ?? '');
+  // داخل ProductSelection يشارك المعرضَ اختيارَه (فيقفز إلى صورة اللون)، وخارجه حالة محلية
+  const shared = useContext(SelectionContext);
+  const [own, setOwn] = useState<string>(variants[0]?.id ?? '');
+  const selected = shared?.selected ?? own;
+  const setSelected = shared?.setSelected ?? setOwn;
 
   const axes = useMemo(() => {
     const map = new Map<string, { nameAr: string; values: Map<string, { valueAr: string; hexColor: string | null }> }>();
@@ -255,6 +271,16 @@ export interface GalleryImage {
   avif: string | null;
   medium: string | null;
   mediumAvif: string | null;
+  /** للمتغيّر بعينه أو لقيمة خيار (اللون الأحمر) — أو للجميع */
+  variantId?: string | null;
+  optionValueId?: string | null;
+}
+
+/** أوّل صورة تخصّ المتغيّر: له بعينه، ثم لإحدى قيمه (الأحمر بأي مقاس) — أو -1 */
+export function imageIndexFor(images: readonly GalleryImage[], variantId: string, valueIds: readonly string[]): number {
+  const exact = images.findIndex((img) => img.variantId === variantId);
+  if (exact >= 0) return exact;
+  return images.findIndex((img) => !!img.optionValueId && valueIds.includes(img.optionValueId));
 }
 
 /**
@@ -262,17 +288,32 @@ export interface GalleryImage {
  *
  * يُصيَّر في الخادم بالغلاف محدّداً، فالصورة الكبيرة (LCP) في مصدر HTML
  * بأولوية جلب عالية؛ المصغّرات وحدها تحتاج السكربت لتبدّل الصورة.
+ *
+ * داخل ProductSelection: حين يختار المشتري لوناً تقفز الصورة الكبيرة إلى صورته إن ربطها
+ * البائع به. الغلاف يبقى أول ما يُرى — القفز عند تغيير الاختيار لا عند التحميل.
  */
 export function ProductGallery({
   images,
   name,
   soldOut,
+  variantValues = {},
 }: {
   images: GalleryImage[];
   name: string;
   soldOut: boolean;
+  /** قيم خيارات كل متغيّر — لمطابقة صورة القيمة بالمتغيّر المختار */
+  variantValues?: Readonly<Record<string, readonly string[]>>;
 }) {
   const [index, setIndex] = useState(0);
+  const shared = useContext(SelectionContext);
+  const [seen, setSeen] = useState(shared?.selected ?? '');
+  // ضبط الحالة حين يتغيّر الاختيار (أثناء التصيير لا في أثر): اختيار لون له صورة يقفز إليها،
+  // ولون بلا صورة يُبقي ما يتصفّحه المشتري
+  if (shared && shared.selected !== seen) {
+    setSeen(shared.selected);
+    const i = imageIndexFor(images, shared.selected, variantValues[shared.selected] ?? []);
+    if (i >= 0) setIndex(i);
+  }
   const shown = images[index] ?? images[0];
 
   return (
