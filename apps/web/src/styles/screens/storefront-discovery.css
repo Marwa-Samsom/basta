@@ -610,7 +610,7 @@
   border-radius: var(--radius-sm);
 }
 
-.sd-pdp__info { display: grid; gap: var(--space-4); min-width: 0; }
+.sd-pdp__info { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); min-width: 0; }
 .sd-pdp__titles { display: grid; gap: 9px; }
 .sd-pdp__name { font-size: var(--text-xl); line-height: 1.4; }
 .sd-pdp__en { font-size: var(--text-sm); color: var(--text-muted); }
@@ -751,7 +751,7 @@
 .sd-stock__dot { inline-size: 9px; block-size: 9px; flex: none; border-radius: var(--radius-full); background: var(--sd-tone); }
 
 /* الإضافة — عدّاد كمية وزرّ 52 */
-.sd-buy { display: grid; gap: 11px; }
+.sd-buy { display: grid; gap: 11px; container-type: inline-size; }
 .sd-buy__row { display: flex; gap: 11px; align-items: stretch; }
 .sd-qty {
   display: flex;
@@ -794,6 +794,16 @@
   --btn-border: var(--border-default);
   --btn-fg: var(--text-faint);
   opacity: 1;
+}
+
+/* الصفّ في سطر واحد يحتاج ~440: عمود المعلومات على الحاسوب 400 (و360 تحت 1100) فكان
+   الصفّ يفيض منه ويزيح الصفحة أفقياً. حيث لا يتّسع: ترتيب الهاتف نفسه (ST-23) —
+   الكمية والقلب والمقارنة سطراً، و«أضف إلى السلة» سطراً كاملاً تحتها.
+   بعد قاعدة ‎.sd-buy__add‎ لا قبلها — وإلا أعاد `flex: 1` الأساس إلى صفر. */
+@container (max-width: 440px) {
+  .sd-buy__row { flex-wrap: wrap; }
+  .sd-buy__add { order: 1; flex-basis: 100%; }
+  .sd-buy__row .wish-heart { margin-inline-start: auto; }
 }
 .sd-buy__hint,
 .sd-buy__done {
