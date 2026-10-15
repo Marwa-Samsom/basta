@@ -31,7 +31,6 @@ const alice = { userId: '', token: '' };
 const bob = { userId: '', token: '' };
 const carol = { userId: '', token: '' };
 let vendorId = '';
-let categoryId = '';
 const productIds: string[] = [];
 
 type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
@@ -63,7 +62,6 @@ async function makeProduct(
   const product = await prisma.product.create({
     data: {
       vendorId,
-      categoryId,
       slug: `wish-${SUFFIX}-${Math.random().toString(36).slice(2, 9)}`,
       nameAr,
       status,
@@ -130,7 +128,6 @@ beforeAll(async () => {
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  categoryId = (await prisma.category.findUniqueOrThrow({ where: { slug: 'men-clothing' } })).id;
   const owner = await prisma.user.create({
     data: {
       email: `owner.${SUFFIX}@basta.test`,
@@ -320,7 +317,6 @@ describe('ST-23 · المفضّلة', () => {
     // الحشو مسوّدات تُدرج مباشرةً: 199 منتجاً بلا متغيّرات لا تظهر في أي مكان
     const filler = Array.from({ length: MAX_WISHLIST - 1 }, (_, i) => ({
       vendorId,
-      categoryId,
       slug: `wish-fill-${SUFFIX}-${i}`,
       nameAr: `حشو ${i}`,
       status: 'draft' as const,

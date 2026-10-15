@@ -120,11 +120,3 @@ export function assertVariantMatrix(variants: readonly VariantDraft[]): string[]
 
   return keys;
 }
-
-/** السمات الإلزامية للفئة التي لم تُملأ — تمنع النشر لا الحفظ كمسودة (SRS V-02). */
-export function missingRequiredAttributes(
-  required: readonly { readonly attributeId: string; readonly nameAr: string }[],
-  provided: ReadonlySet<string>,
-): string[] {
-  return required.filter((r) => !provided.has(r.attributeId)).map((r) => r.nameAr);
-}

@@ -88,7 +88,6 @@ beforeAll(async () => {
   token = a.token;
   otherToken = (await vendor('b')).token;
 
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'men-clothing' } });
   const color = await prisma.attribute.findUniqueOrThrow({ where: { code: 'color' }, include: { values: true } });
   const size = await prisma.attribute.findUniqueOrThrow({ where: { code: 'size' }, include: { values: true } });
   const valueOf = (attr: typeof color, en: string) => attr.values.find((v) => v.valueEn === en)!.id;
@@ -99,7 +98,6 @@ beforeAll(async () => {
   const product = await prisma.product.create({
     data: {
       vendorId: a.vendorId,
-      categoryId: category.id,
       slug: `p-${SUFFIX}`,
       nameAr: `قميص ${SUFFIX}`,
       status: 'active',
@@ -140,7 +138,7 @@ beforeAll(async () => {
     image[key] = img.id;
   }
   const other = await prisma.product.create({
-    data: { vendorId: vendorIds[1]!, categoryId: category.id, slug: `p-other-${SUFFIX}`, nameAr: 'منتج آخر', status: 'draft' },
+    data: { vendorId: vendorIds[1]!, slug: `p-other-${SUFFIX}`, nameAr: 'منتج آخر', status: 'draft' },
   });
   otherProductId = other.id;
 }, 60_000);
@@ -157,18 +155,15 @@ afterAll(async () => {
 });
 
 describe('ربط صورة المنتج بخيار', () => {
-  it('صورة لقيمة: تظهر مع كل متغيّر يحملها — والربط لا يعيد المنشور للمراجعة', async () => {
+  it('صورة لقيمة: تظهر مع كل متغيّر يحملها — والمنشور يبقى منشوراً', async () => {
     if (!dbUp) return;
-    const before = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
     const red = await link(image.red, { optionValueId: value.red });
     expect(red.statusCode, red.body).toBe(200);
     expect(red.json()).toMatchObject({ id: image.red, optionValueId: value.red, variantId: null });
     expect((await link(image.blue, { optionValueId: value.blue })).statusCode).toBe(200);
 
-    // الصور معتمدة؛ تغيّر أيّها يظهر مع أي لون وحده — لا مراجعة ولا نسخة محتوى جديدة
     const after = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
     expect(after.status).toBe('active');
-    expect(after.contentRevision).toBe(before.contentRevision);
 
     // المحرّر يقرأ الربط
     const detail = (await call('GET', `/vendor/products/${productId}`, { token })).json();

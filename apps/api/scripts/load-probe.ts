@@ -27,7 +27,6 @@ async function post(path: string, body: unknown, headers: Record<string, string>
 }
 
 async function makeVariant(stock: number): Promise<string> {
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   const user = await prisma.user.create({ data: { email: `${TAG}.${stock}@basta.test`, fullName: 'بائع الحِمل', passwordHash: 'x', roles: { create: { role: 'vendor_owner' } } } });
   const vendor = await prisma.vendor.create({
     data: {
@@ -35,7 +34,7 @@ async function makeVariant(stock: number): Promise<string> {
       shippingZones: { create: { nameAr: 'السعودية', regions: { create: { country: 'SA' } }, rates: { create: { method: 'flat', priceMinorUnits: 1_000n } } } },
     },
   });
-  const product = await prisma.product.create({ data: { vendorId: vendor.id, categoryId: category.id, slug: `${TAG}-p-${stock}`, nameAr: 'منتج العرض المحدود', status: 'active', publishedAt: new Date() } });
+  const product = await prisma.product.create({ data: { vendorId: vendor.id, slug: `${TAG}-p-${stock}`, nameAr: 'منتج العرض المحدود', status: 'active', publishedAt: new Date() } });
   const variant = await prisma.productVariant.create({ data: { productId: product.id, vendorId: vendor.id, sku: `${TAG}-${stock}`.toUpperCase(), priceMinorUnits: 9_900n, optionsKey: '', isActive: true } });
   await prisma.inventory.create({ data: { variantId: variant.id, onHand: stock, reserved: 0 } });
   await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: stock, reason: 'import' } });

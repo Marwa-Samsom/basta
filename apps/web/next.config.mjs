@@ -30,6 +30,15 @@ const nextConfig = {
   // الذي لا يصلح مساراً للنظام — Next 15 تساهل معه، و Turbopack في 16 يرفضه
   outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
   images: { formats: ['image/avif', 'image/webp'] },
+  // سقطت الأقسام العامة (14 أكتوبر 2026): الفئات صارت لكل متجر. روابطها المحفوظة
+  // والمفهرسة تذهب إلى دليل المتاجر لا إلى 404
+  async redirects() {
+    return [
+      { source: '/categories', destination: '/shops', permanent: true },
+      { source: '/c/:slug*', destination: '/shops', permanent: true },
+      { source: '/admin/categories', destination: '/admin/attributes', permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

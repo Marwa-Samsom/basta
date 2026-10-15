@@ -13,7 +13,8 @@ interface Item {
   status: string;
   rejectReason: string | null;
   vendor: { id: string; nameAr: string; status: string };
-  categoryNameAr: string;
+  /** فئة المنتج في متجره — null إن لم يضعه البائع في فئة */
+  vendorCategoryNameAr: string | null;
   variantCount: number;
   priceFrom: { minorUnits: string; currency: string } | null;
   thumbnail: string | null;
@@ -21,21 +22,20 @@ interface Item {
 }
 
 /**
- * AD-07 — مراجعة المنتجات (Q-15): كل منتج ينتظر الاعتماد قبل ظهوره، ومنه
- * المنشور المعدَّل محتواه (Q-16). الأقدم أولاً.
+ * AD-07 — المنتجات. لا مراجعة قبل النشر (قرار صاحب المشروع 15 أكتوبر 2026): البائع
+ * ينشر فيظهر منتجه، والإدارة تتابع المنشور وتوقف المخالف بسبب يصل البائع. الأحدث أولاً.
  */
 export default function AdminProductsPage() {
-  const [status, setStatus] = useState('pending_review');
+  const [status, setStatus] = useState('active');
   const [search, setSearch] = useState('');
   const q = new URLSearchParams({ status, pageSize: '100', ...(search.trim() ? { search: search.trim() } : {}) });
   const { data, error, forbidden, reload } = useAdminData<{ items: Item[]; total: number }>(`/admin/products?${q}`);
-  const queue = status === 'pending_review';
 
   return (
     <div className="ao-page">
-      <AdminHeader title="مراجعة المنتجات" count={data ? `${data.total} منتج` : undefined} hint="الاعتماد ينشر فوراً، والرفض يصل البائع بسببه حرفياً." />
+      <AdminHeader title="المنتجات" count={data ? `${data.total} منتج` : undefined} hint="البائع ينشر بلا مراجعة. افتح أي منتج لتوقفه إن خالف — السبب يصل البائع حرفياً." />
       <div className="toolbar">
-        <Tabs value={status} onChange={setStatus} label="حالة المنتج" options={['pending_review', 'active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: PRODUCT_STATUS[k]! }))} />
+        <Tabs value={status} onChange={setStatus} label="حالة المنتج" options={['active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: PRODUCT_STATUS[k]! }))} />
         <div className="toolbar__end">
           <span className="input-icon ao-search">
             <Icon name="search" size={15} />
@@ -49,10 +49,6 @@ export default function AdminProductsPage() {
         search.trim() ? (
           <Empty icon="search" title="لا منتجات بهذا البحث" actions={<button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>أزل التصفية</button>}>
             جرّب اسماً آخر أو امسح البحث.
-          </Empty>
-        ) : queue ? (
-          <Empty icon="check-circle" tone="success" title="انتهى الطابور">
-            لا منتجات تنتظر المراجعة الآن. ستظهر المنتجات الجديدة والمعدّلة بعد النشر هنا مباشرة.
           </Empty>
         ) : (
           <Empty icon="package" title="لا منتجات بهذه الحالة" />
@@ -71,7 +67,8 @@ export default function AdminProductsPage() {
                   <span className="ao-pitem__text">
                     <span className="ao-pitem__name">{p.nameAr}</span>
                     <span className="ao-pitem__sub">
-                      {p.vendor.nameAr} · {p.categoryNameAr}
+                      {p.vendor.nameAr}
+                      {p.vendorCategoryNameAr ? ` · ${p.vendorCategoryNameAr}` : ''}
                     </span>
                     <span className="ao-pitem__tags">
                       <span className={`badge ${TONE[p.status] ?? ''}`}>{PRODUCT_STATUS[p.status] ?? p.status}</span>

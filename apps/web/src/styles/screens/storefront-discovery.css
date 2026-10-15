@@ -217,60 +217,42 @@
 }
 .sd-shopcard__chev { color: var(--text-muted); }
 
-/* ------------------------------------------------------------ ST-02 الأقسام */
+/* ------------------------------------------------------------ دليل المتاجر */
+/* حلّ محلّ شجرة الأقسام حين صارت الفئات لكل متجر (14 أكتوبر 2026) */
 
 .sd-cats { display: grid; gap: var(--space-4); max-inline-size: 1100px; }
-.sd-tree {
-  background: var(--surface-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+.sd-shopdir__search { display: flex; gap: var(--space-2); max-inline-size: 30rem; }
+.sd-shopdir__search .field__control { flex: 1; min-width: 0; }
+.sd-shopcard__body { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.sd-shopcard__meta,
+.sd-shopcard__cats {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.sd-tree__row {
-  --sd-indent: 0px;
-  display: flex;
+.sd-shopcard__meta svg { color: var(--warning); vertical-align: -1px; }
+.sd-shops--dir { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sd-pager { display: flex; align-items: center; justify-content: center; gap: var(--space-3); }
+
+/* فئات المتجر في صفحته — أزرار تصفية تلتفّ، والمختار بلون العلامة */
+.sd-shopcats { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.sd-shopcat {
+  display: inline-flex;
   align-items: center;
-  gap: 11px;
-  min-height: 48px;
-  padding-inline: calc(var(--space-4) + var(--sd-indent)) var(--space-4);
-  border-block-end: 1px solid var(--border-subtle);
+  gap: 6px;
+  min-height: 36px;
+  padding-inline: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
   background: var(--surface-card);
   color: var(--text-strong);
   font-size: var(--text-sm);
-  text-decoration: none;
-  cursor: pointer;
-  list-style: none;
 }
-.sd-tree__row::-webkit-details-marker { display: none; }
-.sd-tree__row:hover { background: var(--surface-sunken); color: var(--text-strong); }
-.sd-tree__row[data-depth='0'] { min-height: 60px; font-size: var(--text-base); font-weight: var(--weight-bold); }
-.sd-tree__row[data-depth='1'] { --sd-indent: 28px; }
-.sd-tree__row[data-depth='2'] { --sd-indent: 56px; }
-.sd-tree__row[data-depth='3'] { --sd-indent: 84px; }
-.sd-tree__row[data-depth='4'] { --sd-indent: 112px; }
-.sd-tree__group[open] > summary.sd-tree__row { background: var(--brand-subtle); }
-.sd-tree__icon {
-  inline-size: 36px;
-  block-size: 36px;
-  flex: none;
-  border-radius: var(--radius-sm);
-  background: var(--brand-subtle);
-  color: var(--brand-text);
-  display: grid;
-  place-items: center;
-}
-.sd-tree__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sd-tree__all .sd-tree__name { color: var(--brand-text); font-weight: var(--weight-semi); }
-.sd-tree__chev {
-  color: var(--text-muted);
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-.sd-tree__group[open] > summary .sd-tree__chev { transform: rotate(180deg); }
-.sd-tree__go { color: var(--brand); }
-.sd-tree > :last-child > .sd-tree__row:last-child,
-.sd-tree > .sd-tree__row:last-child { border-block-end: 0; }
-
+.sd-shopcat:hover { border-color: var(--brand); }
+.sd-shopcat[aria-current] { border-color: var(--brand); background: var(--brand-subtle); color: var(--brand-text); font-weight: var(--weight-semi); }
+.sd-shopcat .num { font-size: var(--text-2xs); color: var(--text-muted); }
 /* ------------------------------------------------------------ ST-03 / ST-04 القائمة */
 
 .sd-list { display: grid; gap: 14px; min-width: 0; }

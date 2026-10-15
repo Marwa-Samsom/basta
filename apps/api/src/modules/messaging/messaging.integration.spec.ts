@@ -98,7 +98,6 @@ beforeAll(async () => {
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
-  const home = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   for (const tag of ['x', 'y']) {
     const email = `shop${tag}.${SUFFIX}@basta.test`;
     const u = await prisma.user.create({
@@ -113,7 +112,7 @@ beforeAll(async () => {
       },
     });
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: home.id, slug: `msg-${tag}-${SUFFIX}`, nameAr: `عباءة ${tag}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `msg-${tag}-${SUFFIX}`, nameAr: `عباءة ${tag}`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `MSG-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },
@@ -123,7 +122,7 @@ beforeAll(async () => {
     shops.push({ ownerId: u.id, token: await login(email), vendorId: vendor.id, productId: product.id, variantId: variant.id, nameAr });
   }
   const draft = await prisma.product.create({
-    data: { vendorId: shops[0]!.vendorId, categoryId: home.id, slug: `msg-draft-${SUFFIX}`, nameAr: 'مسودّة', status: 'draft' },
+    data: { vendorId: shops[0]!.vendorId, slug: `msg-draft-${SUFFIX}`, nameAr: 'مسودّة', status: 'draft' },
   });
   draftProductId = draft.id;
 

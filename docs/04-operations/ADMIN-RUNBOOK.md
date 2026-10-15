@@ -48,9 +48,8 @@ DATABASE_URL="<عنوان قاعدة الإنتاج>" npm run admin:transfer-own
 |---|---|---|---|
 | مراجعة بائع، قبول/رفض وثائقه، اعتماده أو رفضه بسبب | `/admin/vendors` ← الملف | `vendors.review` | `vendors.integration.spec.ts` |
 | تعليق متجر وإعادته | `/admin/vendors/[id]` | `vendors.review` | `vendors.integration.spec.ts` |
-| اعتماد منتج أو رفضه بسبب، وإيقاف منشور | `/admin/products` | `catalog.manage` | `catalog.integration.spec.ts` |
-| الفئات: إضافة، تسمية، نقل فرع، إخفاء | `/admin/categories` | `catalog.manage` | `catalog.integration.spec.ts` |
-| السمات: إنشاء، قيم جديدة، ربط بفئة | `/admin/categories` ← السمات | `catalog.manage` | `catalog.integration.spec.ts` |
+| متابعة المنشور وإيقاف المخالف بسبب يصل البائع — لا مراجعة قبل النشر (ADR-016) | `/admin/products` | `catalog.manage` | `catalog.integration.spec.ts` |
+| السمات: إنشاء، قيم جديدة — مكتبة يستعملها كل بائع (الفئات لكل متجر يديرها البائع، ADR-015) | `/admin/attributes` | `catalog.manage` | `catalog.integration.spec.ts` |
 | البحث عن طلب بالرقم أو العميل أو المتجر | `/admin/orders` | `orders.manage` | `admin.integration.spec.ts` |
 | إلغاء متجر من طلب قبل الشحن مع ردّ المبلغ | `/admin/orders` ← التفاصيل | `orders.cancel` | `orders.integration.spec.ts` |
 | استلام مرتجع بدل متجر متعثّر | `/admin/returns` | `orders.manage` | `admin.integration.spec.ts` |
@@ -58,7 +57,7 @@ DATABASE_URL="<عنوان قاعدة الإنتاج>" npm run admin:transfer-own
 | نزاع مصعَّد: مراسلة الطرفين وحسمه بقرار مكتوب | `/admin/disputes` | `disputes.resolve` | `orders.integration.spec.ts` |
 | طلبات السحب: موافقة، تسجيل تحويل بمرجع، رفض بسبب | `/admin/payouts` | `payouts.approve` | `finance.integration.spec.ts` |
 | تحويلات المشترين: تأكيد الوارد بمرجعه ومبلغه، وتسجيل ردّ المبلغ بمرجع التحويل الصادر | `/admin/transfers` | `payouts.approve` | `manual-transfer.integration.spec.ts`، `e2e/manual-transfer.spec.ts` |
-| تغيير نسبة عمولة (بائع/فئة/عامة) من الآن | `/admin/commissions` | `commissions.edit` | `finance.integration.spec.ts` |
+| تغيير نسبة عمولة (لمتجر أو عامة) من الآن، أو إعادة متجر إلى العامة | `/admin/commissions` | `commissions.edit` | `finance.integration.spec.ts` |
 | إضافة سعر صرف | `/admin/currencies` | `settings.edit` | `admin.integration.spec.ts` |
 | الإعدادات (التعليق، الإرجاع، الهامش…) والضرائب لكل بلد | `/admin/settings` | `settings.edit` | `admin.integration.spec.ts` |
 | كوبون: إنشاء، إيقاف | `/admin/coupons` | `coupons.manage` | `admin.integration.spec.ts` |

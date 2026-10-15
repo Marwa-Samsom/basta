@@ -7,7 +7,7 @@ import { ProductGrid } from '@/components/product-card';
 import { RecentSection } from '@/components/recent';
 import { EmptyState } from '@/components/ui';
 import { internalPath } from '@/lib/safe-path';
-import { getBanners, getCampaigns, getCategories, getFeatured, imageUrl, listProducts, type Campaign, type ProductCard } from '@/lib/storefront';
+import { getBanners, getCampaigns, getFeatured, getShops, imageUrl, listProducts, type Campaign } from '@/lib/storefront';
 
 /**
  * يُصيَّر عند الطلب لا وقت البناء: البناء لا يعتمد على خادم API حيّ (المرحلة 12).
@@ -15,17 +15,11 @@ import { getBanners, getCampaigns, getCategories, getFeatured, imageUrl, listPro
  */
 export const dynamic = 'force-dynamic';
 
-/** مربّعات الأقسام في الشريط — ستة كما في التصميم، والبقية في «كل الأقسام» */
-const CATEGORY_TILES = 6;
-/** بطاقات المتاجر أسفل الرئيسية */
-const SHOP_CARDS = 4;
-
-/** متاجر مميّزة بلا تكرار من المنتجات المعروضة فعلاً — لا قائمة مصطنعة */
-function shopsOf(products: ProductCard[]): ProductCard['vendor'][] {
-  const seen = new Map<string, ProductCard['vendor']>();
-  for (const p of products) if (!seen.has(p.vendor.id)) seen.set(p.vendor.id, p.vendor);
-  return [...seen.values()].slice(0, SHOP_CARDS);
-}
+/**
+ * مربّعات المتاجر في الشريط — ستة كما كانت مربّعات الأقسام، والبقية في «كل المتاجر».
+ * سقطت الأقسام العامة حين صارت الفئات لكل متجر (14 أكتوبر 2026).
+ */
+const SHOP_TILES = 6;
 
 const endDate = (iso: string) => new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long' }).format(new Date(iso));
 
@@ -61,11 +55,11 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
 
 /**
  * ST-01 — الرئيسية. البانرات والمميّز من لوحة الإدارة (AD-19)؛ ما لم تُضف
- * الإدارة شيئاً يبقى ما هو حقيقي: الفئات وأحدث المنشور — لا صور مصطنعة.
+ * الإدارة شيئاً يبقى ما هو حقيقي: المتاجر وأحدث المنشور — لا صور مصطنعة.
  */
 export default async function HomePage() {
-  const [categories, latest, banners, featured, campaigns] = await Promise.all([
-    getCategories(),
+  const [shopsPage, latest, banners, featured, campaigns] = await Promise.all([
+    getShops().catch(() => ({ items: [] })),
     listProducts({ sort: 'newest', pageSize: '12' }),
     getBanners('home_hero'),
     getFeatured(),
@@ -77,8 +71,7 @@ export default async function HomePage() {
   // رابط محفوظ قبل تشديد التحقق قد يكون `//موقع-آخر` — يُعاد فحصه عند العرض
   const bannerHref = internalPath(banner?.linkUrl);
   const isEmpty = latest.items.length === 0;
-  const tiles = categories.slice(0, CATEGORY_TILES);
-  const shops = shopsOf([...featured, ...latest.items]);
+  const tiles = shopsPage.items.slice(0, SHOP_TILES);
   const topCampaigns = campaigns.filter((c) => c.placement === 'home_top');
   const middleCampaigns = campaigns.filter((c) => c.placement === 'home_middle');
 
@@ -93,7 +86,7 @@ export default async function HomePage() {
           </h1>
           <p className="sd-hero__body">
             {isEmpty
-              ? 'أول المتاجر تنضم هذه الأيام. تصفّح الأقسام لترى ما وصل، وسجّل متجرك إن كنت تاجراً.'
+              ? 'أول المتاجر تنضم هذه الأيام. تصفّح المتاجر لترى ما وصل، وسجّل متجرك إن كنت تاجراً.'
               : 'اشترِ من بائعين حقيقيين، بعملة بلدك، وتابع كل طلب من متجره.'}
           </p>
           {bannerHref ? (
@@ -102,8 +95,8 @@ export default async function HomePage() {
               <Icon name="next" size={17} mirror />
             </Link>
           ) : (
-            <Link href="/categories" className="btn btn--on-brand btn--lg sd-hero__cta">
-              تصفّح الأقسام
+            <Link href="/shops" className="btn btn--on-brand btn--lg sd-hero__cta">
+              تصفّح المتاجر
               <Icon name="next" size={17} mirror />
             </Link>
           )}
@@ -117,21 +110,21 @@ export default async function HomePage() {
       </section>
 
       {tiles.length > 0 ? (
-        <section className="sd-section" aria-labelledby="sd-cats-title">
+        <section className="sd-section" aria-labelledby="sd-shops-title">
           <div className="sd-section__head">
-            <h2 id="sd-cats-title" className="sd-section__title">
-              تصفّح الأقسام
+            <h2 id="sd-shops-title" className="sd-section__title">
+              تصفّح المتاجر
             </h2>
-            <Link href="/categories" className="sd-section__link">
-              كل الأقسام
+            <Link href="/shops" className="sd-section__link">
+              كل المتاجر
               <Icon name="chev-end" size={14} mirror />
             </Link>
           </div>
           <div className="sd-tiles">
             {tiles.map((c) => (
-              <Link key={c.id} href={`/c/${c.slug}`} className="sd-tile">
+              <Link key={c.id} href={`/s/${encodeURIComponent(c.slug)}`} className="sd-tile">
                 <span className="sd-tile__icon" aria-hidden>
-                  <Icon name="boxes" size={21} />
+                  <Icon name="store" size={21} />
                 </span>
                 <span className="sd-tile__label">{c.nameAr}</span>
               </Link>
@@ -184,27 +177,6 @@ export default async function HomePage() {
           </EmptyState>
         )}
       </section>
-
-      {shops.length > 0 ? (
-        <section className="sd-section" aria-labelledby="sd-shops-title">
-          <div className="sd-section__head">
-            <h2 id="sd-shops-title" className="sd-section__title">
-              متاجر على بسطة
-            </h2>
-          </div>
-          <div className="sd-shops">
-            {shops.map((s) => (
-              <Link key={s.id} href={`/s/${s.slug}`} className="sd-shopcard">
-                <span className="sd-shopcard__logo" aria-hidden>
-                  <Icon name="store" size={22} />
-                </span>
-                <span className="sd-shopcard__name">{s.nameAr}</span>
-                <Icon name="chev-end" size={16} mirror className="sd-shopcard__chev" />
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       <CompareBar />
       {/* SH-08 — لا يُرسم إلا حين يعرض المتصفّح التثبيت */}

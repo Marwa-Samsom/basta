@@ -20,6 +20,19 @@ export interface StorefrontProductCard {
   readonly isSoldOut: boolean;
 }
 
+/** بطاقة متجر في دليل المتاجر */
+export interface StorefrontShopCard {
+  readonly id: string;
+  readonly slug: string;
+  readonly nameAr: string;
+  readonly descriptionAr: string | null;
+  readonly ratingAvg: number;
+  readonly ratingCount: number;
+  readonly productCount: number;
+  /** أوائل فئات المتجر بترتيبه — لمحة عمّا يبيع */
+  readonly categories: readonly string[];
+}
+
 export interface FacetBucket {
   readonly id: string;
   readonly label: string;
@@ -168,11 +181,8 @@ export class StorefrontService implements OnModuleInit {
   private async whereOf(input: SearchInput): Promise<Prisma.ProductWhereInput> {
     const and: Prisma.ProductWhereInput[] = [VISIBLE];
 
-    if (input.categoryPath) {
-      const ids = await this.categoryIdsUnder(input.categoryPath);
-      and.push({ categoryId: { in: ids } });
-    }
     if (input.vendorId) and.push({ vendorId: input.vendorId });
+    if (input.storeCategoryId) and.push({ vendorCategoryId: input.storeCategoryId });
     if (input.brandId) and.push({ brandId: input.brandId });
 
     const term = input.q?.trim();
@@ -205,11 +215,6 @@ export class StorefrontService implements OnModuleInit {
   }
 
   /**
-   * رابط الفئة إلى مسارها الداخلي. المسار المادّي تفصيل تخزين ("/3/17/")،
-   * والرابط العام يحمل اسماً مقروءاً — فالترجمة هنا لا في المتصفّح.
-   * فئة غير موجودة أو موقوفة تُرجع `null` فتصير النتيجة فارغة لا خطأ.
-   */
-  /**
    * المنتجات المميّزة بترتيب الإدارة (AD-19). قاعدة الرؤية نفسها: منتج صار
    * مخفياً بعد تمييزه يسقط من القسم بصمت ولا يظهر مكسوراً.
    */
@@ -232,32 +237,70 @@ export class StorefrontService implements OnModuleInit {
 
   /**
    * خريطة الموقع — المرحلة 12. ما يُفهرس هو ما يراه الزائر: قاعدة الرؤية
-   * نفسها للمنتجات، والمتاجر المعتمدة، والفئات الفعّالة، والصفحات المنشورة.
+   * نفسها للمنتجات، والمتاجر المعتمدة، والصفحات المنشورة.
    */
   async sitemap() {
-    const [products, shops, categories, pages] = await Promise.all([
+    const [products, shops, pages] = await Promise.all([
       this.prisma.product.findMany({ where: VISIBLE, select: { slug: true, updatedAt: true }, orderBy: { updatedAt: 'desc' }, take: 45_000 }),
       this.prisma.vendor.findMany({ where: { status: 'approved' }, select: { slug: true, updatedAt: true }, take: 5_000 }),
-      this.prisma.category.findMany({ where: { isActive: true }, select: { slug: true } }),
       this.prisma.cmsPage.findMany({ where: { isPublished: true }, select: { slug: true, updatedAt: true } }),
     ]);
-    return { products, shops, categories, pages };
+    return { products, shops, pages };
   }
 
-  async categoryPathOf(slug: string): Promise<string | null> {
-    const row = await this.prisma.category.findFirst({
-      where: { slug, isActive: true },
-      select: { path: true },
-    });
-    return row?.path ?? null;
-  }
-
-  private async categoryIdsUnder(path: string): Promise<string[]> {
-    const rows = await this.prisma.category.findMany({
-      where: { path: { startsWith: path }, isActive: true },
-      select: { id: true },
-    });
-    return rows.map((r) => r.id);
+  /**
+   * دليل المتاجر — حلّ محلّ «كل الأقسام» حين صارت الفئات لكل متجر (14 أكتوبر 2026).
+   * المعتمد الذي له منتج معروض وحده: متجر فارغ صفحة بلا شيء.
+   */
+  async shops(input: { q?: string | undefined; page?: number | undefined }): Promise<Page<StorefrontShopCard>> {
+    const page = Math.max(1, input.page ?? 1);
+    const pageSize = 24;
+    const term = input.q?.trim();
+    const where: Prisma.VendorWhereInput = {
+      status: 'approved',
+      products: { some: VISIBLE },
+      ...(term ? { nameAr: { contains: term, mode: 'insensitive' } } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.vendor.findMany({
+        where,
+        orderBy: [{ ratingCount: 'desc' }, { createdAt: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          slug: true,
+          nameAr: true,
+          descriptionAr: true,
+          ratingAvg: true,
+          ratingCount: true,
+          _count: { select: { products: { where: VISIBLE } } },
+          // الفئة الفارغة لا تقول شيئاً عمّا يبيع المتجر
+          categories: {
+            where: { products: { some: VISIBLE } },
+            orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
+            take: 4,
+            select: { nameAr: true },
+          },
+        },
+      }),
+      this.prisma.vendor.count({ where }),
+    ]);
+    return {
+      page,
+      pageSize,
+      total,
+      items: rows.map((v) => ({
+        id: v.id,
+        slug: v.slug,
+        nameAr: v.nameAr,
+        descriptionAr: v.descriptionAr,
+        ratingAvg: Number(v.ratingAvg),
+        ratingCount: v.ratingCount,
+        productCount: v._count.products,
+        categories: v.categories.map((c) => c.nameAr),
+      })),
+    };
   }
 
   private async cards(rows: readonly CardRow[]): Promise<StorefrontProductCard[]> {
@@ -437,7 +480,7 @@ export class StorefrontService implements OnModuleInit {
             ratingCount: true,
           },
         },
-        category: { select: { id: true, slug: true, nameAr: true, path: true } },
+        vendorCategory: { select: { id: true, nameAr: true } },
         brand: { select: { id: true, nameAr: true } },
         images: { orderBy: { sort: 'asc' }, select: { id: true, fileKey: true, altAr: true, variantId: true, optionValueId: true } },
         attrValues: {
@@ -502,7 +545,8 @@ export class StorefrontService implements OnModuleInit {
       nameEn: product.nameEn,
       descriptionAr: product.descriptionAr,
       currency,
-      category: product.category,
+      /** فئة المنتج في متجره — مسار التنقّل: المتجر ← فئته ← المنتج */
+      storeCategory: product.vendorCategory,
       brand: product.brand,
       vendor: {
         id: product.vendor.id,
@@ -542,8 +586,11 @@ export class StorefrontService implements OnModuleInit {
     };
   }
 
-  /** صفحة البائع — ST-11، والمعلَّق يردّ ST-12 لا 404. */
-  async shopBySlug(slug: string) {
+  /**
+   * صفحة البائع — ST-11، والمعلَّق يردّ ST-12 لا 404. فئات المتجر أزرار تصفية
+   * فوق منتجاته: الفئة التي لا منتج معروضاً فيها لا تظهر للمشتري.
+   */
+  async shopBySlug(slug: string, opts: { category?: string | undefined; page?: number | undefined } = {}) {
     const vendor = await this.prisma.vendor.findFirst({
       where: { slug },
       select: {
@@ -566,9 +613,21 @@ export class StorefrontService implements OnModuleInit {
 
     // المعلَّق يُعرَض بحالته وبلا منتجات: إخفاؤه كلياً يكسر روابط محفوظة ومفهرسة
     const suspended = vendor.status !== 'approved';
-    const products = suspended
-      ? { items: [], page: 1, pageSize: 24, total: 0, engine: 'db' as const, tookMs: 0 }
-      : await this.list({ vendorId: vendor.id, pageSize: 24 });
+    const [products, categories] = suspended
+      ? [{ items: [], page: 1, pageSize: 24, total: 0, engine: 'db' as const, tookMs: 0 }, []]
+      : await Promise.all([
+          this.list({
+            vendorId: vendor.id,
+            ...(opts.category ? { storeCategoryId: opts.category } : {}),
+            page: opts.page ?? 1,
+            pageSize: 24,
+          }),
+          this.prisma.vendorCategory.findMany({
+            where: { vendorId: vendor.id },
+            orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
+            select: { id: true, nameAr: true, _count: { select: { products: { where: VISIBLE } } } },
+          }),
+        ]);
 
     return {
       vendor: {
@@ -584,7 +643,12 @@ export class StorefrontService implements OnModuleInit {
         since: vendor.createdAt,
         isSuspended: suspended,
       },
+      categories: categories
+        .filter((c) => c._count.products > 0)
+        .map((c) => ({ id: c.id, nameAr: c.nameAr, count: c._count.products })),
       products: products.items,
+      page: products.page,
+      pageSize: products.pageSize,
       total: products.total,
     };
   }
@@ -599,7 +663,7 @@ export class StorefrontService implements OnModuleInit {
       include: {
         vendor: { select: { id: true, slug: true, nameAr: true, settlementCurrency: true } },
         brand: { select: { id: true, nameAr: true } },
-        category: { select: { id: true, nameAr: true, path: true } },
+        vendorCategory: { select: { id: true, nameAr: true } },
         attrValues: { select: { attributeValueId: true, attributeValue: { select: { valueAr: true } } } },
         variants: {
           where: { archivedAt: null, isActive: true },
@@ -617,8 +681,6 @@ export class StorefrontService implements OnModuleInit {
     );
 
     return rows.map((r) => {
-      const segments = r.category.path.split('/').filter(Boolean);
-      const ancestors = segments.map((_, i) => `/${segments.slice(0, i + 1).join('/')}/`);
       return {
         id: r.id,
         slug: r.slug,
@@ -630,9 +692,8 @@ export class StorefrontService implements OnModuleInit {
         vendorId: r.vendor.id,
         vendorNameAr: r.vendor.nameAr,
         vendorSlug: r.vendor.slug,
-        categoryId: r.category.id,
-        categoryAncestors: ancestors,
-        categoryNameAr: r.category.nameAr,
+        storeCategoryId: r.vendorCategory?.id ?? null,
+        storeCategoryNameAr: r.vendorCategory?.nameAr ?? null,
         attributeValueIds: r.attrValues.flatMap((a) => (a.attributeValueId ? [a.attributeValueId] : [])),
         attributeValuesAr: r.attrValues.flatMap((a) =>
           a.attributeValue ? [a.attributeValue.valueAr] : [],

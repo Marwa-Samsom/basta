@@ -156,7 +156,7 @@ export const EVENTS: readonly EventDef[] = [
   },
   {
     code: 'product_rejected',
-    labelAr: 'رفض منتج',
+    labelAr: 'إيقاف منتج',
     audience: 'vendor',
     variables: ['store_name', 'product_name', 'reason', 'link'],
     sample: { store_name: 'متجر الورد', product_name: 'فستان كتان', reason: 'الصورة الأولى لا تُظهر المنتج', link: '/vendor/products' },
@@ -265,7 +265,7 @@ export const EVENTS: readonly EventDef[] = [
  */
 export const PREF_CATEGORIES = [
   { key: 'orders', labelAr: 'طلب جديد', noteAr: 'عند كل طلب فرعي جديد', codes: ['vendor_new_order'] },
-  { key: 'products', labelAr: 'قرار مراجعة منتج', noteAr: 'رفض منتج مع السبب', codes: ['product_rejected'] },
+  { key: 'products', labelAr: 'إيقاف منتج', noteAr: 'حين توقف الإدارة منتجاً منشوراً، مع السبب', codes: ['product_rejected'] },
   { key: 'stock', labelAr: 'مخزون منخفض', noteAr: 'عند بلوغ حدّ التنبيه', codes: ['low_stock'] },
   { key: 'returns', labelAr: 'مرتجع أو نزاع', noteAr: 'طلب إرجاع جديد أو رسالة في نزاع', codes: ['return_requested', 'dispute_message'] },
   { key: 'payouts', labelAr: 'حالة التحويلات', noteAr: 'التحويل والرفض', codes: ['payout_paid', 'payout_rejected'] },
@@ -395,10 +395,12 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'طلب انضمامكم يحتاج تعديلاً'),
   t('vendor_rejected', 'in_app', 'طلب انضمامكم يحتاج تعديلاً: {{reason}}.'),
 
+  // لا مراجعة قبل النشر (15 أكتوبر 2026): الإدارة توقف المنشور المخالف. المهاجرة
+  // 20261015120000 تستبدل النصّ القديم في القاعدة إن لم تحرّره الإدارة
   t('product_rejected', 'email',
-    'فريق {{store_name}}،\n\nلم ننشر المنتج «{{product_name}}». السبب: {{reason}}.\n\nعدّلوه وأعيدوا إرساله للمراجعة: {{link}}\n\nبسطة',
-    'المنتج «{{product_name}}» يحتاج تعديلاً'),
-  t('product_rejected', 'in_app', 'لم يُنشر «{{product_name}}»: {{reason}}.'),
+    'فريق {{store_name}}،\n\nأوقفنا عرض المنتج «{{product_name}}» في المتجر. السبب: {{reason}}.\n\nعدّلوه ثم انشروه من جديد: {{link}}\n\nبسطة',
+    'أوقفنا عرض «{{product_name}}»'),
+  t('product_rejected', 'in_app', 'أُوقف عرض «{{product_name}}»: {{reason}}.'),
 
   t('low_stock', 'email',
     'فريق {{store_name}}،\n\nقارب مخزون هذه المنتجات على النفاد: {{items}}.\n\nزيدوا الكمية قبل أن تنفد فيتوقّف بيعها: {{link}}\n\nبسطة',

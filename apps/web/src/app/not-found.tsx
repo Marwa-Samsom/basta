@@ -4,7 +4,7 @@ import { SearchBox } from '@/components/search-box';
 
 /**
  * SH-05 — الصفحة غير موجودة. تقول ماذا تفعل الآن، لا «404» وحدها:
- * بحث في مكانه، والأقسام، والرئيسية.
+ * بحث في مكانه، والمتاجر، والرئيسية.
  */
 export default function NotFound() {
   return (
@@ -14,15 +14,15 @@ export default function NotFound() {
       </span>
       <h1 className="sd-404__title">لم نجد هذه الصفحة</h1>
       <p className="sd-404__body">
-        قد يكون الرابط قديماً، أو نُقل المنتج أو أوقف البائع عرضه. ابحث عمّا تريد أو ابدأ من الأقسام.
+        قد يكون الرابط قديماً، أو نُقل المنتج أو أوقف البائع عرضه. ابحث عمّا تريد أو ابدأ من المتاجر.
       </p>
       <div className="sd-404__search">
         <SearchBox />
       </div>
       <div className="sd-404__actions">
-        <Link className="btn btn--primary btn--lg" href="/categories">
-          <Icon name="boxes" size={17} />
-          تصفّح الأقسام
+        <Link className="btn btn--primary btn--lg" href="/shops">
+          <Icon name="store" size={17} />
+          تصفّح المتاجر
         </Link>
         <Link className="btn btn--secondary btn--lg" href="/">
           <Icon name="back" size={17} mirror />

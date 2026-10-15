@@ -59,7 +59,6 @@ export function toSnapshot(cart: PricedCart): Snapshot {
         variantId: l.variantId,
         productId: l.productId,
         vendorId: l.vendorId,
-        categoryId: l.categoryId,
         nameAr: l.nameAr,
         variantLabel: l.variantLabel,
         sku: l.sku,

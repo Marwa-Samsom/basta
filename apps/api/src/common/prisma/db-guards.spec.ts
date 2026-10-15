@@ -240,17 +240,26 @@ describe('التدقيق الليلي · views موجودة وتعمل', () => {
   });
 });
 
-describe('Q-01 · قواعد العمولة المبذورة', () => {
-  dbIt('قاعدة عامة واحدة بـ 10% وست قواعد فئوية', async () => {
+describe('العمولة — نسبة عامة أو لمتجر (قرار 14 أكتوبر 2026)', () => {
+  dbIt('قاعدة عامة واحدة سارية بـ 10%، ولا قاعدة فئة سارية', async () => {
     const global = await prisma.commissionRule.findFirst({
       where: { scope: 'global', effectiveTo: null },
     });
     expect(global?.rateBps).toBe(1000);
 
     const perCategory = await prisma.commissionRule.count({
-      where: { scope: 'category', effectiveTo: null },
+      where: { scope: { notIn: ['global', 'vendor'] }, effectiveTo: null },
     });
-    expect(perCategory).toBeGreaterThanOrEqual(6);
+    expect(perCategory).toBe(0);
+  });
+
+  dbIt('ترفض قاعدة فئة سارية — المستوى أُلغي، والمنتهية تبقى سجلاً', async () => {
+    await expect(
+      prisma.$executeRawUnsafe(
+        `INSERT INTO "commission_rules" ("id","scope","rateBps","effectiveFrom","createdAt")
+         VALUES (gen_random_uuid(), 'category', 500, now(), now())`,
+      ),
+    ).rejects.toThrow();
   });
 
   dbIt('يرفض نسبة عمولة خارج المدى', async () => {

@@ -31,7 +31,6 @@ const line = (vendorId: string, price: bigint, qty: number, bps = 1000): PricedL
   variantId: `v-${vendorId}-${price}`,
   productId: `p-${vendorId}`,
   vendorId,
-  categoryId: 'c',
   nameAr: 'منتج',
   variantLabel: null,
   sku: 'SKU',

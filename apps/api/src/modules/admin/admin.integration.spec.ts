@@ -125,7 +125,6 @@ beforeAll(async () => {
   admin = await makeAdmin('root', PERMISSION_CODES);
   limited = await makeAdmin('content', ['content.manage']);
 
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   const vEmail = `vendor.${SUFFIX}@basta.test`;
   const vu = await prisma.user.create({
     data: { email: vEmail, fullName: 'بائع الإدارة', passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'vendor_owner' } } },
@@ -138,7 +137,7 @@ beforeAll(async () => {
     },
   });
   const p = await prisma.product.create({
-    data: { vendorId: v.id, categoryId: category.id, slug: `p-${SUFFIX}`, nameAr: `منتج ${SUFFIX}`, status: 'active', publishedAt: new Date() },
+    data: { vendorId: v.id, slug: `p-${SUFFIX}`, nameAr: `منتج ${SUFFIX}`, status: 'active', publishedAt: new Date() },
   });
   const variant = await prisma.productVariant.create({
     data: { productId: p.id, vendorId: v.id, sku: `SKU-${SUFFIX}`.toUpperCase(), priceMinorUnits: 15_000n, optionsKey: '', isActive: true },
@@ -523,7 +522,7 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
       expect(bad.statusCode, `${JSON.stringify(linkUrl)} ${bad.body}`).toBe(400);
     }
     expect(await prisma.banner.count({ where: { titleAr: `خبيث ${SUFFIX}` } })).toBe(0);
-    const banner = await call('POST', '/admin/banners', limited.token, { placement: 'home_hero', imageKey: img.json().imageKey, linkUrl: '/categories', titleAr: `تخفيضات ${SUFFIX}`, isActive: true });
+    const banner = await call('POST', '/admin/banners', limited.token, { placement: 'home_hero', imageKey: img.json().imageKey, linkUrl: '/shops', titleAr: `تخفيضات ${SUFFIX}`, isActive: true });
     expect(banner.statusCode, banner.body).toBe(201);
     const live = (await call('GET', '/storefront/banners?placement=home_hero')).json();
     const b = live.find((x: { titleAr: string }) => x.titleAr === `تخفيضات ${SUFFIX}`);
@@ -579,7 +578,7 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     if (!dbUp) return;
     const d = await call('GET', '/admin/dashboard', admin.token);
     expect(d.statusCode).toBe(200);
-    expect(d.json().queues).toMatchObject({ vendors: expect.any(Number), products: expect.any(Number), payouts: expect.any(Number), disputes: expect.any(Number) });
+    expect(d.json().queues).toMatchObject({ vendors: expect.any(Number), payouts: expect.any(Number), disputes: expect.any(Number) });
     expect(d.json().alerts).toEqual([]);
   });
 });

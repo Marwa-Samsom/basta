@@ -66,7 +66,8 @@ export interface ProductPage {
   nameEn: string | null;
   descriptionAr: string | null;
   currency: string;
-  category: { id: string; slug: string; nameAr: string };
+  /** فئة المنتج في متجره — null إن لم يضعه البائع في فئة */
+  storeCategory: { id: string; nameAr: string } | null;
   brand: { id: string; nameAr: string } | null;
   vendor: {
     id: string;
@@ -121,17 +122,24 @@ export interface ShopPage {
     since: string;
     isSuspended: boolean;
   };
+  /** فئات المتجر التي فيها معروض — أزرار التصفية بترتيب البائع */
+  categories: { id: string; nameAr: string; count: number }[];
   products: ProductCard[];
+  page: number;
+  pageSize: number;
   total: number;
 }
 
-export interface Category {
+/** بطاقة متجر في دليل المتاجر */
+export interface ShopCard {
   id: string;
-  parentId: string | null;
   slug: string;
   nameAr: string;
-  depth: number;
-  children?: Category[];
+  descriptionAr: string | null;
+  ratingAvg: number;
+  ratingCount: number;
+  productCount: number;
+  categories: string[];
 }
 
 /**
@@ -164,10 +172,27 @@ const slugPath = (slug: string): string => encodeURIComponent(decodeParam(slug))
 export const getProduct = (slug: string): Promise<ProductPage> =>
   get(`/storefront/products/${slugPath(slug)}`);
 
-export const getShop = (slug: string): Promise<ShopPage> =>
-  get(`/storefront/shops/${slugPath(slug)}`);
+export function getShop(slug: string, opts: { category?: string | undefined; page?: number | undefined } = {}): Promise<ShopPage> {
+  const query = new URLSearchParams();
+  if (opts.category) query.set('category', opts.category);
+  if (opts.page && opts.page > 1) query.set('page', String(opts.page));
+  const qs = query.toString();
+  return get(`/storefront/shops/${slugPath(slug)}${qs ? `?${qs}` : ''}`);
+}
 
-export const getCategories = (): Promise<Category[]> => get('/storefront/categories', 300);
+/** دليل المتاجر — حلّ محلّ «كل الأقسام» حين صارت الفئات لكل متجر (14 أكتوبر 2026) */
+export function getShops(opts: { q?: string | undefined; page?: number | undefined } = {}): Promise<{
+  items: ShopCard[];
+  page: number;
+  pageSize: number;
+  total: number;
+}> {
+  const query = new URLSearchParams();
+  if (opts.q?.trim()) query.set('q', opts.q.trim());
+  if (opts.page && opts.page > 1) query.set('page', String(opts.page));
+  const qs = query.toString();
+  return get(`/storefront/shops${qs ? `?${qs}` : ''}`, opts.q ? 0 : 120);
+}
 
 export interface Banner {
   id: string;
@@ -209,19 +234,6 @@ export function listProducts(params: Record<string, string | undefined>): Promis
   for (const [k, v] of Object.entries(params)) if (v) query.set(k, v);
   // البحث لا يُخزَّن: كل كلمة استعلام جديد، والتخزين يملأ الذاكرة بلا فائدة
   return get(`/storefront/products?${query.toString()}`, params['q'] ? 0 : 60);
-}
-
-/** شجرة إلى قائمة مسطّحة — للعثور على فئة بالرابط */
-export function flatten(tree: Category[]): Category[] {
-  const out: Category[] = [];
-  const walk = (nodes: Category[]): void => {
-    for (const n of nodes) {
-      out.push(n);
-      if (n.children?.length) walk(n.children);
-    }
-  };
-  walk(tree);
-  return out;
 }
 
 export const num = (value: number): string =>

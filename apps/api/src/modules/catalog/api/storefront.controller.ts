@@ -3,8 +3,6 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { Public } from '../../../common/security/decorators';
-import { SearchService } from '../../search/public';
-import { CategoryService } from '../application/category.service';
 import { StorefrontService } from '../application/storefront.service';
 
 export class StorefrontQueryDto {
@@ -13,15 +11,14 @@ export class StorefrontQueryDto {
   @MaxLength(120)
   q?: string;
 
-  /** رابط الفئة (slug) — يشمل كل الفروع تحته */
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  category?: string;
-
   @IsOptional()
   @IsUUID()
   vendorId?: string;
+
+  /** فئة من فئات المتجر — مع vendorId */
+  @IsOptional()
+  @IsUUID('4', { message: 'الفئة غير صالحة.' })
+  storeCategory?: string;
 
   @IsOptional()
   @IsUUID()
@@ -68,6 +65,32 @@ export class StorefrontQueryDto {
   pageSize?: number;
 }
 
+export class ShopQueryDto {
+  /** فئة من فئات المتجر — أزرار التصفية في صفحته */
+  @IsOptional()
+  @IsUUID('4', { message: 'الفئة غير صالحة.' })
+  category?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+}
+
+export class ShopsQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+}
+
 /**
  * المتجر — مسارات عامة بلا مصادقة (المرحلة 07).
  *
@@ -77,24 +100,16 @@ export class StorefrontQueryDto {
 @ApiTags('storefront')
 @Controller()
 export class StorefrontController {
-  constructor(
-    private readonly storefront: StorefrontService,
-    private readonly categories: CategoryService,
-    private readonly search: SearchService,
-  ) {}
+  constructor(private readonly storefront: StorefrontService) {}
 
   @Public()
   @Get('storefront/products')
   @ApiOperation({ summary: 'تصفّح وبحث بأوجه تصفية — ST-03 و ST-04' })
   async list(@Query() query: StorefrontQueryDto) {
-    // فئة مجهولة تُترجم إلى مسار لا يطابق شيئاً: نتيجة فارغة لا 400
-    const categoryPath = query.category
-      ? ((await this.storefront.categoryPathOf(query.category)) ?? '/__none__/')
-      : undefined;
     return this.storefront.list({
       ...(query.q ? { q: query.q } : {}),
-      ...(categoryPath ? { categoryPath } : {}),
       ...(query.vendorId ? { vendorId: query.vendorId } : {}),
+      ...(query.storeCategory ? { storeCategoryId: query.storeCategory } : {}),
       ...(query.brandId ? { brandId: query.brandId } : {}),
       ...(query.attrs ? { attributeValueIds: query.attrs.split(',').filter(Boolean) } : {}),
       ...(query.minPrice !== undefined ? { minPriceMinor: query.minPrice } : {}),
@@ -121,10 +136,17 @@ export class StorefrontController {
   }
 
   @Public()
+  @Get('storefront/shops')
+  @ApiOperation({ summary: 'دليل المتاجر المعتمدة التي لها منتج معروض' })
+  shops(@Query() query: ShopsQueryDto) {
+    return this.storefront.shops({ q: query.q, page: query.page });
+  }
+
+  @Public()
   @Get('storefront/shops/:slug')
-  @ApiOperation({ summary: 'صفحة البائع — ST-11، والمعلَّق يُعرض بحالته لا 404' })
-  shop(@Param('slug') slug: string) {
-    return this.storefront.shopBySlug(slug);
+  @ApiOperation({ summary: 'صفحة البائع بفئاته — ST-11، والمعلَّق يُعرض بحالته لا 404' })
+  shop(@Param('slug') slug: string, @Query() query: ShopQueryDto) {
+    return this.storefront.shopBySlug(slug, { category: query.category, page: query.page });
   }
 
   @Public()
@@ -139,12 +161,5 @@ export class StorefrontController {
   @ApiOperation({ summary: 'المنتجات المميّزة في الرئيسية بترتيب الإدارة — AD-19' })
   featured() {
     return this.storefront.featured();
-  }
-
-  @Public()
-  @Get('storefront/categories')
-  @ApiOperation({ summary: 'شجرة الفئات — ST-02' })
-  tree() {
-    return this.categories.tree();
   }
 }

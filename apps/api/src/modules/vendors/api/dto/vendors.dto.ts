@@ -5,7 +5,6 @@ import {
   IsIn,
   IsOptional,
   IsString,
-  IsUUID,
   Length,
   Matches,
   MaxLength,
@@ -41,11 +40,6 @@ export class ApplyVendorDto {
   @IsIn(['individual', 'company'], { message: 'نوع النشاط: فرد أو شركة.' })
   businessType?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  mainCategoryId?: string;
-
   @ApiPropertyOptional({ enum: SETTLEMENT_CURRENCIES, description: 'اختيار صريح — بدونه تُقترح عملة البلد ويُطلب اختيارها قبل الإرسال' })
   @IsOptional()
   @IsIn(SETTLEMENT_CURRENCIES as unknown as string[], { message: 'العملة غير مدعومة للتسوية.' })
@@ -80,11 +74,6 @@ export class UpdateShopDto {
   @IsOptional()
   @IsIn(['individual', 'company'])
   businessType?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  mainCategoryId?: string;
 }
 
 export class UpdateStoreProfileDto {

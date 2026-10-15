@@ -5,30 +5,32 @@ import { SearchModule } from '../search/public';
 import { VendorsModule } from '../vendors/public';
 import {
   AdminCatalogController,
-  CategoriesController,
+  AttributesController,
   VendorCatalogController,
 } from './api/catalog.controllers';
 import { StorefrontController } from './api/storefront.controller';
-import { CategoryService } from './application/category.service';
+import { AttributeService } from './application/attribute.service';
 import { LowStockNotifier } from './application/low-stock-notifier';
 import { ProductImageService } from './application/product-image.service';
 import { ProductImportService } from './application/product-import.service';
 import { ProductService } from './application/product.service';
 import { StorefrontService } from './application/storefront.service';
+import { VendorCategoryService } from './application/vendor-category.service';
 import { LocalImageStorage } from './infrastructure/product-images';
 import { ProductImageGate } from './infrastructure/product-image-gate';
 
 @Module({
   imports: [InventoryModule, VendorsModule, SearchModule, NotificationsModule],
   controllers: [
-    CategoriesController,
+    AttributesController,
     AdminCatalogController,
     VendorCatalogController,
     StorefrontController,
   ],
   providers: [
     ProductImageGate,
-    CategoryService,
+    AttributeService,
+    VendorCategoryService,
     ProductService,
     ProductImageService,
     ProductImportService,
@@ -36,6 +38,6 @@ import { ProductImageGate } from './infrastructure/product-image-gate';
     LocalImageStorage,
     LowStockNotifier,
   ],
-  exports: [CategoryService, ProductService, StorefrontService, ProductImageGate],
+  exports: [AttributeService, ProductService, StorefrontService, ProductImageGate],
 })
 export class CatalogModule {}

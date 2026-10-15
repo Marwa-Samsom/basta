@@ -1,15 +1,23 @@
 import { expect, test } from '@playwright/test';
-import { PASSWORD, makeAdmin, makeVendor, prisma, tag } from './fixtures';
+import { API, PASSWORD, makeAdmin, makeVendor, prisma, tag } from './fixtures';
 
 /**
- * المدير يعتمد ما قرأه: البائع عدّل المنتج بعد أن فتحه المراجِع، فالاعتماد
- * يُردّ وتُعرض النسخة الحالية — ولا يُنشر إلا بعد أن يعتمدها هي.
+ * لا مراجعة قبل النشر (قرار صاحب المشروع 15 أكتوبر 2026): المنتج المنشور يظهر فوراً،
+ * وللإدارة بعده قرار واحد — إيقاف المخالف بسبب يصل البائع حرفياً، فيختفي من المتجر
+ * حتى يعدّله البائع وينشره من جديد.
  */
-test('تعديل البائع أثناء المراجعة: الاعتماد يُردّ، والنسخة الجديدة تُعرض ثم تُعتمد', async ({ page }) => {
+test('الإدارة توقف منشوراً مخالفاً بسبب: يختفي من المتجر، والسبب محفوظ للبائع', async ({ page }) => {
   const t = tag();
   const v = await makeVendor(t);
   const admin = await makeAdmin(t, ['catalog.manage']);
-  const product = await prisma.product.update({ where: { slug: v.productSlug }, data: { status: 'pending_review', publishedAt: null } });
+  const product = await prisma.product.findUniqueOrThrow({ where: { slug: v.productSlug } });
+  const reason = `الصور لا تطابق المنتج ${t}`;
+  // من الـ API لا من صفحة المنتج: الصفحة تُخزَّن دقيقة (ISR)، والقاعدة تقول الحال الآن
+  const shown = async () => (await fetch(`${API}/storefront/products/${encodeURIComponent(v.productSlug)}`)).status;
+
+  // منشور ويظهر للمشترين بلا اعتماد أحد
+  expect(product.status).toBe('active');
+  expect(await shown()).toBe(200);
 
   await page.goto(`/login?next=${encodeURIComponent(`/admin/products/${product.id}`)}`);
   await page.getByLabel('البريد الإلكتروني').fill(admin.email);
@@ -18,15 +26,15 @@ test('تعديل البائع أثناء المراجعة: الاعتماد يُ
   await page.getByLabel('رمز التحقق الثنائي').fill(admin.totp());
   await page.getByRole('button', { name: 'دخول' }).click();
   await expect(page.getByRole('heading', { level: 1, name: v.productName })).toBeVisible();
+  await expect(page.getByRole('button', { name: /اعتمد/ })).toHaveCount(0);
 
-  // البائع يغيّر الاسم والمدير ما زال على النسخة التي فتحها
-  await prisma.product.update({ where: { id: product.id }, data: { nameAr: `اسم لم يقرأه أحد ${t}`, contentRevision: { increment: 1 } } });
-  await page.getByRole('button', { name: 'اعتمد وانشر' }).click();
-  await expect(page.getByText('عدّل البائع المنتج منذ فتحته')).toBeVisible();
-  await expect(page.getByRole('heading', { level: 1, name: `اسم لم يقرأه أحد ${t}` })).toBeVisible();
-  expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('pending_review');
+  await page.getByRole('button', { name: 'أوقف المنتج بسبب' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('السبب').fill(reason);
+  await dialog.getByRole('button', { name: 'أوقف المنتج بسبب' }).click();
+  await expect(page.getByText('أُوقف المنتج وأُبلغ البائع بالسبب.')).toBeVisible();
 
-  // قرأ الجديد — يعتمده
-  await page.getByRole('button', { name: 'اعتمد وانشر' }).click();
-  await expect.poll(async () => (await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('active');
+  const stopped = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+  expect(stopped).toMatchObject({ status: 'rejected', rejectReason: reason });
+  expect(await shown()).toBe(404);
 });

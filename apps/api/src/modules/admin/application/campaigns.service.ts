@@ -52,12 +52,6 @@ function couponLiveNow(c: { isActive: boolean; startsAt: Date | null; endsAt: Da
   );
 }
 
-/** مسار الفئة العليا من المسار المادّي: "/a/b/c/" ← "/a/" (المقطع ليس معرّفاً دائماً — جذور البذرة أرقام) */
-const topCategoryPath = (path: string): string | null => {
-  const first = path.split('/').find(Boolean);
-  return first ? `/${first}/` : null;
-};
-
 /**
  * AD-17 — الحملات: مدة وموضع ومنتجات مرتّبة يدوياً وكوبون يُعلَن معها.
  *
@@ -81,23 +75,11 @@ export class CampaignsService {
       orderBy: [{ startsAt: 'desc' }],
       include: {
         coupon: { select: { code: true } },
-        items: { select: { product: { select: { vendorId: true, category: { select: { path: true } } } } } },
+        items: { select: { product: { select: { vendorId: true } } } },
       },
     });
 
-    // الفئة العليا المشتركة: معرّفها من المسار، واسمها باستعلام واحد للكل
-    const shared = new Map<string, string | null>();
-    for (const r of rows) {
-      const tops = new Set(r.items.map((i) => topCategoryPath(i.product.category.path)));
-      shared.set(r.id, tops.size === 1 ? [...tops][0]! : null);
-    }
-    const topPaths = [...new Set([...shared.values()].filter((v): v is string => !!v))];
-    const names = new Map(
-      (topPaths.length ? await this.prisma.category.findMany({ where: { path: { in: topPaths } }, select: { path: true, nameAr: true } }) : []).map((c) => [c.path, c.nameAr]),
-    );
-
     return rows.map((r) => {
-      const top = shared.get(r.id);
       return {
         id: r.id,
         nameAr: r.nameAr,
@@ -111,7 +93,6 @@ export class CampaignsService {
         couponCode: r.coupon?.code ?? null,
         scope: {
           shops: new Set(r.items.map((i) => i.product.vendorId)).size,
-          categoryNameAr: top ? (names.get(top) ?? null) : null,
         },
       };
     });

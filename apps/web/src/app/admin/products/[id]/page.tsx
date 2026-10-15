@@ -1,11 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { use, useEffect } from 'react';
+import { use } from 'react';
 import { Feedback, Loading, ReasonButton } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { media, PRODUCT_STATUS, TONE, useAction, useAdminData } from '@/lib/admin';
 import { money } from '@/lib/orders';
 
@@ -14,10 +13,8 @@ interface Detail {
   nameAr: string;
   status: string;
   rejectReason: string | null;
-  /** النسخة المعروضة — يُعتمد بها، فلا يُنشر ما عدّله البائع بعد فتحها */
-  contentRevision: number;
   descriptionAr: string | null;
-  category: { nameAr: string };
+  vendorCategory: { nameAr: string } | null;
   currency: string;
   attributes: { attributeId: string; nameAr: string; valueAr: string | null; number: string | null; boolean: boolean | null }[];
   variants: { id: string; sku: string; options: { nameAr: string; valueAr: string }[]; price: { minorUnits: string; currency: string }; isActive: boolean; stock: { available: number } }[];
@@ -27,44 +24,14 @@ interface Detail {
 const PRESETS = ['الصورة الأولى لا تُظهر المنتج', 'الوصف لا يطابق الصور', 'منتج ممنوع البيع على المنصة', 'السعر غير منطقي أو مضلِّل'];
 
 /**
- * AD-07 — المنتج كما سيراه المشتري، ثم قرار واحد: اعتماد (ينشر فوراً) أو
- * رفض بسبب يصل البائع حرفياً. «التالي» يفتح أقدم منتج في الطابور.
- * اختصارات: A اعتماد · N التالي.
+ * AD-07 — المنتج كما يراه المشتري. لا مراجعة قبل النشر (قرار صاحب المشروع 15 أكتوبر
+ * 2026): البائع ينشر فيظهر فوراً، وللإدارة قرار واحد بعده — إيقاف المنشور المخالف
+ * بسبب يصل البائع حرفياً، فيعدّله وينشره من جديد.
  */
 export default function AdminProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router = useRouter();
   const { data: p, error, forbidden, reload } = useAdminData<Detail>(`/admin/products/${id}`);
   const act = useAction();
-
-  const next = async () => {
-    const q = await api<{ items: { id: string }[] }>('/admin/products?status=pending_review&pageSize=2');
-    const n = q.items.find((x) => x.id !== id);
-    router.push(n ? `/admin/products/${n.id}` : '/admin/products');
-  };
-
-  const approve = () =>
-    act.run(async () => {
-      if (!p) return;
-      try {
-        await api(`/admin/products/${id}/approve`, { method: 'POST', body: { contentRevision: p.contentRevision } });
-      } catch (e) {
-        // البائع عدّل بعد الفتح: تُعرض النسخة الحالية ليقرأها قبل أن يعتمد، والرسالة تقول لماذا
-        if (e instanceof ApiError && e.details?.['reason'] === 'CONTENT_CHANGED') reload();
-        throw e;
-      }
-      await next();
-    }, 'نُشر المنتج.');
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest('input, textarea, dialog')) return;
-      if (e.key.toLowerCase() === 'a' && p?.status === 'pending_review') void approve();
-      if (e.key.toLowerCase() === 'n') void next();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
 
   if (!p) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
 
@@ -77,7 +44,7 @@ export default function AdminProductPage({ params }: { params: Promise<{ id: str
     <div className="ao-page">
       <Link href="/admin/products" className="ao-back">
         <Icon name="back" size={14} mirror />
-        الطابور
+        المنتجات
       </Link>
 
       <Feedback error={act.error} notice={act.notice} />
@@ -89,7 +56,7 @@ export default function AdminProductPage({ params }: { params: Promise<{ id: str
             <span className={`badge ${TONE[p.status] ?? ''}`}>{PRODUCT_STATUS[p.status] ?? p.status}</span>
           </div>
           <div className="ao-review__meta">
-            <span>{p.category.nameAr}</span>
+            {p.vendorCategory ? <span>{p.vendorCategory.nameAr}</span> : null}
             <span>
               <span className="num">{p.variants.length}</span> متغيّراً
             </span>
@@ -105,7 +72,7 @@ export default function AdminProductPage({ params }: { params: Promise<{ id: str
         {p.rejectReason ? (
           <div className="ao-note" data-tone="danger">
             <Icon name="alert" size={16} />
-            <span>سبب الرفض: «{p.rejectReason}»</span>
+            <span>سبب الإيقاف: «{p.rejectReason}»</span>
           </div>
         ) : null}
 
@@ -146,34 +113,24 @@ export default function AdminProductPage({ params }: { params: Promise<{ id: str
         </div>
 
         <footer className="ao-review__foot">
-          {p.status === 'pending_review' ? (
-            <button type="button" className="btn btn--primary" disabled={act.busy} aria-keyshortcuts="A" onClick={() => void approve()}>
-              <Icon name="check" size={16} />
-              اعتمد وانشر
-              <kbd className="ao-kbd">A</kbd>
-            </button>
-          ) : null}
-          {p.status === 'pending_review' || p.status === 'active' ? (
+          {p.status === 'active' ? (
             <ReasonButton
-              label={p.status === 'active' ? 'إيقاف المنشور بسبب' : 'ارفض بسبب'}
+              label="أوقف المنتج بسبب"
               presets={PRESETS}
               disabled={act.busy}
               onSubmit={(r) =>
                 act.run(async () => {
                   await api(`/admin/products/${id}/reject`, { method: 'POST', body: { reason: r } });
                   reload();
-                }, 'رُفض المنتج وأُبلغ البائع بالسبب.')
+                }, 'أُوقف المنتج وأُبلغ البائع بالسبب.')
               }
             />
           ) : null}
-          <button type="button" className="btn btn--ghost btn--sm" aria-keyshortcuts="N" onClick={() => void next()}>
-            التالي
-            <kbd className="ao-kbd">N</kbd>
-            <Icon name="next" size={14} mirror />
-          </button>
           <span className="ao-review__hint">
             <Icon name="info" size={14} />
-            الرفض يصل البائع بسببه حرفياً.
+            {p.status === 'active'
+              ? 'الإيقاف يخفيه من المتجر فوراً، والسبب يصل البائع حرفياً — يعدّله وينشره من جديد.'
+              : 'غير منشور — لا يظهر للمشترين.'}
           </span>
         </footer>
       </article>

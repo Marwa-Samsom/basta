@@ -159,7 +159,7 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
           actions={
             suggestions.length > 0 ? (
               suggestions.map((c) => (
-                <Link key={c.slug} href={`/c/${c.slug}`} className="btn btn--secondary">
+                <Link key={c.slug} href={`/s/${encodeURIComponent(c.slug)}`} className="btn btn--secondary">
                   {c.nameAr}
                 </Link>
               ))

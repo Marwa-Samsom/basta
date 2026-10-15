@@ -2,19 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, type ProductStatus } from '@prisma/client';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
-  ConflictError,
   DomainError,
   DuplicateError,
   InvalidInputError,
   InvalidStateTransitionError,
   NotFoundError,
 } from '../../../common/errors/domain-error';
-import {
-  MoneyError,
-  money,
-  parse as parseMoney,
-  toDecimalString,
-} from '../../../common/money/money';
+import { MoneyError, parse as parseMoney } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ScopedRepository } from '../../../common/prisma/scoped-repository';
 import { vendorScopeOf, type Actor, type VendorScope } from '../../../common/security/actor';
@@ -27,14 +21,10 @@ import {
 import { VendorDirectory } from '../../vendors/public';
 import { StorefrontService } from './storefront.service';
 import { productSlug } from '../domain/slug';
-import {
-  assertVariantMatrix,
-  missingRequiredAttributes,
-  normalizeSku,
-  type OptionChoice,
-} from '../domain/variant-matrix';
+import { assertVariantMatrix, normalizeSku, type OptionChoice } from '../domain/variant-matrix';
 import { LocalImageStorage } from '../infrastructure/product-images';
-import { CategoryService, isUniqueViolation, type EffectiveAttribute } from './category.service';
+import { AttributeService, isUniqueViolation, type AttributeView } from './attribute.service';
+import { VendorCategoryService } from './vendor-category.service';
 import {
   priceView,
   type AdminProductListItemView,
@@ -69,7 +59,8 @@ export interface AttributeInput {
 }
 
 export interface ProductFieldsInput {
-  readonly categoryId: string;
+  /** فئة من فئات المتجر، أو null بلا فئة */
+  readonly vendorCategoryId?: string | null | undefined;
   readonly brandId?: string | null | undefined;
   readonly nameAr: string;
   readonly nameEn?: string | null | undefined;
@@ -126,7 +117,7 @@ const ATTRIBUTE_SELECT = { id: true, code: true, nameAr: true, nameEn: true } as
 const VALUE_SELECT = { id: true, valueAr: true, valueEn: true, hexColor: true } as const;
 
 const DETAIL_INCLUDE = {
-  category: { select: { id: true, slug: true, nameAr: true, nameEn: true } },
+  vendorCategory: { select: { id: true, nameAr: true } },
   vendor: { select: { settlementCurrency: true } },
   variants: {
     where: { archivedAt: null },
@@ -169,7 +160,8 @@ export class ProductService {
     private readonly inventory: InventoryService,
     private readonly vendors: VendorDirectory,
     private readonly storefront: StorefrontService,
-    private readonly categories: CategoryService,
+    private readonly attributes: AttributeService,
+    private readonly categories: VendorCategoryService,
     private readonly storage: LocalImageStorage,
   ) {}
 
@@ -196,7 +188,14 @@ export class ProductService {
 
   async list(
     scope: VendorScope,
-    query: { status?: ProductStatus | undefined; search?: string | undefined; page?: number | undefined; pageSize?: number | undefined },
+    query: {
+      status?: ProductStatus | undefined;
+      search?: string | undefined;
+      /** فئة من فئات المتجر، أو none لما بلا فئة */
+      category?: string | undefined;
+      page?: number | undefined;
+      pageSize?: number | undefined;
+    },
   ): Promise<Page<ProductListItemView>> {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
@@ -205,6 +204,7 @@ export class ProductService {
     const where: Record<string, unknown> = {
       deletedAt: null,
       ...(query.status ? { status: query.status } : {}),
+      ...(query.category ? { vendorCategoryId: query.category === 'none' ? null : query.category } : {}),
       ...(search
         ? {
             OR: [
@@ -224,12 +224,14 @@ export class ProductService {
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
+          vendorCategory: { select: { id: true, nameAr: true } },
           variants: { where: { archivedAt: null }, select: { id: true, priceMinorUnits: true } },
           images: { take: 1, orderBy: { sort: 'asc' }, select: { fileKey: true } },
         },
       }) as Promise<
         Prisma.ProductGetPayload<{
           include: {
+            vendorCategory: { select: { id: true; nameAr: true } };
             variants: { select: { id: true; priceMinorUnits: true } };
             images: { select: { fileKey: true } };
           };
@@ -262,6 +264,7 @@ export class ProductService {
           nameAr: r.nameAr,
           nameEn: r.nameEn,
           status: r.status,
+          vendorCategory: r.vendorCategory,
           variantCount: r.variants.length,
           priceFrom: first !== undefined ? priceView(first, currency) : null,
           priceTo: last !== undefined ? priceView(last, currency) : null,
@@ -296,8 +299,9 @@ export class ProductService {
 
   async create(scope: VendorScope, actor: Actor, input: CreateProductInput): Promise<ProductDetailView> {
     const vendor = await this.vendors.get(scope.vendorId);
-    const effective = await this.effectiveFor(input.categoryId);
+    const effective = await this.attributes.all();
     await this.assertBrand(input.brandId);
+    if (input.vendorCategoryId) await this.categories.assertOwned(scope, input.vendorCategoryId);
 
     const variants = this.resolveVariants(input.variants, effective, vendor.settlementCurrency);
     for (const v of variants) {
@@ -319,7 +323,7 @@ export class ProductService {
         data: {
           id: productId,
           vendorId: scope.vendorId,
-          categoryId: input.categoryId,
+          vendorCategoryId: input.vendorCategoryId ?? null,
           brandId: input.brandId ?? null,
           slug: productSlug(input.nameEn, randomBytes(4).toString('hex')),
           nameAr: input.nameAr,
@@ -364,9 +368,9 @@ export class ProductService {
     if (!current) throw new NotFoundError('المنتج غير موجود.', { id });
 
     const currency = current.vendor.settlementCurrency;
-    const categoryChanged = input.categoryId !== undefined && input.categoryId !== current.categoryId;
-    const effective = await this.effectiveFor(input.categoryId ?? current.categoryId);
+    const effective = await this.attributes.all();
     if (input.brandId !== undefined) await this.assertBrand(input.brandId);
+    if (input.vendorCategoryId) await this.categories.assertOwned(scope, input.vendorCategoryId);
 
     // ---- المتغيّرات: المجموعة الحيّة النهائية تُفحص كاملةً
     const liveIds = new Set(current.variants.map((v) => v.id));
@@ -399,91 +403,18 @@ export class ProductService {
       };
       finalVariants = resolved;
     } else {
-      // الفئة الجديدة قد لا تعرّف سمات المتغيّرات القائمة — يُعاد فحصها عليها
-      finalVariants = categoryChanged
-        ? this.resolveVariants(current.variants.map((v) => this.asInput(v, currency)), effective, currency)
-        : current.variants.map((v) => this.asResolved(v, currency));
+      finalVariants = current.variants.map((v) => this.asResolved(v, currency));
     }
 
-    // ---- السمات: المُرسلة تستبدل القائمة، والفئة الجديدة تُعيد فحص القائمة
-    const attributes = input.attributes
-      ? this.resolveAttributes(input.attributes, effective)
-      : categoryChanged
-        ? this.resolveAttributes(current.attrValues.map(asAttributeInput), effective)
-        : null;
+    // ---- السمات: المُرسلة تستبدل القائمة
+    const attributes = input.attributes ? this.resolveAttributes(input.attributes, effective) : null;
 
-    // قيد المراجعة كالمنشور: بلا هذا يُفرَّغ المنتج بعد إرساله فتعتمده الإدارة ناقصاً (Q-15)
-    if (current.status === 'active' || current.status === 'pending_review') {
-      const provided = providedAttributeIds(
-        attributes ?? current.attrValues.map((a) => ({ attributeId: a.attributeId })),
-        finalVariants,
-      );
-      const missing = missingRequiredAttributes(
-        effective.filter((a) => a.isRequired).map((a) => ({ attributeId: a.attributeId, nameAr: a.nameAr })),
-        provided,
-      );
-      if (missing.length > 0) {
-        const state = current.status === 'active' ? 'منشور' : 'قيد المراجعة';
-        throw new InvalidInputError(
-          `المنتج ${state}، والتعديل يترك سمات إلزامية فارغة: ${missing.join('، ')}. املأها أو أوقف النشر أولاً.`,
-          { missing },
-        );
-      }
-    }
-
-    /**
-     * Q-16 — محسوم 13 سبتمبر 2026: تعديل **المحتوى** في منتج منشور يعيده للمراجعة،
-     * والسعر والمخزون لا. المحتوى ما يراه المشتري ويمكن أن يخالف: الاسم والوصف والفئة
-     * والعلامة والسمات وتركيبات المتغيّرات — والصور في خدمة الصور.
-     * المقارنة بالقيم لا بوجود الحقل: إرسال الاسم نفسه لا يعيد المراجعة.
-     */
-    const changed = <T>(next: T | undefined, prev: T): boolean => next !== undefined && next !== prev;
-    const attributeSignature = (
-      rows: readonly {
-        attributeId: string;
-        attributeValueId: string | null;
-        valueTextAr: string | null;
-        valueTextEn: string | null;
-        valueNumber: Prisma.Decimal | null;
-        valueBoolean: boolean | null;
-      }[],
-    ): string =>
-      rows
-        .map((r) =>
-          [
-            r.attributeId,
-            r.attributeValueId ?? '',
-            r.valueTextAr ?? '',
-            r.valueTextEn ?? '',
-            r.valueNumber?.toString() ?? '',
-            r.valueBoolean ?? '',
-          ].join('¦'),
-        )
-        .sort()
-        .join('\n');
-    const optionsSignature = (variants: readonly { optionsKey: string }[]): string =>
-      variants
-        .map((v) => v.optionsKey)
-        .sort()
-        .join('\n');
-
-    const contentChanged =
-      changed(input.nameAr, current.nameAr) ||
-      changed(input.nameEn, current.nameEn) ||
-      changed(input.descriptionAr, current.descriptionAr) ||
-      changed(input.descriptionEn, current.descriptionEn) ||
-      categoryChanged ||
-      changed(input.brandId, current.brandId) ||
-      (attributes !== null && attributeSignature(attributes) !== attributeSignature(current.attrValues)) ||
-      (variantPlan !== null && optionsSignature(finalVariants) !== optionsSignature(current.variants));
-    const backToReview = current.status === 'active' && contentChanged;
+    // لا مراجعة (15 أكتوبر 2026، ألغى Q-16): تعديل المنشور يظهر للمشترين فور الحفظ،
+    // ولا يغيّر حالته — الإدارة توقف المخالف بعد النشر لا قبله
 
     await this.write(async (tx) => {
       const fields: Prisma.ProductUncheckedUpdateManyInput = {};
-      if (backToReview) fields.status = 'pending_review';
-      // كل تعديل محتوى نسخة جديدة — وقيد المراجعة خاصة: اعتماد نسخة قديمة يُردّ
-      if (contentChanged) fields.contentRevision = { increment: 1 };
-      if (input.categoryId !== undefined) fields.categoryId = input.categoryId;
+      if (input.vendorCategoryId !== undefined) fields.vendorCategoryId = input.vendorCategoryId;
       if (input.brandId !== undefined) fields.brandId = input.brandId;
       if (input.nameAr !== undefined) fields.nameAr = input.nameAr;
       if (input.nameEn !== undefined) fields.nameEn = input.nameEn;
@@ -565,6 +496,8 @@ export class ProductService {
       }
     });
 
+    // المنشور يبقى منشوراً بتغيير سعره أو فئة متجره — ووثيقة البحث تحملهما
+    this.reindex(id);
     return this.get(scope, id);
   }
 
@@ -648,45 +581,39 @@ export class ProductService {
     })) as ProductDetailRow | null;
     if (!product) throw new NotFoundError('المنتج غير موجود.', { id });
 
-    const [vendor, category, effective] = await Promise.all([
-      this.vendors.get(scope.vendorId),
-      this.prisma.category.findUnique({ where: { id: product.categoryId }, select: { isActive: true } }),
-      this.categories.effectiveAttributes(product.categoryId),
-    ]);
+    const vendor = await this.vendors.get(scope.vendorId);
 
     const reasons: string[] = [];
-    if (vendor.status !== 'approved') {
-      reasons.push('المتجر لم يُعتمد بعد — النشر يُتاح بعد مراجعة الإدارة لوثائقه');
+    // قيد المراجعة ينشر فيُحفظ منشوراً، ويظهر للمشترين فور اعتماد متجره (قاعدة الرؤية
+    // تشترط بائعاً معتمداً). المعلَّق لا ينشر جديداً: منتجاته مخفية حتى يُرفع التعليق
+    if (vendor.status === 'suspended' || vendor.status === 'banned') {
+      reasons.push('المتجر معلَّق — لا تنشر منتجاً حتى يُرفع التعليق');
+    } else if (vendor.status !== 'approved' && vendor.status !== 'in_review') {
+      reasons.push('أرسل طلب متجرك للمراجعة أولاً — النشر يُتاح من لحظة إرساله');
     }
-    if (!category?.isActive) reasons.push('الفئة موقوفة — انقل المنتج إلى فئة فعّالة');
     if (!product.variants.some((v) => v.isActive)) reasons.push('لا متغيّر فعّال يحمل سعراً');
-    // المشتري يشتري ما يراه — منتج بلا صورة لا يصل المراجعة أصلاً
+    // المشتري يشتري ما يراه — منتج بلا صورة لا يُنشر
     if (product.images.length === 0) reasons.push('أضف صورة واحدة على الأقل — الأولى هي الرئيسية في المتجر');
-
-    const missing = missingRequiredAttributes(
-      effective.filter((a) => a.isRequired).map((a) => ({ attributeId: a.attributeId, nameAr: a.nameAr })),
-      providedAttributeIds(
-        product.attrValues.map((a) => ({ attributeId: a.attributeId })),
-        product.variants.map((v) => this.asResolved(v, vendor.settlementCurrency)),
-      ),
-    );
-    if (missing.length > 0) reasons.push(`سمات إلزامية للفئة لم تُملأ: ${missing.join('، ')}`);
 
     if (reasons.length > 0) throw new PublishBlockedError(reasons);
 
     /**
-     * Q-15 — محسوم 13 سبتمبر 2026: النشر **طلب مراجعة** لا نشر فوري.
-     * الموانع أعلاه تُفحص عند الإرسال كي لا تصل الإدارة منتجات ناقصة، والاعتماد
-     * أو الرفض بسبب يقع في approve و reject. الإرسال المكرر لا يغيّر شيئاً.
+     * لا مراجعة قبل النشر — قرار صاحب المشروع 15 أكتوبر 2026، ألغى Q-15:
+     * «المنتجات تنزل على حساب الزبون من دون مراجعة الإدارة». النشر فوري، والمنشور
+     * أول مرة يأخذ publishedAt ويحتفظ به إن أُوقف ثم أُعيد. النشر المكرر لا يغيّر شيئاً.
      */
-    if (product.status !== 'active' && product.status !== 'pending_review') {
-      await this.products(scope).updateOwned(id, { status: 'pending_review', rejectReason: null });
+    if (product.status !== 'active') {
+      await this.products(scope).updateOwned(id, {
+        status: 'active',
+        rejectReason: null,
+        publishedAt: product.publishedAt ?? new Date(),
+      });
     }
     this.reindex(id);
     return this.get(scope, id);
   }
 
-  /** سحب الإرسال أو إيقاف النشر: يعود مسودة من أي حالة. */
+  /** إيقاف النشر بيد البائع: يعود مسودة من أي حالة. */
   async unpublish(scope: VendorScope, id: string): Promise<ProductDetailView> {
     const found = await this.products(scope).findFirst({ where: { id, deletedAt: null }, select: { id: true } });
     if (!found) throw new NotFoundError('المنتج غير موجود.', { id });
@@ -695,52 +622,16 @@ export class ProductService {
     return this.get(scope, id);
   }
 
-  // ================================================================ مراجعة الإدارة — Q-15
+  // ================================================================ الإدارة
   // وصول إداري صريح بلا نطاق بائع: الإدارة ترى كل المتاجر (ADR-010).
 
   /**
-   * اعتماد منتج قيد المراجعة. المعتمد لأول مرة يأخذ publishedAt، والمُعاد اعتماده يحتفظ بتاريخه.
-   *
-   * `reviewed` نسخة المحتوى التي فتحها المراجِع. البائع يستطيع التعديل والمنتج قيد
-   * المراجعة، والاعتماد بلا نسخة كان يُنشر ما كُتب بعد الفتح — محتوى لم يره أحد.
-   * النسخة شرط في الكتابة نفسها: تعديل بين الفتح والاعتماد يُردّ 409 بالنسخة الحالية.
+   * إيقاف منشور مخالف بسبب يراه البائع — بعد النشر لا قبله (لا مراجعة منذ 15 أكتوبر
+   * 2026). يختفي من المتجر فوراً، والبائع يعدّله وينشره من جديد. المسودة لم تُنشر فلا تُوقف.
    */
-  async approve(id: string, reviewed: number): Promise<void> {
-    const product = await this.prisma.product.findFirst({
-      where: { id, deletedAt: null },
-      select: { status: true, publishedAt: true, contentRevision: true, vendor: { select: { status: true } } },
-    });
-    if (!product) throw new NotFoundError('المنتج غير موجود.', { id });
-    if (product.status !== 'pending_review') {
-      throw new InvalidStateTransitionError(product.status, 'active');
-    }
-    if (product.vendor.status !== 'approved') {
-      throw new InvalidInputError('المتجر غير معتمد أو معلَّق — لا يُعتمد منتج لا يستطيع صاحبه البيع.');
-    }
-
-    // الشرط على الحالة والنسخة داخل الكتابة: اعتمادان متزامنان، أو سحب البائع أو
-    // تعديله أثناء المراجعة، لا يمرّ معه اعتماد
-    const { count } = await this.prisma.product.updateMany({
-      where: { id, deletedAt: null, status: 'pending_review', contentRevision: reviewed },
-      data: { status: 'active', rejectReason: null, publishedAt: product.publishedAt ?? new Date() },
-    });
-    if (count === 0) {
-      const now = await this.prisma.product.findFirst({ where: { id, deletedAt: null }, select: { status: true, contentRevision: true } });
-      if (now?.status === 'pending_review' && now.contentRevision !== reviewed) {
-        throw new ConflictError('عدّل البائع المنتج منذ فتحته. راجع النسخة الحالية ثم اعتمدها.', {
-          reason: 'CONTENT_CHANGED',
-          contentRevision: now.contentRevision,
-        });
-      }
-      throw new InvalidStateTransitionError(now?.status ?? 'deleted', 'active');
-    }
-    this.reindex(id);
-  }
-
-  /** رفض بسبب يراه البائع — لمنتج قيد المراجعة أو منشور. المسودة لم تُرسل فلا تُرفض. */
   async reject(id: string, reason: string): Promise<void> {
     const { count } = await this.prisma.product.updateMany({
-      where: { id, deletedAt: null, status: { in: ['pending_review', 'active'] } },
+      where: { id, deletedAt: null, status: 'active' },
       data: { status: 'rejected', rejectReason: reason },
     });
     if (count === 0) {
@@ -751,7 +642,7 @@ export class ProductService {
     this.reindex(id);
   }
 
-  /** تفاصيل المنتج كما يراها البائع، لمراجِع الإدارة — بنطاق بائعه صراحةً. */
+  /** تفاصيل المنتج كما يراها البائع، للإدارة — بنطاق بائعه صراحةً. */
   async adminGet(actor: Actor, id: string): Promise<ProductDetailView> {
     const product = await this.prisma.product.findFirst({
       where: { id, deletedAt: null },
@@ -761,7 +652,7 @@ export class ProductService {
     return this.get(vendorScopeOf(actor, product.vendorId), id);
   }
 
-  /** منتجات المنصة. طابور المراجعة (?status=pending_review) مرتّب الأقدم أولاً — من انتظر أطول يُراجَع أولاً. */
+  /** منتجات المنصة، الأحدث تعديلاً أولاً — للإدارة تتابع المنشور وتوقف المخالف. */
   async adminList(query: {
     status?: ProductStatus | undefined;
     search?: string | undefined;
@@ -789,12 +680,12 @@ export class ProductService {
     const [rows, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        orderBy: { updatedAt: query.status === 'pending_review' ? 'asc' : 'desc' },
+        orderBy: { updatedAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
           vendor: { select: { id: true, nameAr: true, status: true, settlementCurrency: true } },
-          category: { select: { nameAr: true } },
+          vendorCategory: { select: { nameAr: true } },
           variants: { where: { archivedAt: null }, select: { priceMinorUnits: true } },
           images: { take: 1, orderBy: { sort: 'asc' }, select: { fileKey: true } },
         },
@@ -818,7 +709,7 @@ export class ProductService {
           status: r.status,
           rejectReason: r.rejectReason,
           vendor: { id: r.vendor.id, nameAr: r.vendor.nameAr, status: r.vendor.status },
-          categoryNameAr: r.category.nameAr,
+          vendorCategoryNameAr: r.vendorCategory?.nameAr ?? null,
           variantCount: r.variants.length,
           priceFrom: lowest !== null ? priceView(lowest, r.vendor.settlementCurrency) : null,
           thumbnail: image ? this.storage.urls(image.fileKey)['thumb.webp'] : null,
@@ -844,16 +735,6 @@ export class ProductService {
       }
       throw err;
     }
-  }
-
-  private async effectiveFor(categoryId: string): Promise<EffectiveAttribute[]> {
-    const category = await this.prisma.category.findUnique({
-      where: { id: categoryId },
-      select: { isActive: true },
-    });
-    if (!category) throw new NotFoundError('الفئة غير موجودة.', { categoryId });
-    if (!category.isActive) throw new InvalidInputError('الفئة موقوفة — اختر فئة فعّالة.', { categoryId });
-    return this.categories.effectiveAttributes(categoryId);
   }
 
   private async assertBrand(brandId: string | null | undefined): Promise<void> {
@@ -929,7 +810,7 @@ export class ProductService {
 
   private resolveVariants(
     inputs: readonly VariantInput[],
-    effective: readonly EffectiveAttribute[],
+    effective: readonly AttributeView[],
     currency: string,
   ): ResolvedVariant[] {
     const keys = assertVariantMatrix(inputs.map((v) => ({ sku: v.sku, options: v.options ?? [] })));
@@ -941,7 +822,7 @@ export class ProductService {
         const axis = axes.get(option.attributeId);
         if (!axis) {
           throw new InvalidInputError(
-            `خيار في المتغيّر «${sku}» يشير إلى سمة ليست من سمات المتغيّرات في هذه الفئة.`,
+            `خيار في المتغيّر «${sku}» يشير إلى سمة ليست من سمات المتغيّرات (كاللون والمقاس).`,
             { sku, attributeId: option.attributeId },
           );
         }
@@ -984,7 +865,7 @@ export class ProductService {
 
   private resolveAttributes(
     inputs: readonly AttributeInput[],
-    effective: readonly EffectiveAttribute[],
+    effective: readonly AttributeView[],
   ): ResolvedAttribute[] {
     const byId = new Map(effective.map((a) => [a.attributeId, a]));
     const seen = new Set<string>();
@@ -992,7 +873,7 @@ export class ProductService {
     return inputs.map((input) => {
       const attribute = byId.get(input.attributeId);
       if (!attribute) {
-        throw new InvalidInputError('سمة ليست من سمات هذه الفئة.', { attributeId: input.attributeId });
+        throw new InvalidInputError('السمة غير موجودة.', { attributeId: input.attributeId });
       }
       if (attribute.isVariantAxis) {
         throw new InvalidInputError(
@@ -1049,21 +930,6 @@ export class ProductService {
     });
   }
 
-  private asInput(v: ProductDetailRow['variants'][number], currency: string): VariantInput {
-    return {
-      id: v.id,
-      sku: v.sku,
-      price: toDecimalString(money(v.priceMinorUnits, currency)),
-      compareAtPrice:
-        v.compareAtPriceMinorUnits !== null
-          ? toDecimalString(money(v.compareAtPriceMinorUnits, currency))
-          : null,
-      barcode: v.barcode,
-      weightGrams: v.weightGrams,
-      options: v.optionValues.map((o) => ({ attributeId: o.attributeId, valueId: o.attributeValueId })),
-    };
-  }
-
   private asResolved(v: ProductDetailRow['variants'][number], currency: string): ResolvedVariant {
     void currency;
     return {
@@ -1087,12 +953,11 @@ export class ProductService {
       slug: row.slug,
       status: row.status,
       rejectReason: row.rejectReason,
-      contentRevision: row.contentRevision,
       nameAr: row.nameAr,
       nameEn: row.nameEn,
       descriptionAr: row.descriptionAr,
       descriptionEn: row.descriptionEn,
-      category: row.category,
+      vendorCategory: row.vendorCategory,
       brandId: row.brandId,
       hasVariants: row.hasVariants,
       currency,
@@ -1174,25 +1039,3 @@ export class ProductService {
 
 const hasVariants = (variants: readonly { options: readonly OptionChoice[] }[]): boolean =>
   variants.length > 1 || (variants[0]?.options.length ?? 0) > 0;
-
-/** السمة الإلزامية تُستوفى على المنتج أو على المتغيّرات (المقاس الإلزامي يحمله كل متغيّر) */
-function providedAttributeIds(
-  attributes: readonly { attributeId: string }[],
-  variants: readonly { options: readonly OptionChoice[] }[],
-): Set<string> {
-  const ids = new Set(attributes.map((a) => a.attributeId));
-  for (const v of variants) for (const o of v.options) ids.add(o.attributeId);
-  return ids;
-}
-
-function asAttributeInput(a: ProductDetailRow['attrValues'][number]): AttributeInput {
-  return {
-    attributeId: a.attributeId,
-    ...(a.attributeValueId !== null ? { valueId: a.attributeValueId } : {}),
-    ...(a.valueTextAr !== null ? { text: a.valueTextAr } : {}),
-    ...(a.valueTextEn !== null ? { textEn: a.valueTextEn } : {}),
-    ...(a.valueNumber !== null ? { number: a.valueNumber.toNumber() } : {}),
-    ...(a.valueBoolean !== null ? { boolean: a.valueBoolean } : {}),
-  };
-
-}

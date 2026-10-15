@@ -126,7 +126,6 @@ beforeAll(async () => {
   buyerId = buyer.userId;
   strangerToken = (await account('stranger')).token;
 
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
 
   // ثلاثة بائعين بثلاث عملات: الريال والدينار والدولار — ADR-013
   const specs = [
@@ -167,7 +166,6 @@ beforeAll(async () => {
     const product = await prisma.product.create({
       data: {
         vendorId: vendor.id,
-        categoryId: category.id,
         slug: `p-${tag}-${SUFFIX}`,
         nameAr: `منتج ${tag}`,
         status: 'active',
@@ -518,9 +516,8 @@ describe('دفع بعد انتهاء الحجز — إشعاران متزامن�
   /** منتج بقطعة واحدة لدى البائع الأول — القطعة الأخيرة هي ما يُتسابق عليه */
   async function oneUnit(): Promise<string> {
     n++;
-    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
     const product = await prisma.product.create({
-      data: { vendorId: vendorIds[0]!, categoryId: category.id, slug: `last-${n}-${SUFFIX}`, nameAr: `القطعة الأخيرة ${n}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendorIds[0]!, slug: `last-${n}-${SUFFIX}`, nameAr: `القطعة الأخيرة ${n}`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendorIds[0]!, sku: `LAST-${n}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 9_900n, optionsKey: '', isActive: true },
@@ -633,9 +630,8 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
   /** منتج بمخزون وافر — لا يتنافس الاختبار على مخزون اختبار آخر */
   async function stocked(): Promise<string> {
     n++;
-    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
     const product = await prisma.product.create({
-      data: { vendorId: vendorIds[1]!, categoryId: category.id, slug: `cpn-${n}-${SUFFIX}`, nameAr: `منتج الكوبون ${n}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendorIds[1]!, slug: `cpn-${n}-${SUFFIX}`, nameAr: `منتج الكوبون ${n}`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendorIds[1]!, sku: `CPN-${n}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },
@@ -744,7 +740,6 @@ describe('الإجمالي الذي رآه المشتري هو ما يُخصم �
   // بائع يشحن إلى بلدين بسعرين: الأردن 5.000 د.أ والسعودية 25.000 د.أ
   beforeAll(async () => {
     if (!dbUp) return;
-    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
     const owner = await prisma.user.create({
       data: { email: `two-zones.${SUFFIX}@basta.test`, fullName: 'بائع بمنطقتين', passwordHash: await hashPassword('كلمة-مرور-اختبار-طويلة'), roles: { create: { role: 'vendor_owner' } } },
     });
@@ -761,7 +756,7 @@ describe('الإجمالي الذي رآه المشتري هو ما يُخصم �
     });
     vendorIds.push(vendor.id);
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: category.id, slug: `p-zones-${SUFFIX}`, nameAr: 'منتج بمنطقتين', status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `p-zones-${SUFFIX}`, nameAr: 'منتج بمنطقتين', status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `ZONES-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },

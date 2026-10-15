@@ -4,8 +4,9 @@ import { localList, useLocalList } from './recent';
 import type { ProductPage } from './storefront';
 
 /**
- * قائمة المقارنة — ST-10. حتى أربعة منتجات من القسم نفسه: مقارنة قميص
- * بمكبّر صوت لا صفوف مشتركة لها، فالقسم الواحد شرط لا تفضيل.
+ * قائمة المقارنة — ST-10. حتى أربعة منتجات. كان شرطها «القسم نفسه»، وسقطت الأقسام
+ * العامة حين صارت الفئات لكل متجر (14 أكتوبر 2026): المشتري يختار ما يقارنه، وصفوف
+ * الجدول هي السمات المشتركة بينها.
  */
 
 export const COMPARE_MAX = 4;
@@ -14,11 +15,9 @@ export interface CompareItem {
   slug: string;
   nameAr: string;
   thumb: string | null;
-  categoryId: string;
-  categorySlug: string;
-  categoryNameAr: string;
 }
 
+/** عناصر محفوظة قبل التغيير تحمل حقول القسم أيضاً — تُقبل، والزائد لا يُقرأ */
 const isCompare = (v: unknown): v is CompareItem => {
   const o = v as Partial<CompareItem> | null;
   return (
@@ -27,10 +26,7 @@ const isCompare = (v: unknown): v is CompareItem => {
     typeof o.slug === 'string' &&
     o.slug.length > 0 &&
     typeof o.nameAr === 'string' &&
-    (o.thumb === null || typeof o.thumb === 'string') &&
-    typeof o.categoryId === 'string' &&
-    typeof o.categorySlug === 'string' &&
-    typeof o.categoryNameAr === 'string'
+    (o.thumb === null || typeof o.thumb === 'string')
   );
 };
 
@@ -38,20 +34,14 @@ export const compareList = localList<CompareItem>('basta.compare', isCompare);
 
 export const useCompare = (): readonly CompareItem[] => useLocalList(compareList);
 
-export type AddResult = 'added' | 'exists' | 'full' | 'other-category';
+export type AddResult = 'added' | 'exists' | 'full';
 
 export function addToCompare(item: CompareItem): AddResult {
   const list = compareList.read();
   if (list.some((x) => x.slug === item.slug)) return 'exists';
-  if (list.length > 0 && list[0]!.categoryId !== item.categoryId) return 'other-category';
   if (list.length >= COMPARE_MAX) return 'full';
-  compareList.write([...list, item]);
+  compareList.write([...list, { slug: item.slug, nameAr: item.nameAr, thumb: item.thumb }]);
   return 'added';
-}
-
-/** قائمة جديدة تبدأ بهذا المنتج — حين يختار المشتري قسماً آخر */
-export function restartCompare(item: CompareItem): void {
-  compareList.write([item]);
 }
 
 export function removeFromCompare(slug: string): void {
