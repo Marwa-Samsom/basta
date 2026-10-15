@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Header,
@@ -12,7 +13,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
 import { ForbiddenActorError, vendorScopeOf, type Actor } from '../../../common/security/actor';
 import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
@@ -77,12 +78,9 @@ export class PaidDto {
 }
 
 export class CommissionDto {
-  @IsIn(['global', 'category', 'vendor'])
-  scope!: 'global' | 'category' | 'vendor';
-
-  @IsOptional()
-  @IsUUID()
-  categoryId?: string;
+  /** نسبة عامة لكل المنصة، أو خاصة بمتجر — لا مستوى فئة (14 أكتوبر 2026) */
+  @IsIn(['global', 'vendor'], { message: 'النطاق: عامة (global) أو متجر (vendor).' })
+  scope!: 'global' | 'vendor';
 
   @IsOptional()
   @IsUUID()
@@ -185,12 +183,18 @@ export class AdminFinanceController {
     return this.finance.commissionRules();
   }
 
+  @Delete('commissions/vendor/:vendorId')
+  @RequirePermission('commissions.edit')
+  @ApiOperation({ summary: 'إلغاء نسبة المتجر الخاصة — يعود إلى النسبة العامة من الآن' })
+  endVendorCommission(@CurrentActor() a: Actor, @Param('vendorId', new ParseUUIDPipe()) vendorId: string) {
+    return this.finance.endVendorCommission(a.userId, vendorId);
+  }
+
   @Post('commissions')
   @RequirePermission('commissions.edit')
   setCommission(@CurrentActor() a: Actor, @Body() dto: CommissionDto) {
     return this.finance.setCommission(a.userId, {
       scope: dto.scope,
-      categoryId: dto.categoryId ?? null,
       vendorId: dto.vendorId ?? null,
       rateBps: dto.rateBps,
     });

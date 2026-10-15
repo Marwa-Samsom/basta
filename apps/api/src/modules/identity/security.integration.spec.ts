@@ -93,7 +93,7 @@ describe('A07 · التخمين وسرقة الجلسة', () => {
 
   it('حدّ التخمين لا يخنق التصفّح: 200 طلب متجر من عنوان واحد تمرّ', async () => {
     if (!dbUp) return;
-    const results = await Promise.all(Array.from({ length: 200 }, () => call('GET', '/storefront/categories', { ip: '10.0.0.70' })));
+    const results = await Promise.all(Array.from({ length: 200 }, () => call('GET', '/attributes', { ip: '10.0.0.70' })));
     expect(results.every((r) => r.statusCode === 200)).toBe(true);
   });
 
@@ -156,7 +156,7 @@ describe('A03 و A08 · الحقن وسلامة المدخلات', () => {
 describe('A05 · الإعداد الآمن', () => {
   it('ترويسات الأمان على كل ردّ، والردّ المصادَق لا يُخزَّن', async () => {
     if (!dbUp) return;
-    const pub = await call('GET', '/storefront/categories');
+    const pub = await call('GET', '/attributes');
     expect(pub.headers['x-content-type-options']).toBe('nosniff');
     expect(pub.headers['x-frame-options']).toBe('DENY');
     expect(String(pub.headers['content-security-policy'])).toContain("frame-ancestors 'none'");

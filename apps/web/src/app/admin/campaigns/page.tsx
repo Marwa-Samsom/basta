@@ -21,7 +21,7 @@ interface Campaign {
   productCount: number;
   couponId: string | null;
   couponCode: string | null;
-  scope: { shops: number; categoryNameAr: string | null };
+  scope: { shops: number };
 }
 
 interface CampaignProduct {
@@ -77,8 +77,7 @@ const productsLabel = (n: number) => (n === 0 ? 'بلا منتجات بعد' : c
 
 const scopeOf = (c: Campaign) => {
   if (c.productCount === 0) return '—';
-  const shops = counted(c.scope.shops, 'متجر واحد', 'متجران', 'متاجر', 'متجراً');
-  return c.scope.categoryNameAr ? `تصنيف: ${c.scope.categoryNameAr} · ${shops}` : shops;
+  return counted(c.scope.shops, 'متجر واحد', 'متجران', 'متاجر', 'متجراً');
 };
 
 const day = (iso: string) => new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long' }).format(new Date(iso));

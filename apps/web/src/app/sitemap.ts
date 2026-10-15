@@ -5,7 +5,6 @@ import { SITE_URL } from '@/lib/seo';
 interface SitemapData {
   products: { slug: string; updatedAt: string }[];
   shops: { slug: string; updatedAt: string }[];
-  categories: { slug: string }[];
   pages: { slug: string; updatedAt: string }[];
 }
 
@@ -25,8 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const at = (p: string) => `${SITE_URL}${p}`;
   return [
     { url: at('/'), changeFrequency: 'daily', priority: 1 },
-    { url: at('/categories'), changeFrequency: 'weekly', priority: 0.6 },
-    ...data.categories.map((c) => ({ url: at(`/c/${encodeURIComponent(c.slug)}`), changeFrequency: 'daily' as const, priority: 0.7 })),
+    { url: at('/shops'), changeFrequency: 'daily', priority: 0.7 },
     ...data.products.map((p) => ({ url: at(`/p/${encodeURIComponent(p.slug)}`), lastModified: new Date(p.updatedAt), changeFrequency: 'weekly' as const, priority: 0.8 })),
     ...data.shops.map((s) => ({ url: at(`/s/${encodeURIComponent(s.slug)}`), lastModified: new Date(s.updatedAt), changeFrequency: 'weekly' as const, priority: 0.6 })),
     ...data.pages.map((p) => ({ url: at(`/pages/${encodeURIComponent(p.slug)}`), lastModified: new Date(p.updatedAt), changeFrequency: 'monthly' as const, priority: 0.3 })),

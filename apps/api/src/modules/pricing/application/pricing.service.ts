@@ -69,7 +69,6 @@ export class PricingService {
           select: {
             id: true,
             nameAr: true,
-            categoryId: true,
             vendorId: true,
             // كل الصور (عشر على الأكثر) لا الأولى: صورة اللون المختار تسبق الرئيسية في السلة والطلب
             images: { orderBy: { sort: 'asc' }, select: { fileKey: true, variantId: true, optionValueId: true } },
@@ -113,7 +112,6 @@ export class PricingService {
       variantId: v.id,
       productId: v.product.id,
       vendorId: v.vendorId,
-      categoryId: v.product.categoryId,
       nameAr: v.product.nameAr,
       variantLabel: v.optionValues.map((o) => o.attributeValue.valueAr).join(' / ') || null,
       sku: v.sku,
@@ -121,7 +119,7 @@ export class PricingService {
       unitPriceMinor: v.priceMinorUnits,
       qty: merged.get(v.id) ?? 0,
       weightGrams: v.weightGrams,
-      commissionBps: commissions(v.vendorId, v.product.categoryId) ?? defaultBps,
+      commissionBps: commissions(v.vendorId) ?? defaultBps,
     }));
 
     const shipping = new Map<string, ShippingQuote>();
@@ -191,37 +189,24 @@ export class PricingService {
   }
 
   /**
-   * أدقّ قاعدة عمولة نافذة: البائع قبل الفئة قبل العامة (Q-01). تُلقط على
-   * السطر الآن وتُقرأ اللقطة في كل احتساب لاحق — ADR-004.
+   * نسبة العمولة على كل منتج يُباع: نسبة المتجر إن خُصّصت، وإلا العامة — بغضّ
+   * النظر عن فئته أو سعره (قرار صاحب المشروع 14 أكتوبر 2026، ألغى مستوى الفئة).
+   * تُلقط على السطر الآن وتُقرأ اللقطة في كل احتساب لاحق — ADR-004.
    */
-  private async commissionRules(
-    vendorIds: readonly string[],
-    at: Date,
-  ): Promise<(vendorId: string, categoryId: string) => number | null> {
+  private async commissionRules(vendorIds: readonly string[], at: Date): Promise<(vendorId: string) => number | null> {
     const rules = await this.prisma.commissionRule.findMany({
       where: {
+        scope: { in: ['vendor', 'global'] },
         effectiveFrom: { lte: at },
         OR: [{ effectiveTo: null }, { effectiveTo: { gt: at } }],
         AND: [{ OR: [{ vendorId: { in: [...vendorIds] } }, { vendorId: null }] }],
       },
       orderBy: { effectiveFrom: 'desc' },
     });
-    const categoryPaths = new Map(
-      (
-        await this.prisma.category.findMany({ select: { id: true, path: true } })
-      ).map((c) => [c.id, c.path]),
-    );
-    const idByPathSegment = (path: string): string[] => path.split('/').filter(Boolean);
 
-    return (vendorId, categoryId) => {
+    return (vendorId) => {
       const vendorRule = rules.find((r) => r.scope === 'vendor' && r.vendorId === vendorId);
       if (vendorRule) return vendorRule.rateBps;
-      // الفئة وأسلافها: أقرب سلف له قاعدة يفوز
-      const ancestry = idByPathSegment(categoryPaths.get(categoryId) ?? '').reverse();
-      for (const id of [categoryId, ...ancestry]) {
-        const rule = rules.find((r) => r.scope === 'category' && r.categoryId === id);
-        if (rule) return rule.rateBps;
-      }
       return rules.find((r) => r.scope === 'global')?.rateBps ?? null;
     };
   }

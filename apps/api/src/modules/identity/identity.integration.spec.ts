@@ -32,7 +32,6 @@ beforeAll(async () => {
   }
 
   // بائعان حقيقيان لكل منهما منتج — الحالة التي يجب ألّا يخترقها أحد
-  const cat = await prisma.category.findFirstOrThrow();
 
   const mk = async (tag: string) => {
     const user = await prisma.user.create({
@@ -58,7 +57,6 @@ beforeAll(async () => {
     const product = await prisma.product.create({
       data: {
         vendorId: vendor.id,
-        categoryId: cat.id,
         slug: `p-${tag}-${SUFFIX}`,
         nameAr: `منتج ${tag}`,
         status: 'active',

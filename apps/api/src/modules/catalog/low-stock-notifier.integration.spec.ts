@@ -125,7 +125,6 @@ const dbIt: typeof it = ((name: string, fn: never, timeout?: number) =>
 
 /** منتج بمتغيّرات ومخزونها فوق العتبة — منشور أو مسوّدة */
 async function product(label: string, stock: number[], status: 'active' | 'draft' = 'active'): Promise<string[]> {
-  const category = await prisma.category.findFirstOrThrow({ where: { slug: 'fashion' } });
   const productId = randomUUID();
   const variantIds = stock.map(() => randomUUID());
   await prisma.$transaction(async (tx) => {
@@ -133,7 +132,6 @@ async function product(label: string, stock: number[], status: 'active' | 'draft
       data: {
         id: productId,
         vendorId: created.vendorId,
-        categoryId: category.id,
         slug: `p-${label}-${SUFFIX}-${productId.slice(0, 6)}`,
         nameAr: `منتج ${label}`,
         status,

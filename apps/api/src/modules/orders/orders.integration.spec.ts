@@ -162,7 +162,6 @@ beforeAll(async () => {
   tracking = app.get(TrackingService);
   lifecycle = app.get(OrderLifecycleService);
 
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
 
   // بائعان بعملتين: الريال (تحويل) والدينار (عملة الدفع نفسها)
   for (const [tag, currency, price] of [
@@ -189,7 +188,7 @@ beforeAll(async () => {
       },
     });
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: category.id, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `SKU-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: price, optionsKey: '', isActive: true },

@@ -2,11 +2,10 @@ import { expect, test } from '@playwright/test';
 import { PASSWORD, makeVendor, png, prisma, tag } from './fixtures';
 
 /**
- * البائع يرفع صور منتجه من المحرّر: كانت الواجهة بلا مكان للصور أصلاً، والإرسال لا
- * يشترطها — فيصل كل منتج المراجعة بلا صورة. الآن الصورة شرط الإرسال، وتُرفع
- * وتُرتَّب (الأولى هي الرئيسية) من المحرّر نفسه عبر ممرّ /api/v1.
+ * البائع يرفع صور منتجه من المحرّر: كانت الواجهة بلا مكان للصور أصلاً. الآن الصورة
+ * شرط النشر، وتُرفع وتُرتَّب (الأولى هي الرئيسية) من المحرّر نفسه عبر ممرّ /api/v1.
  */
-test('صور المنتج: الإرسال يُمنع بلا صورة، ثم تُرفع صورتان وتُختار الرئيسية ويُرسل', async ({ page }) => {
+test('صور المنتج: النشر يُمنع بلا صورة، ثم تُرفع صورتان وتُختار الرئيسية ويُنشر', async ({ page }) => {
   const t = tag();
   const v = await makeVendor(t);
   const product = await prisma.product.update({ where: { slug: v.productSlug }, data: { status: 'draft', publishedAt: null } });
@@ -17,8 +16,8 @@ test('صور المنتج: الإرسال يُمنع بلا صورة، ثم تُ
   await page.getByRole('button', { name: 'دخول' }).click();
   await expect(page.getByRole('heading', { level: 2, name: /الصور/ })).toBeVisible();
 
-  // بلا صورة: العائق يُعرض ولا يُرسل
-  await page.getByRole('button', { name: 'أرسل للمراجعة' }).click();
+  // بلا صورة: العائق يُعرض ولا يُنشر
+  await page.getByRole('button', { name: 'انشر', exact: true }).click();
   await expect(page.getByText('أضف صورة واحدة على الأقل')).toBeVisible();
   expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('draft');
 
@@ -41,12 +40,12 @@ test('صور المنتج: الإرسال يُمنع بلا صورة، ثم تُ
     .toBe(blue!.id);
   await expect(gallery.getByRole('listitem').first()).toContainText('الرئيسية');
 
-  // والآن يُرسل
-  await page.getByRole('button', { name: 'أرسل للمراجعة' }).click();
-  await expect(page.getByText('أُرسل المنتج إلى مراجعة الإدارة.')).toBeVisible();
-  expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('pending_review');
+  // والآن يُنشر فوراً بلا مراجعة (15 أكتوبر 2026)
+  await page.getByRole('button', { name: 'انشر', exact: true }).click();
+  await expect(page.getByText('نُشر المنتج — يراه المشترون الآن.')).toBeVisible();
+  expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status).toBe('active');
 
-  // المعروض للمراجعة لا يبقى بلا صورة: حذف الأولى يمرّ، وحذف الأخيرة يُرفض برسالة
+  // المنشور لا يبقى بلا صورة: حذف الأولى يمرّ، وحذف الأخيرة يُرفض برسالة
   await gallery.getByRole('button', { name: 'احذف الصورة 1' }).click();
   await expect(gallery.getByRole('img')).toHaveCount(1);
   await gallery.getByRole('button', { name: 'احذف الصورة 1' }).click();

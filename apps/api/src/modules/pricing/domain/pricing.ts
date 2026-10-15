@@ -20,7 +20,6 @@ export interface PricedLineInput {
   readonly variantId: string;
   readonly productId: string;
   readonly vendorId: string;
-  readonly categoryId: string;
   readonly nameAr: string;
   readonly variantLabel: string | null;
   readonly sku: string;

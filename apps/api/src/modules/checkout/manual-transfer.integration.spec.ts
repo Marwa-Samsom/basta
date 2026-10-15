@@ -171,7 +171,6 @@ beforeAll(async () => {
   financeId = finance.id;
   contentToken = (await admin('content', ['content.manage'])).token;
 
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   // بائعان بعملتين: التقسيم عند التأكيد يُنتج فرعيين بحصّتين مجموعهما الأب
   for (const [tag, currency, price] of [['jod', 'JOD', 12_500n], ['usd', 'USD', 4_750n]] as const) {
     const user = await prisma.user.create({
@@ -202,7 +201,7 @@ beforeAll(async () => {
     });
     vendorIds.push(vendor.id);
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: category.id, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `SKU-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: price, optionsKey: '', isActive: true },

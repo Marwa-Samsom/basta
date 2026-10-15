@@ -30,31 +30,27 @@ afterAll(async () => {
 });
 
 describe('البذور لا تكتب فوق ما حرّرته الإدارة', () => {
-  it('الإعداد والعملة واسم الفئة والسمة تبقى كما حُرّرت بعد تشغيل البذور ثانيةً', async () => {
+  it('الإعداد والعملة والسمة تبقى كما حُرّرت بعد تشغيل البذور ثانيةً', async () => {
     if (!dbUp) return;
     const before = {
       setting: await prisma.setting.findUniqueOrThrow({ where: { key: 'cart_expiry_hours' } }),
       currency: await prisma.currency.findUniqueOrThrow({ where: { code: 'EUR' } }),
-      category: await prisma.category.findUniqueOrThrow({ where: { slug: 'phones' } }),
       attribute: await prisma.attribute.findUniqueOrThrow({ where: { code: 'warranty_months' } }),
     };
     try {
       // ما تفعله الإدارة من لوحتها
       await prisma.setting.update({ where: { key: 'cart_expiry_hours' }, data: { valueJson: 72 } });
       await prisma.currency.update({ where: { code: 'EUR' }, data: { minPayoutMinorUnits: 9_999n } });
-      await prisma.category.update({ where: { slug: 'phones' }, data: { nameEn: 'Mobile phones (edited)' } });
       await prisma.attribute.update({ where: { code: 'warranty_months' }, data: { nameAr: 'الضمان (معدّل)' } });
 
       runSeed();
 
       expect((await prisma.setting.findUniqueOrThrow({ where: { key: 'cart_expiry_hours' } })).valueJson).toBe(72);
       expect((await prisma.currency.findUniqueOrThrow({ where: { code: 'EUR' } })).minPayoutMinorUnits).toBe(9_999n);
-      expect((await prisma.category.findUniqueOrThrow({ where: { slug: 'phones' } })).nameEn).toBe('Mobile phones (edited)');
       expect((await prisma.attribute.findUniqueOrThrow({ where: { code: 'warranty_months' } })).nameAr).toBe('الضمان (معدّل)');
     } finally {
       await prisma.setting.update({ where: { key: 'cart_expiry_hours' }, data: { valueJson: before.setting.valueJson as never } });
       await prisma.currency.update({ where: { code: 'EUR' }, data: { minPayoutMinorUnits: before.currency.minPayoutMinorUnits } });
-      await prisma.category.update({ where: { slug: 'phones' }, data: { nameEn: before.category.nameEn } });
       await prisma.attribute.update({ where: { code: 'warranty_months' }, data: { nameAr: before.attribute.nameAr } });
     }
   }, 120_000);

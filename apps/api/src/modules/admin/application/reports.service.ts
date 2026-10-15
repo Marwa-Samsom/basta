@@ -197,10 +197,9 @@ export class ReportsService {
 
   async dashboard(r: Range, withMoney: boolean) {
     const deadlineHours = Number((await this.prisma.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } }))?.valueJson) || 48;
-    const [report, vendors, products, payouts, disputes, overdue, drift] = await Promise.all([
+    const [report, vendors, payouts, disputes, overdue, drift] = await Promise.all([
       withMoney ? this.financial(r) : Promise.resolve(null),
       this.prisma.vendor.count({ where: { status: 'in_review' } }),
-      this.prisma.product.count({ where: { status: 'pending_review', deletedAt: null } }),
       this.prisma.payoutRequest.count({ where: { status: { in: ['requested', 'approved'] } } }),
       this.prisma.dispute.count({ where: { status: { in: ['open', 'escalated'] } } }),
       this.prisma.subOrder.count({
@@ -210,7 +209,8 @@ export class ReportsService {
     ]);
     return {
       ...(report ?? { sales: null, ledger: null }),
-      queues: { vendors, products, payouts, disputes, overdueAcceptance: overdue },
+      // لا طابور منتجات: النشر بلا مراجعة منذ 15 أكتوبر 2026
+      queues: { vendors, payouts, disputes, overdueAcceptance: overdue },
       alerts: withMoney ? drift.filter((d) => d.rows > 0) : [],
     };
   }

@@ -9,8 +9,8 @@ import {
 } from './domain/search-query';
 
 describe('مرشّحات البحث', () => {
-  it('الفئة تُرشَّح بالعضوية في مصفوفة الأسلاف لا ببادئة نصّية', () => {
-    expect(buildFilter({ categoryPath: '/3/17/' })).toEqual(['categoryAncestors = "/3/17/"']);
+  it('فئة المتجر تُرشَّح داخل متجرها — المتجر والفئة شرطان معاً', () => {
+    expect(buildFilter({ vendorId: 'v', storeCategoryId: 'c' })).toEqual(['vendorId = "v"', 'storeCategoryId = "c"']);
   });
 
   it('السعر مدىً، والمخزون شرطاً', () => {
@@ -59,8 +59,8 @@ describe('إعدادات الفهرس', () => {
   it('كل حقل يُرشَّح به مُعلَن — وإلا رفض المحرّك المرشّح وقت التنفيذ', () => {
     const used = [
       ...buildFilter({
-        categoryPath: '/1/',
         vendorId: 'v',
+        storeCategoryId: 'c',
         brandId: 'b',
         attributeValueIds: ['a'],
         minPriceMinor: 1,

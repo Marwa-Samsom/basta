@@ -57,7 +57,7 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
   { key: 'nameEn', header: 'الاسم_إنجليزي', aliases: ['name_en'], required: false, example: ['Cotton T-shirt', 'Cotton T-shirt'] },
   { key: 'descriptionAr', header: 'الوصف_عربي', aliases: ['description_ar'], required: false, example: ['قطن مصري 100%', 'قطن مصري 100%'] },
   { key: 'descriptionEn', header: 'الوصف_إنجليزي', aliases: ['description_en'], required: false, example: ['100% Egyptian cotton', '100% Egyptian cotton'] },
-  { key: 'category', header: 'الفئة', aliases: ['category'], required: true, example: ['fashion', 'fashion'] },
+  { key: 'category', header: 'الفئة', aliases: ['category'], required: false, example: ['قمصان', 'قمصان'] },
   { key: 'price', header: 'السعر', aliases: ['price'], required: true, example: ['79.00', '79.00'] },
   { key: 'compareAtPrice', header: 'السعر_قبل_الخصم', aliases: ['compare_at_price'], required: false, example: ['99.00', ''] },
   { key: 'stock', header: 'الكمية', aliases: ['stock', 'qty'], required: true, example: ['25', '10'] },
@@ -151,7 +151,8 @@ export interface ParsedRow {
   readonly nameEn: string | null;
   readonly descriptionAr: string | null;
   readonly descriptionEn: string | null;
-  readonly category: string;
+  /** اسم فئة من فئات المتجر — تُنشأ إن غابت. فارغ = بلا فئة */
+  readonly category: string | null;
   readonly priceMinorUnits: bigint;
   readonly compareAtPriceMinorUnits: bigint | null;
   readonly stock: number;
@@ -238,8 +239,7 @@ export function parseRow(
   if (nameAr === '') fail('nameAr', 'إلزامي.');
   else if (nameAr.length > LIMITS.name) fail('nameAr', `أطول من ${LIMITS.name} محرفاً.`);
 
-  const category = cell('category');
-  if (category === '') fail('category', 'إلزامي — اكتب المعرّف النصّي للفئة أو اسمها.');
+  const category = optional('category', 80);
 
   if (cell('price') === '') fail('price', 'إلزامي.');
   const priceMinorUnits = price('price');
@@ -314,14 +314,6 @@ export interface AxisLookup {
 }
 
 export interface ImportLookups {
-  /**
-   * بالمعرّف النصّي والاسم العربي معاً، بمفتاح lookupKey.
-   * `axisIds` سمات المتغيّرات المعرّفة للفئة وأسلافها — «المقاس» لا يُقبل على «بقالة».
-   */
-  readonly categories: ReadonlyMap<
-    string,
-    { readonly id: string; readonly nameAr: string; readonly axisIds: ReadonlySet<string> }
-  >;
   /** سمات المتغيّرات بالرمز والاسمين، بمفتاح lookupKey */
   readonly axes: ReadonlyMap<string, AxisLookup>;
   /** SKU الحيّة عند هذا البائع وحده */
@@ -351,7 +343,8 @@ export interface PlannedProduct {
   readonly nameEn: string | null;
   readonly descriptionAr: string | null;
   readonly descriptionEn: string | null;
-  readonly categoryId: string;
+  /** اسم فئة المتجر كما كُتب — الخدمة تطابقه أو تنشئه في معاملة الكتابة */
+  readonly categoryName: string | null;
   readonly variants: PlannedVariant[];
 }
 
@@ -378,7 +371,7 @@ interface Group {
   readonly axes: string;
   readonly combos: Map<string, number>;
   readonly nameKey: string;
-  readonly categoryId: string;
+  readonly categoryKey: string;
 }
 
 /**
@@ -431,9 +424,6 @@ export function planImport(
       continue;
     }
 
-    const category = lookups.categories.get(lookupKey(row.category));
-    if (!category) fail('category', `الفئة «${row.category}» غير موجودة.`);
-
     const options: OptionChoice[] = [];
     row.options.forEach((opt, i) => {
       const nameKey = i === 0 ? 'option1Name' : 'option2Name';
@@ -442,10 +432,6 @@ export function planImport(
       if (!axis) {
         const offered = availableAxes.slice(0, 8).join('، ') || 'لا شيء بعد';
         fail(nameKey, `«${opt.name}» ليست سمة متغيّرات معرّفة. المتاح: ${offered}.`);
-        return;
-      }
-      if (category && !category.axisIds.has(axis.id)) {
-        fail(nameKey, `السمة «${axis.nameAr}» غير معرّفة لفئة «${category.nameAr}».`);
         return;
       }
       const valueId = axis.values.get(lookupKey(opt.value));
@@ -472,7 +458,7 @@ export function planImport(
       if (lookupKey(row.nameAr) !== group.nameKey) {
         fail('nameAr', `يخالف الاسم في السطر ${group.product.line} ${ref}.`);
       }
-      if (category && category.id !== group.categoryId) {
+      if (lookupKey(row.category ?? '') !== group.categoryKey) {
         fail('category', `تخالف الفئة في السطر ${group.product.line} ${ref}.`);
       }
       if (axesKeyOf(options) !== group.axes) {
@@ -495,7 +481,7 @@ export function planImport(
       }
     }
 
-    if (reasons.length > 0 || !category) {
+    if (reasons.length > 0) {
       rejected.push({ line: row.line, sku: row.sku, reasons });
       continue;
     }
@@ -525,13 +511,13 @@ export function planImport(
           nameEn: row.nameEn,
           descriptionAr: row.descriptionAr,
           descriptionEn: row.descriptionEn,
-          categoryId: category.id,
+          categoryName: row.category,
           variants: [variant],
         },
         axes: axesKeyOf(options),
         combos: new Map([[optionsKey, row.line]]),
         nameKey: lookupKey(row.nameAr),
-        categoryId: category.id,
+        categoryKey: lookupKey(row.category ?? ''),
       });
     }
     acceptedSkus.set(row.sku, row.line);

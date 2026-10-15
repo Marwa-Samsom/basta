@@ -87,7 +87,6 @@ beforeAll(async () => {
   await app.getHttpAdapter().getInstance().ready();
   tracking = app.get(TrackingService);
 
-  const home = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   for (const tag of ['a', 'b']) {
     const email = `rep${tag}.${SUFFIX}@basta.test`;
     const u = await prisma.user.create({
@@ -101,7 +100,7 @@ beforeAll(async () => {
       },
     });
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: home.id, slug: `rep-${tag}-${SUFFIX}`, nameAr: `منتج تقارير ${tag}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `rep-${tag}-${SUFFIX}`, nameAr: `منتج تقارير ${tag}`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `VRP-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },

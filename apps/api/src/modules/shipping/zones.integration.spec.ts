@@ -81,7 +81,6 @@ beforeAll(async () => {
   await app.getHttpAdapter().getInstance().ready();
   pricing = app.get(PricingService);
 
-  const home = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   for (const tag of ['a', 'b']) {
     const email = `ship${tag}.${SUFFIX}@basta.test`;
     const u = await prisma.user.create({
@@ -94,7 +93,7 @@ beforeAll(async () => {
       },
     });
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: home.id, slug: `ship-${tag}-${SUFFIX}`, nameAr: `منتج شحن ${tag}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `ship-${tag}-${SUFFIX}`, nameAr: `منتج شحن ${tag}`, status: 'active', publishedAt: new Date() },
     });
     // 2.4 كغ — «حسب الوزن» يقرّبها إلى 3
     const variant = await prisma.productVariant.create({

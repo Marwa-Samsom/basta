@@ -26,27 +26,25 @@ import {
   RequirePermission,
   Roles,
 } from '../../../common/security/decorators';
-import { CategoryService } from '../application/category.service';
+import { AttributeService } from '../application/attribute.service';
 import { ProductImageService } from '../application/product-image.service';
 import { ProductImportService } from '../application/product-import.service';
 import { ProductService } from '../application/product.service';
+import { VendorCategoryService } from '../application/vendor-category.service';
 import { IMPORT_MAX_BYTES, ImportFileRejectedError } from '../domain/import-plan';
 import { IMAGE_MAX_BYTES, ImageRejectedError } from '../infrastructure/product-images';
 import {
   AdjustStockDto,
   CreateAttributeDto,
-  CreateCategoryDto,
   CreateProductDto,
-  LinkAttributeDto,
   ListProductsQueryDto,
-  MoveCategoryDto,
   RejectProductDto,
   LinkImageDto,
   ReorderImagesDto,
-  ApproveProductDto,
+  ReorderVendorCategoriesDto,
   AttributeValueCreateDto,
-  UpdateCategoryDto,
   UpdateProductDto,
+  VendorCategoryDto,
 } from './dto/catalog.dto';
 import { scopeOf, uuidParam } from './scope';
 
@@ -86,22 +84,15 @@ async function readSingleFile(
 // ============================================================================ عام
 
 @ApiTags('catalog')
-@Controller('categories')
-export class CategoriesController {
-  constructor(private readonly categories: CategoryService) {}
+@Controller('attributes')
+export class AttributesController {
+  constructor(private readonly attributes: AttributeService) {}
 
   @Public()
   @Get()
-  @ApiOperation({ summary: 'شجرة الفئات الفعّالة' })
-  tree() {
-    return this.categories.tree();
-  }
-
-  @Public()
-  @Get(':id/attributes')
-  @ApiOperation({ summary: 'سمات الفئة مع ما ترثه من أسلافها' })
-  attributes(@Param('id', uuidParam) id: string) {
-    return this.categories.effectiveAttributes(id);
+  @ApiOperation({ summary: 'مكتبة السمات بقيمها — متاحة لأي منتج' })
+  all() {
+    return this.attributes.all();
   }
 }
 
@@ -114,102 +105,49 @@ export class CategoriesController {
 @Controller('admin')
 export class AdminCatalogController {
   constructor(
-    private readonly categories: CategoryService,
+    private readonly attributes: AttributeService,
     private readonly products: ProductService,
     private readonly notifications: NotificationsService,
     private readonly prisma: PrismaService,
   ) {}
 
-  @Post('categories')
-  @ApiOperation({ summary: 'إنشاء فئة — حتى أربعة مستويات' })
-  createCategory(@Body() dto: CreateCategoryDto) {
-    return this.categories.create(dto);
-  }
-
-  @Patch('categories/:id')
-  updateCategory(@Param('id', uuidParam) id: string, @Body() dto: UpdateCategoryDto) {
-    return this.categories.update(id, dto);
-  }
-
-  @Post('categories/:id/move')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'نقل فئة بفرعها كاملاً' })
-  moveCategory(@Param('id', uuidParam) id: string, @Body() dto: MoveCategoryDto) {
-    return this.categories.move(id, dto.parentId ?? null);
-  }
-
   @Post('attributes')
   createAttribute(@Body() dto: CreateAttributeDto) {
-    return this.categories.createAttribute(dto);
+    return this.attributes.createAttribute(dto);
   }
 
   @Post('attributes/:id/values')
   addAttributeValue(@Param('id', uuidParam) id: string, @Body() dto: AttributeValueCreateDto) {
-    return this.categories.addAttributeValue(id, dto);
-  }
-
-  @Put('categories/:id/attributes/:attributeId')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async linkAttribute(
-    @Param('id', uuidParam) id: string,
-    @Param('attributeId', uuidParam) attributeId: string,
-    @Body() dto: LinkAttributeDto,
-  ): Promise<void> {
-    await this.categories.linkAttribute(id, attributeId, dto);
-  }
-
-  @Delete('categories/:id/attributes/:attributeId')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async unlinkAttribute(
-    @Param('id', uuidParam) id: string,
-    @Param('attributeId', uuidParam) attributeId: string,
-  ): Promise<void> {
-    await this.categories.unlinkAttribute(id, attributeId);
-  }
-
-  @Get('categories')
-  @ApiOperation({ summary: 'كل الفئات مسطّحة بمسارها — ومنها غير الفعّالة لتُعاد — AD-08' })
-  listCategories() {
-    return this.prisma.category.findMany({
-      orderBy: [{ path: 'asc' }],
-      select: { id: true, parentId: true, slug: true, nameAr: true, nameEn: true, depth: true, sort: true, isActive: true, path: true, _count: { select: { products: true, children: true } } },
-    });
+    return this.attributes.addAttributeValue(id, dto);
   }
 
   @Get('attributes')
-  @ApiOperation({ summary: 'كل السمات بقيمها والفئات المرتبطة — AD-09' })
+  @ApiOperation({ summary: 'كل السمات بقيمها وعدد المنتجات التي تستعملها — AD-09' })
   listAttributes() {
     return this.prisma.attribute.findMany({
       orderBy: [{ sort: 'asc' }, { code: 'asc' }],
       include: {
         values: { orderBy: { sort: 'asc' }, select: { id: true, valueAr: true, valueEn: true, hexColor: true } },
-        categories: { select: { isRequired: true, category: { select: { id: true, nameAr: true } } } },
+        _count: { select: { productValues: true, variantOptions: true } },
       },
     });
   }
 
   @Get('products')
-  @ApiOperation({ summary: 'منتجات المنصة — ?status=pending_review طابور المراجعة، الأقدم أولاً (Q-15)' })
+  @ApiOperation({ summary: 'منتجات المنصة، الأحدث تعديلاً أولاً — لا مراجعة قبل النشر (15 أكتوبر 2026)' })
   listProducts(@Query() query: ListProductsQueryDto) {
     return this.products.adminList(query);
   }
 
   @Get('products/:id')
-  @ApiOperation({ summary: 'تفاصيل منتج للمراجعة كما يراها بائعه' })
+  @ApiOperation({ summary: 'تفاصيل منتج كما يراها بائعه' })
   getProduct(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string) {
     return this.products.adminGet(actor, id);
   }
 
-  @Post('products/:id/approve')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'اعتماد منتج قيد المراجعة — يصير منشوراً (Q-15)' })
-  async approveProduct(@Param('id', uuidParam) id: string, @Body() dto: ApproveProductDto): Promise<void> {
-    await this.products.approve(id, dto.contentRevision);
-  }
-
   @Post('products/:id/reject')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'رفض منتج قيد المراجعة أو منشور بسبب يراه البائع' })
+  @ApiOperation({ summary: 'إيقاف منشور مخالف بسبب يراه البائع — يعدّله وينشره من جديد' })
   async rejectProduct(@Param('id', uuidParam) id: string, @Body() dto: RejectProductDto): Promise<void> {
     await this.products.reject(id, dto.reason);
     const p = await this.prisma.product.findUnique({ where: { id }, select: { nameAr: true, vendorId: true } });
@@ -232,9 +170,44 @@ export class AdminCatalogController {
 export class VendorCatalogController {
   constructor(
     private readonly products: ProductService,
+    private readonly categories: VendorCategoryService,
     private readonly images: ProductImageService,
     private readonly importer: ProductImportService,
   ) {}
+
+  // ---------------------------------------------------------- فئات المتجر
+
+  @Get('categories')
+  @ApiOperation({ summary: 'فئات متجري بترتيبها وعدد منتجات كل منها' })
+  listCategories(@CurrentActor() actor: Actor) {
+    return this.categories.list(scopeOf(actor));
+  }
+
+  @Post('categories')
+  @ApiOperation({ summary: 'فئة جديدة في آخر القائمة — بلا مراجعة إدارية' })
+  createCategory(@CurrentActor() actor: Actor, @Body() dto: VendorCategoryDto) {
+    return this.categories.create(scopeOf(actor), dto.nameAr);
+  }
+
+  @Put('categories/order')
+  @ApiOperation({ summary: 'ترتيب الفئات — كلها بالترتيب الجديد' })
+  reorderCategories(@CurrentActor() actor: Actor, @Body() dto: ReorderVendorCategoriesDto) {
+    return this.categories.reorder(scopeOf(actor), dto.ids);
+  }
+
+  @Patch('categories/:id')
+  @ApiOperation({ summary: 'إعادة تسمية فئة' })
+  renameCategory(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string, @Body() dto: VendorCategoryDto) {
+    return this.categories.rename(scopeOf(actor), id, dto.nameAr);
+  }
+
+  @Delete('categories/:id')
+  @ApiOperation({ summary: 'حذف فئة — منتجاتها تبقى في المتجر بلا فئة' })
+  removeCategory(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string) {
+    return this.categories.remove(scopeOf(actor), id);
+  }
+
+  // -------------------------------------------------------------- المنتجات
 
   @Get('products')
   list(@CurrentActor() actor: Actor, @Query() query: ListProductsQueryDto) {
@@ -267,7 +240,7 @@ export class VendorCatalogController {
 
   @Post('products/:id/publish')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'إرسال المنتج لمراجعة الإدارة — يصير «قيد المراجعة» حتى يُعتمد أو يُرفض (Q-15)' })
+  @ApiOperation({ summary: 'نشر المنتج فوراً بلا مراجعة — والمتجر قيد المراجعة يظهر منتجه فور اعتماده' })
   publish(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string) {
     return this.products.publish(scopeOf(actor), id);
   }
@@ -321,7 +294,7 @@ export class VendorCatalogController {
   }
 
   @Put('products/:id/images/:imageId/link')
-  @ApiOperation({ summary: 'مع أي خيار تظهر الصورة — قيمة (الأحمر) أو متغيّر أو الجميع. لا يعيد المنشور للمراجعة' })
+  @ApiOperation({ summary: 'مع أي خيار تظهر الصورة — قيمة (الأحمر) أو متغيّر أو الجميع' })
   linkImage(
     @CurrentActor() actor: Actor,
     @Param('id', uuidParam) id: string,

@@ -68,7 +68,6 @@ export class ProductImageService {
           sort: (last._max.sort ?? -1) + 1,
         },
       });
-      await this.contentChanged(scope, productId);
       return this.view(image);
     } catch (err) {
       await this.storage.remove(key);
@@ -86,14 +85,12 @@ export class ProductImageService {
     const image = await this.prisma.productImage.findFirst({ where: { id: imageId, productId } });
     if (!image) throw new NotFoundError('الصورة غير موجودة.', { imageId });
 
-    // المنشور والمعروض للمراجعة لا يبقى بلا صورة: حذف صورته الوحيدة كان يعيده للمراجعة
-    // (contentChanged) دون أن يمرّ بموانع الإرسال، فيُعتمد منتج بلا صورة
-    if (product._count.images <= 1 && (product.status === 'active' || product.status === 'pending_review')) {
+    // المنشور لا يبقى بلا صورة: النشر يشترطها، فحذف الوحيدة يتجاوز الشرط من الخلف
+    if (product._count.images <= 1 && product.status === 'active') {
       throw new InvalidInputError('هذه الصورة الوحيدة للمنتج. أضف صورة أخرى قبل حذفها — المنتج المعروض لا يبقى بلا صورة.');
     }
 
     await this.prisma.productImage.delete({ where: { id: imageId } });
-    await this.contentChanged(scope, productId);
     // الصف حُذف فالصورة غير مرئية؛ ملف لم يُحذف يُسجَّل ولا يُفشل طلب البائع
     await this.storage.remove(image.fileKey).catch((err: unknown) =>
       this.logger.error(`تعذّر حذف ملفات الصورة ${image.fileKey}`, err as Error),
@@ -103,8 +100,7 @@ export class ProductImageService {
   /**
    * ترتيب الصور: كلها بترتيبها الجديد، والأولى هي الرئيسية (صورة البطاقة في المتجر).
    * المجموعة كاملة لا جزء منها — صورة أُضيفت أو حُذفت منذ فتح البائع الصفحة تُردّ
-   * 409 بدل ترتيب نصفه قديم. وتغيير الصورة الرئيسية محتوى يراه المشتري (Q-16)، أما
-   * إرسال الترتيب نفسه ثانيةً فلا يغيّر شيئاً ولا يعيد المنتج للمراجعة.
+   * 409 بدل ترتيب نصفه قديم. وإرسال الترتيب نفسه ثانيةً لا يكتب شيئاً.
    */
   async reorder(scope: VendorScope, productId: string, imageIds: string[]): Promise<ProductImageView[]> {
     const product = await new ScopedRepository(this.prisma.product as never, scope, 'المنتج').findFirst({
@@ -125,8 +121,6 @@ export class ProductImageService {
       await this.prisma.$transaction(
         imageIds.map((id, sort) => this.prisma.productImage.update({ where: { id }, data: { sort } })),
       );
-      // الرئيسية تغيّرت ← محتوى جديد؛ تسوية الترتيب وحدها (فجوات قديمة) لا تعيده للمراجعة
-      if (current[0]!.id !== imageIds[0]) await this.contentChanged(scope, productId);
     }
     const byId = new Map(current.map((i) => [i.id, i]));
     return imageIds.map((id, sort) => this.view({ ...byId.get(id)!, sort }));
@@ -136,9 +130,6 @@ export class ProductImageService {
    * مع أي خيار تظهر الصورة: لقيمة (اللون الأحمر — مع كل متغيّر يحملها، أحمر بأي مقاس)،
    * أو لمتغيّر واحد بعينه، أو للجميع (كلاهما فارغ). الصفحة تقفز إليها حين يختار المشتري
    * ذلك الخيار، والسلة والطلب يعرضانها لما اختاره.
-   *
-   * لا يعيد المنشور للمراجعة ولا يغيّر نسخة محتواه (Q-16): الصور نفسها معتمدة، ولم يتغيّر
-   * إلا أيّها يظهر مع أي لون — كما لا يعيده ترتيبٌ لا يمسّ الرئيسية.
    */
   async link(
     scope: VendorScope,
@@ -205,16 +196,5 @@ export class ProductImageService {
       sort: image.sort,
       urls: this.storage.urls(image.fileKey),
     };
-  }
-
-  /**
-   * Q-16: الصور محتوى يراه المشتري — إضافتها أو حذفها نسخة محتوى جديدة (فلا يُعتمد
-   * ما فتحه المراجِع قبلها)، وفي منتج منشور تعيده للمراجعة.
-   * الشرط على الحالة داخل الكتابة: منتج غير منشور لا تتغيّر حالته.
-   */
-  private async contentChanged(scope: VendorScope, productId: string): Promise<void> {
-    const products = new ScopedRepository(this.prisma.product as never, scope, 'المنتج');
-    await products.updateWhere({ id: productId, deletedAt: null }, { contentRevision: { increment: 1 } });
-    await products.updateWhere({ id: productId, status: 'active', deletedAt: null }, { status: 'pending_review' });
   }
 }

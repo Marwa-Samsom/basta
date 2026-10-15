@@ -114,7 +114,6 @@ const dbIt: typeof it = ((name: string, fn: never, timeout?: number) =>
 
 /** منتج بمتغيّرات جديدة ومخزونها الابتدائي — عبر الخدمة نفسها التي يستعملها الكتالوج */
 async function stocked(label: string, quantities: number[], threshold = 0): Promise<string[]> {
-  const category = await prisma.category.findFirstOrThrow({ where: { slug: 'fashion' } });
   const productId = randomUUID();
   const variantIds = quantities.map(() => randomUUID());
 
@@ -123,7 +122,6 @@ async function stocked(label: string, quantities: number[], threshold = 0): Prom
       data: {
         id: productId,
         vendorId: created.vendorId,
-        categoryId: category.id,
         slug: `p-${label}-${SUFFIX}-${productId.slice(0, 6)}`,
         nameAr: label,
       },

@@ -31,7 +31,7 @@ export function productJsonLd(p: ProductPage): Record<string, unknown> {
     url,
     image: p.images.map((i) => imageUrl(i.urls['full'] ?? null)).filter(Boolean),
     sku: p.variants[0]?.sku,
-    category: p.category.nameAr,
+    ...(p.storeCategory ? { category: p.storeCategory.nameAr } : {}),
     ...(p.brand ? { brand: { '@type': 'Brand', name: p.brand.nameAr } } : {}),
     offers:
       low === high

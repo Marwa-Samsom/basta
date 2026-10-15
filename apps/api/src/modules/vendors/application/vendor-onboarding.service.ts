@@ -51,7 +51,6 @@ export interface OnboardingView {
   readonly nameEn: string | null;
   readonly country: string;
   readonly businessType: string | null;
-  readonly mainCategoryId: string | null;
   readonly status: VendorLifecycle;
   readonly rejectionReason: string | null;
   readonly submittedAt: string | null;
@@ -112,7 +111,6 @@ export class VendorOnboardingService {
       slug?: string | null;
       country: string;
       businessType?: string | null;
-      mainCategoryId?: string | null;
       /** اختيار صريح من البائع — بدونه تُقترح عملة بلده ويُطلب اختيارها قبل الإرسال */
       settlementCurrency?: string | null;
     },
@@ -154,7 +152,6 @@ export class VendorOnboardingService {
           nameEn: input.nameEn?.trim() || null,
           country,
           businessType: input.businessType ?? null,
-          mainCategoryId: input.mainCategoryId ?? null,
           settlementCurrency: chosen ?? defaultCurrencyFor(country),
           settlementCurrencyChosenAt: chosen ? new Date() : null,
           status: 'pending',
@@ -281,7 +278,6 @@ export class VendorOnboardingService {
       nameEn: vendor.nameEn,
       country: vendor.country,
       businessType: vendor.businessType,
-      mainCategoryId: vendor.mainCategoryId,
       status,
       rejectionReason: vendor.rejectionReason,
       submittedAt: vendor.submittedAt?.toISOString() ?? null,
@@ -313,7 +309,6 @@ export class VendorOnboardingService {
       slug?: string;
       country?: string;
       businessType?: string | null;
-      mainCategoryId?: string | null;
     },
   ): Promise<OnboardingView> {
     const vendor = await this.require(scope.vendorId);
@@ -340,7 +335,6 @@ export class VendorOnboardingService {
       }
       data['businessType'] = input.businessType ?? null;
     }
-    if (input.mainCategoryId !== undefined) data['mainCategoryId'] = input.mainCategoryId ?? null;
 
     if (Object.keys(data).length > 0) {
       await this.prisma.vendor.update({ where: { id: scope.vendorId }, data });

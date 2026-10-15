@@ -69,7 +69,8 @@ export interface ProductDetail {
   nameEn: string | null;
   descriptionAr: string | null;
   descriptionEn: string | null;
-  category: { id: string; slug: string; nameAr: string };
+  /** فئة من فئات المتجر — null بلا فئة */
+  vendorCategory: { id: string; nameAr: string } | null;
   brandId: string | null;
   hasVariants: boolean;
   currency: string;
@@ -80,13 +81,15 @@ export interface ProductDetail {
   updatedAt: string;
 }
 
-export type ProductStatus = 'draft' | 'pending_review' | 'active' | 'rejected' | 'archived';
+/** لا مراجعة قبل النشر (15 أكتوبر 2026): البائع ينشر فيصير منشوراً، والموقوف أوقفته الإدارة بسبب */
+export type ProductStatus = 'draft' | 'active' | 'rejected' | 'archived';
 
 export interface ProductListItem {
   id: string;
   nameAr: string;
   nameEn: string | null;
   status: ProductStatus;
+  vendorCategory: { id: string; nameAr: string } | null;
   variantCount: number;
   priceFrom: Price | null;
   priceTo: Price | null;
@@ -115,21 +118,20 @@ export interface LowStockRow {
   productNameAr: string;
 }
 
-export interface Category {
+/** فئة من فئات المتجر — يديرها البائع وحده (14 أكتوبر 2026) */
+export interface VendorCategory {
   id: string;
-  parentId: string | null;
-  slug: string;
   nameAr: string;
-  depth: number;
-  children?: Category[];
+  sort: number;
+  productCount: number;
 }
 
-export interface EffectiveAttribute {
+/** سمة من المكتبة العامة — متاحة لكل منتج، ولا إلزام */
+export interface Attribute {
   attributeId: string;
   code: string;
   nameAr: string;
   inputType: 'select' | 'text' | 'number' | 'boolean';
-  isRequired: boolean;
   isVariantAxis: boolean;
   values: { id: string; valueAr: string; hexColor: string | null }[];
 }
@@ -138,10 +140,9 @@ export interface EffectiveAttribute {
 export const PRODUCT_STATUS: Readonly<
   Record<ProductStatus, { label: string; tone: string; hint: string }>
 > = Object.freeze({
-  draft: { label: 'مسوّدة', tone: 'badge--pending', hint: 'لم تُرسل للمراجعة بعد.' },
-  pending_review: { label: 'قيد المراجعة', tone: 'badge--review', hint: 'بانتظار مراجعة الإدارة.' },
+  draft: { label: 'مسوّدة', tone: 'badge--pending', hint: 'لم يُنشر بعد — تراه وحدك.' },
   active: { label: 'منشور', tone: 'badge--approved', hint: 'يظهر للمشترين.' },
-  rejected: { label: 'مرفوض', tone: 'badge--rejected', hint: 'اقرأ السبب وصحّح ثم أعد الإرسال.' },
+  rejected: { label: 'موقوف', tone: 'badge--rejected', hint: 'أوقفته الإدارة — اقرأ السبب وأصلحه ثم انشره من جديد.' },
   archived: { label: 'مؤرشف', tone: 'badge--pending', hint: 'لا يظهر ولا يُباع.' },
 });
 

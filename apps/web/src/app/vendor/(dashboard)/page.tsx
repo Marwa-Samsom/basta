@@ -11,7 +11,6 @@ import { num, PRODUCT_STATUS, type LowStockRow, type Page, type ProductListItem 
 interface Snapshot {
   total: number;
   drafts: number;
-  inReview: number;
   rejected: number;
   active: number;
   low: LowStockRow[];
@@ -34,10 +33,9 @@ export default function DashboardHome() {
     let alive = true;
     void (async () => {
       try {
-        const [all, drafts, inReview, rejected, active, low] = await Promise.all([
+        const [all, drafts, rejected, active, low] = await Promise.all([
           api<Page<ProductListItem>>('/vendor/products?pageSize=5'),
           api<Page<ProductListItem>>('/vendor/products?status=draft&pageSize=1'),
-          api<Page<ProductListItem>>('/vendor/products?status=pending_review&pageSize=1'),
           api<Page<ProductListItem>>('/vendor/products?status=rejected&pageSize=5'),
           api<Page<ProductListItem>>('/vendor/products?status=active&pageSize=1'),
           api<LowStockRow[]>('/vendor/inventory/low-stock'),
@@ -46,7 +44,6 @@ export default function DashboardHome() {
         setSnap({
           total: all.total,
           drafts: drafts.total,
-          inReview: inReview.total,
           rejected: rejected.total,
           active: active.total,
           low,
@@ -112,22 +109,20 @@ export default function DashboardHome() {
           <span className="stat__note">تظهر للمشترين</span>
         </Link>
 
-        <Link className="stat" href="/vendor/products">
+{/* لا مراجعة قبل النشر (15 أكتوبر 2026): ما يحتاج البائعَ هو ما أوقفته الإدارة بعد نشره */}
+        <Link className="stat" href="/vendor/products?status=rejected">
           <span className="stat__label">
-            <Icon name="clock" size={15} />
-            قيد المراجعة ومرفوض
+            <Icon name="alert" size={15} />
+            موقوفة
           </span>
-          <span className="vp-kpi__pair">
-            <span className="stat__value num">{num(snap.inReview)}</span>
-            <span className="stat__note">{snap.inReview > 0 ? 'بانتظار الإدارة' : 'لا شيء ينتظر'}</span>
-          </span>
+          <span className="stat__value num">{num(snap.rejected)}</span>
           {snap.rejected > 0 ? (
             <span className="badge badge--danger vp-kpi__badge">
               <Icon name="alert" size={13} />
-              <span className="num">{num(snap.rejected)}</span> مرفوض — يحتاج تصحيحاً
+              أوقفتها الإدارة — تحتاج تصحيحاً
             </span>
           ) : (
-            <span className="stat__note">لا رفض</span>
+            <span className="stat__note">لا شيء موقوف</span>
           )}
         </Link>
 
@@ -137,7 +132,7 @@ export default function DashboardHome() {
             مسوّدات
           </span>
           <span className="stat__value num">{num(snap.drafts)}</span>
-          <span className="stat__note">لم تُرسل بعد</span>
+          <span className="stat__note">لم تُنشر بعد</span>
         </Link>
 
         <Link className="stat" href="/vendor/inventory">
@@ -255,7 +250,7 @@ export default function DashboardHome() {
           {snap.rejected > 0 ? (
             <section className="card card--flush">
               <header className="card__head">
-                <h2>منتجات مرفوضة</h2>
+                <h2>منتجات موقوفة</h2>
                 <Link className="btn btn--ghost btn--sm vp-head-link" href="/vendor/products">
                   المنتجات
                   <Icon name="chev-end" size={13} mirror />

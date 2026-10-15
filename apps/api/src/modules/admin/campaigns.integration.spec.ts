@@ -101,7 +101,6 @@ beforeAll(async () => {
   await prisma.user.create({ data: { email: bEmail, fullName: 'مشترٍ', phone: uniquePhone(), passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'customer' } } } });
   buyer = await login(bEmail);
 
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   const vu = await prisma.user.create({
     data: { email: `vendor.${SUFFIX}@basta.test`, fullName: 'بائع الحملات', passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'vendor_owner' } } },
   });
@@ -112,7 +111,7 @@ beforeAll(async () => {
   // أربعة: ثلاثة منشورة ومسوّدة
   for (const [i, status] of (['active', 'active', 'active', 'draft'] as const).entries()) {
     const p = await prisma.product.create({
-      data: { vendorId: v.id, categoryId: category.id, slug: `p${i}-${SUFFIX}`, nameAr: `منتج حملة ${i} ${SUFFIX}`, status, publishedAt: status === 'active' ? new Date() : null },
+      data: { vendorId: v.id, slug: `p${i}-${SUFFIX}`, nameAr: `منتج حملة ${i} ${SUFFIX}`, status, publishedAt: status === 'active' ? new Date() : null },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: p.id, vendorId: v.id, sku: `CMP${i}-${SUFFIX}`.toUpperCase(), priceMinorUnits: BigInt(10_000 + i * 1_000), optionsKey: '', isActive: true },
@@ -256,11 +255,10 @@ describe('AD-17 · الحملات — الترتيب والظهور في الر�
     await prisma.coupon.update({ where: { id: coupon.id }, data: { isActive: true } });
 
     // القائمة: العدد والنطاق والرمز
-    const row = ((await call('GET', '/admin/campaigns', content)).json() as { id: string; productCount: number; couponCode: string; scope: { shops: number; categoryNameAr: string | null } }[]).find((c) => c.id === id)!;
+    const row = ((await call('GET', '/admin/campaigns', content)).json() as { id: string; productCount: number; couponCode: string; scope: { shops: number } }[]).find((c) => c.id === id)!;
     expect(row.productCount).toBe(3);
     expect(row.couponCode).toBe(coupon.code);
     expect(row.scope.shops).toBe(1);
-    expect(row.scope.categoryNameAr).toBe((await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } })).nameAr);
   });
 
   it('المجدولة والمنتهية والموقوفة لا تظهر في الرئيسية، والحالة تُحسب في الخادم', async () => {

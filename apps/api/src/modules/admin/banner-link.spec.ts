@@ -6,7 +6,7 @@ import { isInternalPath } from './application/content.service';
  * لو وُضعت في href — والقاعدة نفسها في internalPath بالواجهة (next بعد الدخول).
  */
 describe('رابط البانر — مسار داخلي فقط', () => {
-  it.each(['/categories', '/c/ملابس', '/search?q=a&page=2', '/p/x#reviews', '/'])('يقبل %s', (link) => {
+  it.each(['/shops', '/s/متجر?category=x', '/search?q=a&page=2', '/p/x#reviews', '/'])('يقبل %s', (link) => {
     expect(isInternalPath(link)).toBe(true);
   });
 
