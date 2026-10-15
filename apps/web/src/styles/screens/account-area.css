@@ -57,6 +57,13 @@
 /* الخروج زرّ لا رابط — بشكل عناصر التنقّل، ومنفصل عنها بمسافة */
 button.aa-nav__link { font-family: inherit; cursor: pointer; text-align: start; }
 .aa-nav__link--out { margin-block-start: var(--space-3); }
+/* لوحتا الإدارة والتاجر — مجموعة منفصلة بخطّ فوقها، بلون العلامة لأنها خروج من الحساب إلى العمل */
+.aa-nav__group { margin-block-start: var(--space-3); padding-block-start: var(--space-3); border-block-start: 1px solid var(--border-subtle); }
+.aa-nav__link--panel { color: var(--brand-text); font-weight: var(--weight-semi); }
+/* على الجوال القائمة شريط أفقي — لا خطّ فوق قرص */
+@media (max-width: 860px) {
+  .aa-nav__group { margin: 0; padding: 0; border: 0; }
+}
 @media (min-width: 861px) {
   button.aa-nav__link { inline-size: 100%; border: 0; background: none; }
 }
