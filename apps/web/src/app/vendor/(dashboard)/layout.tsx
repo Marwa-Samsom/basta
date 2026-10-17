@@ -109,6 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
       groups={NAV}
       tools={<NotificationBell />}
+      exitHref="/account"
       sideFoot={
         <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login">
           خروج
