@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from '@/components/icons';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export interface DashNavItem {
   href: string;
@@ -33,26 +34,27 @@ function activeHref(pathname: string, groups: DashNavGroup[]): string | null {
 /**
  * قشرة اللوحتين — ملفات التصميم: شريط جانبي بعرض 232 فيه هوية المتجر أو
  * الإدارة وأقسامها بأيقوناتها وعدّاداتها، وشريط علوي فيه عنوان القسم المفتوح
- * والجرس والمستخدم. لوحة البائع بسطح أبيض، والإدارة بسطح معكوس داكن
- * (`tone="inverse"`) — فلا يخلط المدير بين اللوحتين.
+ * والجرس والمستخدم. اللوحتان بسطح الموقع نفسه — كان شريط الإدارة معكوساً
+ * داكناً ليميّزها، وتوحّد بطلب صاحبة المشروع (17 أكتوبر 2026).
  */
 export function DashShell({
-  tone = 'light',
   ident,
   groups,
   tools,
   user,
   sideFoot,
   banner,
+  exitHref,
   children,
 }: {
-  tone?: 'light' | 'inverse';
   ident: ReactNode;
   groups: DashNavGroup[];
   tools?: ReactNode;
   user?: { name: string; sub?: string | undefined } | undefined;
   sideFoot?: ReactNode;
   banner?: ReactNode;
+  /** وجهة «✕» أعلى اللوحة: يغادرها إلى الموقع والجلسة باقية — غير «خروج» الذي ينهيها */
+  exitHref?: string;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -73,7 +75,7 @@ export function DashShell({
   }, [open]);
 
   return (
-    <div className="dash" data-density="compact" data-tone={tone}>
+    <div className="dash" data-density="compact">
       <aside className="dash__side" data-open={open} id="dash-side">
         {ident}
         <nav className="dash__nav" aria-label="أقسام اللوحة">
@@ -117,6 +119,7 @@ export function DashShell({
           </button>
           <span className="dash__title">{title}</span>
           <div className="dash__tools">
+            <ThemeToggle />
             {tools}
             {user ? (
               <span className="dash__user">
@@ -125,6 +128,11 @@ export function DashShell({
                 </span>
                 <span className="dash__user-name">{user.name}</span>
               </span>
+            ) : null}
+            {exitHref ? (
+              <Link href={exitHref} className="icon-btn" aria-label="الخروج من اللوحة" title="الخروج من اللوحة">
+                <Icon name="x" size={18} />
+              </Link>
             ) : null}
           </div>
         </header>

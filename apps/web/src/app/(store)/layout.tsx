@@ -4,6 +4,7 @@ import '@/styles/screens/storefront-purchase.css';
 import { Icon } from '@/components/icons';
 import { NotificationBell } from '@/components/notification-bell';
 import { SearchBox } from '@/components/search-box';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { CartButton, ShopStrip } from '@/components/store-chrome';
 import { getShops } from '@/lib/storefront';
 
@@ -58,6 +59,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
           </Link>
           <SearchBox />
           <div className="store__tools">
+            <ThemeToggle />
             <NotificationBell />
             <Link href="/account" className="icon-btn" aria-label="حسابي وطلباتي">
               <Icon name="user" size={19} />

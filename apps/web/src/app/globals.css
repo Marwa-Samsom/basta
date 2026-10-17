@@ -669,7 +669,7 @@ textarea.field__control {
   position: sticky;
   inset-block-start: 0;
   block-size: 100dvh;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--surface-card);
   border-inline-end: 1px solid var(--border-default);
   padding-block: var(--space-3);
@@ -677,6 +677,10 @@ textarea.field__control {
   flex-direction: column;
   gap: var(--space-1);
 }
+
+/* الأقسام وحدها تتمرّر: «خروج» في الذيل ظاهر دائماً مهما طالت القائمة —
+   قائمة الإدارة تتجاوز العشرين بنداً فكان الزرّ يختفي تحت حافة الشاشة */
+.dash__side > .dash__nav { flex: 1; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 .dash__ident {
   display: flex;
@@ -752,7 +756,7 @@ textarea.field__control {
 }
 .dash__link[data-active='true'] .dash__count { background: var(--brand); color: var(--text-on-brand); }
 
-.dash__side-foot { margin-block-start: auto; padding: var(--space-3) var(--space-2) 0; border-block-start: 1px solid var(--border-subtle); }
+.dash__side-foot { flex: none; padding: var(--space-3) var(--space-2) 0; border-block-start: 1px solid var(--border-subtle); }
 
 .dash__col { display: flex; flex-direction: column; min-width: 0; }
 
@@ -812,27 +816,6 @@ textarea.field__control {
   font-weight: var(--weight-black);
   font-size: var(--text-md);
 }
-
-/* الإدارة — الشريط بسطح معكوس، والقسم المفتوح بتعبئة العلامة */
-.dash[data-tone='inverse'] .dash__side {
-  --inv-line: color-mix(in srgb, var(--text-on-inverse) 12%, transparent);
-  --inv-soft: color-mix(in srgb, var(--text-on-inverse) 62%, transparent);
-  background: var(--surface-inverse);
-  border-inline-end-color: var(--surface-inverse);
-  color: var(--text-on-inverse);
-}
-.dash[data-tone='inverse'] .dash__ident,
-.dash[data-tone='inverse'] .dash__side-foot { border-color: var(--inv-line); }
-.dash[data-tone='inverse'] .dash__ident-name { color: var(--text-on-inverse); }
-.dash[data-tone='inverse'] .dash__ident-sub,
-.dash[data-tone='inverse'] .dash__group { color: var(--inv-soft); }
-.dash[data-tone='inverse'] .dash__link { color: color-mix(in srgb, var(--text-on-inverse) 82%, transparent); }
-.dash[data-tone='inverse'] .dash__link:hover { background: color-mix(in srgb, var(--text-on-inverse) 8%, transparent); color: var(--text-on-inverse); }
-.dash[data-tone='inverse'] .dash__link[data-active='true'] { background: var(--brand); color: var(--text-on-brand); font-weight: var(--weight-bold); }
-.dash[data-tone='inverse'] .dash__count { background: var(--danger); color: var(--text-on-brand); }
-.dash[data-tone='inverse'] .dash__link[data-active='true'] .dash__count { background: color-mix(in srgb, var(--text-on-brand) 22%, transparent); }
-.dash[data-tone='inverse'] .dash__side-foot .btn { --btn-fg: var(--text-on-inverse); }
-.dash[data-tone='inverse'] .dash__side-foot .btn:hover:not(:disabled) { --btn-bg: color-mix(in srgb, var(--text-on-inverse) 8%, transparent); }
 
 @media (max-width: 860px) {
   .dash { grid-template-columns: minmax(0, 1fr); }

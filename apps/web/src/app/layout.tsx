@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { connection } from 'next/server';
 // الخطوط مستضافة ذاتياً: سياسة المحتوى لا تسمح بخطوط من أصل آخر، والمشروع محلي
 // بلا اعتماد على شبكة خارجية.
@@ -20,6 +21,7 @@ import { IconSprite } from '@/components/icons';
 import { SessionExpiredRedirect } from '@/components/session-expired';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import { SITE_URL } from '@/lib/seo';
+import { THEME_BOOT } from '@/lib/theme';
 import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from '@/lib/theme-colors';
 
 export const metadata: Metadata = {
@@ -46,9 +48,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // كل صفحة تُصيَّر عند الطلب: سياسة المحتوى تحمل nonce جديداً لكل طلب
   // (src/proxy.ts)، وصفحة مبنية سلفاً لا تعرفه فتُحجب سكربتاتها كلها
   await connection();
-  // lang و dir على عنصر html — أساس RTL لا خاصية CSS
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+  // lang و dir على عنصر html — أساس RTL لا خاصية CSS. و data-theme يضعه سكربت
+  // الوضع قبل الترطيب، فيختلف عن مصدر الخادم عمداً (lib/theme)
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <head>
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+      </head>
       <body>
         <IconSprite />
         {children}

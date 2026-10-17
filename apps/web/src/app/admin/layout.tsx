@@ -97,7 +97,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <MeContext.Provider value={me}>
       <DashShell
-        tone="inverse"
         ident={
           <DashIdent
             href="/admin"
@@ -111,6 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           />
         }
         groups={groups}
+        exitHref="/account"
         sideFoot={
           <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login?next=/admin">
             خروج
