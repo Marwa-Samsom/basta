@@ -132,11 +132,11 @@ export class OrderQueryService {
 
   async vendorList(
     vendorId: string,
-    q: { status?: string; search?: string; page?: number },
+    q: { status?: readonly string[]; search?: string; page?: number },
   ): Promise<{ items: unknown[]; total: number; counts: Record<string, number> }> {
     const where: Prisma.SubOrderWhereInput = {
       vendorId,
-      ...(q.status ? { status: q.status as SubOrderStatus } : {}),
+      ...(q.status?.length ? { status: { in: q.status as SubOrderStatus[] } } : {}),
       ...(q.search ? { subOrderNumber: { contains: q.search.trim(), mode: 'insensitive' } } : {}),
     };
     const page = Math.max(1, q.page ?? 1);

@@ -723,3 +723,27 @@ describe('حسم النزاع لصالح المشتري يردّ ماله — و
     expect(await statusOf(a.id)).toBe('delivered');
   });
 });
+
+describe('قائمة طلبات المتجر — تصفية بحالة أو أكثر', () => {
+  it('تبويب «ملغى أو مُسترَد» يجمع حالاته الأربع، وحالة مفردة لا تُظهر غيرها، والمجهولة تُرفض', async () => {
+    if (!dbUp) return;
+    const { a, b, order } = await placeOrder([1, 1]);
+    expect((await call('POST', `/me/orders/${order.orderNumber}/stores/${b.id}/cancel`, buyer.token, { reason: 'غيّرت رأيي' })).statusCode).toBe(200);
+    expect(await statusOf(b.id)).toBe('refunded');
+
+    const closed = ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'];
+    const grouped = await call('GET', `/vendor/orders?status=${closed.join(',')}`, vendors[1]!.token);
+    expect(grouped.statusCode, grouped.body).toBe(200);
+    const items = grouped.json().items as { id: string; status: string }[];
+    expect(items.map((i) => i.id)).toContain(b.id);
+    for (const i of items) expect(closed).toContain(i.status);
+
+    const waiting = (await call('GET', '/vendor/orders?status=awaiting_vendor', vendors[1]!.token)).json().items as { id: string; status: string }[];
+    expect(waiting.map((i) => i.id)).not.toContain(b.id);
+    for (const i of waiting) expect(i.status).toBe('awaiting_vendor');
+    // أخوه عند المتجر الآخر لا يظهر هنا أصلاً
+    expect(items.map((i) => i.id)).not.toContain(a.id);
+
+    expect((await call('GET', '/vendor/orders?status=completed,bogus', vendors[1]!.token)).statusCode).toBe(400);
+  });
+});

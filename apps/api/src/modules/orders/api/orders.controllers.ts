@@ -12,10 +12,11 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  IsArray,
   IsIn,
   IsInt,
   IsOptional,
@@ -75,10 +76,15 @@ export class TransitionDto {
 }
 
 export class VendorOrdersQueryDto {
+  /** حالة أو أكثر مفصولة بفاصلة — تبويب «ملغى أو مُسترَد» يجمع أربع حالات نهائية */
   @IsOptional()
-  @IsString()
-  @IsIn(Object.values(SubOrderStatuses), { message: 'حالة الطلب غير معروفة.' })
-  status?: string;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.split(',').map((s) => s.trim()).filter(Boolean) : value,
+  )
+  @IsArray()
+  @ArrayMaxSize(Object.values(SubOrderStatuses).length)
+  @IsIn(Object.values(SubOrderStatuses), { each: true, message: 'حالة الطلب غير معروفة.' })
+  status?: string[];
 
   @IsOptional()
   @IsString()
@@ -141,7 +147,7 @@ export class VendorOrdersController {
   @ApiOperation({ summary: 'طلبات المتجر مع عدّاد لكل حالة' })
   list(@CurrentActor() actor: Actor, @Query() q: VendorOrdersQueryDto) {
     return this.query.vendorList(vendorIdOf(actor), {
-      ...(q.status ? { status: q.status } : {}),
+      ...(q.status?.length ? { status: q.status } : {}),
       ...(q.search ? { search: q.search } : {}),
       ...(q.page ? { page: q.page } : {}),
     });
