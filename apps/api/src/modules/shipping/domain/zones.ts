@@ -16,6 +16,8 @@
  * تسعير لا تقرؤه الطريقة المختارة (كان سيُحفظ ويُتجاهل بصمت).
  */
 
+import { placeKey, samePlace } from '../../../common/places';
+
 export const RATE_METHODS = ['flat', 'by_weight', 'free_over'] as const;
 export type RateMethod = (typeof RATE_METHODS)[number];
 
@@ -49,7 +51,7 @@ export class ShapeError extends Error {
   }
 }
 
-/** قصّ الطرفين وحده — كما يفعل `quoteShipping`؛ أيّ توحيد أبعد يصنع فرقاً لا يراه التسعير */
+/** قصّ الطرفين للحفظ — المقارنة بـ `placeKey` كما في `quoteShipping`: «عمّان» و«عمان» مكان واحد */
 const clean = (v: string | null | undefined): string | null => {
   const t = (v ?? '').trim();
   return t === '' ? null : t;
@@ -65,7 +67,7 @@ export function normalizeRegion(r: { country: string; region?: string | null | u
   return { country, region: clean(r.region), city: clean(r.city) };
 }
 
-export const regionKey = (r: RegionShape): string => `${r.country}|${r.region ?? ''}|${r.city ?? ''}`;
+export const regionKey = (r: RegionShape): string => `${r.country}|${placeKey(r.region)}|${placeKey(r.city)}`;
 
 /** يحذف التكرار داخل المنطقة الواحدة — لا أثر له في التسعير، ويُربك العرض */
 export function dedupeRegions(rows: readonly RegionShape[]): RegionShape[] {
@@ -93,9 +95,9 @@ export function ties(a: RegionShape, b: RegionShape): boolean {
     case 1:
       return true;
     case 2:
-      return a.region === b.region;
+      return samePlace(a.region, b.region);
     case 3:
-      return a.city === b.city && (a.region === null || b.region === null || a.region === b.region);
+      return samePlace(a.city, b.city) && (a.region === null || b.region === null || samePlace(a.region, b.region));
   }
 }
 

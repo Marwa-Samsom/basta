@@ -9,6 +9,8 @@ import { api } from '@/lib/api';
 import { minorUnitDigits } from '@/lib/money';
 import { money } from '@/lib/orders';
 import { COUNTRIES } from '@/lib/vendor';
+import { samePlace } from '@/lib/places';
+import { RegionSelect } from '@/components/region-select';
 
 type Method = 'flat' | 'by_weight' | 'free_over';
 
@@ -357,7 +359,7 @@ function CoverageEditor({
       <div className="vx-cover-add">
         <Field label="البلد">
           {(p) => (
-            <select className="field__control" {...p} value={country} onChange={(e) => set({ country: e.target.value })}>
+            <select className="field__control" {...p} value={country} onChange={(e) => set({ country: e.target.value, region: '' })}>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.nameAr}
@@ -366,7 +368,7 @@ function CoverageEditor({
             </select>
           )}
         </Field>
-        <TextInput label="المحافظة / المنطقة" optional value={region} onChange={(e) => set({ region: e.target.value })} />
+        <RegionSelect country={country} value={region} onChange={(v) => set({ region: v })} emptyLabel="كل البلد" optional />
         <TextInput label="المدينة" optional value={city} onChange={(e) => set({ city: e.target.value })} />
         <button type="button" className="btn btn--secondary" onClick={add}>
           <Icon name="plus" size={15} />
@@ -375,8 +377,8 @@ function CoverageEditor({
       </div>
       <p className="vx-hint">
         <Icon name="info" size={13} />
-        الدول ثم المناطق ثم المدن — والأدقّ يفوز: سعر المدينة قبل سعر محافظتها قبل سعر البلد. اكتب المحافظة والمدينة كما يكتبها
-        المشتري في عنوانه، فالمطابقة حرفية. اترك المدينة فارغة لتغطية المحافظة كلها، والاثنتين لتغطية البلد كله.
+        الدول ثم المناطق ثم المدن — والأدقّ يفوز: سعر المدينة قبل سعر محافظتها قبل سعر البلد. المحافظة من القائمة نفسها التي يختار منها
+        المشتري عنوانه، والمدينة تُطابَق بلا تشكيل ولا همزة. اترك المدينة فارغة لتغطية المحافظة كلها، و«كل البلد» لتغطيته كله.
       </p>
     </div>
   );
@@ -556,11 +558,11 @@ type PreviewResult =
  * الحكم الملزم عند الدفع للخادم؛ هذه تُري البائع ما سيراه المشتري.
  */
 function previewQuote(zones: Zone[], addr: Region, itemsMinor: bigint, grams: number): PreviewResult {
-  const norm = (v: string | null) => (v ?? '').trim();
+  // بقاعدة الخادم نفسها — «عمّان» و«عمان» مكان واحد (lib/places)
   const score = (r: Region): number => {
     if (r.country.toUpperCase() !== addr.country.toUpperCase()) return -1;
-    if (r.city && norm(r.city) !== norm(addr.city)) return -1;
-    if (r.region && norm(r.region) !== norm(addr.region)) return -1;
+    if (r.city && !samePlace(r.city, addr.city)) return -1;
+    if (r.region && !samePlace(r.region, addr.region)) return -1;
     return r.city ? 3 : r.region ? 2 : 1;
   };
   let best: { zone: Zone; score: number } | null = null;
@@ -623,7 +625,7 @@ function Preview({ zones, currency }: { zones: Zone[]; currency: string }) {
       <div className="vx-preview__inputs">
         <Field label="البلد">
           {(p) => (
-            <select className="field__control" {...p} value={addr.country} onChange={(e) => setAddr({ ...addr, country: e.target.value })}>
+            <select className="field__control" {...p} value={addr.country} onChange={(e) => setAddr({ ...addr, country: e.target.value, region: '' })}>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.nameAr}
@@ -632,7 +634,7 @@ function Preview({ zones, currency }: { zones: Zone[]; currency: string }) {
             </select>
           )}
         </Field>
-        <TextInput label="المحافظة" value={addr.region ?? ''} onChange={(e) => setAddr({ ...addr, region: e.target.value })} />
+        <RegionSelect label="المحافظة" country={addr.country} value={addr.region ?? ''} onChange={(v) => setAddr({ ...addr, region: v })} emptyLabel="—" optional />
         <TextInput label="المدينة" value={addr.city ?? ''} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
         <AmountField label="قيمة السلّة" value={basket} onChange={setBasket} currency={currency} />
         <TextInput label="الوزن (كغ)" className="field__control vx-days" inputMode="decimal" dir="ltr" value={weight} onChange={(e) => setWeight(e.target.value)} />

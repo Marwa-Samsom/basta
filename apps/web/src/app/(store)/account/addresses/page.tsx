@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Icon } from '@/components/icons';
+import { RegionSelect } from '@/components/region-select';
 import { Alert, EmptyState, Field, PageHead, TextInput } from '@/components/ui';
 import { api, session } from '@/lib/api';
 import {
@@ -345,6 +346,13 @@ function AddressDrawer({
       if (submitted) setErrors(validate(next));
     };
 
+  /** المحافظة من القائمة؛ وتغيير البلد يفرغها — محافظة بلد آخر لا تبقى مختارة */
+  const setRegion = (region: string, country = form.country) => {
+    const next = { ...form, country, region };
+    setForm(next);
+    if (submitted) setErrors(validate(next));
+  };
+
   /** الخطأ يظهر عند مغادرة الحقل، لا أثناء الكتابة */
   const blur = (key: keyof FormState) => () => {
     const e = validate(form)[key];
@@ -440,7 +448,7 @@ function AddressDrawer({
           />
           <Field label="البلد">
             {(props) => (
-              <select className="field__control" {...props} value={form.country} onChange={set('country')}>
+              <select className="field__control" {...props} value={form.country} onChange={(e) => setRegion('', e.target.value)}>
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.name}
@@ -449,14 +457,7 @@ function AddressDrawer({
               </select>
             )}
           </Field>
-          <TextInput
-            label="المحافظة / المنطقة"
-            maxLength={80}
-            value={form.region}
-            error={errors.region}
-            onChange={set('region')}
-            onBlur={blur('region')}
-          />
+          <RegionSelect country={form.country} value={form.region} error={errors.region} onChange={(v) => setRegion(v)} onBlur={blur('region')} />
           <TextInput
             label="المدينة"
             autoComplete="address-level2"

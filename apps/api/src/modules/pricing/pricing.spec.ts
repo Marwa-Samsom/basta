@@ -335,6 +335,23 @@ describe('الشحن', () => {
     expect(q.available).toBe(false);
     if (!q.available) expect(q.reason).toMatch(/لا يشحن/);
   });
+
+  it('اسم المكان يطابق بلا شدّة ولا همزة ولا «محافظة» — لا حرفياً', () => {
+    const regional = [
+      {
+        regions: [
+          { country: 'JO', region: 'عمان', city: null },
+          { country: 'JO', region: 'الزرقا', city: null },
+        ],
+        rates: [{ method: 'flat', priceMinor: 2_000n, perKgMinor: null, freeOverMinor: null, minDays: 2, maxDays: 4, isActive: true }],
+      },
+    ];
+    for (const region of ['عمّان', 'محافظة عمان', 'الزرقاء', ' الزرقا ']) {
+      const q = quoteShipping(regional, { country: 'JO', region, city: 'أي مدينة' }, ctx);
+      expect(q, region).toMatchObject({ available: true, minor: 2_000n });
+    }
+    expect(quoteShipping(regional, { country: 'JO', region: 'إربد', city: 'إربد' }, ctx).available).toBe(false);
+  });
 });
 
 describe('سقف خصم النسبة — للطلب كله، بعملة الكوبون', () => {
