@@ -22,7 +22,8 @@ const QUEUES: { key: keyof Dashboard['queues']; label: string; sub: string; href
   { key: 'vendors', label: 'متاجر تنتظر الاعتماد', sub: 'الأقدم أولاً', href: '/admin/vendors', icon: 'store', hot: true },
   { key: 'payouts', label: 'طلبات تحويل', sub: 'بانتظار الموافقة أو التحويل', href: '/admin/payouts', icon: 'wallet', hot: false },
   { key: 'disputes', label: 'نزاعات مفتوحة', sub: 'مفتوحة ومصعَّدة — الرصيد مجمَّد', href: '/admin/disputes', icon: 'scale', hot: true },
-  { key: 'overdueAcceptance', label: 'طلبات فرعية قاربت مهلة القبول', sub: 'أقل من 12 ساعة على انقضاء المهلة', href: '/admin/orders?status=processing', icon: 'clock', hot: true },
+  // القائمة نفسها التي يعدّها: كانت تفتح كل «قيد التنفيذ» فيضيع الطلب بين المئات
+  { key: 'overdueAcceptance', label: 'طلبات فرعية قاربت مهلة القبول', sub: 'أقل من 12 ساعة على انقضاء المهلة', href: '/admin/orders?due=acceptance', icon: 'clock', hot: true },
 ];
 
 const VIEW_LABELS: Record<string, string> = {

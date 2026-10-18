@@ -276,6 +276,8 @@
 .ao-stack { display: grid; gap: 2px; min-width: 0; justify-items: start; }
 .ao-stack--end { justify-items: end; }
 .ao-stack__sub { font-size: var(--text-2xs); color: var(--text-muted); }
+/* مهلة القبول تنقضي قريباً — لون التحذير لا الخطر: لم يُلغَ بعد */
+.ao-due { display: inline-flex; align-items: center; gap: 4px; color: var(--warning-text); }
 .ao-rtext { min-inline-size: 18rem; line-height: 1.7; }
 
 /* المتجر في خلية: مربّع أيقونة واسم وسطر تحته */
