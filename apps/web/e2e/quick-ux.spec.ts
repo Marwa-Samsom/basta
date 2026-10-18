@@ -21,7 +21,7 @@ test('الدفع: الزر ينتظر الاسم والشارع والهاتف،
   await page.goto('/checkout');
 
   await page.getByLabel('البلد').selectOption('SA');
-  await page.getByLabel('المحافظة / المنطقة').fill('الرياض');
+  await page.getByLabel('المحافظة / المنطقة').selectOption('الرياض');
   await page.getByLabel('المدينة').fill('الرياض');
 
   // انقطاع الشبكة أثناء «احسب الشحن»: رسالة تقول ما حدث لا «Failed to fetch»
