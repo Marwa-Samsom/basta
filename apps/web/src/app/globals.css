@@ -1105,6 +1105,34 @@ a.stat:hover { box-shadow: var(--shadow-md); }
 
 .store__tools { display: flex; align-items: center; gap: var(--space-2); flex: none; }
 
+/* عملة العرض — الرمز ظاهر، والقائمة الأصلية شفّافة فوقه تفتح بأسماء العملات كاملة */
+.cur-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  block-size: var(--ctrl-h);
+  padding-inline: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.cur-pick:hover { background: var(--surface-sunken); color: var(--text-strong); }
+.cur-pick:focus-within { outline: 2px solid var(--brand); outline-offset: 1px; }
+.cur-pick[data-busy] { opacity: 0.6; }
+.cur-pick__code { font-weight: var(--weight-semi); letter-spacing: 0.02em; }
+.cur-pick__select {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
 .store__cats {
   max-width: var(--width-storefront);
   margin-inline: auto;

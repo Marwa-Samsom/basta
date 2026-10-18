@@ -7,6 +7,7 @@ import { Icon } from '@/components/icons';
 import { RecordView } from '@/components/recent';
 import { Crumbs } from '@/components/listing';
 import { ProductGrid } from '@/components/product-card';
+import { requestCurrency } from '@/lib/currency-server';
 import { getProduct, getShop, imageUrl, num } from '@/lib/storefront';
 import { ProductGallery, ProductSelection, VariantPicker, type GalleryImage } from '@/components/variant-picker';
 import { WishHeart } from '@/components/wish-heart';
@@ -19,7 +20,8 @@ const MORE_FROM_SHOP = 4;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProduct(slug);
+  // بعملة الصفحة نفسها: الطلب واحد يخدم البيانات الوصفية والصفحة
+  const product = await getProduct(slug, await requestCurrency());
   return {
     title: product.nameAr,
     description: product.descriptionAr?.slice(0, 160) ?? `${product.nameAr} من ${product.vendor.nameAr}`,
@@ -43,10 +45,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  */
 export default async function ProductPage({ params }: Params) {
   const { slug } = await params;
-  const product = await getProduct(slug);
+  const currency = await requestCurrency();
+  const product = await getProduct(slug, currency);
 
   // منتجات أخرى من المتجر نفسه — تحسين لا شرط: تعذّر جلبها لا يُسقط الصفحة
-  const shop = await getShop(product.vendor.slug).catch(() => null);
+  const shop = await getShop(product.vendor.slug, { currency }).catch(() => null);
   const more = (shop?.products ?? []).filter((p) => p.id !== product.id).slice(0, MORE_FROM_SHOP);
 
   const images: GalleryImage[] = product.images.map((img) => ({

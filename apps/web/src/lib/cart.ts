@@ -1,6 +1,7 @@
 'use client';
 
 import { api, ApiError } from './api';
+import { displayCurrency } from './currency';
 
 /**
  * السلة في المتصفّح — رمز في التخزين المحلي، والسلة نفسها في الخادم.
@@ -15,8 +16,6 @@ const changed = <T>(value: T): T => {
   window.dispatchEvent(new Event(CART_EVENT));
   return value;
 };
-const CURRENCY_KEY = 'basta.currency';
-
 export interface Money {
   minorUnits: string;
   currency?: string;
@@ -31,8 +30,12 @@ export interface CartLine {
   imageKey: string | null;
   qty: number;
   available: number;
+  /** بعملة السلة — عملة العرض التي يدفع بها */
   unitPrice: Money;
   lineTotal: Money;
+  /** بعملة المتجر حين تختلف عن عملة السلة */
+  originalUnitPrice: Money | null;
+  originalLineTotal: Money | null;
   priceChanged: boolean;
 }
 
@@ -43,6 +46,7 @@ export interface CartView {
   groups: {
     vendorId: string;
     vendorNameAr: string;
+    storeCurrency: string;
     lines: CartLine[];
     subtotal: Money;
     shipping: Money | null;
@@ -53,11 +57,6 @@ export interface CartView {
   couponCode: string | null;
   blockers: string[];
 }
-
-export const displayCurrency = (): string => {
-  if (typeof window === 'undefined') return 'JOD';
-  return window.localStorage.getItem(CURRENCY_KEY) ?? 'JOD';
-};
 
 const readToken = (): string | null =>
   typeof window === 'undefined' ? null : window.localStorage.getItem(TOKEN_KEY);
@@ -93,13 +92,24 @@ export const cartApi = {
   get: (): Promise<CartView | null> => {
     const token = readToken();
     if (!token) return Promise.resolve(null);
-    return api<CartView>('/cart', { headers: { 'x-cart-token': token } }).catch((err) => {
-      if (err instanceof ApiError && err.status === 404) {
-        window.localStorage.removeItem(TOKEN_KEY);
-        return null;
-      }
-      throw err;
-    });
+    return api<CartView>('/cart', { headers: { 'x-cart-token': token } })
+      .then((cart) =>
+        // سلة من قبل أن تتغيّر عملة العرض (جهاز آخر، أو دخول بحساب له عملته): تتبع الصفحة
+        cart.currency === displayCurrency()
+          ? cart
+          : api<CartView>('/cart/currency', {
+              method: 'PUT',
+              body: { currency: displayCurrency() },
+              headers: { 'x-cart-token': token },
+            }).catch(() => cart),
+      )
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          window.localStorage.removeItem(TOKEN_KEY);
+          return null;
+        }
+        throw err;
+      });
   },
   add: (variantId: string, qty: number) =>
     withCart((t) =>

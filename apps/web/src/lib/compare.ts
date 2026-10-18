@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from './api';
+import { displayCurrency } from './currency';
 import { localList, useLocalList } from './recent';
 import type { ProductPage } from './storefront';
 
@@ -57,7 +58,10 @@ export function clearCompare(): void {
 /** المنتج كما يعرضه المتجر الآن، أو null إن لم يعد منشوراً */
 export async function fetchPublicProduct(slug: string): Promise<ProductPage | null> {
   try {
-    return await api<ProductPage>(`/storefront/products/${encodeURIComponent(slug)}`, { auth: false });
+    // بعملة الصفحة التي يُعرض فيها — المقارنة و«شاهدتَ مؤخراً» بالعملة نفسها
+    return await api<ProductPage>(`/storefront/products/${encodeURIComponent(slug)}?currency=${displayCurrency()}`, {
+      auth: false,
+    });
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return null;
     throw err;

@@ -217,7 +217,12 @@ export default function CartPage() {
                 <dd className="money num">{cart.totals.total.formatted}</dd>
               </div>
             </dl>
-            <p className="sp-sum__fx">الأسعار بعملة كل متجر، وتُحوَّل إلى {cart.currency} عند الدفع.</p>
+            {cart.groups.some((g) => g.storeCurrency !== cart.currency) ? (
+              <p className="sp-sum__fx">
+                كل المبالغ بعملتك (<span className="num">{cart.currency}</span>) بسعر صرف اليوم، وهي ما تدفعه؛ سعر
+                المتجر بعملته تحت قطعته. تغيّر العملة من رأس الصفحة.
+              </p>
+            ) : null}
           </div>
 
           <div className="sp-bar">
@@ -324,6 +329,11 @@ function CartRow({ line: l, busy, onQty }: { line: CartLine; busy: boolean; onQt
         <span className="sp-line__unit num">
           {l.unitPrice.formatted} × {l.qty}
         </span>
+        {l.originalLineTotal ? (
+          <span className="sp-line__store">
+            <span className="num">{l.originalLineTotal.formatted}</span> بعملة المتجر
+          </span>
+        ) : null}
       </div>
     </div>
   );

@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import '@/styles/screens/storefront-discovery.css';
 import '@/styles/screens/storefront-purchase.css';
+import { CurrencyPicker } from '@/components/currency-picker';
 import { Icon } from '@/components/icons';
 import { NotificationBell } from '@/components/notification-bell';
 import { SearchBox } from '@/components/search-box';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { CartButton, ShopStrip } from '@/components/store-chrome';
-import { getShops } from '@/lib/storefront';
+import { requestCurrency } from '@/lib/currency-server';
+import { getCurrencies, getShops } from '@/lib/storefront';
 
 /** المتاجر الظاهرة في شريط الرأس — البقية في «كل المتاجر» */
 const TOP_SHOPS = 6;
@@ -46,12 +48,19 @@ const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
  * الرأس بلا رقائقها: سقوط شريط لا يُسقط الصفحة.
  */
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
-  const top = await getShops()
-    .then((r) => r.items.slice(0, TOP_SHOPS))
-    .catch(() => []);
+  const [top, money, chosen] = await Promise.all([
+    getShops()
+      .then((r) => r.items.slice(0, TOP_SHOPS))
+      .catch(() => []),
+    getCurrencies(),
+    requestCurrency(),
+  ]);
+  // ما يعرضه الخادم بالضبط: المختارة إن كانت متاحة، وإلا افتراضية الإدارة.
+  // data-currency منه تقرأ السلة والمفضّلة — فلا تختلف عملة صفحة عن سلّتها
+  const currency = chosen && money.currencies.some((c) => c.code === chosen) ? chosen : money.defaultCurrency;
 
   return (
-    <div className="store" data-density="comfortable">
+    <div className="store" data-density="comfortable" data-currency={currency}>
       <header className="store__head">
         <div className="store__bar">
           <Link href="/" className="store__brand">
@@ -59,6 +68,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
           </Link>
           <SearchBox />
           <div className="store__tools">
+            <CurrencyPicker current={currency} options={money.currencies} />
             <ThemeToggle />
             <NotificationBell />
             <Link href="/account" className="icon-btn" aria-label="حسابي وطلباتي">
