@@ -383,7 +383,9 @@ function StoreCard({
         ) : (
           <ol className="sp-track" aria-label="مسار الطلب">
             {TRACK.map((t, i) => {
-              const state = i < step ? 'done' : i === step ? 'current' : 'todo';
+              // آخر المسار إن بُلغ فقد تمّ — «تم التسليم» بساعة الانتظار يُقرأ «لم يُسلَّم بعد»
+              const last = i === TRACK.length - 1;
+              const state = i < step || (last && i === step) ? 'done' : i === step ? 'current' : 'todo';
               const at = i <= step ? reachedAt(t.key, i) : null;
               return (
                 <li
