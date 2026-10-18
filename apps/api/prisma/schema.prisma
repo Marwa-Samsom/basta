@@ -360,6 +360,8 @@ model VendorBankAccount {
 
 /// فئات المتجر — يديرها البائع وحده بلا تدخّل الإدارة (قرار صاحب المشروع 14 أكتوبر 2026،
 /// ألغى شجرة الفئات العامة). قائمة مسطّحة لكل متجر، والمنتج في فئة واحدة منها أو بلا فئة.
+/// كل متجر جديد يبدأ بالفئات الثماني المقترحة — المشغِّل vendors_seed_categories
+/// في مهاجرة 20261018120000_vendor_category_templates، ويعدّلها البائع بعدها.
 model VendorCategory {
   id        String   @id @default(uuid()) @db.Uuid
   vendorId  String   @db.Uuid

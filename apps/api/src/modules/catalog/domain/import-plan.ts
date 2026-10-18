@@ -57,7 +57,7 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
   { key: 'nameEn', header: 'الاسم_إنجليزي', aliases: ['name_en'], required: false, example: ['Cotton T-shirt', 'Cotton T-shirt'] },
   { key: 'descriptionAr', header: 'الوصف_عربي', aliases: ['description_ar'], required: false, example: ['قطن مصري 100%', 'قطن مصري 100%'] },
   { key: 'descriptionEn', header: 'الوصف_إنجليزي', aliases: ['description_en'], required: false, example: ['100% Egyptian cotton', '100% Egyptian cotton'] },
-  { key: 'category', header: 'الفئة', aliases: ['category'], required: false, example: ['قمصان', 'قمصان'] },
+  { key: 'category', header: 'الفئة', aliases: ['category'], required: true, example: ['أزياء وملابس', 'أزياء وملابس'] },
   { key: 'price', header: 'السعر', aliases: ['price'], required: true, example: ['79.00', '79.00'] },
   { key: 'compareAtPrice', header: 'السعر_قبل_الخصم', aliases: ['compare_at_price'], required: false, example: ['99.00', ''] },
   { key: 'stock', header: 'الكمية', aliases: ['stock', 'qty'], required: true, example: ['25', '10'] },
@@ -239,7 +239,9 @@ export function parseRow(
   if (nameAr === '') fail('nameAr', 'إلزامي.');
   else if (nameAr.length > LIMITS.name) fail('nameAr', `أطول من ${LIMITS.name} محرفاً.`);
 
+  // لا منتج بلا فئة (18 أكتوبر 2026) — اسم فئة من فئات المتجر، أو اسم جديد يُنشأ له
   const category = optional('category', 80);
+  if (category === null) fail('category', 'إلزامي — اسم فئة من فئات متجرك، أو اسم جديد تُنشأ به.');
 
   if (cell('price') === '') fail('price', 'إلزامي.');
   const priceMinorUnits = price('price');

@@ -301,7 +301,11 @@ export class ProductService {
     const vendor = await this.vendors.get(scope.vendorId);
     const effective = await this.attributes.all();
     await this.assertBrand(input.brandId);
-    if (input.vendorCategoryId) await this.categories.assertOwned(scope, input.vendorCategoryId);
+    // لا يُضاف منتج بلا فئة — قرار صاحبة المشروع 18 أكتوبر 2026، والمتجر يبدأ بثماني فئات
+    if (!input.vendorCategoryId) {
+      throw new InvalidInputError('اختر فئة للمنتج — أو أضف فئة جديدة لمتجرك.', { field: 'vendorCategoryId' });
+    }
+    await this.categories.assertOwned(scope, input.vendorCategoryId);
 
     const variants = this.resolveVariants(input.variants, effective, vendor.settlementCurrency);
     for (const v of variants) {
@@ -370,6 +374,11 @@ export class ProductService {
     const currency = current.vendor.settlementCurrency;
     const effective = await this.attributes.all();
     if (input.brandId !== undefined) await this.assertBrand(input.brandId);
+    // الفئة بعد الحفظ إلزامية: منتج قديم بلا فئة يبقى ظاهراً، ويُصنَّف عند أوّل تعديل
+    const category = input.vendorCategoryId !== undefined ? input.vendorCategoryId : current.vendorCategoryId;
+    if (!category) {
+      throw new InvalidInputError('اختر فئة للمنتج قبل الحفظ — لا يبقى منتج بلا فئة.', { field: 'vendorCategoryId' });
+    }
     if (input.vendorCategoryId) await this.categories.assertOwned(scope, input.vendorCategoryId);
 
     // ---- المتغيّرات: المجموعة الحيّة النهائية تُفحص كاملةً
@@ -592,6 +601,7 @@ export class ProductService {
       reasons.push('أرسل طلب متجرك للمراجعة أولاً — النشر يُتاح من لحظة إرساله');
     }
     if (!product.variants.some((v) => v.isActive)) reasons.push('لا متغيّر فعّال يحمل سعراً');
+    if (!product.vendorCategoryId) reasons.push('اختر فئة للمنتج من «الفئة في متجرك»');
     // المشتري يشتري ما يراه — منتج بلا صورة لا يُنشر
     if (product.images.length === 0) reasons.push('أضف صورة واحدة على الأقل — الأولى هي الرئيسية في المتجر');
 

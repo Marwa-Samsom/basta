@@ -123,6 +123,16 @@ const dbIt: typeof it = ((name: string, fn: never, timeout?: number) =>
 
 // ---------------------------------------------------------------------------- أدوات
 
+/** أوّل فئة في المتجر — كل متجر يبدأ بالثماني المقترحة، ولا منتج بلا فئة (18 أكتوبر 2026) */
+const firstCategory = new Map<Tag, string>();
+async function catOf(tag: Tag): Promise<string> {
+  const known = firstCategory.get(tag);
+  if (known) return known;
+  const list = (await as(tag).get('/vendor/categories')).json() as { id: string }[];
+  firstCategory.set(tag, list[0]!.id);
+  return list[0]!.id;
+}
+
 function as(tag: Tag) {
   const headers = { authorization: `Bearer ${vendors[tag].token}` };
   const url = (path: string) => `/api/v1${path}`;
@@ -191,7 +201,7 @@ async function expectNoDrift(variantIds: readonly string[]): Promise<void> {
 
 async function simpleProduct(tag: Tag, sku: string, vendorCategoryId?: string) {
   const res = await as(tag).post('/vendor/products', {
-    ...(vendorCategoryId ? { vendorCategoryId } : {}),
+    vendorCategoryId: vendorCategoryId ?? (await catOf(tag)),
     nameAr: 'منتج بسيط',
     attributes: [{ attributeId: attr('material').attributeId, text: 'قطن' }],
     variants: [{ sku, price: '10.00', stock: 2 }],
@@ -217,8 +227,9 @@ describe('بوابة 05 · البند الأول — دورة حياة منتج 
     const BLUE_M = `BLUE-M-${SUFFIX}`;
     const BLUE_L = `BLUE-L-${SUFFIX}`;
 
-    // ---- الإنشاء: بلا فئة متجر، والسمات من المكتبة العامة
+    // ---- الإنشاء: في فئة من فئات المتجر، والسمات من المكتبة العامة
     const created = await A.post('/vendor/products', {
+      vendorCategoryId: await catOf('a'),
       nameAr: 'قميص قطني',
       nameEn: 'Cotton T-shirt',
       attributes: [{ attributeId: attr('material').attributeId, text: 'قطن مصري' }],
@@ -328,6 +339,7 @@ describe('بوابة 05 · البند الأول — دورة حياة منتج 
     const sku = `REUSE-${SUFFIX}`;
     const first = await simpleProduct('a', sku);
     const clash = await as('a').post('/vendor/products', {
+      vendorCategoryId: await catOf('a'),
       nameAr: 'منتج آخر',
       variants: [{ sku, price: '10.00', stock: 1 }],
     });
@@ -343,6 +355,7 @@ describe('بوابة 05 · البند الأول — دورة حياة منتج 
 
   dbIt('الدينار بثلاث خانات: «12.500» لبائع JOD تُخزَّن 12500 وتُعرض 12.500', async () => {
     const res = await as('b').post('/vendor/products', {
+      vendorCategoryId: await catOf('b'),
       nameAr: 'شماغ',
       variants: [{ sku: `JOD-${SUFFIX}`, price: '12.500', stock: 1 }],
     });
@@ -351,6 +364,7 @@ describe('بوابة 05 · البند الأول — دورة حياة منتج 
     expect(res.json().variants[0].price.formatted).toContain('12.500');
 
     const numeric = await as('b').post('/vendor/products', {
+      vendorCategoryId: await catOf('b'),
       nameAr: 'شماغ',
       variants: [{ sku: `JODN-${SUFFIX}`, price: 12.5, stock: 1 }],
     });
@@ -393,6 +407,7 @@ describe('النشر', () => {
   dbIt('يُمنع بكل أسبابه معاً: متجر لم يُرسل طلبه ولا صورة', async () => {
     const P = as('pending');
     const created = await P.post('/vendor/products', {
+      vendorCategoryId: await catOf('pending'),
       nameAr: 'حذاء',
       variants: [{ sku: `PEND-${SUFFIX}`, price: '150.00', stock: 2 }],
     });
@@ -423,6 +438,7 @@ describe('النشر', () => {
   dbIt('سمة ليست محور متغيّرات لا تصير خياراً: «الخامة» على متغيّر تُرفض', async () => {
     const material = attr('material').attributeId;
     const res = await as('a').post('/vendor/products', {
+      vendorCategoryId: await catOf('a'),
       nameAr: 'أرز',
       variants: [
         { sku: `RICE-M-${SUFFIX}`, price: '20.00', stock: 1, options: [{ attributeId: material, valueId: opt('size', 'M').valueId }] },
@@ -794,12 +810,16 @@ describe('فئات المتجر — يديرها البائع بلا إدارة 
     expect((await A.put('/vendor/categories/order', { ids: reversed.slice(1) })).statusCode).toBe(400);
     expect((await listOf('a')).map((c) => c.id)).toEqual(reversed);
 
-    // الحذف لا يمسّ المنتج: يبقى في المتجر بلا فئة
+    // فئة فيها منتج لا تُحذف — لا منتج بلا فئة؛ تُحذف بعد نقله، والمنتج سليم في فئته الجديدة
+    const blocked = await A.delete(`/vendor/categories/${shirts.id}`);
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().message).toMatch(/فيها 1 منتج — انقلها إلى فئة أخرى/);
+    expect((await A.patch(`/vendor/products/${product.id}`, { vendorCategoryId: pants.id })).statusCode).toBe(200);
     const removed = await A.delete(`/vendor/categories/${shirts.id}`);
     expect(removed.statusCode).toBe(200);
-    expect(removed.json()).toEqual({ productsUncategorized: 1 });
+    expect(removed.json()).toEqual({ productsUncategorized: 0 });
     const after = (await A.get(`/vendor/products/${product.id}`)).json();
-    expect(after.vendorCategory).toBeNull();
+    expect(after.vendorCategory).toEqual({ id: pants.id, nameAr: pants.nameAr });
     expect(after.variants).toHaveLength(1);
     expect((await listOf('a')).some((c) => c.id === shirts.id)).toBe(false);
   });
@@ -826,7 +846,7 @@ describe('فئات المتجر — يديرها البائع بلا إدارة 
     await expect(
       prisma.product.update({ where: { id: mine.id }, data: { vendorCategoryId: own.id } }),
     ).rejects.toThrow();
-    expect((await prisma.product.findUniqueOrThrow({ where: { id: mine.id } })).vendorCategoryId).toBeNull();
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: mine.id } })).vendorCategoryId).toBe(await catOf('b'));
     expect((await as('a').get('/vendor/categories')).json().find((c: CategoryJson) => c.id === own.id)?.nameAr).toBe(`خاصة ${SUFFIX}`);
   });
 
@@ -841,8 +861,10 @@ describe('فئات المتجر — يديرها البائع بلا إدارة 
     const moved = await A.patch(`/vendor/products/${product.id}`, { vendorCategoryId: offers.id });
     expect(moved.statusCode, moved.body).toBe(200);
     expect(moved.json()).toMatchObject({ status: 'active', vendorCategory: { id: offers.id } });
+    // لا يُخرج من كل فئة: null مرفوض والمنتج باقٍ في فئته منشوراً
     const out = await A.patch(`/vendor/products/${product.id}`, { vendorCategoryId: null });
-    expect(out.json()).toMatchObject({ status: 'active', vendorCategory: null });
+    expect(out.statusCode).toBe(400);
+    expect((await A.get(`/vendor/products/${product.id}`)).json()).toMatchObject({ status: 'active', vendorCategory: { id: offers.id } });
 
     // المشتري يرى الفئة التي فيها معروض وحدها، ويصفّي منتجات المتجر بها
     await A.patch(`/vendor/products/${product.id}`, { vendorCategoryId: offers.id });
@@ -856,6 +878,57 @@ describe('فئات المتجر — يديرها البائع بلا إدارة 
     expect(filtered.products.map((p: { id: string }) => p.id)).toEqual([product.id]);
     expect(filtered.total).toBe(1);
     expect((await app.inject({ method: 'GET', url: `/api/v1/storefront/shops/v-a-${SUFFIX}?category=x` })).statusCode).toBe(400);
+  });
+
+  dbIt('كل متجر جديد يبدأ بالفئات الثماني المقترحة بترتيبها، ويعدّلها كفئاته', async () => {
+    const owner = await prisma.user.create({ data: { email: `tpl.${SUFFIX}@basta.test`, fullName: 'قوالب الفئات' } });
+    const v = await prisma.vendor.create({
+      data: { ownerUserId: owner.id, slug: `tpl-${SUFFIX}`, nameAr: 'متجر القوالب', country: 'JO', settlementCurrency: 'JOD' },
+    });
+    const names = (await prisma.vendorCategory.findMany({ where: { vendorId: v.id }, orderBy: { sort: 'asc' } })).map((c) => c.nameAr);
+    expect(names).toEqual([
+      'أزياء وملابس',
+      'أحذية وحقائب',
+      'إلكترونيات',
+      'المنزل والمطبخ',
+      'الجمال والعناية',
+      'أطفال وألعاب',
+      'رياضة وهوايات',
+      'طعام ومنتجات محلية',
+    ]);
+    // قوالب لا قيود: تُعاد تسميتها وتُحذف كأي فئة للمتجر
+    const first = await prisma.vendorCategory.findFirstOrThrow({ where: { vendorId: v.id }, orderBy: { sort: 'asc' } });
+    await prisma.vendorCategory.update({ where: { id: first.id }, data: { nameAr: 'عبايات' } });
+    expect(await prisma.vendorCategory.count({ where: { vendorId: v.id } })).toBe(8);
+  });
+
+  dbIt('لا منتج بلا فئة: الإنشاء بلا فئة يُرفض، والقديم بلا فئة يبقى ظاهراً ويُصنَّف عند أوّل تعديل أو نشر', async () => {
+    const A = as('a');
+    const none = await A.post('/vendor/products', { nameAr: 'بلا فئة', variants: [{ sku: `VC-NONE-${SUFFIX}`, price: '10.000', stock: 1 }] });
+    expect(none.statusCode).toBe(400);
+    // رسائل التحقق مصفوفة — رسالة الفئة بينها
+    expect([none.json().message].flat().join(' ')).toMatch(/اختر فئة للمنتج/);
+
+    // منتج سبق القرار: منشور بلا فئة — يبقى منشوراً، ولا يُعدَّل ولا يُعاد نشره قبل تصنيفه
+    const legacy = await simpleProduct('a', `VC-OLD-${SUFFIX}`);
+    await withImage('a', legacy.id);
+    expect((await A.post(`/vendor/products/${legacy.id}/publish`)).statusCode).toBe(200);
+    await prisma.product.update({ where: { id: legacy.id }, data: { vendorCategoryId: null } });
+    expect((await A.get(`/vendor/products/${legacy.id}`)).json()).toMatchObject({ status: 'active', vendorCategory: null });
+
+    const rename = await A.patch(`/vendor/products/${legacy.id}`, { nameAr: 'اسم جديد' });
+    expect(rename.statusCode).toBe(400);
+    expect(rename.json().message).toMatch(/اختر فئة للمنتج قبل الحفظ/);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: legacy.id } })).nameAr).toBe('منتج بسيط');
+
+    await prisma.product.update({ where: { id: legacy.id }, data: { status: 'draft' } });
+    const blocked = await A.post(`/vendor/products/${legacy.id}/publish`);
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().message).toContain('اختر فئة للمنتج');
+
+    const fixed = await A.patch(`/vendor/products/${legacy.id}`, { nameAr: 'اسم جديد', vendorCategoryId: await catOf('a') });
+    expect(fixed.statusCode, fixed.body).toBe(200);
+    expect((await A.post(`/vendor/products/${legacy.id}/publish`)).statusCode).toBe(200);
   });
 });
 

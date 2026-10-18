@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { DuplicateError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
+import { ConflictError, DuplicateError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ScopedRepository } from '../../../common/prisma/scoped-repository';
 import type { VendorScope } from '../../../common/security/actor';
@@ -99,12 +99,22 @@ export class VendorCategoryService {
   }
 
   /**
-   * حذف الفئة لا يمسّ منتجاتها: تبقى في المتجر بلا فئة. الإفراغ والحذف في معاملة
-   * واحدة — المفتاح الأجنبي RESTRICT يرفض حذف فئة بقي فيها منتج.
+   * فئة فيها منتج حيّ لا تُحذف — حذفها كان يخرجه بلا فئة، ولا منتج بلا فئة منذ
+   * 18 أكتوبر 2026. المؤرشف وحده يخرج منها (لا يُعرض ولا يُحرَّر)، والإفراغ والحذف
+   * في معاملة واحدة — المفتاح الأجنبي RESTRICT يرفض حذف فئة بقي فيها منتج.
    */
   async remove(scope: VendorScope, id: string): Promise<{ productsUncategorized: number }> {
     const products = await this.prisma.$transaction(async (tx) => {
       await this.repo(scope, tx).findByIdOrFail(id, { select: { id: true } });
+      // ملكيته ثبتت في السطر السابق — الاسم للرسالة وحدها
+      const category = await tx.vendorCategory.findUniqueOrThrow({ where: { id }, select: { nameAr: true } });
+      const live = await tx.product.count({ where: { vendorId: scope.vendorId, vendorCategoryId: id, deletedAt: null } });
+      if (live > 0) {
+        throw new ConflictError(`«${category.nameAr}» فيها ${live} ${live === 1 ? 'منتج' : 'منتجات'} — انقلها إلى فئة أخرى قبل حذفها.`, {
+          vendorCategoryId: id,
+          products: live,
+        });
+      }
       const affected = await tx.product.findMany({
         where: { vendorId: scope.vendorId, vendorCategoryId: id },
         select: { id: true },
