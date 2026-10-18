@@ -234,29 +234,35 @@ function RateFields({ draft, onChange, currency }: { draft: RateDraft; onChange:
 function RateCard({
   rate,
   currency,
+  revision,
   onSave,
   onToggle,
   onCancel,
 }: {
   rate: Rate | null;
   currency: string;
-  onSave: (body: Record<string, unknown>) => Promise<boolean>;
-  onToggle?: (active: boolean) => Promise<boolean>;
+  /** بصمة المنطقة — خطأ وقع على بصمة قديمة لم يعد صحيحاً (أُضيفت تسعيرة أخرى مثلاً) فيُخفى */
+  revision: string;
+  /** يعيد رسالة الخطأ لتظهر في البطاقة، أو null عند النجاح */
+  onSave: (body: Record<string, unknown>) => Promise<string | null>;
+  onToggle?: (active: boolean) => Promise<string | null>;
   onCancel?: () => void;
 }) {
   const [draft, setDraft] = useState<RateDraft>(() => (rate ? draftOf(rate, currency) : emptyDraft()));
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ text: string; at: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const fail = (text: string | null) => setFailure(text ? { text, at: revision } : null);
+  const error = failure && failure.at === revision ? failure.text : null;
 
   const save = async () => {
     const out = bodyOf(draft, currency);
     if ('error' in out) {
-      setError(out.error);
+      fail(out.error);
       return;
     }
-    setError(null);
+    fail(null);
     setBusy(true);
-    await onSave(out.body);
+    fail(await onSave(out.body));
     setBusy(false);
   };
 
@@ -284,8 +290,9 @@ function RateCard({
               aria-label="تسعيرة مفعّلة"
               disabled={busy}
               onClick={async () => {
+                fail(null);
                 setBusy(true);
-                await onToggle(!rate.isActive);
+                fail(await onToggle(!rate.isActive));
                 setBusy(false);
               }}
             />
@@ -394,6 +401,8 @@ function ZoneEditor({
   const [cover, setCover] = useState<CoverRow>({ country: zone?.regions[0]?.country ?? 'SA', region: '', city: '', touched: false });
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
+  // أي تغيّر في المنطقة — من هذه البطاقات أو من مفتاحها في القائمة — يُسقط أخطاء التسعيرات القديمة
+  const revision = useMemo(() => JSON.stringify(zone), [zone]);
 
   const run = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
     setBusy(true);
@@ -436,10 +445,22 @@ function ZoneEditor({
     if (ok !== null) onDeleted(zone.id);
   };
 
-  const saveRate = async (path: string, method: 'POST' | 'PATCH', body: Record<string, unknown>, notice: string): Promise<boolean> => {
-    const z = await run(() => api<Zone>(path, { method, body }));
-    if (z) onSaved(z, notice);
-    return z !== null;
+  /**
+   * خطأ التسعيرة يعود إلى بطاقتها ولا يُرفع أعلى الصفحة: إيقاف آخر تسعيرة مفعّلة
+   * يُرفض، والرسالة هناك بعيدة عن المفتاح فبدا كأنه لا يستجيب.
+   */
+  const saveRate = async (path: string, method: 'POST' | 'PATCH', body: Record<string, unknown>, notice: string): Promise<string | null> => {
+    setBusy(true);
+    try {
+      const z = await api<Zone>(path, { method, body });
+      onError(null);
+      onSaved(z, notice);
+      return null;
+    } catch (e) {
+      return (e as Error).message;
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -496,6 +517,7 @@ function ZoneEditor({
                 key={`${r.id}:${r.method}:${r.priceMinorUnits}:${r.isActive}`}
                 rate={r}
                 currency={currency}
+                revision={revision}
                 onSave={(body) => saveRate(`/vendor/shipping/rates/${r.id}`, 'PATCH', body, 'حُفظت التسعيرة.')}
                 onToggle={(active) =>
                   saveRate(`/vendor/shipping/rates/${r.id}`, 'PATCH', { isActive: active }, active ? 'فُعّلت التسعيرة.' : 'أُوقفت التسعيرة.')
@@ -506,10 +528,11 @@ function ZoneEditor({
               <RateCard
                 rate={null}
                 currency={currency}
+                revision={revision}
                 onSave={async (body) => {
-                  const ok = await saveRate(`/vendor/shipping/zones/${zone.id}/rates`, 'POST', body, 'أُضيفت التسعيرة.');
-                  if (ok) setAdding(false);
-                  return ok;
+                  const failed = await saveRate(`/vendor/shipping/zones/${zone.id}/rates`, 'POST', body, 'أُضيفت التسعيرة.');
+                  if (!failed) setAdding(false);
+                  return failed;
                 }}
                 onCancel={() => setAdding(false)}
               />
