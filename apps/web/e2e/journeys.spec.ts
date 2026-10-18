@@ -50,7 +50,7 @@ async function shopperBuys(page: Page, productSlug: string, productName: string)
   await page.getByLabel('اسم المستلم').fill('مشترٍ E2E');
   await page.getByLabel('الهاتف').fill('+966500000000');
   await page.getByLabel('البلد').selectOption('SA');
-  await page.getByLabel('المحافظة / المنطقة').fill('الرياض');
+  await page.getByLabel('المحافظة / المنطقة').selectOption('الرياض');
   await page.getByLabel('المدينة').fill('الرياض');
   await page.getByLabel('الشارع ورقم البناء').fill('طريق الملك فهد 10');
   await page.getByRole('button', { name: 'احسب الشحن' }).click();

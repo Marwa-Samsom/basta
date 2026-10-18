@@ -49,5 +49,6 @@ test('ردّ قديم بطيء لا يكتب فوق الأحدث، والاقت�
   await expect(page.getByRole('option', { name: 'قميص قطني' })).toBeVisible();
   await page.waitForTimeout(1200);
   await expect(page.getByRole('option', { name: 'اقتراح قديم' })).toHaveCount(0);
-  await expect(page.getByRole('option')).toHaveCount(2);
+  // داخل قائمة الاقتراحات وحدها: زرّ العملة في الرأس قائمة أصلية خياراتها «option» أيضاً
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(2);
 });
