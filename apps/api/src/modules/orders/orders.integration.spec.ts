@@ -546,15 +546,19 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect((await call('GET', `/vendor/disputes/${id}`, vendors[1]!.token)).statusCode).toBe(404);
     expect((await call('POST', `/me/disputes/${id}/escalate`, buyer.token)).statusCode).toBe(204);
 
-    const later = new Date(Date.now() + 15 * 86_400_000);
-    await scheduler.completeDelivered(later);
+    // تسليم الاختبار يُرجَّع إلى ما قبل مدة التعليق، والمهمة بالوقت الحقيقي. كانت تُستدعى
+    // «بعد 15 يوماً» فتُكمل كل طلب مُسلَّم في القاعدة — ومنها طلبات التجربة اليدوية الحيّة
+    // على قاعدة التطوير، فيُغلق إرجاعها قبل مهلته (J-02، 18 أكتوبر 2026)
+    await prisma.subOrder.updateMany({ where: { id: { in: [a.id, b.id] } }, data: { deliveredAt: new Date(Date.now() - 15 * 86_400_000) } });
+    const now = new Date();
+    await scheduler.completeDelivered(now);
     expect(await statusOf(a.id)).toBe('delivered');
     expect(await statusOf(b.id)).toBe('completed');
 
     const queue = await call('GET', '/admin/disputes', admin.token);
     expect(queue.json().map((d: { id: string }) => d.id)).toContain(id);
     expect((await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: 'أُرسل البديل وقبله المشتري' })).statusCode).toBe(204);
-    await scheduler.completeDelivered(later);
+    await scheduler.completeDelivered(now);
     expect(await statusOf(a.id)).toBe('completed');
   });
 
