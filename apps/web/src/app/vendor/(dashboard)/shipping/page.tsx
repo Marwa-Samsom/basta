@@ -52,6 +52,29 @@ const countryName = (code: string): string => COUNTRIES.find((c) => c.code === c
 const describe = (r: Region): string => [r.city, r.region, countryName(r.country)].filter(Boolean).join('، ');
 const keyOf = (r: Region): string => `${r.country}|${r.region ?? ''}|${r.city ?? ''}`;
 
+/** صفّ الإضافة في محرّر التغطية — `touched` حين اختار البائع بلداً أو كتب شيئاً */
+interface CoverRow {
+  country: string;
+  region: string;
+  city: string;
+  touched: boolean;
+}
+
+/**
+ * ما كتبه البائع في صفّ الإضافة ولم يضغط «أضف إلى التغطية» يدخل مع الحفظ — كان
+ * الحفظ يُرفض بـ«أضف بلداً» والبلد مختار أمامه. صفّ لم يلمسه لا يُضاف: البلد
+ * الافتراضي في القائمة ليس نيّة تغطية.
+ */
+function pendingRow(row: CoverRow, regions: Region[]): Region | null {
+  if (!row.touched) return null;
+  const region = row.region.trim() || null;
+  const city = row.city.trim() || null;
+  // البلد وحده نيّة حين لا تغطية غيره؛ مع تغطية قائمة هو ما بقي في القائمة بعد إضافة سابقة
+  if (!region && !city && regions.length > 0) return null;
+  const next = { country: row.country, region, city };
+  return regions.some((r) => keyOf(r) === keyOf(next)) ? null : next;
+}
+
 /** «12.5» ← 1250 بخانات العملة، والصفر مقبول (شحن مجاني). بلا عدد عشري في الطريق (ADR-001) */
 function toMinor(input: string, currency: string): string | null {
   const digits = minorUnitDigits(currency);
@@ -281,16 +304,24 @@ function RateCard({
 
 // ---------------------------------------------------------------- المنطقة
 
-function CoverageEditor({ regions, onChange }: { regions: Region[]; onChange: (r: Region[]) => void }) {
-  const [country, setCountry] = useState(regions[0]?.country ?? 'SA');
-  const [region, setRegion] = useState('');
-  const [city, setCity] = useState('');
+function CoverageEditor({
+  regions,
+  onChange,
+  row,
+  onRow,
+}: {
+  regions: Region[];
+  onChange: (r: Region[]) => void;
+  row: CoverRow;
+  onRow: (r: CoverRow) => void;
+}) {
+  const { country, region, city } = row;
+  const set = (patch: Partial<CoverRow>) => onRow({ ...row, ...patch, touched: true });
 
   const add = () => {
     const next: Region = { country, region: region.trim() || null, city: city.trim() || null };
     if (!regions.some((r) => keyOf(r) === keyOf(next))) onChange([...regions, next]);
-    setRegion('');
-    setCity('');
+    onRow({ ...row, region: '', city: '', touched: false });
   };
 
   return (
@@ -319,7 +350,7 @@ function CoverageEditor({ regions, onChange }: { regions: Region[]; onChange: (r
       <div className="vx-cover-add">
         <Field label="البلد">
           {(p) => (
-            <select className="field__control" {...p} value={country} onChange={(e) => setCountry(e.target.value)}>
+            <select className="field__control" {...p} value={country} onChange={(e) => set({ country: e.target.value })}>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.nameAr}
@@ -328,8 +359,8 @@ function CoverageEditor({ regions, onChange }: { regions: Region[]; onChange: (r
             </select>
           )}
         </Field>
-        <TextInput label="المحافظة / المنطقة" optional value={region} onChange={(e) => setRegion(e.target.value)} />
-        <TextInput label="المدينة" optional value={city} onChange={(e) => setCity(e.target.value)} />
+        <TextInput label="المحافظة / المنطقة" optional value={region} onChange={(e) => set({ region: e.target.value })} />
+        <TextInput label="المدينة" optional value={city} onChange={(e) => set({ city: e.target.value })} />
         <button type="button" className="btn btn--secondary" onClick={add}>
           <Icon name="plus" size={15} />
           أضف إلى التغطية
@@ -360,6 +391,7 @@ function ZoneEditor({
   const [name, setName] = useState(zone?.nameAr ?? '');
   const [regions, setRegions] = useState<Region[]>(zone?.regions.map((r) => ({ country: r.country, region: r.region, city: r.city })) ?? []);
   const [draft, setDraft] = useState<RateDraft>(emptyDraft);
+  const [cover, setCover] = useState<CoverRow>({ country: zone?.regions[0]?.country ?? 'SA', region: '', city: '', touched: false });
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -379,15 +411,21 @@ function ZoneEditor({
 
   const save = async () => {
     if (name.trim().length < 2) return onError('اكتب اسماً للمنطقة — حرفان على الأقل.');
-    if (regions.length === 0) return onError('أضف بلداً أو مدينة واحدة على الأقل إلى التغطية.');
+    const pending = pendingRow(cover, regions);
+    const all = pending ? [...regions, pending] : regions;
+    if (all.length === 0) return onError('اختر بلداً للتغطية ثم اضغط «أضف إلى التغطية».');
+    if (pending) {
+      setRegions(all);
+      setCover({ ...cover, region: '', city: '', touched: false });
+    }
     if (!zone) {
       const out = bodyOf(draft, currency);
       if ('error' in out) return onError(out.error);
-      const z = await run(() => api<Zone>('/vendor/shipping/zones', { method: 'POST', body: { nameAr: name, regions, rates: [out.body] } }));
+      const z = await run(() => api<Zone>('/vendor/shipping/zones', { method: 'POST', body: { nameAr: name, regions: all, rates: [out.body] } }));
       if (z) onSaved(z, `أُضيفت منطقة «${z.nameAr}» — ${z.regions.length} في تغطيتها.`);
       return;
     }
-    const z = await run(() => api<Zone>(`/vendor/shipping/zones/${zone.id}`, { method: 'PATCH', body: { nameAr: name, regions } }));
+    const z = await run(() => api<Zone>(`/vendor/shipping/zones/${zone.id}`, { method: 'PATCH', body: { nameAr: name, regions: all } }));
     if (z) onSaved(z, `حُفظت «${z.nameAr}» — ${z.regions.length} في تغطيتها.`);
   };
 
@@ -414,7 +452,7 @@ function ZoneEditor({
           <span className="vx-card__sub">{zone ? 'تحرير المنطقة' : 'تُحفظ مفعّلة بتسعيرتها الأولى'}</span>
         </div>
         <TextInput label="اسم المنطقة" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="الرياض الكبرى" />
-        <CoverageEditor regions={regions} onChange={setRegions} />
+        <CoverageEditor regions={regions} onChange={setRegions} row={cover} onRow={setCover} />
 
         {!zone ? (
           <div className="vx-divider vx-editor">
