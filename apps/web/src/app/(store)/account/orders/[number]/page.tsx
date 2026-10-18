@@ -454,7 +454,8 @@ function StoreCard({
                   ) : null}
                 </span>
                 <span className="sp-items__qty num">× {i.qty}</span>
-                <span className="sp-items__total money num">{money(i.lineTotalMinorUnits, currency)}</span>
+                {/* سطر القطعة بعملة المتجر كما في السلة — كان يُسمّى بعملة الدفع فيُقرأ «19.900 د.أ» وهو بالريال */}
+                <span className="sp-items__total money num">{money(i.lineTotalMinorUnits, s.currency)}</span>
 
                 {s.reviewable && !i.review && i.refundedQty < i.qty ? (
                   <span className="sp-rate" role="group" aria-label="قيّم المنتج">
@@ -495,6 +496,9 @@ function StoreCard({
           <span>حصّة هذا المتجر من دفعتك</span>
           <span className="sp-kv__v money num">{money(s.chargeTotalMinorUnits, currency)}</span>
         </p>
+        {s.currency !== currency ? (
+          <p className="sp-transfer__hint">أسعار القطع بعملة المتجر، وحصّته من دفعتك محوّلة بسعر الصرف لحظة الطلب.</p>
+        ) : null}
 
         {s.refunds.length ? (
           <ul className="sp-refunds">
