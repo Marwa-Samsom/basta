@@ -380,6 +380,9 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     expect(await stock(vendors[1]!.variantId)).toBe(stockB + 2);
     const refunds = await prisma.refund.findMany({ where: { subOrderId: b.id } });
     expect(refunds.map((r) => r.amountMinorUnits)).toEqual([b.chargeTotalMinorUnits]);
+    // البائع يعرف أن المشتري ألغى، بالسبب الذي كتبه — فلا يجهّز طلباً مُلغى (J-03)
+    const told = await prisma.notification.findMany({ where: { userId: vendors[1]!.userId, templateCode: 'vendor_order_canceled' } });
+    expect(told.some((n) => JSON.stringify(n.payloadJson).includes(b.subOrderNumber) && JSON.stringify(n.payloadJson).includes('غيّرت رأيي'))).toBe(true);
 
     // أخوه: الحالة والتاريخ والمخزون والمبالغ كما كانت
     const aAfter = await prisma.subOrder.findUniqueOrThrow({ where: { id: a.id }, include: { statusHistory: true } });
@@ -439,6 +442,26 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     }
     expect(await statusOf(a.id)).toBe('refunded');
     expect(await statusOf(b.id)).toBe('accepted');
+
+    // J-03 (18 أكتوبر 2026): البائع يعرف بالإلغاء، ويراه «أُلغي آلياً» لا «ألغته الإدارة»،
+    // والقطعة «أُلغي» لا «أُرجع»، وصافيه من دفتره صفر لا لقطة الطلب
+    const told = await prisma.notification.findMany({ where: { userId: vendors[0]!.userId, templateCode: 'vendor_order_canceled' } });
+    expect(told.some((n) => JSON.stringify(n.payloadJson).includes(a.subOrderNumber) && n.channel === 'in_app')).toBe(true);
+
+    const seen = await call('GET', `/vendor/orders/${a.id}`, vendors[0]!.token);
+    expect(seen.statusCode, seen.body).toBe(200);
+    const v = seen.json() as {
+      history: { toStatus: string; toLabel: string }[];
+      items: { refundedQty: number; returnedQty: number }[];
+      financials: { netMinorUnits: string; refundedMinorUnits: string; netAfterRefundsMinorUnits: string };
+    };
+    expect(v.history.find((h) => h.toStatus === 'canceled_by_admin')?.toLabel).toBe('أُلغي آلياً');
+    expect(v.items[0]).toMatchObject({ refundedQty: 1, returnedQty: 0 });
+    expect(v.financials.netAfterRefundsMinorUnits).toBe('0');
+    expect(v.financials.refundedMinorUnits).toBe(v.financials.netMinorUnits);
+
+    const row = (await call('GET', `/vendor/orders?search=${a.subOrderNumber}`, vendors[0]!.token)).json().items[0];
+    expect(row.netMinorUnits).toBe('0');
   }, 120_000);
 });
 

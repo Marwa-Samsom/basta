@@ -163,6 +163,7 @@ export class OrderQueryService {
       this.prisma.subOrder.count({ where }),
       this.prisma.subOrder.groupBy({ by: ['status'], where: { vendorId }, _count: true }),
     ]);
+    const nets = await this.ledgerNets(vendorId, rows.map((r) => r.id));
     return {
       items: rows.map((r) => ({
         id: r.id,
@@ -171,7 +172,7 @@ export class OrderQueryService {
         statusLabel: STATUS_LABELS[r.status as SubOrderStatus],
         currency: r.settlementCurrency,
         totalMinorUnits: r.totalMinorUnits.toString(),
-        netMinorUnits: r.vendorNetMinorUnits.toString(),
+        netMinorUnits: (nets.get(r.id) ?? r.vendorNetMinorUnits).toString(),
         placedAt: r.placedAt,
         itemCount: r._count.items,
         buyer: recipientOf(r.order.shippingAddressSnapshot),
@@ -187,6 +188,7 @@ export class OrderQueryService {
       include: { ...SUB_ORDER_DETAIL, order: { select: { orderNumber: true, shippingAddressSnapshot: true, customerNote: true } } },
     });
     if (!sub) throw new NotFoundError('الطلب غير موجود.', { subOrderId });
+    const ledgerNet = (await this.ledgerNets(vendorId, [sub.id])).get(sub.id) ?? sub.vendorNetMinorUnits;
     return {
       ...present(sub, 'vendor'),
       orderNumber: sub.order.orderNumber,
@@ -200,6 +202,9 @@ export class OrderQueryService {
         commissionMinorUnits: sub.commissionMinorUnits.toString(),
         commissionRateBps: sub.commissionRateBpsSnapshot,
         netMinorUnits: sub.vendorNetMinorUnits.toString(),
+        /** ما رجع من نصيب البائع للمشتري (بعد عكس عمولته) — وصافيه بعده كما في دفتره */
+        refundedMinorUnits: (sub.vendorNetMinorUnits - ledgerNet).toString(),
+        netAfterRefundsMinorUnits: ledgerNet.toString(),
       },
     };
   }
@@ -336,6 +341,28 @@ export class OrderQueryService {
     };
   }
 
+  /**
+   * صافي البائع الفعلي لكل فرعي من دفتره لا من لقطة الطلب: الاسترداد يُقيَّد في
+   * الدفتر ولا يغيّر اللقطة، فكان «صافي أرباحك 92.000» يُعرض لطلب رُدّ كله (J-03،
+   * 18 أكتوبر 2026). قيود الفرعي كلها بمرجعه، وتحرير المعلّق قيدان متقابلان صافيهما صفر.
+   * فرعي بلا قيود بعد يغيب عن الخريطة فتُستعمل لقطته.
+   */
+  private async ledgerNets(vendorId: string, subOrderIds: readonly string[]): Promise<Map<string, bigint>> {
+    if (subOrderIds.length === 0) return new Map();
+    const rows = await this.prisma.ledgerEntry.groupBy({
+      by: ['refId', 'direction'],
+      where: { vendorId, refType: 'sub_order', refId: { in: [...subOrderIds] } },
+      _sum: { amountMinorUnits: true },
+    });
+    const out = new Map<string, bigint>();
+    for (const r of rows) {
+      if (!r.refId) continue;
+      const v = r._sum.amountMinorUnits ?? 0n;
+      out.set(r.refId, (out.get(r.refId) ?? 0n) + (r.direction === 'credit' ? v : -v));
+    }
+    return out;
+  }
+
   private async returnWindow(): Promise<number> {
     const row = await this.prisma.setting.findUnique({ where: { key: 'return_window_days' } });
     const v = Number(row?.valueJson);
@@ -343,13 +370,31 @@ export class OrderQueryService {
   }
 }
 
+/**
+ * «ألغته الإدارة» حالةٌ يصلها النظام أيضاً (انقضاء مهلة القبول) — الفاعل في سطر
+ * التاريخ يفرّق: بلا دور منفّذ فهو آلي، ويُسمّى كذلك لا باسم الإدارة (J-03).
+ */
+const SYSTEM_CANCEL = 'أُلغي آلياً';
+const labelOf = (to: string, actorRole: string | null): string =>
+  to === 'canceled_by_admin' && actorRole === null ? SYSTEM_CANCEL : STATUS_LABELS[to as SubOrderStatus];
+
+/** القطع التي عادت بطلب إرجاع لم يُرفض — ما سواها من المُسترَد أُلغي لا «أُرجع» */
+function returnedQty(s: SubOrderRow, orderItemId: string): number {
+  return s.returns
+    .filter((r) => r.status !== 'rejected')
+    .flatMap((r) => (Array.isArray(r.itemsJson) ? (r.itemsJson as { orderItemId?: string; qty?: number }[]) : []))
+    .filter((l) => l.orderItemId === orderItemId)
+    .reduce((n, l) => n + (Number(l.qty) || 0), 0);
+}
+
 function present(s: SubOrderRow, audience: TransitionActor) {
   const status = s.status as SubOrderStatus;
+  const canceledBySystem = s.statusHistory.some((h) => h.toStatus === 'canceled_by_admin' && h.actorRole === null);
   return {
     id: s.id,
     number: s.subOrderNumber,
     status,
-    statusLabel: STATUS_LABELS[status],
+    statusLabel: status === 'canceled_by_admin' && canceledBySystem ? SYSTEM_CANCEL : STATUS_LABELS[status],
     // الأزرار مشتقّة من الجدول نفسه الذي يرفض على الخادم — لا قائمتان تتباعدان
     actions: allowedFor(status, audience).filter((to) => !(audience === 'customer' && to === 'return_requested')),
     currency: s.settlementCurrency,
@@ -366,10 +411,12 @@ function present(s: SubOrderRow, audience: TransitionActor) {
       unitPriceMinorUnits: i.unitPriceMinorUnits.toString(),
       lineSubtotalMinorUnits: i.lineSubtotalMinorUnits.toString(),
       lineTotalMinorUnits: i.lineTotalMinorUnits.toString(),
+      // من المُسترَد: ما عاد بإرجاع — والباقي (refundedQty − returnedQty) أُلغي
+      returnedQty: Math.min(i.refundedQty, returnedQty(s, i.id)),
     })),
     history: s.statusHistory.map((h) => ({
       ...h,
-      toLabel: STATUS_LABELS[h.toStatus as SubOrderStatus],
+      toLabel: labelOf(h.toStatus, h.actorRole),
     })),
     shipment: s.shipment,
     returns: s.returns,

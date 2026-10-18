@@ -94,6 +94,8 @@ export interface OrderItemView {
   unitPriceMinorUnits: string;
   qty: number;
   refundedQty: number;
+  /** من المُسترَد: ما عاد بطلب إرجاع — والباقي أُلغي (رفض المتجر أو إلغاء) */
+  returnedQty: number;
   /** بعملة المتجر قبل الخصم والضريبة: سعر القطعة × الكمية */
   lineSubtotalMinorUnits: string;
   lineTotalMinorUnits: string;
