@@ -22,6 +22,8 @@ import { imageUrl } from '@/lib/storefront';
 
 interface Item extends OrderItemView {
   imageKeySnapshot?: string | null;
+  /** السطر بعملة الدفع قبل الضريبة والخصم — جزء «قيمة المنتجات» في الملخّص */
+  chargeSubtotalMinorUnits: string;
 }
 
 interface Store extends Omit<SubOrderView, 'items'> {
@@ -138,6 +140,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
   const storeCount =
     order.stores.length === 1 ? 'متجر واحد' : order.stores.length === 2 ? 'متجران' : `${order.stores.length} متاجر`;
   const unsplit = order.stores.length === 0;
+  const refunded = refundTotals(order.stores);
 
   const cancelTransfer = async () => {
     if (!window.confirm('تلغي الطلب؟ تعود القطع للمتاجر ولا يُؤخذ منك شيء.')) return;
@@ -250,6 +253,26 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
                 <dt>الإجمالي</dt>
                 <dd className="money num">{money(order.grandTotalMinorUnits, order.currency)}</dd>
               </div>
+              {refunded.done > 0n || refunded.pending > 0n ? (
+                <>
+                  {refunded.done > 0n ? (
+                    <div>
+                      <dt>المُسترَد</dt>
+                      <dd className="num sp-sum__saving">− {money(refunded.done, order.currency)}</dd>
+                    </div>
+                  ) : null}
+                  {refunded.pending > 0n ? (
+                    <div>
+                      <dt>استرداد قيد التنفيذ</dt>
+                      <dd className="num">{money(refunded.pending, order.currency)}</dd>
+                    </div>
+                  ) : null}
+                  <div className="sp-sum__total">
+                    <dt>صافي ما دفعته</dt>
+                    <dd className="money num">{money(BigInt(order.grandTotalMinorUnits) - refunded.done, order.currency)}</dd>
+                  </div>
+                </>
+              ) : null}
             </dl>
           </div>
         </aside>
@@ -407,6 +430,11 @@ function StoreCard({
           {s.items.map((i) => {
             const src = thumbOf(i.imageKeySnapshot);
             const rating = i.review?.rating ?? null;
+            // المسترَدّ نوعان: قطع عادت بإرجاع، وقطع أُلغيت (رفض المتجر أو إلغاء) — «أُرجع» للأولى وحدها
+            const returned = Math.min(i.refundedQty, returnedQtyOf(s, i.id));
+            const refundNote = [returned ? `أُرجع ${returned}` : '', i.refundedQty > returned ? `أُلغي ${i.refundedQty - returned}` : '']
+              .filter(Boolean)
+              .join(' · ');
             return (
               <li key={i.id} className="sp-items__row">
                 <span className="sp-thumb sp-thumb--sm" aria-hidden>
@@ -419,16 +447,27 @@ function StoreCard({
                 </span>
                 <span className="sp-items__text">
                   <span className="sp-items__name">{i.productNameSnapshotAr}</span>
-                  {i.variantLabelSnapshot || i.refundedQty ? (
+                  {i.variantLabelSnapshot || refundNote ? (
                     <span className="sp-items__sub">
                       {i.variantLabelSnapshot}
-                      {i.variantLabelSnapshot && i.refundedQty ? ' · ' : ''}
-                      {i.refundedQty ? `أُرجع ${i.refundedQty}` : ''}
+                      {i.variantLabelSnapshot && refundNote ? ' · ' : ''}
+                      {refundNote}
                     </span>
                   ) : null}
                 </span>
                 <span className="sp-items__qty num">× {i.qty}</span>
-                <span className="sp-items__total money num">{money(i.lineTotalMinorUnits, currency)}</span>
+                {/*
+                 * بعملة الدفع وقبل الضريبة، كما في «قيمة المنتجات» — فأسطر الطلب تجمع الملخّص.
+                 * كان بعملة المتجر شاملاً الضريبة (23.00 ر.س) والملخّص بالدينار بلاها، فلا يُقارَنان.
+                 */}
+                <span className="sp-items__total">
+                  <span className="money num">{money(i.chargeSubtotalMinorUnits, currency)}</span>
+                  {s.currency !== currency ? (
+                    <span className="sp-items__store">
+                      <span className="num">{money(i.lineSubtotalMinorUnits, s.currency)}</span> بعملة المتجر
+                    </span>
+                  ) : null}
+                </span>
 
                 {s.reviewable && !i.review && i.refundedQty < i.qty ? (
                   <span className="sp-rate" role="group" aria-label="قيّم المنتج">
@@ -469,6 +508,11 @@ function StoreCard({
           <span>حصّة هذا المتجر من دفعتك</span>
           <span className="sp-kv__v money num">{money(s.chargeTotalMinorUnits, currency)}</span>
         </p>
+        {s.currency !== currency ? (
+          <p className="sp-transfer__hint">
+            المبالغ بعملة دفعتك بسعر الصرف لحظة الطلب، وسعر المتجر بعملته تحت قطعته؛ الضريبة والشحن في ملخّص الدفع.
+          </p>
+        ) : null}
 
         {s.refunds.length ? (
           <ul className="sp-refunds">
@@ -602,6 +646,26 @@ function refundState(r: { status: string; transferReference?: string | null }) {
   }
   if (r.status === 'awaiting_transfer') return 'نحوّله لحسابك — نبلغك بمرجع التحويل حين يخرج';
   return 'قيد التنفيذ';
+}
+
+/** القطع التي عادت من هذا السطر بإرجاع لم يُرفض — ما زاد عليها من المسترَدّ أُلغي ولم يُرجَع */
+function returnedQtyOf(s: Store, orderItemId: string): number {
+  return s.returns
+    .filter((r) => r.status !== 'rejected')
+    .flatMap((r) => r.itemsJson)
+    .filter((l) => l.orderItemId === orderItemId)
+    .reduce((n, l) => n + l.qty, 0);
+}
+
+/** مجموع الاستردادات على الطلب كله بعملة الدفع: ما رُدّ فعلاً، وما زال في الطريق */
+function refundTotals(stores: Store[]): { done: bigint; pending: bigint } {
+  let done = 0n;
+  let pending = 0n;
+  for (const r of stores.flatMap((s) => s.refunds)) {
+    if (r.status === 'succeeded') done += BigInt(r.amountMinorUnits);
+    else if (r.status !== 'failed') pending += BigInt(r.amountMinorUnits);
+  }
+  return { done, pending };
 }
 
 function ReasonSelect({ options, value, onChange }: { options: Record<string, string>; value: string; onChange: (v: string) => void }) {

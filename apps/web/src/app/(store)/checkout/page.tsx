@@ -9,6 +9,7 @@ import { Alert, Field, PageHead, Spinner, TextInput } from '@/components/ui';
 import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
 import { CART_EVENT, cartApi, cartHeaders, type CartView } from '@/lib/cart';
+import { RegionSelect } from '@/components/region-select';
 import { attemptKey, definitive, endAttempt } from '@/lib/checkout-attempt';
 import { digitsOnly } from '@/lib/digits';
 import { withNext } from '@/lib/safe-path';
@@ -397,7 +398,12 @@ function CheckoutForm() {
               <TextInput label="اسم المستلم" value={address.recipientName} onChange={set('recipientName')} />
               <Field label="البلد">
                 {(props) => (
-                  <select className="field__control" {...props} value={address.country} onChange={set('country')}>
+                  <select
+                    className="field__control"
+                    {...props}
+                    value={address.country}
+                    onChange={(e) => setAddress((a) => ({ ...a, country: e.target.value, region: '' }))}
+                  >
                     <option value="JO">الأردن</option>
                     <option value="SA">السعودية</option>
                     <option value="AE">الإمارات</option>
@@ -406,7 +412,7 @@ function CheckoutForm() {
                   </select>
                 )}
               </Field>
-              <TextInput label="المحافظة / المنطقة" value={address.region} onChange={set('region')} />
+              <RegionSelect country={address.country} value={address.region} onChange={(v) => setAddress((a) => ({ ...a, region: v }))} />
               <TextInput label="المدينة" value={address.city} onChange={set('city')} />
               <div className="sp-fields__wide">
                 <TextInput label="الشارع ورقم البناء" value={address.street} onChange={set('street')} />

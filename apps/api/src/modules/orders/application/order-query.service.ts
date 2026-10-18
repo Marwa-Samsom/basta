@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { TransferDetailsService } from '../../payments/public';
+import { allocate } from '../../pricing/public';
 import { AWAITING_TRANSFER } from './order-lifecycle.service';
 import {
   STATUS_LABELS,
@@ -25,6 +26,7 @@ const SUB_ORDER_DETAIL = {
       unitPriceMinorUnits: true,
       qty: true,
       refundedQty: true,
+      lineSubtotalMinorUnits: true,
       lineTotalMinorUnits: true,
       review: { select: { id: true, rating: true } },
     },
@@ -132,11 +134,11 @@ export class OrderQueryService {
 
   async vendorList(
     vendorId: string,
-    q: { status?: string; search?: string; page?: number },
+    q: { status?: readonly string[]; search?: string; page?: number },
   ): Promise<{ items: unknown[]; total: number; counts: Record<string, number> }> {
     const where: Prisma.SubOrderWhereInput = {
       vendorId,
-      ...(q.status ? { status: q.status as SubOrderStatus } : {}),
+      ...(q.status?.length ? { status: { in: q.status as SubOrderStatus[] } } : {}),
       ...(q.search ? { subOrderNumber: { contains: q.search.trim(), mode: 'insensitive' } } : {}),
     };
     const page = Math.max(1, q.page ?? 1);
@@ -298,15 +300,21 @@ export class OrderQueryService {
       // ما رآه المشتري قبل التقسيم: أسطر اللقطة، ليعرف ماذا حجز
       ...(order.subOrders.length === 0 ? { lines: snapshotLines(order.pricingSnapshot) } : {}),
       // تتبّع لكل بائع: شحنة ومسار وحالة مستقلة — ST-19
-      stores: order.subOrders.map((s) => ({
-        ...present(s, 'customer'),
-        chargeTotalMinorUnits: (s.chargeTotalMinorUnits ?? 0n).toString(),
-        returnable:
-          s.status === 'delivered' &&
-          !!s.deliveredAt &&
-          Date.now() - s.deliveredAt.getTime() <= returnWindowDays * 86_400_000,
-        reviewable: s.status === 'delivered' || s.status === 'completed',
-      })),
+      stores: order.subOrders.map((s) => {
+        const base = present(s, 'customer');
+        const charged = chargedLines(order.pricingSnapshot, s);
+        return {
+          ...base,
+          // سطر القطعة بعملة الدفع قبل الضريبة والخصم — كما في «قيمة المنتجات» في الملخّص
+          items: base.items.map((i, k) => ({ ...i, chargeSubtotalMinorUnits: (charged[k] ?? 0n).toString() })),
+          chargeTotalMinorUnits: (s.chargeTotalMinorUnits ?? 0n).toString(),
+          returnable:
+            s.status === 'delivered' &&
+            !!s.deliveredAt &&
+            Date.now() - s.deliveredAt.getTime() <= returnWindowDays * 86_400_000,
+          reviewable: s.status === 'delivered' || s.status === 'completed',
+        };
+      }),
     };
   }
 
@@ -356,6 +364,7 @@ function present(s: SubOrderRow, audience: TransitionActor) {
     items: s.items.map((i) => ({
       ...i,
       unitPriceMinorUnits: i.unitPriceMinorUnits.toString(),
+      lineSubtotalMinorUnits: i.lineSubtotalMinorUnits.toString(),
       lineTotalMinorUnits: i.lineTotalMinorUnits.toString(),
     })),
     history: s.statusHistory.map((h) => ({
@@ -372,6 +381,26 @@ function present(s: SubOrderRow, audience: TransitionActor) {
     })),
     disputes: s.disputes,
   };
+}
+
+/**
+ * أسطر الفرعي بعملة الدفع: بنوده المحوَّلة في لقطة التسعير (charge.items) موزّعةً
+ * على أسطره بنسبة قيمتها — فمجموعها بنود المتجر في «قيمة المنتجات» بالضبط، كما في
+ * السلة. طلب بلا لقطة: يُحوَّل مجموعه بلقطة صرف الفرعي.
+ */
+function chargedLines(
+  snapshot: Prisma.JsonValue | null,
+  s: { vendorId: string; fxRateSnapshot: Prisma.Decimal; items: readonly { lineSubtotalMinorUnits: bigint }[] },
+): bigint[] {
+  const subtotals = s.items.map((i) => i.lineSubtotalMinorUnits);
+  const subs = (snapshot as { subOrders?: { vendorId?: string; charge?: { items?: string } }[] } | null)?.subOrders ?? [];
+  const fromSnapshot = subs.find((x) => x.vendorId === s.vendorId)?.charge?.items;
+  const rate = Number(s.fxRateSnapshot);
+  const items =
+    fromSnapshot !== undefined
+      ? BigInt(fromSnapshot)
+      : BigInt(Math.round(Number(subtotals.reduce((a, b) => a + b, 0n)) / (rate > 0 ? rate : 1)));
+  return allocate(items, subtotals);
 }
 
 /** أسطر الطلب من لقطة التسعير — لطلب لم يُقسَّم بعد (ينتظر التحويل أو أُلغي قبله) */

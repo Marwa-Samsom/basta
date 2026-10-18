@@ -1,10 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
 import { Alert, Field, TextInput } from '@/components/ui';
 import { Icon, type IconName } from '@/components/icons';
+import { withNext } from '@/lib/safe-path';
 import { COUNTRIES, type Onboarding } from '@/lib/vendor';
 import { OnboardingFrame, OnboardingHead } from '../onboarding/onboarding-chrome';
 
@@ -13,6 +15,37 @@ interface SlugCheck {
   available: boolean;
   suggestion: string;
 }
+
+/**
+ * مسوّدة النموذج في تبويب المتصفّح — جلسة انتهت أثناء الكتابة تحوّل إلى الدخول
+ * ثم تعود هنا، وكان ما كُتب يضيع. تُمحى بعد أن يُسجَّل المتجر.
+ */
+const DRAFT_KEY = 'basta.vendorRegisterDraft';
+const BLANK = { nameAr: '', nameEn: '', slug: '', country: 'JO', businessType: 'individual' };
+type Draft = { form: typeof BLANK; slugTouched: boolean };
+
+function readDraft(): Draft | null {
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as Draft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(draft: Draft | null): void {
+  try {
+    if (draft) window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    else window.sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // تخزين محجوب (تصفّح خاص صارم): يبقى النموذج يعمل بلا مسوّدة
+  }
+}
+
+const subscribeSession = (cb: () => void) => {
+  window.addEventListener('storage', cb);
+  return () => window.removeEventListener('storage', cb);
+};
 
 const BUSINESS_TYPES = [
   { value: 'individual', label: 'فرد', hint: 'سجل تجاري فردي أو عمل حر' },
@@ -26,8 +59,9 @@ const BUSINESS_TYPES = [
  * ضغطة مفتاح يُغرق الخادم، والفحص عند الإرسال وحده يُفاجئ البائع بعد أن أتمّ
  * النموذج. والمستعمَل يُقترح له بديل جاهز بدل رفض جاف.
  *
- * خطوة «الحساب» في التصميم تمّت قبل هذه الصفحة: الوصول إليها يتطلّب دخولاً،
- * فالشريط يعرضها مكتملة والنموذج يبدأ من المتجر.
+ * خطوة «الحساب» في التصميم تسبق هذه الصفحة: الزائر بلا حساب يرى بطاقة «ابدأ
+ * بحسابك» لا النموذج — كان يملؤه ثم يُحوَّل إلى الدخول فيضيع ما كتب. ومن دخل
+ * يرى الشريط مكتملاً حتى «الحساب»، والنموذج يبدأ من المتجر.
  *
  * ومن له متجر لم يُرسَل بعد (أو رُفض) يصل هنا بزرّ «رجوع» من المستندات:
  * الصفحة نفسها تصير تعديلاً — تملأ النموذج من متجره وتحفظ عبر
@@ -35,13 +69,8 @@ const BUSINESS_TYPES = [
  */
 export default function VendorRegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({
-    nameAr: '',
-    nameEn: '',
-    slug: '',
-    country: 'JO',
-    businessType: 'individual',
-  });
+  const signedIn = useSyncExternalStore(subscribeSession, () => !!session.read(), () => false);
+  const [form, setForm] = useState(BLANK);
   const [slugTouched, setSlugTouched] = useState(false);
   const [check, setCheck] = useState<SlugCheck | null>(null);
   const [checking, setChecking] = useState(false);
@@ -50,9 +79,11 @@ export default function VendorRegisterPage() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [existing, setExisting] = useState<Onboarding | null>(null);
   const existingSlug = existing?.slug ?? null;
+  // المسوّدة تُكتب بعد أن يُعرف إن كان للحساب متجر — قبلها كانت الكتابة الأولى تمحوها قبل استعادتها
+  const draftReady = useRef(false);
 
   useEffect(() => {
-    if (!session.read()) return;
+    if (!signedIn) return;
     let alive = true;
     api<Onboarding>('/vendor/onboarding')
       .then((v) => {
@@ -62,6 +93,7 @@ export default function VendorRegisterPage() {
           router.replace(v.status === 'in_review' ? '/vendor/onboarding/status' : '/vendor/store');
           return;
         }
+        draftReady.current = true;
         setExisting(v);
         setForm({
           nameAr: v.nameAr,
@@ -72,12 +104,27 @@ export default function VendorRegisterPage() {
         });
         setSlugTouched(true);
       })
-      // 404 = لا متجر بعد: الصفحة تسجيل جديد كما هي
-      .catch(() => undefined);
+      // 404 = لا متجر بعد: تسجيل جديد، بما كُتب قبل التحويل إلى الدخول إن وُجد
+      .catch(() => {
+        if (!alive) return;
+        draftReady.current = true;
+        const draft = readDraft();
+        if (draft) {
+          setForm({ ...BLANK, ...draft.form });
+          setSlugTouched(draft.slugTouched);
+        }
+      });
     return () => {
       alive = false;
     };
-  }, [router]);
+    // الدخول من تبويب آخر يقلب signedIn فيُعاد الفحص — متجر قائم يُحوَّل كما لو دخل هنا
+  }, [router, signedIn]);
+
+  useEffect(() => {
+    if (!draftReady.current || existing) return;
+    const blank = !form.nameAr.trim() && !form.nameEn.trim() && !form.slug.trim();
+    writeDraft(blank ? null : { form, slugTouched });
+  }, [form, slugTouched, existing]);
 
   const candidate = slugTouched ? form.slug : form.nameEn || form.nameAr;
 
@@ -146,11 +193,13 @@ export default function VendorRegisterPage() {
       });
       // الرمز الجديد يحمل دور البائع — بدونه ترتدّ الخطوة التالية 403
       session.write(res.tokens);
+      writeDraft(null);
       // العملة قبل المستندات: الاعتماد يثبّتها، فتُختار قبل أن يُرسل الطلب
       router.push('/vendor/onboarding/currency');
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        router.push('/login?next=/vendor/register');
+        writeDraft({ form, slugTouched });
+        router.push(withNext('/login', '/vendor/register'));
         return;
       }
       setError(err instanceof Error ? err.message : existing ? 'تعذّر حفظ بيانات المتجر.' : 'تعذّر تسجيل المتجر.');
@@ -184,6 +233,26 @@ export default function VendorRegisterPage() {
         : 'يُشتقّ من الاسم الإنجليزي، وتستطيع تغييره.';
   const slugError = slugState === 'taken' ? 'الرابط محجوز لمتجر آخر — اختر رابطاً غيره.' : null;
   const slugValue = slugTouched ? form.slug : (check?.slug ?? '');
+
+  if (!signedIn) {
+    return (
+      <OnboardingFrame step={1}>
+        <OnboardingHead title="سجّل متجرك على بسطة" lead="متجرك يُربط بحسابك في بسطة — أنشئه أو ادخل، ثم نعود بك إلى هنا لبيانات المتجر." />
+        <section className="card vo-gate">
+          <h2 className="vo-card-title">ابدأ بحسابك</h2>
+          <p className="vo-note__text">بالحساب تتابع طلب متجرك، وتصلك نتيجة المراجعة على بريدك، وتدخل لوحتك بعدها.</p>
+          <div className="vo-actions">
+            <Link className="btn btn--primary" href={withNext('/register', '/vendor/register')}>
+              أنشئ حساباً
+            </Link>
+            <Link className="btn btn--secondary" href={withNext('/login', '/vendor/register')}>
+              لديّ حساب — ادخل
+            </Link>
+          </div>
+        </section>
+      </OnboardingFrame>
+    );
+  }
 
   return (
     <OnboardingFrame step={2}>

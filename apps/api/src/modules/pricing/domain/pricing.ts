@@ -13,6 +13,7 @@
  */
 
 import { InvalidInputError } from '../../../common/errors/domain-error';
+import { samePlace } from '../../../common/places';
 
 // -------------------------------------------------------------------- الأنواع
 
@@ -391,11 +392,11 @@ export function quoteShipping(
   address: { country: string; region: string | null; city: string | null },
   context: { itemsMinor: bigint; weightGrams: number; vendorNameAr: string },
 ): ShippingQuote {
-  const norm = (v: string | null): string => (v ?? '').trim();
+  // «عمّان» تطابق «عمان» و«الزرقا» تطابق «الزرقاء» — common/places
   const score = (r: ZoneInput['regions'][number]): number => {
     if (r.country.toUpperCase() !== address.country.toUpperCase()) return -1;
-    if (r.city && norm(r.city) !== norm(address.city)) return -1;
-    if (r.region && norm(r.region) !== norm(address.region)) return -1;
+    if (r.city && !samePlace(r.city, address.city)) return -1;
+    if (r.region && !samePlace(r.region, address.region)) return -1;
     return r.city ? 3 : r.region ? 2 : 1;
   };
 

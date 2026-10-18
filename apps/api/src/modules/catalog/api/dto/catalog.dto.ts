@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsIn,
   IsInt,
   IsNumber,
@@ -16,6 +17,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { ATTRIBUTE_INPUT_TYPES, type AttributeInputType } from '../../application/attribute.service';
@@ -204,10 +206,11 @@ export class AttributeValueDto {
 }
 
 export class CreateProductDto {
-  @ApiPropertyOptional({ nullable: true, description: 'فئة من فئات متجرك — غائبة = بلا فئة' })
-  @IsOptional()
+  /** إلزامية منذ 18 أكتوبر 2026 — لا يُضاف منتج بلا فئة (والمتجر يبدأ بثماني فئات) */
+  @ApiProperty({ description: 'فئة من فئات متجرك' })
+  @IsDefined({ message: 'اختر فئة للمنتج — أو أضف فئة جديدة لمتجرك.' })
   @IsUUID('4', { message: 'معرّف الفئة غير صالح.' })
-  vendorCategoryId?: string | null;
+  vendorCategoryId!: string;
 
   @IsOptional()
   @IsUUID('4')
@@ -252,10 +255,11 @@ export class CreateProductDto {
 }
 
 export class UpdateProductDto {
-  @ApiPropertyOptional({ nullable: true, description: 'فئة من فئات متجرك — null يخرجه من فئته' })
-  @IsOptional()
-  @IsUUID('4', { message: 'معرّف الفئة غير صالح.' })
-  vendorCategoryId?: string | null;
+  /** غائبة = لا تتغيّر؛ ولا تُرسل null — المنتج لا يخرج من كل فئة */
+  @ApiPropertyOptional({ description: 'فئة من فئات متجرك — غائبة لا تغيّرها' })
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @IsUUID('4', { message: 'اختر فئة للمنتج — لا يبقى منتج بلا فئة.' })
+  vendorCategoryId?: string;
 
   @IsOptional()
   @IsUUID('4')

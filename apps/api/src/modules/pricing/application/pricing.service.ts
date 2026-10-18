@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { minorUnitDigits } from '../../../common/money/money';
+import { samePlace } from '../../../common/places';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
 import {
@@ -248,7 +249,7 @@ export class PricingService {
       },
       orderBy: { effectiveFrom: 'desc' },
     });
-    const regional = rows.find((r) => r.region && r.region === address.region);
+    const regional = rows.find((r) => r.region && samePlace(r.region, address.region));
     const national = rows.find((r) => !r.region);
     const rate = regional ?? national;
     return rate ? { rateBps: rate.rateBps, inclusive: rate.isPriceInclusive } : { rateBps: 0, inclusive: true };

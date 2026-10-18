@@ -451,6 +451,8 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
       method: 'POST',
       ...api('/vendor/products', sellerToken),
       payload: {
+        // المتجر يبدأ بالفئات الثماني المقترحة، ولا منتج بلا فئة
+        vendorCategoryId: (await prisma.vendorCategory.findFirstOrThrow({ where: { vendorId }, orderBy: { sort: 'asc' } })).id,
         nameAr: 'قميص قطني',
         nameEn: 'Cotton shirt',
         attributes: [{ attributeId: material.id, text: 'قطن 100%' }],
@@ -496,6 +498,7 @@ describe('بوابة 06 · البند الثاني — المعلَّق لا ي�
       method: 'POST',
       ...api('/vendor/products', sellerToken),
       payload: {
+        vendorCategoryId: (await prisma.vendorCategory.findFirstOrThrow({ where: { vendorId }, orderBy: { sort: 'asc' } })).id,
         nameAr: 'قميص آخر',
         attributes: [{ attributeId: material.id, text: 'كتّان' }],
         variants: [{ sku: `SH2-${SUFFIX}`, price: '22.000', stock: 3 }],

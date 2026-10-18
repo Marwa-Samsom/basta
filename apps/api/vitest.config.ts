@@ -12,7 +12,8 @@ export default defineConfig({
     environment: 'node',
     // ملفات الاختبار تدخل عشرات المرات من العنوان نفسه؛ حدّ التخمين الحقيقي
     // يُختبر في security.integration.spec.ts بقيمته الفعلية
-    env: { THROTTLE_AUTH_LIMIT: '100000', THROTTLE_DEFAULT_LIMIT: '100000' },
+    // ورمز التطوير الثابت مطفأ: الاختبارات تثبت الرموز الحقيقية ولو كان مفعَّلاً في .env
+    env: { THROTTLE_AUTH_LIMIT: '100000', THROTTLE_DEFAULT_LIMIT: '100000', DEV_FIXED_CODE: '' },
     include: ['src/**/*.spec.ts'],
     coverage: { reporter: ['text', 'lcov'], include: ['src/**/*.ts'] },
   },

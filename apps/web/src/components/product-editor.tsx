@@ -175,7 +175,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
       nameAr: form.nameAr,
       ...(form.nameEn ? { nameEn: form.nameEn } : {}),
       ...(form.descriptionAr ? { descriptionAr: form.descriptionAr } : {}),
-      vendorCategoryId: form.vendorCategoryId || null,
+      ...(form.vendorCategoryId ? { vendorCategoryId: form.vendorCategoryId } : {}),
       attributes: attrs,
       variants: variants.map((v) => ({
         ...(v.id ? { id: v.id } : {}),
@@ -226,6 +226,12 @@ export function ProductEditor({ productId }: { productId?: string }) {
   }
 
   async function save(): Promise<void> {
+    // لا منتج بلا فئة (18 أكتوبر 2026) — والقديم بلا فئة يُصنَّف عند أوّل حفظ
+    if (!form.vendorCategoryId) {
+      setNotice(null);
+      setFailure('اختر فئة للمنتج من «الفئة في متجرك»، أو أضف فئة جديدة.');
+      return;
+    }
     // محور مختار بلا قيمة في صفّ: يُقال بالاسم هنا بدل رفض الخادم العام
     const unset = axes.find((a) => variants.some((v) => !v.options[a.attributeId]));
     if (unset) {
@@ -384,8 +390,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
             <div className="vp-grid-2">
               <Field
                 label="الفئة في متجرك"
-                optional
-                hint="تظهر للمشترين أزراراً في صفحة متجرك. أدرها كلها من «الفئات» في القائمة."
+                hint="إلزامية — تظهر للمشترين أزراراً في صفحة متجرك. أدرها كلها من «الفئات» في القائمة."
               >
                 {(props) => (
                   <select
@@ -401,7 +406,9 @@ export function ProductEditor({ productId }: { productId?: string }) {
                       }
                     }}
                   >
-                    <option value="">بلا فئة</option>
+                    <option value="" disabled>
+                      اختر فئة
+                    </option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nameAr}
@@ -705,7 +712,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
               ) : null}
               <div>
                 <dt>الفئة</dt>
-                <dd>{categoryName ?? 'بلا فئة'}</dd>
+                <dd>{categoryName ?? 'لم تُختر — مطلوبة'}</dd>
               </div>
               <div>
                 <dt>المتغيّرات</dt>

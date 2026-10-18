@@ -161,7 +161,11 @@ export class ShippingZonesService {
           ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
         },
       });
-      await this.assertCoherent(tx, vendorId, zoneId);
+      await this.assertCoherent(tx, vendorId, zoneId, (name) =>
+        before.isActive
+          ? `منطقة «${name}» المفعّلة تحتاج تسعيرة مفعّلة واحدة على الأقل — فعّل تسعيرة فيها أولاً.`
+          : `فعّل تسعيرة واحدة على الأقل في «${name}» قبل تفعيل المنطقة — بلا تسعيرة مفعّلة لن يستطيع المشترون هناك الشراء منك.`,
+      );
       const out = present(await tx.shippingZone.findUniqueOrThrow({ where: { id: zoneId }, include: zoneInclude }));
       await this.audit(tx, userId, 'shipping_zone.update', zoneId, present(before), out);
       return out;
@@ -225,7 +229,13 @@ export class ShippingZonesService {
         where: { id: rateId },
         data: { ...rateData(rate), ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}) },
       });
-      await this.assertCoherent(tx, vendorId, current.zoneId);
+      await this.assertCoherent(
+        tx,
+        vendorId,
+        current.zoneId,
+        (name) =>
+          `لا يمكن إيقاف هذه التسعيرة — هي الوحيدة المفعّلة في «${name}»، وبدونها لن يستطيع المشترون هناك الشراء منك. أضف تسعيرة أخرى أولاً، أو أوقف المنطقة نفسها.`,
+      );
       const out = present(await tx.shippingZone.findUniqueOrThrow({ where: { id: current.zoneId }, include: zoneInclude }));
       await this.audit(tx, userId, 'shipping_rate.update', current.zoneId, present(before), out);
       return out;
@@ -248,8 +258,17 @@ export class ShippingZonesService {
    * ما تقرؤه نواة التسعير متّسق للمنطقة المعدَّلة: إن كانت مفعّلة فلها تغطية
    * وتسعيرة مفعّلة، ولا تتعادل تغطيتها مع منطقة مفعّلة أخرى. الفحص مقصور على
    * المنطقة المعدَّلة: بيانات قديمة في منطقة أخرى لا تمنع تعديلاً لا يمسّها.
+   *
+   * `noRate` يقول ما رُفض بلغة الفعل نفسه: «منطقة مفعّلة بلا تسعيرة» كانت تُقرأ
+   * وصفاً لحال المنطقة الآن، والمفتاح الذي ضُغط ما زال «مفعّلة».
    */
-  private async assertCoherent(tx: Tx, vendorId: string, zoneId: string): Promise<void> {
+  private async assertCoherent(
+    tx: Tx,
+    vendorId: string,
+    zoneId: string,
+    noRate: (zoneName: string) => string = (name) =>
+      `منطقة «${name}» المفعّلة تحتاج تسعيرة مفعّلة واحدة على الأقل — بدونها لن يستطيع المشترون هناك الشراء منك.`,
+  ): Promise<void> {
     const zones = await tx.shippingZone.findMany({ where: { vendorId, isActive: true }, include: zoneInclude });
     const zone = zones.find((z) => z.id === zoneId);
     if (!zone) return; // موقوفة: لا تُقرأ في التسعير أصلاً
@@ -258,10 +277,7 @@ export class ShippingZonesService {
       throw new InvalidInputError('المنطقة المفعّلة تحتاج بلداً أو مدينة واحدة على الأقل في تغطيتها.', { field: 'regions' });
     }
     if (!zone.rates.some((r) => r.isActive)) {
-      throw new ConflictError(
-        `منطقة «${zone.nameAr}» مفعّلة بلا تسعيرة مفعّلة — المشترون فيها لن يستطيعوا الشراء منك. أبقِ تسعيرة واحدة مفعّلة على الأقل، أو أوقف المنطقة.`,
-        { zoneId },
-      );
+      throw new ConflictError(noRate(zone.nameAr), { zoneId });
     }
     const regionsOf = (z: ZoneRow): RegionShape[] => z.regions.map((r) => ({ country: r.country, region: r.region, city: r.city }));
     const tie = findTie(

@@ -154,11 +154,12 @@ describe('الاستيراد — تحليل الملف', () => {
     expect(parseRow(row({ السعر_قبل_الخصم: '50.00' }), columns, 2, 'SAR').ok).toBe(false);
   });
 
-  it('الفئة اختيارية — فراغها منتج بلا فئة، وما فوق 80 حرفاً يُرفض', () => {
+  it('الفئة إلزامية (18 أكتوبر 2026) — فراغها يرفض سطره، وما فوق 80 حرفاً يُرفض، والملف بلا عمودها يُرفض', () => {
     const none = parseRow(row({ الفئة: '' }), columns, 2, 'SAR');
-    expect(none.ok && none.row.category).toBeNull();
+    expect(none.ok).toBe(false);
+    if (!none.ok) expect(none.rejected.reasons.map((r) => r.column)).toContain('الفئة');
     expect(parseRow(row({ الفئة: 'ف'.repeat(81) }), columns, 2, 'SAR').ok).toBe(false);
-    expect(resolveHeaders(['رمز_المنتج', 'SKU', 'الاسم_عربي', 'السعر', 'الكمية']).has('category')).toBe(false);
+    expect(() => resolveHeaders(['رمز_المنتج', 'SKU', 'الاسم_عربي', 'السعر', 'الكمية'])).toThrow(/الفئة/);
   });
 });
 

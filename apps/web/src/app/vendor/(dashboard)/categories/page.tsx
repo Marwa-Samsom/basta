@@ -18,7 +18,8 @@ function categoriesLabel(n: number): string {
 /**
  * فئات المتجر — قرار صاحب المشروع 14 أكتوبر 2026: «كل متجر له فئاته، ينشئها
  * دون تدخّل الإدارة». قائمة مسطّحة بترتيب البائع، وهو ترتيب أزرارها في صفحة
- * متجره. الحذف لا يمسّ المنتجات: تبقى في المتجر بلا فئة.
+ * متجره. والمتجر يبدأ بثماني فئات مقترحة يعدّلها (18 أكتوبر 2026)، والفئة التي
+ * فيها منتجات لا تُحذف قبل نقلها — لا منتج بلا فئة.
  */
 export default function VendorCategoriesPage() {
   const [items, setItems] = useState<VendorCategory[] | null>(null);
@@ -105,9 +106,12 @@ export default function VendorCategoriesPage() {
   };
 
   const remove = (c: VendorCategory): void => {
-    const products =
-      c.productCount > 0 ? ` منتجاتها (${num(c.productCount)}) تبقى في متجرك بلا فئة.` : '';
-    if (!window.confirm(`حذف فئة «${c.nameAr}»؟${products}`)) return;
+    if (c.productCount > 0) {
+      setNotice(null);
+      setError(`«${c.nameAr}» فيها ${num(c.productCount)} ${c.productCount === 1 ? 'منتج' : 'منتجات'} — انقلها إلى فئة أخرى من محرّر كل منتج قبل حذفها.`);
+      return;
+    }
+    if (!window.confirm(`حذف فئة «${c.nameAr}»؟`)) return;
     void run(() => api(`/vendor/categories/${c.id}`, { method: 'DELETE' }), `حُذفت «${c.nameAr}».`);
   };
 
@@ -256,7 +260,7 @@ export default function VendorCategoriesPage() {
           {uncategorized ? (
             <div className="card__foot vp-foot">
               <Link className="small" href="/vendor/products?category=none">
-                <span className="num">{num(uncategorized)}</span> منتج بلا فئة — اعرضها
+                <span className="num">{num(uncategorized)}</span> منتج بلا فئة — صنّفها، فالفئة تُطلب عند تعديلها أو نشرها
               </Link>
             </div>
           ) : null}

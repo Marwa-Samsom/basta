@@ -25,16 +25,17 @@ interface ListView {
   counts: Record<string, number>;
 }
 
-/** التبويبات بترتيب العمل اليومي: ما ينتظرك أولاً. التسميات هي تسميات الحالة نفسها في الشارة */
-const TABS: { key: string; label: string }[] = [
-  { key: '', label: 'الكل' },
-  { key: 'awaiting_vendor', label: labelOf('awaiting_vendor') },
-  { key: 'accepted', label: labelOf('accepted') },
-  { key: 'preparing', label: labelOf('preparing') },
-  { key: 'ready_to_ship', label: labelOf('ready_to_ship') },
-  { key: 'shipped', label: labelOf('shipped') },
-  { key: 'delivered', label: labelOf('delivered') },
-  { key: 'return_requested', label: labelOf('return_requested') },
+/**
+ * التبويبات بترتيب العمل اليومي: ما ينتظرك أولاً، ثم ما انتهى. كل حالة لها
+ * تبويب — طلب في حالة بلا تبويب كان يُعدّ في «الكل» ولا يظهر في غيره. الحالات
+ * الأربع التي يخرج بها الطلب ملغى أو مردود المال تجتمع في تبويب واحد.
+ */
+const TABS: { statuses: string[]; label: string }[] = [
+  { statuses: [], label: 'الكل' },
+  ...(['awaiting_vendor', 'accepted', 'preparing', 'ready_to_ship', 'shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned', 'completed'] as const).map(
+    (s) => ({ statuses: [s], label: labelOf(s) }),
+  ),
+  { statuses: ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'], label: 'ملغى أو مُسترَد' },
 ];
 
 /**
@@ -103,15 +104,16 @@ export default function VendorOrdersPage() {
       <section className="card card--flush">
         <div className="tabs vm-tabs" role="tablist" aria-label="حالة الطلب">
           {TABS.map((t) => {
-            const count = t.key ? (data?.counts[t.key] ?? 0) : all;
+            const key = t.statuses.join(',');
+            const count = t.statuses.length ? t.statuses.reduce((n, s) => n + (data?.counts[s] ?? 0), 0) : all;
             return (
               <button
-                key={t.key}
+                key={key}
                 type="button"
                 role="tab"
                 className="tabs__tab"
-                aria-selected={tab === t.key}
-                onClick={() => setTab(t.key)}
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
               >
                 {t.label}
                 {data ? <span className="tabs__count">{count}</span> : null}

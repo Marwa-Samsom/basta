@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { EnvError, loadEnv, parseTrustProxy, resetEnvCache, smtpUrlProblem } from './env';
+import { EnvError, devFixedCodeOf, loadEnv, parseTrustProxy, resetEnvCache, smtpUrlProblem } from './env';
 
 const LONG = 'x'.repeat(32);
 
@@ -188,5 +188,45 @@ describe('عنوان SMTP (SMTP_URL)', () => {
     expect(smtpUrlProblem('smtp://login:key@smtp-relay.brevo.com:587')).toBeNull();
     expect(smtpUrlProblem('https://smtp.gmail.com')).toMatch(/smtp:\/\//);
     expect(smtpUrlProblem('me@gmail.com:pass@smtp.gmail.com')).toMatch(/SMTP_URL/);
+  });
+});
+
+describe('رمز الدخول الثابت للتطوير (DEV_FIXED_CODE)', () => {
+  let saved: NodeJS.ProcessEnv;
+  beforeEach(() => {
+    saved = { ...process.env };
+    resetEnvCache();
+  });
+  afterEach(() => {
+    process.env = saved;
+    resetEnvCache();
+  });
+
+  it('يرفض الإقلاع به في الإنتاج — لا يتجاهله بصمت', () => {
+    production({ PAYMENT_PROVIDER: 'manual', SHIPPING_CARRIER: 'none', DEV_FIXED_CODE: '123456' });
+    expect(() => loadEnv()).toThrow(/DEV_FIXED_CODE.*ممنوع في الإنتاج/);
+  });
+
+  it('يسري في NODE_ENV=development وحده، وغيابه لا يغيّر شيئاً', () => {
+    production({ NODE_ENV: 'development', DEV_FIXED_CODE: '123456' });
+    expect(loadEnv().devFixedCode).toBe('123456');
+    resetEnvCache();
+    production({ NODE_ENV: 'development', DEV_FIXED_CODE: undefined });
+    expect(loadEnv().devFixedCode).toBeNull();
+  });
+
+  it('خارج development صراحةً لا أثر له (الاختبارات، أو بيئة نسيت NODE_ENV)', () => {
+    production({ NODE_ENV: 'test', DEV_FIXED_CODE: '123456' });
+    expect(loadEnv().devFixedCode).toBeNull();
+    resetEnvCache();
+    production({ NODE_ENV: undefined, DEV_FIXED_CODE: '123456' });
+    expect(loadEnv().devFixedCode).toBeNull();
+  });
+
+  it('ستة أرقام لاتينية وإلا رُفض الإقلاع', () => {
+    expect(devFixedCodeOf('12345', false).problem).toMatch(/ستة أرقام/);
+    expect(devFixedCodeOf('abcdef', false).problem).toMatch(/ستة أرقام/);
+    expect(devFixedCodeOf('١٢٣٤٥٦', false).problem).toMatch(/ستة أرقام/);
+    expect(devFixedCodeOf('  ', false)).toEqual({ code: null, problem: null });
   });
 });

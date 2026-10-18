@@ -275,6 +275,31 @@ describe('بوابة 09 · البند 1 — الانتقال غير المسمو
   });
 });
 
+describe('تفاصيل طلب المشتري — أسطر القطع بعملة الدفع (18 أكتوبر 2026)', () => {
+  it('أسطر القطع تجمع «قيمة المنتجات» بالضبط، ومع قطعة الريال سعرها بعملة المتجر', async () => {
+    if (!dbUp) return;
+    const { order } = await placeOrder([2, 1]);
+    const res = await call('GET', `/me/orders/${order.orderNumber}`, buyer.token);
+    expect(res.statusCode, res.body).toBe(200);
+    const view = res.json() as {
+      currency: string;
+      itemsSubtotalMinorUnits: string;
+      stores: { currency: string; items: { qty: number; lineSubtotalMinorUnits: string; chargeSubtotalMinorUnits: string }[] }[];
+    };
+    expect(view.currency).toBe('JOD');
+    const lines = view.stores.flatMap((s) => s.items);
+    // كان السطر بعملة المتجر شاملاً الضريبة والملخّص بعملة الدفع بلاها، فلا يُقارَنان
+    expect(String(lines.reduce((a, l) => a + BigInt(l.chargeSubtotalMinorUnits), 0n))).toBe(view.itemsSubtotalMinorUnits);
+
+    const sar = view.stores.find((s) => s.currency === 'SAR')!.items[0]!;
+    expect(sar.lineSubtotalMinorUnits).toBe('39800');
+    expect(sar.chargeSubtotalMinorUnits).not.toBe('39800');
+    const jod = view.stores.find((s) => s.currency === 'JOD')!.items[0]!;
+    expect(jod.chargeSubtotalMinorUnits).toBe(jod.lineSubtotalMinorUnits);
+    expect(jod.chargeSubtotalMinorUnits).toBe('12500');
+  });
+});
+
 describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => {
   it('قطعة من ثلاث: يُردّ نصيبها بسعر اللقطة، وتعود قطعة واحدة للمخزون', async () => {
     if (!dbUp) return;
@@ -721,5 +746,29 @@ describe('حسم النزاع لصالح المشتري يردّ ماله — و
     const r = await call('POST', `/admin/orders/stores/${a.id}/transition`, admin.token, { to: 'refunded' });
     expect(r.statusCode).toBeGreaterThanOrEqual(400);
     expect(await statusOf(a.id)).toBe('delivered');
+  });
+});
+
+describe('قائمة طلبات المتجر — تصفية بحالة أو أكثر', () => {
+  it('تبويب «ملغى أو مُسترَد» يجمع حالاته الأربع، وحالة مفردة لا تُظهر غيرها، والمجهولة تُرفض', async () => {
+    if (!dbUp) return;
+    const { a, b, order } = await placeOrder([1, 1]);
+    expect((await call('POST', `/me/orders/${order.orderNumber}/stores/${b.id}/cancel`, buyer.token, { reason: 'غيّرت رأيي' })).statusCode).toBe(200);
+    expect(await statusOf(b.id)).toBe('refunded');
+
+    const closed = ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'];
+    const grouped = await call('GET', `/vendor/orders?status=${closed.join(',')}`, vendors[1]!.token);
+    expect(grouped.statusCode, grouped.body).toBe(200);
+    const items = grouped.json().items as { id: string; status: string }[];
+    expect(items.map((i) => i.id)).toContain(b.id);
+    for (const i of items) expect(closed).toContain(i.status);
+
+    const waiting = (await call('GET', '/vendor/orders?status=awaiting_vendor', vendors[1]!.token)).json().items as { id: string; status: string }[];
+    expect(waiting.map((i) => i.id)).not.toContain(b.id);
+    for (const i of waiting) expect(i.status).toBe('awaiting_vendor');
+    // أخوه عند المتجر الآخر لا يظهر هنا أصلاً
+    expect(items.map((i) => i.id)).not.toContain(a.id);
+
+    expect((await call('GET', '/vendor/orders?status=completed,bogus', vendors[1]!.token)).statusCode).toBe(400);
   });
 });
