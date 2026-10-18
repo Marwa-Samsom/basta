@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CatalogModule } from '../catalog/public';
 import { NotificationsModule } from '../notifications/public';
+import { PricingModule } from '../pricing/public';
 import {
   AdminContentController,
   AdminOperationsController,
@@ -18,7 +19,7 @@ import { ReportsService } from './application/reports.service';
  * حالة طلب: تلك تمرّ بوحداتها (الطلبات، المال، البائعون، الكتالوج).
  */
 @Module({
-  imports: [NotificationsModule, CatalogModule],
+  imports: [NotificationsModule, CatalogModule, PricingModule],
   controllers: [AdminReportsController, AdminOperationsController, AdminContentController, PublicContentController, AdminCampaignsController, PublicCampaignsController],
   providers: [ReportsService, OperationsService, ContentService, CampaignsService],
   exports: [ReportsService],

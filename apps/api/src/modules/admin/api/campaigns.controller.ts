@@ -128,7 +128,8 @@ export class PublicCampaignsController {
   @Public()
   @Get('storefront/campaigns')
   @ApiOperation({ summary: 'الحملات الجارية في الرئيسية بمواضعها — AD-17' })
-  live() {
-    return this.campaigns.publicCampaigns();
+  live(@Query('currency') currency?: string) {
+    // عملة العرض — المجهولة تسقط إلى افتراضية الإدارة داخل الكتالوج
+    return this.campaigns.publicCampaigns(new Date(), currency && /^[A-Za-z]{3}$/.test(currency) ? currency : undefined);
   }
 }

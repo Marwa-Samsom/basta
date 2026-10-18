@@ -49,6 +49,8 @@ model User {
   passwordHash    String?
   fullName        String
   locale          String     @default("ar")
+  /// عملة العرض والدفع التي اختارها — تتبعه بين أجهزته. null: افتراضية الإدارة
+  preferredCurrency String?  @db.Char(3)
   status          UserStatus @default(active)
   /// مالك المنصة — واحد على الأكثر، يُعيَّن من سكربت المدير الأول، ولا يغيّره مدير آخر
   isPlatformOwner Boolean    @default(false)

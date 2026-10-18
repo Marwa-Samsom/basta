@@ -20,6 +20,8 @@ export interface Profile {
   /** رموز الاستعادة التي لم تُستعمل بعد — صفر حين التحقق غير مفعَّل */
   recoveryCodesLeft: number;
   isAdmin: boolean;
+  /** عملة العرض التي اختارها — تتبعه بين أجهزته. null: لم يختر بعد */
+  preferredCurrency: string | null;
   createdAt: Date;
 }
 
@@ -49,8 +51,21 @@ export class AccountService {
       totpEnabled: u.totpEnabledAt !== null,
       recoveryCodesLeft: u.totpEnabledAt ? u._count.recoveryCodes : 0,
       isAdmin: u.roles.some((r) => r.role === 'admin'),
+      preferredCurrency: u.preferredCurrency,
       createdAt: u.createdAt,
     };
+  }
+
+  /**
+   * عملة العرض التي اختارها من رأس المتجر (18 أكتوبر 2026) — تُحفظ في حسابه
+   * فيجدها على جهاز آخر حين يدخل. المفعّلة وحدها؛ والسعر النافذ يُفحص عند العرض.
+   */
+  async setCurrency(userId: string, code: string): Promise<{ preferredCurrency: string }> {
+    const currency = code.trim().toUpperCase();
+    const known = await this.prisma.currency.findFirst({ where: { code: currency, isActive: true }, select: { code: true } });
+    if (!known) throw new InvalidInputError('عملة غير مدعومة.', { currency: code });
+    await this.prisma.user.update({ where: { id: userId }, data: { preferredCurrency: known.code } });
+    return { preferredCurrency: known.code };
   }
 
   async updateProfile(userId: string, input: { fullName?: string; phone?: string }, meta: RequestMeta): Promise<Profile> {

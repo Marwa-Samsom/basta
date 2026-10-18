@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InventoryModule } from '../inventory/public';
+import { PricingModule } from '../pricing/public';
 import { MyWishlistController } from './api/wishlist.controller';
 import { WishlistService } from './application/wishlist.service';
 
@@ -8,7 +9,7 @@ import { WishlistService } from './application/wishlist.service';
  * (كما تفعل السلة والتسعير)، والمخزون عبر واجهة وحدته العامة.
  */
 @Module({
-  imports: [InventoryModule],
+  imports: [InventoryModule, PricingModule],
   controllers: [MyWishlistController],
   providers: [WishlistService],
   exports: [WishlistService],

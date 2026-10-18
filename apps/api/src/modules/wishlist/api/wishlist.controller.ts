@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Put,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Actor } from '../../../common/security/actor';
@@ -30,8 +31,9 @@ export class MyWishlistController {
 
   @Get()
   @ApiOperation({ summary: 'المحفوظ، الأحدث أولاً، بسعره الآن وسعره لحظة الحفظ وحالته' })
-  list(@CurrentActor() a: Actor) {
-    return this.wishlist.list(a.userId);
+  list(@CurrentActor() a: Actor, @Query('currency') currency?: string) {
+    // عملة العرض — المجهولة تسقط إلى افتراضية الإدارة
+    return this.wishlist.list(a.userId, currency && /^[A-Za-z]{3}$/.test(currency) ? currency : undefined);
   }
 
   @Get('ids')

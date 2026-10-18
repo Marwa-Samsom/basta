@@ -291,7 +291,7 @@ export class CampaignsService {
    * الموضع ثم البداية. البطاقات من مخطّط المميّز نفسه (قاعدة الرؤية، الأسعار،
    * العملة)، والحملة التي لم يبقَ فيها منتج ظاهر لا تُعرض عنواناً فارغاً.
    */
-  async publicCampaigns(now = new Date()): Promise<PublicCampaign[]> {
+  async publicCampaigns(now = new Date(), currency?: string): Promise<PublicCampaign[]> {
     const rows = await this.prisma.campaign.findMany({
       where: { isActive: true, startsAt: { lte: now }, endsAt: { gt: now } },
       orderBy: [{ startsAt: 'asc' }],
@@ -305,7 +305,7 @@ export class CampaignsService {
 
     const out: PublicCampaign[] = [];
     for (const r of rows) {
-      const products = await this.storefront.cardsByIds(r.items.map((i) => i.productId));
+      const products = await this.storefront.cardsByIds(r.items.map((i) => i.productId), currency);
       if (products.length === 0) continue;
       out.push({
         id: r.id,

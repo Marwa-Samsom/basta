@@ -13,6 +13,13 @@ describe('مرشّحات البحث', () => {
     expect(buildFilter({ vendorId: 'v', storeCategoryId: 'c' })).toEqual(['vendorId = "v"', 'storeCategoryId = "c"']);
   });
 
+  it('بعملة العرض: عملتها بسعرها الخام، وغيرها بدولار الفهرس — 10 دنانير ليست أرخص من 20 ريالاً', () => {
+    expect(buildFilter({ displayCurrency: 'JOD', minPriceMinor: 10_000, minPriceUsd: 13.8, maxPriceMinor: 20_000, maxPriceUsd: 27.6 })).toEqual([
+      '(currency = "JOD" AND priceMinor >= 10000) OR (currency != "JOD" AND priceUsd >= 13.8)',
+      '(currency = "JOD" AND priceMinor <= 20000) OR (currency != "JOD" AND priceUsd <= 27.6)',
+    ]);
+  });
+
   it('السعر مدىً، والمخزون شرطاً', () => {
     expect(buildFilter({ minPriceMinor: 1000, maxPriceMinor: 5000, inStockOnly: true })).toEqual([
       'priceMinor >= 1000',
@@ -42,9 +49,9 @@ describe('الترتيب والصفحات', () => {
     expect(buildSort(undefined)).toEqual([]);
   });
 
-  it('السعر والأحدث يُرسلان صراحةً', () => {
-    expect(buildSort('price_asc')).toEqual(['priceMinor:asc']);
-    expect(buildSort('price_desc')).toEqual(['priceMinor:desc']);
+  it('السعر بدولار الفهرس لا بالوحدة الخام بين العملات، والأحدث صراحةً', () => {
+    expect(buildSort('price_asc')).toEqual(['priceUsd:asc']);
+    expect(buildSort('price_desc')).toEqual(['priceUsd:desc']);
     expect(buildSort('newest')).toEqual(['createdAt:desc']);
   });
 
@@ -66,8 +73,11 @@ describe('إعدادات الفهرس', () => {
         minPriceMinor: 1,
         inStockOnly: true,
       }),
-    ].map((f) => String(f).split(' ')[0]);
+      ...buildFilter({ displayCurrency: 'JOD', maxPriceMinor: 1, maxPriceUsd: 1 }),
+    ].flatMap((f) => [...String(f).matchAll(/([a-zA-Z]+) (?:>=|<=|!=|=|>|<) /g)].map((m) => m[1]!));
 
+    // كل «حقل عامل» في المرشّح، ولو داخل تعبير مركّب بـ AND و OR
+    expect(used).toContain('priceUsd');
     for (const field of used) {
       expect(INDEX_SETTINGS.filterableAttributes).toContain(field);
     }

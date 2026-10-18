@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { format, money } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { PricingService, type Quote, type QuoteAddress } from '../../pricing/public';
+import { allocate, convertMinor, DisplayCurrencyService, PricingService, type Quote, type QuoteAddress } from '../../pricing/public';
 
 export const MAX_QTY_PER_LINE = 50;
 
@@ -15,8 +15,12 @@ export interface CartLineView {
   readonly imageKey: string | null;
   readonly qty: number;
   readonly available: number;
+  /** بعملة السلة — عملة العرض التي يدفع بها المشتري */
   readonly unitPrice: { minorUnits: string; currency: string; formatted: string };
   readonly lineTotal: { minorUnits: string; currency: string; formatted: string };
+  /** بعملة المتجر حين تختلف عن عملة السلة — يُعرض تحت المحوَّل */
+  readonly originalUnitPrice: { minorUnits: string; currency: string; formatted: string } | null;
+  readonly originalLineTotal: { minorUnits: string; currency: string; formatted: string } | null;
   /** السعر تغيّر منذ أُضيف — يُقال للمشتري قبل الدفع لا بعده */
   readonly priceChanged: boolean;
 }
@@ -28,6 +32,8 @@ export interface CartView {
   readonly groups: readonly {
     vendorId: string;
     vendorNameAr: string;
+    /** عملة المتجر — مبالغ المجموعة نفسها بعملة السلة */
+    storeCurrency: string;
     lines: readonly CartLineView[];
     subtotal: { minorUnits: string; currency: string; formatted: string };
     shipping: { minorUnits: string; currency: string; formatted: string } | null;
@@ -57,14 +63,22 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
+    private readonly display: DisplayCurrencyService,
   ) {}
 
+  /** عملة السلة = عملة العرض التي يدفع بها — من المتاحة للمشتري وحدها */
+  private async currencyOf(code: string): Promise<string> {
+    const normalized = code.trim().toUpperCase();
+    if (!(await this.display.isAvailable(normalized))) throw new InvalidInputError('عملة غير مدعومة.', { currency: code });
+    return normalized;
+  }
+
   async create(currency: string, userId: string | null): Promise<CartView> {
-    const hours = await this.expiryHours();
+    const [hours, code] = await Promise.all([this.expiryHours(), this.currencyOf(currency)]);
     const cart = await this.prisma.cart.create({
       data: {
         sessionToken: randomBytes(24).toString('base64url'),
-        currency: currency.toUpperCase(),
+        currency: code,
         userId,
         expiresAt: new Date(Date.now() + hours * 3_600_000),
       },
@@ -136,8 +150,8 @@ export class CartService {
   }
 
   async setCurrency(token: string, currency: string): Promise<CartView> {
-    const cart = await this.require(token);
-    await this.prisma.cart.update({ where: { id: cart.id }, data: { currency: currency.toUpperCase() } });
+    const [cart, code] = await Promise.all([this.require(token), this.currencyOf(currency)]);
+    await this.prisma.cart.update({ where: { id: cart.id }, data: { currency: code } });
     return this.view(token);
   }
 
@@ -200,34 +214,46 @@ export class CartService {
     const atAdd = new Map(items.map((i) => [i.variantId, i.priceMinorUnitsAtAdd]));
     const blockers = [...quote.blockers];
 
-    const groups = quote.subOrders.map((s) => ({
-      vendorId: s.vendorId,
-      vendorNameAr: s.vendorNameAr,
-      lines: s.lines.map((l) => {
-        const available = quote.availability.get(l.variantId) ?? 0;
-        if (available < l.qty) {
-          blockers.push(
-            available === 0
-              ? `${l.nameAr} نفد. احذفه من سلّتك.`
-              : `${l.nameAr}: المتاح ${available} فقط.`,
-          );
-        }
-        return {
-          variantId: l.variantId,
-          productId: l.productId,
-          nameAr: l.nameAr,
-          variantLabel: l.variantLabel,
-          imageKey: l.imageKey,
-          qty: l.qty,
-          available,
-          unitPrice: view(l.unitPriceMinor, s.currency),
-          lineTotal: view(l.lineSubtotal, s.currency),
-          priceChanged: atAdd.get(l.variantId) !== l.unitPriceMinor,
-        };
-      }),
-      subtotal: view(s.vendor.items, s.currency),
-      shipping: quote.shippingKnown ? view(s.vendor.shipping, s.currency) : null,
-    }));
+    /**
+     * كل مبلغ بعملة السلة (18 أكتوبر 2026). سطر المتجر حصّة من بنوده المحوَّلة
+     * بنسبة قيمته (allocate)، فمجموع الأسطر = مجموع المتجر = ما يدخل الإجمالي بالضبط؛
+     * وسعر القطعة بمعامل المتجر نفسه، كما في صفحة المنتج.
+     */
+    const groups = quote.subOrders.map((s) => {
+      const converted = s.currency !== cart.currency;
+      const lineTotals = allocate(s.charge.items, s.lines.map((l) => l.lineSubtotal));
+      return {
+        vendorId: s.vendorId,
+        vendorNameAr: s.vendorNameAr,
+        storeCurrency: s.currency,
+        lines: s.lines.map((l, i) => {
+          const available = quote.availability.get(l.variantId) ?? 0;
+          if (available < l.qty) {
+            blockers.push(
+              available === 0
+                ? `${l.nameAr} نفد. احذفه من سلّتك.`
+                : `${l.nameAr}: المتاح ${available} فقط.`,
+            );
+          }
+          return {
+            variantId: l.variantId,
+            productId: l.productId,
+            nameAr: l.nameAr,
+            variantLabel: l.variantLabel,
+            imageKey: l.imageKey,
+            qty: l.qty,
+            available,
+            unitPrice: view(converted ? convertMinor(l.unitPriceMinor, s.fxFactor) : l.unitPriceMinor, cart.currency),
+            lineTotal: view(lineTotals[i] ?? 0n, cart.currency),
+            originalUnitPrice: converted ? view(l.unitPriceMinor, s.currency) : null,
+            originalLineTotal: converted ? view(l.lineSubtotal, s.currency) : null,
+            priceChanged: atAdd.get(l.variantId) !== l.unitPriceMinor,
+          };
+        }),
+        subtotal: view(s.charge.items, cart.currency),
+        shipping: quote.shippingKnown ? view(s.charge.shipping, cart.currency) : null,
+      };
+    });
 
     const totalView = (minor: bigint) => ({ minorUnits: minor.toString(), formatted: format(money(minor, cart.currency)) });
 

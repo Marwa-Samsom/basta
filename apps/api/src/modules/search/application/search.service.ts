@@ -185,6 +185,26 @@ export class SearchService {
   }
 
   /**
+   * عدد الوثائق التي ينقصها حقل — لترقية الفهرس بعد إضافة حقل (priceUsd في
+   * 18 أكتوبر 2026) بلا إعادة بناء يدوية. null: المحرّك لا يجيب.
+   */
+  async missing(field: string): Promise<number | null> {
+    if (!(await this.meili.isUp())) return null;
+    await this.ensureIndex();
+    try {
+      const res = await this.meili.request<{ estimatedTotalHits: number }>(
+        'POST',
+        `/indexes/${this.meili.index}/search`,
+        { q: '', limit: 0, filter: `${field} NOT EXISTS` },
+        3000,
+      );
+      return res.estimatedTotalHits;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * مرشّحو الاقتراحات أثناء الكتابة — ST-06: المعرّف والاسم. الفهرس نسخة قد
    * تتأخّر عن القاعدة، فالكتالوج يصفّيهم بقاعدة الرؤية قبل أن يراهم أحد.
    */

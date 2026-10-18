@@ -97,6 +97,8 @@ export interface PricedSubOrder {
   readonly vendor: Breakdown;
   /** بعملة الدفع — حصّته من فاتورة المشتري */
   readonly charge: Breakdown;
+  /** معامل الصرف الذي حُوّلت به بنوده (عملة البائع ← عملة الدفع) — لعرض سعر القطعة بالمعامل نفسه */
+  readonly fxFactor: number;
   readonly commissionMinor: bigint;
   readonly vendorNetMinor: bigint;
   /** وحدات عملة البائع الصغرى لكل وحدة صغرى من عملة الدفع */
@@ -135,7 +137,7 @@ export function fxFactor(
   return (to / from) * scale * (1 + fx.spreadBps / 10_000);
 }
 
-const convertMinor = (amount: bigint, factor: number): bigint =>
+export const convertMinor = (amount: bigint, factor: number): bigint =>
   factor === 1 ? amount : BigInt(Math.round(Number(amount) * factor));
 
 // -------------------------------------------------------------- الخصم
@@ -338,6 +340,7 @@ export function priceCart(input: {
       },
       commissionMinor: commission,
       vendorNetMinor: vendorNet,
+      fxFactor: factor,
       fxRateSnapshot: (1 / factor).toFixed(10),
       shipping: quote && quote.available ? { minDays: quote.minDays, maxDays: quote.maxDays } : { minDays: 0, maxDays: 0 },
     });

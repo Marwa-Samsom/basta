@@ -76,8 +76,10 @@ async function createCampaign(body: Record<string, unknown>) {
   return id;
 }
 
-const publicOf = async () => (await call('GET', '/storefront/campaigns')).json() as {
-  id: string; nameAr: string; placement: string; endsAt: string; couponCode: string | null; products: { id: string; price: { formatted: string } }[];
+/** بعملة البائع (SAR) افتراضاً — الحملة تُعرض بعملة المشتري كباقي المتجر */
+const publicOf = async (currency = 'SAR') => (await call('GET', `/storefront/campaigns?currency=${currency}`)).json() as {
+  id: string; nameAr: string; placement: string; endsAt: string; couponCode: string | null;
+  products: { id: string; price: { formatted: string; currency: string; minorUnits: string } }[];
 }[];
 
 beforeAll(async () => {
@@ -237,8 +239,12 @@ describe('AD-17 · الحملات — الترتيب والظهور في الر�
     const live = mine.find((c) => c.id === id)!;
     expect(live.products.map((p) => p.id)).toEqual(order);
     expect(live.couponCode).toBe(coupon.code);
-    // البطاقة بمخطّط المميّز نفسه — السعر منسّق بعملة البائع
+    // البطاقة بمخطّط المميّز نفسه — السعر منسّق بعملة البائع حين يطلبها المشتري
     expect(live.products[0]!.price.formatted).toMatch(/120/);
+    // وبعملة أخرى محوَّلاً: الحملة لا تفلت من عملة العرض
+    const inUsd = (await publicOf('USD')).find((c) => c.id === id)!;
+    expect(inUsd.products[0]!.price.currency).toBe('USD');
+    expect(inUsd.products[0]!.price.minorUnits).not.toBe(live.products[0]!.price.minorUnits);
 
     // منتج أُعيد مسوّدة، ومنتج بائعه صار مخفياً: يسقطان من الواجهة، ويبقيان في الإدارة
     await prisma.product.update({ where: { id: p0!.id }, data: { status: 'draft' } });

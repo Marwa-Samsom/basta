@@ -56,6 +56,12 @@ export const SETTINGS_SPEC: Record<
   payment_reconcile_minutes: { labelAr: 'مهلة المصالحة', kind: 'int', min: 1, max: 60, unit: 'دقيقة' },
   fx_spread_bps: { labelAr: 'هامش الصرف', kind: 'int', min: 0, max: 1000, unit: 'نقطة أساس', financial: 'يغيّر السعر المعروض للمشتري بين العملات من الآن؛ المستحقات السابقة على لقطتها.' },
   base_currency: { labelAr: 'عملة المحاسبة', kind: 'currency', financial: 'تغيّر عملة التقارير الموحّدة فقط — لا تمسّ أي دفتر.' },
+  // 18 أكتوبر 2026: المشتري يختار عملته من رأس المتجر؛ هذه ما يراه قبل أن يختار
+  default_display_currency: {
+    labelAr: 'عملة العرض الافتراضية',
+    kind: 'currency',
+    hint: 'ما يرى به الزائر الجديد الأسعار ويدفع، حتى يختار عملته من رأس المتجر',
+  },
   coupon_default_funded_by: { labelAr: 'مموّل الكوبون الافتراضي', kind: 'enum', options: ['platform', 'vendor'] },
   // الدفع بتحويل يدوي — ما يراه المشتري بعد «أكّد الطلب». اسم المستفيد ووجهة واحدة
   // على الأقل (كليك أو IBAN) شرطٌ لقبول أي طلب

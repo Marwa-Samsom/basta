@@ -4,6 +4,7 @@
  * أسوأ من الخطأ الصاخب (ADR-001).
  */
 import { format, money } from '../../../common/money/money';
+import type { DisplayFx } from '../../pricing/public';
 
 export interface PriceView {
   readonly minorUnits: string;
@@ -17,6 +18,17 @@ export const priceView = (minorUnits: bigint, currency: string): PriceView => ({
   currency,
   formatted: format(money(minorUnits, currency)),
 });
+
+/**
+ * سعر للمشتري بعملة العرض، ومعه سعر المتجر الأصلي حين يختلفان. بلا سعر صرف
+ * نافذ يُعرض بعملته كما هو — سعر صحيح بعملة أخرى خيرٌ من صفحة ساقطة.
+ */
+export function displayedPrice(fx: DisplayFx, minor: bigint, currency: string): { price: PriceView; original: PriceView | null } {
+  const converted = currency === fx.currency ? null : fx.convert(minor, currency);
+  return converted === null
+    ? { price: priceView(minor, currency), original: null }
+    : { price: priceView(converted, fx.currency), original: priceView(minor, currency) };
+}
 
 export interface StockSummaryView {
   readonly onHand: number;

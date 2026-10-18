@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ConflictError, ForbiddenError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { StorefrontService } from '../../catalog/public';
 import { NotificationsService } from '../../notifications/public';
+import { DisplayCurrencyService } from '../../pricing/public';
 import { PERMISSION_CODES, SETTINGS_SPEC } from '../domain/permissions';
 
 const PAGE = 50;
@@ -16,6 +18,8 @@ export class OperationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly storefront: StorefrontService,
+    private readonly display: DisplayCurrencyService,
   ) {}
 
   private audit(actorUserId: string, action: string, entityType: string, entityId: string, before?: unknown, after?: unknown) {
@@ -301,6 +305,10 @@ export class OperationsService {
     if (spec.kind === 'currency') {
       const c = await this.prisma.currency.findUnique({ where: { code: String(value) } });
       if (!c) throw new InvalidInputError('عملة غير معروفة.');
+      // عملة الزائر الجديد يجب أن تُعرض: موقوفة أو بلا سعر صرف تسقط بصمت إلى غيرها
+      if (key === 'default_display_currency' && !(await this.display.isAvailable(c.code))) {
+        throw new InvalidInputError('هذه العملة موقوفة أو بلا سعر صرف نافذ — أضف سعرها أولاً.');
+      }
     }
     const before = await this.prisma.setting.findUnique({ where: { key } });
     await this.prisma.setting.upsert({
@@ -352,6 +360,8 @@ export class OperationsService {
       data: { baseCode: 'USD', quoteCode: quote, rate, source: source.trim() || 'manual', effectiveAt: new Date() },
     });
     await this.audit(actorId, 'fx.add', 'ExchangeRate', row.id, null, { quote, rate, source });
+    // دولار الفهرس لمنتجات هذه العملة تغيّر — ترتيب البحث بالسعر يتبعه. الفشل لا يُسقط الحفظ
+    void this.storefront.syncCurrency(quote).catch(() => undefined);
     return { ...row, rate: row.rate.toString() };
   }
 
