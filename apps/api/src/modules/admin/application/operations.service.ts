@@ -5,6 +5,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { StorefrontService } from '../../catalog/public';
 import { NotificationsService } from '../../notifications/public';
 import { DisplayCurrencyService } from '../../pricing/public';
+import { acceptBy, acceptanceDueSince } from '../domain/acceptance';
 import { PERMISSION_CODES, SETTINGS_SPEC } from '../domain/permissions';
 
 const PAGE = 50;
@@ -367,10 +368,15 @@ export class OperationsService {
 
   // -------------------------------------------------- AD-12 و AD-15 الطلبات
 
-  async orders(q: { search?: string; status?: string; page?: number }) {
+  /** `due: 'acceptance'` — ما قاربت مهلة قبوله وحده، بقاعدة بطاقة اللوحة نفسها (domain/acceptance) */
+  async orders(q: { search?: string; status?: string; page?: number; due?: 'acceptance' }) {
     const t = q.search?.trim();
+    const now = new Date();
+    const deadlineHours = Number((await this.prisma.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } }))?.valueJson) || 48;
+    const dueSince = acceptanceDueSince(deadlineHours, now);
     const where: Prisma.OrderWhereInput = {
       ...(q.status ? { status: q.status as never } : { status: { not: 'pending_payment' } }),
+      ...(q.due === 'acceptance' ? { subOrders: { some: { status: 'awaiting_vendor', placedAt: { lt: dueSince } } } } : {}),
       ...(t
         ? {
             OR: [
@@ -392,12 +398,22 @@ export class OperationsService {
           orderNumber: true, status: true, currency: true, grandTotalMinorUnits: true, placedAt: true, guestEmail: true,
           customer: { select: { fullName: true, email: true } },
           payment: { select: { status: true } },
-          subOrders: { select: { id: true, subOrderNumber: true, status: true, vendor: { select: { nameAr: true } } } },
+          subOrders: { select: { id: true, subOrderNumber: true, status: true, placedAt: true, vendor: { select: { nameAr: true } } } },
         },
       }),
       this.prisma.order.count({ where }),
     ]);
-    return { items: items.map((o) => ({ ...o, grandTotalMinorUnits: o.grandTotalMinorUnits.toString() })), total };
+    return {
+      items: items.map((o) => ({
+        ...o,
+        grandTotalMinorUnits: o.grandTotalMinorUnits.toString(),
+        subOrders: o.subOrders.map(({ placedAt, ...s }) => {
+          const waiting = s.status === 'awaiting_vendor';
+          return { ...s, acceptBy: waiting ? acceptBy(placedAt, deadlineHours) : null, acceptanceDue: waiting && placedAt < dueSince };
+        }),
+      })),
+      total,
+    };
   }
 
   async returns(status?: string) {

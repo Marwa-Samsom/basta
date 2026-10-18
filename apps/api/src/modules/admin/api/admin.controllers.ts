@@ -422,10 +422,11 @@ export class AdminOperationsController {
 
   @Get('orders')
   @RequirePermission('orders.manage')
-  orders(@Query('q') q?: string, @Query('status') status?: string, @Query('page') page?: string) {
+  orders(@Query('q') q?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('due') due?: string) {
     return this.ops.orders({
       ...(q ? { search: q } : {}),
       ...(status ? { status: assertOneOf(status, Object.values(OrderStatus), 'حالة الطلب') } : {}),
+      ...(due ? { due: assertOneOf(due, ['acceptance'] as const, 'التصفية') } : {}),
       page: Number(page) || 1,
     });
   }

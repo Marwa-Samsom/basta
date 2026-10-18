@@ -574,6 +574,37 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     await expect(prisma.auditLog.update({ where: { id: one.id }, data: { action: 'x' } })).rejects.toThrow();
   });
 
+  it('«قاربت مهلة القبول»: البطاقة تفتح ما تعدّه وحده، بالقاعدة نفسها (J-03)', async () => {
+    if (!dbUp) return;
+    const near = await placeOrder(1);
+    const fresh = await placeOrder(1);
+    const sub = near.subOrders[0]!;
+    const hours = Number((await prisma.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } }))?.valueJson) || 48;
+    // الاختبار يعمل على قاعدة التطوير نفسها: يرجّع طلبه هو وحده، ويعيده بعدها فلا يظهر
+    // في لوحة من يجرّب يدوياً ولا تلغيه مهمة الطلبات الحيّة
+    const placedAt = new Date(Date.now() - (hours - 8) * 3_600_000);
+    await prisma.subOrder.update({ where: { id: sub.id }, data: { placedAt } });
+    try {
+      const list = await call('GET', '/admin/orders?due=acceptance', admin.token);
+      expect(list.statusCode, list.body).toBe(200);
+      type Item = { orderNumber: string; subOrders: { id: string; acceptBy: string | null; acceptanceDue: boolean }[] };
+      const items = list.json().items as Item[];
+      expect(items.map((o) => o.orderNumber)).toContain(near.orderNumber);
+      expect(items.map((o) => o.orderNumber)).not.toContain(fresh.orderNumber);
+      const mine = items.find((o) => o.orderNumber === near.orderNumber)!.subOrders.find((s) => s.id === sub.id)!;
+      expect(mine.acceptanceDue).toBe(true);
+      expect(new Date(mine.acceptBy!).getTime()).toBe(placedAt.getTime() + hours * 3_600_000);
+
+      // البطاقة تعدّ الفرعيات نفسها التي تعرضها القائمة — لا رقم بلا قائمة
+      const queued = (await call('GET', '/admin/dashboard', admin.token)).json().queues.overdueAcceptance as number;
+      expect(queued).toBe(items.flatMap((o) => o.subOrders).filter((s) => s.acceptanceDue).length);
+
+      expect((await call('GET', '/admin/orders?due=late', admin.token)).statusCode).toBe(400);
+    } finally {
+      await prisma.subOrder.update({ where: { id: sub.id }, data: { placedAt: new Date() } });
+    }
+  });
+
   it('اللوحة: طوابير العمل وتنبيهات الانحراف في مكان واحد', async () => {
     if (!dbUp) return;
     const d = await call('GET', '/admin/dashboard', admin.token);

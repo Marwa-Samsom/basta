@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { convert, money, toDecimalString } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { csvCell } from '../../../common/csv';
+import { acceptanceDueSince } from '../domain/acceptance';
 
 export interface Range {
   from: Date;
@@ -203,7 +204,7 @@ export class ReportsService {
       this.prisma.payoutRequest.count({ where: { status: { in: ['requested', 'approved'] } } }),
       this.prisma.dispute.count({ where: { status: { in: ['open', 'escalated'] } } }),
       this.prisma.subOrder.count({
-        where: { status: 'awaiting_vendor', placedAt: { lt: new Date(Date.now() - (deadlineHours - 12) * 3_600_000) } },
+        where: { status: 'awaiting_vendor', placedAt: { lt: acceptanceDueSince(deadlineHours, new Date()) } },
       }),
       this.drift(),
     ]);

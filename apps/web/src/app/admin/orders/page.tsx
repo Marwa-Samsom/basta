@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useState } from 'react';
 import { AdminHeader, Empty, Feedback, Loading, ReasonButton, Tabs } from '@/components/admin';
 import { Icon } from '@/components/icons';
+import { Alert } from '@/components/ui';
 import { api } from '@/lib/api';
 import { PARENT_STATUS, useAction, useAdminData } from '@/lib/admin';
 import { labelOf, money, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
@@ -17,7 +18,16 @@ interface Row {
   guestEmail: string | null;
   customer: { fullName: string | null; email: string | null } | null;
   payment: { status: string } | null;
-  subOrders: { id: string; subOrderNumber: string; status: string; vendor: { nameAr: string } }[];
+  subOrders: {
+    id: string;
+    subOrderNumber: string;
+    status: string;
+    vendor: { nameAr: string };
+    /** موعد انقضاء مهلة القبول — للفرعي الذي ينتظر البائع وحده */
+    acceptBy: string | null;
+    /** أقل من 12 ساعة على الانقضاء — ما تعدّه بطاقة اللوحة */
+    acceptanceDue: boolean;
+  }[];
 }
 
 interface Detail {
@@ -40,13 +50,21 @@ const PARENT_TONE: Record<string, string> = {
   refunded: 'badge--pending',
 };
 
-/** AD-12 — الطلبات: بحث برقم الطلب أو العميل أو المتجر، وتفاصيل كل متجر بمساره، وإلغاء الإدارة قبل الشحن */
+/**
+ * AD-12 — الطلبات: بحث برقم الطلب أو العميل أو المتجر، وتفاصيل كل متجر بمساره، وإلغاء الإدارة قبل الشحن.
+ * `?due=acceptance` من بطاقة اللوحة: ما قاربت مهلة قبوله وحده، بالقاعدة نفسها التي تعدّه بها.
+ */
 function OrdersInner() {
   const params = useSearchParams();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(params.get('status') ?? '');
+  const [due, setDue] = useState(params.get('due') === 'acceptance');
   const [openNumber, setOpenNumber] = useState<string | null>(null);
-  const q = new URLSearchParams({ ...(search.trim() ? { q: search.trim() } : {}), ...(status ? { status } : {}) });
+  const q = new URLSearchParams({
+    ...(search.trim() ? { q: search.trim() } : {}),
+    ...(status ? { status } : {}),
+    ...(due ? { due: 'acceptance' } : {}),
+  });
   const { data, error, forbidden, reload } = useAdminData<{ items: Row[]; total: number }>(`/admin/orders?${q}`);
 
   return (
@@ -55,7 +73,10 @@ function OrdersInner() {
       <div className="toolbar">
         <Tabs
           value={status}
-          onChange={setStatus}
+          onChange={(v) => {
+            setStatus(v);
+            setDue(false);
+          }}
           label="حالة الطلب"
           options={[{ key: '', label: 'الكل' }, ...['processing', 'partially_completed', 'completed', 'canceled', 'refunded', 'payment_failed'].map((k) => ({ key: k, label: PARENT_STATUS[k]! }))]}
         />
@@ -66,20 +87,32 @@ function OrdersInner() {
           </span>
         </div>
       </div>
+      {due ? (
+        <Alert tone="warning" title="طلبات قاربت مهلة القبول">
+          <p>
+            متاجر لم تقبل طلبها وبقي على انقضاء مهلتها أقل من 12 ساعة — بعدها يُلغى آلياً ويُردّ المبلغ. ذكّر المتجر أو
+            ألغِ بنفسك.
+          </p>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={() => setDue(false)}>
+            اعرض كل الطلبات
+          </button>
+        </Alert>
+      ) : null}
       {!data ? (
         <Loading error={error} forbidden={forbidden} onRetry={reload} />
       ) : data.items.length === 0 ? (
         <Empty
           icon="truck"
-          title="لا طلبات بهذه التصفية"
+          title={due ? 'لا طلب قاربت مهلة قبوله' : 'لا طلبات بهذه التصفية'}
           actions={
-            search.trim() || status ? (
+            search.trim() || status || due ? (
               <button
                 type="button"
                 className="btn btn--secondary btn--sm"
                 onClick={() => {
                   setSearch('');
                   setStatus('');
+                  setDue(false);
                 }}
               >
                 أزل التصفية
@@ -116,6 +149,14 @@ function OrdersInner() {
                         <span className="ao-stack">
                           <span className="ao-strong">{o.customer?.fullName ?? o.guestEmail ?? 'ضيف'}</span>
                           <span className="ao-stack__sub">{o.subOrders.map((s) => s.vendor.nameAr).join('، ')}</span>
+                          {o.subOrders
+                            .filter((s) => s.acceptanceDue && s.acceptBy)
+                            .map((s) => (
+                              <span key={s.id} className="ao-stack__sub ao-due">
+                                <Icon name="clock" size={12} />
+                                {s.vendor.nameAr}: يُلغى آلياً <span className="num">{when(s.acceptBy!)}</span>
+                              </span>
+                            ))}
                         </span>
                       </td>
                       <td data-label="المتاجر" className="num">
