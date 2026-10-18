@@ -243,8 +243,10 @@ describe('عملة العرض — 18 أكتوبر 2026', () => {
     const usd = (id: string) => docs.find((d) => d.id === id)!.priceUsd!;
     const spread = Number((await prisma.setting.findUnique({ where: { key: 'fx_spread_bps' } }))?.valueJson ?? 200);
     const noSpread = (k: number) => k / (1 + spread / 10_000);
-    expect(usd(sar.id)).toBeCloseTo((25_000 * noSpread(await factor('SAR', 'USD'))) / 100, 6);
-    expect(usd(jod.id)).toBeCloseTo((30_000 * noSpread(await factor('JOD', 'USD'))) / 100, 6);
+    // priceUsd بالدولار لا بالسنت: الوحدة الصغرى ÷ 10^خاناته — من جدول العملات لا ثابتاً (ADR-013)
+    const cent = 10 ** (await prisma.currency.findUniqueOrThrow({ where: { code: 'USD' } })).minorUnitDigits;
+    expect(usd(sar.id)).toBeCloseTo((25_000 * noSpread(await factor('SAR', 'USD'))) / cent, 6);
+    expect(usd(jod.id)).toBeCloseTo((30_000 * noSpread(await factor('JOD', 'USD'))) / cent, 6);
   });
 
   it('عملة الحساب تُحفظ وتُقرأ، والمجهولة 400، والضيف 401', async () => {
