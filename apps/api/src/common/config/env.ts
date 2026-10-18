@@ -95,6 +95,8 @@ export interface Env {
   meiliUrl: string;
   meiliKey: string;
   meiliIndex: string;
+  /** رمز ثابت لكل رموز الدخول في التطوير وحده (DEV_FIXED_CODE) — null خارجه */
+  devFixedCode: string | null;
 }
 
 let cached: Env | null = null;
@@ -144,6 +146,8 @@ export function loadEnv(): Env {
   if (typeof totpKey === 'string') problems.push(totpKey);
   const smtpProblem = smtpUrlProblem(process.env['SMTP_URL']);
   if (smtpProblem) problems.push(smtpProblem);
+  const fixed = devFixedCodeOf(process.env['DEV_FIXED_CODE'], production);
+  if (fixed.problem) problems.push(fixed.problem);
   if (problems.length > 0) throw new EnvError(problems);
 
   cached = {
@@ -160,8 +164,27 @@ export function loadEnv(): Env {
     meiliUrl: process.env['MEILI_URL'] ?? 'http://127.0.0.1:7701',
     meiliKey: process.env['MEILI_KEY'] ?? '',
     meiliIndex: process.env['MEILI_INDEX'] ?? 'products',
+    devFixedCode: fixed.code,
   };
   return cached;
+}
+
+/**
+ * رمز ثابت للتطوير: يصير رمز تأكيد البريد ورمز الاستعادة هو نفسه، ويُقبل بدل
+ * رمز تطبيق المصادقة — فلا يُفتح صندوق البريد المحلي ولا تطبيق مع كل دخول.
+ *
+ * يفتح كل حساب برمز معروف، فيرفض الإقلاع به في الإنتاج لا يتجاهله: من نسيه في
+ * بيئة النشر يعرف لحظة الإقلاع. وخارج `NODE_ENV=development` صراحةً لا أثر له
+ * (الاختبارات، أو بيئة نسيت NODE_ENV).
+ */
+export function devFixedCodeOf(raw: string | undefined, production: boolean): { code: string | null; problem: string | null } {
+  const value = (raw ?? '').trim();
+  if (!value) return { code: null, problem: null };
+  if (production) {
+    return { code: null, problem: 'DEV_FIXED_CODE (ممنوع في الإنتاج — يفتح كل حساب برمز معروف. احذفه من البيئة)' };
+  }
+  if (!/^\d{6}$/.test(value)) return { code: null, problem: 'DEV_FIXED_CODE (ستة أرقام لاتينية، مثل 123456)' };
+  return { code: process.env.NODE_ENV === 'development' ? value : null, problem: null };
 }
 
 /**

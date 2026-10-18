@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { loadEnv } from '../../../common/config/env';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { OtpPurpose } from '../domain/account';
 import { OTP_MAX_ATTEMPTS, generateOtp, hashOtp, otpExpiryFrom, verifyOtp, type OtpVerdict } from '../domain/otp';
@@ -34,7 +35,8 @@ export class OtpStore {
   /** يُرجع الرمز صريحاً مرة واحدة — ليُرسَل داخل المعاملة نفسها ثم يُنسى */
   async issue(tx: Prisma.TransactionClient, userId: string, purpose: OtpPurpose, now: Date): Promise<{ code: string; expiresAt: Date }> {
     await tx.otpCode.updateMany({ where: { userId, purpose, consumedAt: null }, data: { consumedAt: now } });
-    const code = generateOtp();
+    // التطوير وحده: رمز ثابت يمرّ بالمسار كاملاً (تجزئة، مهلة، محاولات) — common/config/env
+    const code = loadEnv().devFixedCode ?? generateOtp();
     const expiresAt = otpExpiryFrom(now);
     await tx.otpCode.create({ data: { userId, channel: CHANNEL, purpose, codeHash: hashOtp(code), expiresAt } });
     return { code, expiresAt };
