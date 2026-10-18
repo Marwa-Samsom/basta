@@ -15,8 +15,17 @@ export interface SearchInput {
   readonly brandId?: string | undefined;
   /** قيم سمات مطلوبة كلها معاً (AND بين السمات، OR داخل السمة الواحدة) */
   readonly attributeValueIds?: readonly string[] | undefined;
+  /** حدّا السعر بالوحدة الصغرى لعملة العرض (displayCurrency إن وُجدت) */
   readonly minPriceMinor?: number | undefined;
   readonly maxPriceMinor?: number | undefined;
+  /**
+   * عملة العرض وحدّاها بالدولار — يحسبها الكتالوج بسعر الصرف والهامش. منتج
+   * بعملة العرض يُقارن بسعره كما هو، وغيره بدولاره (priceUsd)؛ بلاها يُقارن
+   * priceMinor خاماً كما كان.
+   */
+  readonly displayCurrency?: string | undefined;
+  readonly minPriceUsd?: number | undefined;
+  readonly maxPriceUsd?: number | undefined;
   readonly inStockOnly?: boolean | undefined;
   readonly sort?: SortKey | undefined;
   readonly page?: number | undefined;
@@ -40,6 +49,8 @@ export interface SearchDocument {
   readonly attributeValuesAr: readonly string[];
   readonly priceMinor: number;
   readonly currency: string;
+  /** أرخص متغيّر بالدولار بلا هامش — مفتاح ترتيب واحد بين متاجر بعملات مختلفة. يغيب بلا سعر صرف */
+  readonly priceUsd?: number;
   readonly available: number;
   readonly createdAt: number;
 }
@@ -65,8 +76,17 @@ export function buildFilter(input: SearchInput): (string | string[])[] {
   if (input.storeCategoryId) filter.push(`storeCategoryId = ${quote(input.storeCategoryId)}`);
   if (input.brandId) filter.push(`brandId = ${quote(input.brandId)}`);
 
-  if (input.minPriceMinor !== undefined) filter.push(`priceMinor >= ${input.minPriceMinor}`);
-  if (input.maxPriceMinor !== undefined) filter.push(`priceMinor <= ${input.maxPriceMinor}`);
+  const bound = (op: '>=' | '<=', minor: number | undefined, usd: number | undefined): void => {
+    if (minor === undefined) return;
+    if (!input.displayCurrency || usd === undefined) {
+      filter.push(`priceMinor ${op} ${minor}`);
+      return;
+    }
+    const own = quote(input.displayCurrency);
+    filter.push(`(currency = ${own} AND priceMinor ${op} ${minor}) OR (currency != ${own} AND priceUsd ${op} ${usd})`);
+  };
+  bound('>=', input.minPriceMinor, input.minPriceUsd);
+  bound('<=', input.maxPriceMinor, input.maxPriceUsd);
   if (input.inStockOnly) filter.push('available > 0');
 
   for (const valueId of input.attributeValueIds ?? []) {
@@ -78,10 +98,11 @@ export function buildFilter(input: SearchInput): (string | string[])[] {
 
 export function buildSort(sort: SortKey | undefined): string[] {
   switch (sort) {
+    // بالدولار لا بالوحدة الخام: 10 دنانير أغلى من 20 ريالاً (18 أكتوبر 2026)
     case 'price_asc':
-      return ['priceMinor:asc'];
+      return ['priceUsd:asc'];
     case 'price_desc':
-      return ['priceMinor:desc'];
+      return ['priceUsd:desc'];
     case 'newest':
       return ['createdAt:desc'];
     default:
@@ -130,10 +151,11 @@ export const INDEX_SETTINGS = Object.freeze({
     'storeCategoryId',
     'attributeValueIds',
     'priceMinor',
+    'priceUsd',
     'available',
     'currency',
   ],
-  sortableAttributes: ['priceMinor', 'createdAt'],
+  sortableAttributes: ['priceMinor', 'priceUsd', 'createdAt'],
   typoTolerance: {
     enabled: true,
     // الكلمة العربية قصيرة: «قميص» خمسة أحرف، فعتبة الخطأ الواحد تبدأ عند أربعة

@@ -4,6 +4,7 @@ import { ConflictError, NotFoundError } from '../../../common/errors/domain-erro
 import { format, money } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
+import { DisplayCurrencyService, type DisplayFx } from '../../pricing/public';
 
 /** سقف القائمة لكل مستخدم — يمنع الإغراق ولا يضيّق على أحد */
 export const MAX_WISHLIST = 200;
@@ -59,6 +60,12 @@ const view = (minor: bigint, currency: string): WishlistMoney => ({
   formatted: format(money(minor, currency)),
 });
 
+/** بعملة العرض، أو بعملته إن تعذّر الصرف — المقارنة تبقى بعملة المتجر */
+const shown = (fx: DisplayFx, minor: bigint, currency: string): WishlistMoney => {
+  const converted = fx.convert(minor, currency);
+  return converted === null ? view(minor, currency) : view(converted, fx.currency);
+};
+
 const ACTIVE_VARIANT = { archivedAt: null, isActive: true } as const satisfies Prisma.ProductVariantWhereInput;
 
 /**
@@ -89,6 +96,7 @@ export class WishlistService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly display: DisplayCurrencyService,
   ) {}
 
   async add(userId: string, productId: string): Promise<void> {
@@ -150,7 +158,12 @@ export class WishlistService {
     return rows.map((r) => r.productId);
   }
 
-  async list(userId: string): Promise<WishlistView> {
+  /**
+   * الأسعار بعملة العرض (18 أكتوبر 2026). «انخفض» و«ارتفع» يُقاسان بعملة المتجر
+   * كما سعّر البائع، لا بعد الصرف: تغيّر سعر الصرف ليس تخفيضاً من المتجر.
+   */
+  async list(userId: string, displayCurrency?: string): Promise<WishlistView> {
+    const fx = await this.display.resolve(displayCurrency);
     const rows = await this.prisma.wishlistItem.findMany({
       where: { userId },
       orderBy: [{ createdAt: 'desc' }, { productId: 'asc' }],
@@ -186,7 +199,7 @@ export class WishlistService {
 
     const items = rows.map((r): WishlistItemView => {
       const p = r.product;
-      const saved = view(r.savedPriceMinorUnits, r.currency);
+      const saved = shown(fx, r.savedPriceMinorUnits, r.currency);
       const cheapest = p.variants[0];
       const visible =
         p.status === 'active' && p.deletedAt === null && p.vendor.status === 'approved' && cheapest !== undefined;
@@ -225,8 +238,8 @@ export class WishlistService {
 
       return {
         ...base,
-        currentPrice: view(now, currency),
-        delta: diff !== 0n ? view(diff < 0n ? -diff : diff, currency) : null,
+        currentPrice: shown(fx, now, currency),
+        delta: diff !== 0n ? shown(fx, diff < 0n ? -diff : diff, currency) : null,
         state,
       };
     });

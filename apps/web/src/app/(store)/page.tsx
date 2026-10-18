@@ -6,6 +6,7 @@ import { InstallPrompt } from '@/components/install-prompt';
 import { ProductGrid } from '@/components/product-card';
 import { RecentSection } from '@/components/recent';
 import { EmptyState } from '@/components/ui';
+import { requestCurrency } from '@/lib/currency-server';
 import { internalPath } from '@/lib/safe-path';
 import { getBanners, getCampaigns, getFeatured, getShops, imageUrl, listProducts, type Campaign } from '@/lib/storefront';
 
@@ -58,12 +59,13 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
  * الإدارة شيئاً يبقى ما هو حقيقي: المتاجر وأحدث المنشور — لا صور مصطنعة.
  */
 export default async function HomePage() {
+  const currency = await requestCurrency();
   const [shopsPage, latest, banners, featured, campaigns] = await Promise.all([
     getShops().catch(() => ({ items: [] })),
-    listProducts({ sort: 'newest', pageSize: '12' }),
+    listProducts({ sort: 'newest', pageSize: '12' }, currency),
     getBanners('home_hero'),
-    getFeatured(),
-    getCampaigns(),
+    getFeatured(currency),
+    getCampaigns(currency),
   ]);
 
   const banner = banners[0];

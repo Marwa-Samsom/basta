@@ -4,6 +4,7 @@ import { minorUnitDigits } from '../../../common/money/money';
 import { samePlace } from '../../../common/places';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
+import { DisplayCurrencyService } from './display-currency.service';
 import {
   priceCart,
   quoteShipping,
@@ -48,6 +49,7 @@ export class PricingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly display: DisplayCurrencyService,
   ) {}
 
   async quote(input: QuoteInput): Promise<Quote> {
@@ -90,7 +92,8 @@ export class PricingService {
         where: { id: { in: vendorIds } },
         select: { id: true, nameAr: true, settlementCurrency: true },
       }),
-      this.usdRates(input.now ?? new Date()),
+      // المصدر نفسه الذي يُعرض منه السعر في المتجر — ما يُرى هو ما يُخصم
+      this.display.usdRates(input.now ?? new Date()),
       this.settings(['fx_spread_bps', 'default_commission_bps']),
       this.inventory.levels([...merged.keys()]),
       this.commissionRules(vendorIds, input.now ?? new Date()),
@@ -168,21 +171,6 @@ export class PricingService {
   }
 
   // ------------------------------------------------------------- المصادر
-
-  /** السعر النافذ لكل عملة مقابل الدولار — الأحدث قبل اللحظة لا الأحدث مطلقاً */
-  private async usdRates(at: Date): Promise<Record<string, number>> {
-    const rows = await this.prisma.exchangeRate.findMany({
-      where: { baseCode: 'USD', effectiveAt: { lte: at } },
-      orderBy: { effectiveAt: 'desc' },
-      select: { quoteCode: true, rate: true },
-    });
-    // الصفوف مرتّبة بالأحدث أولاً: أول سعر لكل عملة هو النافذ
-    const out: Record<string, number> = { USD: 1 };
-    for (const r of rows) {
-      if (r.quoteCode !== 'USD' && out[r.quoteCode] === undefined) out[r.quoteCode] = Number(r.rate);
-    }
-    return out;
-  }
 
   private async settings(keys: readonly string[]): Promise<Map<string, unknown>> {
     const rows = await this.prisma.setting.findMany({ where: { key: { in: [...keys] } } });

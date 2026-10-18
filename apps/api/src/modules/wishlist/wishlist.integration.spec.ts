@@ -10,6 +10,8 @@
  *   5. **عزل المالك**: لا يرى أحد مفضّلة غيره ولا يحذف منها — نزع شرط المالك
  *      يجب أن يُسقط هذا (اختبار طفرة).
  *   6. السقف: 200 ثم 409 برسالة تقول ما العمل، والتكرار عند السقف لا يُرفض.
+ *   7. بعملة العرض: المبالغ محوَّلة بمعامل الدفع نفسه، و«انخفض/ارتفع» من سعر
+ *      المتجر لا من الصرف (18 أكتوبر 2026). الحالات أعلاه تُقرأ بعملة المتجر (SAR).
  */
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
@@ -51,6 +53,17 @@ async function makeUser(tag: string) {
   const res = await call('POST', '/auth/login', undefined, { email, password: PASSWORD });
   expect(res.statusCode, res.body).toBe(200);
   return { userId: u.id, token: res.json().tokens.accessToken as string };
+}
+
+/**
+ * معامل الريال ← الدينار كما يحسبه الدفع، من أسعار القاعدة مستقلّاً عن الخدمة:
+ * (دينار/دولار ÷ ريال/دولار) × 10^(3−2) × (1 + الهامش).
+ */
+async function sarToJod(): Promise<number> {
+  const rate = async (code: string) =>
+    Number((await prisma.exchangeRate.findFirstOrThrow({ where: { baseCode: 'USD', quoteCode: code, effectiveAt: { lte: new Date() } }, orderBy: { effectiveAt: 'desc' } })).rate);
+  const spread = Number((await prisma.setting.findUnique({ where: { key: 'fx_spread_bps' } }))?.valueJson ?? 200);
+  return ((await rate('JOD')) / (await rate('SAR'))) * 10 * (1 + spread / 10_000);
 }
 
 /** منتج بمتغيّراته ومخزونها، مباشرةً بالقاعدة — الاختبار عن المفضّلة لا عن الإنشاء */
@@ -106,8 +119,9 @@ interface Item {
   variantId: string | null;
 }
 
-async function listOf(user: { token: string }): Promise<Item[]> {
-  const r = await call('GET', '/me/wishlist', user.token);
+/** بعملة المتجر افتراضاً — منطق الحالة يُقرأ بالأرقام كما سعّرها البائع */
+async function listOf(user: { token: string }, currency = 'SAR'): Promise<Item[]> {
+  const r = await call('GET', `/me/wishlist?currency=${currency}`, user.token);
   expect(r.statusCode, r.body).toBe(200);
   return r.json().items as Item[];
 }
@@ -258,6 +272,16 @@ describe('ST-23 · المفضّلة', () => {
 
     expect(by(rise.id).state).toBe('rise');
     expect(by(rise.id).delta?.minorUnits).toBe('4000');
+
+    // بالدينار: كل مبلغ محوَّل بمعامل الدفع (سعر اليوم + الهامش)، والحالة كما هي
+    const k = await sarToJod();
+    const jod = await listOf(bob, 'JOD');
+    const j = (id: string) => jod.find((i) => i.productId === id)!;
+    expect(j(drop.id).state).toBe('drop');
+    expect(j(drop.id).savedPrice).toMatchObject({ minorUnits: String(Math.round(9_200 * k)), currency: 'JOD' });
+    expect(j(drop.id).currentPrice).toMatchObject({ minorUnits: String(Math.round(7_900 * k)), currency: 'JOD' });
+    expect(j(drop.id).delta).toMatchObject({ minorUnits: String(Math.round(1_300 * k)), currency: 'JOD' });
+    expect(j(rise.id).state).toBe('rise');
 
     expect(by(sold.id).state).toBe('sold_out');
     expect(by(sold.id).available).toBe(0);

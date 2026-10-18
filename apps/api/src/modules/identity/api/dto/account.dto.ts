@@ -25,6 +25,13 @@ export class UpdateProfileDto {
   phone?: string;
 }
 
+export class CurrencyPreferenceDto {
+  @ApiProperty({ example: 'SAR' })
+  @IsString()
+  @Matches(/^[A-Za-z]{3}$/, { message: 'عملة غير مدعومة.' })
+  currency!: string;
+}
+
 export class ChangePasswordDto {
   @ApiProperty()
   @IsString()

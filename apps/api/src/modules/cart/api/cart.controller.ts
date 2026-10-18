@@ -1,15 +1,16 @@
 import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
 import { InvalidInputError } from '../../../common/errors/domain-error';
 import type { Actor } from '../../../common/security/actor';
 import { MaybeActor, OptionalAuth } from '../../../common/security/decorators';
 import { CartService, MAX_QTY_PER_LINE } from '../application/cart.service';
 
-const CURRENCIES = ['USD', 'SAR', 'AED', 'JOD', 'KWD', 'EGP', 'EUR'];
+/** الشكل هنا، والإتاحة في الخدمة: المفعّلة التي لها سعر صرف نافذ (عملة العرض) */
+const CURRENCY = /^[A-Za-z]{3}$/;
 
 export class CreateCartDto {
-  @IsIn(CURRENCIES, { message: 'عملة غير مدعومة.' })
+  @Matches(CURRENCY, { message: 'عملة غير مدعومة.' })
   currency!: string;
 }
 
@@ -38,7 +39,7 @@ export class CouponDto {
 }
 
 export class CurrencyDto {
-  @IsIn(CURRENCIES, { message: 'عملة غير مدعومة.' })
+  @Matches(CURRENCY, { message: 'عملة غير مدعومة.' })
   currency!: string;
 }
 

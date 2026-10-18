@@ -624,6 +624,8 @@
 }
 .sd-price__now { font-size: var(--text-2xl); font-weight: var(--weight-bold); }
 .sd-price__was { font-size: var(--text-md); color: var(--text-faint); }
+/* سعر المتجر بعملته تحت المحوَّل — سطر خاص به أسفل اللوحة */
+.sd-price__store { flex-basis: 100%; font-size: var(--text-sm); color: var(--text-muted); }
 .sd-price__off {
   min-height: 26px;
   padding-inline: 11px;

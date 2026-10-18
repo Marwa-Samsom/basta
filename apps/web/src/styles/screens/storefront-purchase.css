@@ -255,6 +255,7 @@
 .sp-line__price { display: grid; gap: 3px; justify-items: end; flex: none; }
 .sp-line__total { font-size: var(--text-md); font-weight: var(--weight-semi); }
 .sp-line__unit { font-size: var(--text-2xs); color: var(--text-muted); }
+.sp-line__store { font-size: var(--text-2xs); color: var(--text-faint); }
 
 /* عدّاد الكمية −/+ */
 .sp-qty {

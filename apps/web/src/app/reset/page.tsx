@@ -8,6 +8,7 @@ import { Icon } from '@/components/icons';
 import { digitsOnly } from '@/lib/digits';
 import { TextInput } from '@/components/ui';
 import { api, session, type Tokens } from '@/lib/api';
+import { syncAccountCurrency } from '@/lib/currency';
 import { homeFor, internalPath, withNext } from '@/lib/safe-path';
 import { MIN_PASSWORD, NewPasswordField, RESET_EMAIL_KEY } from './new-password-field';
 
@@ -79,6 +80,7 @@ function ResetForm() {
         body: { email: email.trim(), password },
       });
       session.write(login.tokens);
+      await syncAccountCurrency();
       // ما جاء من أجله، وإلا بيته بحسب دوره — البائع لوحته لا صفحة المشتري
       router.push(login.requiresTotpSetup ? '/account/2fa' : (next ?? homeFor(session.roles())));
     } catch {

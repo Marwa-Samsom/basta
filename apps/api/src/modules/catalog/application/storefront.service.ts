@@ -3,9 +3,10 @@ import { Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
+import { DisplayCurrencyService, type DisplayFx } from '../../pricing/public';
 import { SearchService, type SearchDocument, type SearchInput } from '../../search/public';
 import { VendorEvents } from '../../vendors/public';
-import { priceView, type Page, type PriceView } from './views';
+import { displayedPrice, priceView, type Page, type PriceView } from './views';
 
 export interface StorefrontProductCard {
   readonly id: string;
@@ -47,7 +48,8 @@ export interface StorefrontFacets {
     readonly nameAr: string;
     readonly values: readonly FacetBucket[];
   }[];
-  readonly priceRange: { readonly minMinor: string; readonly maxMinor: string } | null;
+  /** بعملة العرض — أرخص وأغلى ما في النتيجة بعد التحويل */
+  readonly priceRange: { readonly minMinor: string; readonly maxMinor: string; readonly currency: string } | null;
 }
 
 export interface StorefrontListResult extends Page<StorefrontProductCard> {
@@ -91,11 +93,30 @@ export class StorefrontService implements OnModuleInit {
     private readonly inventory: InventoryService,
     private readonly search: SearchService,
     private readonly vendorEvents: VendorEvents,
+    private readonly display: DisplayCurrencyService,
   ) {}
 
   /** تعليق متجر أو رفعه أو اعتماده يغيّر ظهور منتجاته كلها — الفهرس يتبعه فوراً */
   onModuleInit(): void {
     this.vendorEvents.onVisibilityChanged((vendorId) => this.syncVendor(vendorId));
+    // الاختبار يبني فهرسه بنفسه؛ مزامنة خلفية تسابقه (NODE_ENV فيه development من .env)
+    if (!process.env['VITEST']) void this.backfillUsd();
+  }
+
+  /**
+   * فهرس بُني قبل priceUsd (18 أكتوبر 2026) يُرتَّب بالسعر خطأً بين العملات —
+   * يُكمَل عند الإقلاع بلا إعادة بناء يدوية. يُعاد كتابة المرئي فقط، ولا يمسح شيئاً.
+   */
+  private async backfillUsd(): Promise<void> {
+    try {
+      const missing = await this.search.missing('priceUsd');
+      if (!missing) return;
+      const ids = (await this.prisma.product.findMany({ where: VISIBLE, select: { id: true } })).map((p) => p.id);
+      for (let i = 0; i < ids.length; i += 500) await this.syncIndex(ids.slice(i, i + 500));
+      this.logger.log(`أُكمل دولار الفهرس لـ ${ids.length} منتجاً (كان ينقص ${missing})`);
+    } catch (err) {
+      this.logger.warn(`تعذّر إكمال دولار الفهرس: ${(err as Error).message}`);
+    }
   }
 
   /**
@@ -114,10 +135,21 @@ export class StorefrontService implements OnModuleInit {
 
   // ------------------------------------------------------------- القائمة
 
-  async list(input: SearchInput): Promise<StorefrontListResult> {
+  /**
+   * الأسعار بعملة العرض (displayCurrency، وإلا افتراضية الإدارة) — قرار 18 أكتوبر
+   * 2026. وحدّا السعر بها أيضاً: يُحوَّلان لكل عملة متجر، ولدولار الفهرس.
+   */
+  async list(request: SearchInput): Promise<StorefrontListResult> {
     const started = Date.now();
-    const page = Math.max(1, input.page ?? 1);
-    const pageSize = Math.min(48, Math.max(1, input.pageSize ?? 24));
+    const page = Math.max(1, request.page ?? 1);
+    const pageSize = Math.min(48, Math.max(1, request.pageSize ?? 24));
+    const fx = await this.display.resolve(request.displayCurrency);
+    const input: SearchInput = {
+      ...request,
+      displayCurrency: fx.currency,
+      minPriceUsd: request.minPriceMinor !== undefined ? (fx.usdBound(request.minPriceMinor) ?? undefined) : undefined,
+      maxPriceUsd: request.maxPriceMinor !== undefined ? (fx.usdBound(request.maxPriceMinor) ?? undefined) : undefined,
+    };
 
     const hit = input.q?.trim() ? await this.search.search({ ...input, page, pageSize }) : null;
 
@@ -133,7 +165,7 @@ export class StorefrontService implements OnModuleInit {
         return row ? [row] : [];
       });
       return {
-        items: await this.cards(ordered),
+        items: await this.cards(ordered, fx),
         page,
         pageSize,
         total: hit.total,
@@ -144,7 +176,7 @@ export class StorefrontService implements OnModuleInit {
       };
     }
 
-    const where = await this.whereOf(input);
+    const where = await this.whereOf(input, fx);
     const [rows, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
@@ -157,13 +189,13 @@ export class StorefrontService implements OnModuleInit {
     ]);
 
     return {
-      items: await this.cards(rows),
+      items: await this.cards(rows, fx),
       page,
       pageSize,
       total,
       engine: 'db',
       tookMs: Date.now() - started,
-      facets: await this.facets(input),
+      facets: await this.facets(input, fx),
     };
   }
 
@@ -178,7 +210,7 @@ export class StorefrontService implements OnModuleInit {
     }
   }
 
-  private async whereOf(input: SearchInput): Promise<Prisma.ProductWhereInput> {
+  private async whereOf(input: SearchInput, fx: DisplayFx): Promise<Prisma.ProductWhereInput> {
     const and: Prisma.ProductWhereInput[] = [VISIBLE];
 
     if (input.vendorId) and.push({ vendorId: input.vendorId });
@@ -201,38 +233,62 @@ export class StorefrontService implements OnModuleInit {
       and.push({ attrValues: { some: { attributeValueId: valueId } } });
     }
 
-    // الحدّان في مرشّح واحد: كانا مفتاحين `priceMinorUnits` منفصلين فيكتب الثاني
-    // فوق الأول، ومن حدّد الأدنى والأعلى معاً رأى ما تحت الأدنى
-    const price: Prisma.BigIntFilter = {
-      ...(input.minPriceMinor !== undefined ? { gte: BigInt(input.minPriceMinor) } : {}),
-      ...(input.maxPriceMinor !== undefined ? { lte: BigInt(input.maxPriceMinor) } : {}),
-    };
     if (input.minPriceMinor !== undefined || input.maxPriceMinor !== undefined) {
-      and.push({ variants: { some: { archivedAt: null, isActive: true, priceMinorUnits: price } } });
+      and.push({ OR: await this.priceBounds(input.minPriceMinor, input.maxPriceMinor, fx) });
     }
 
     return { AND: and };
   }
 
   /**
+   * حدّا السعر بعملة العرض، محوَّلين إلى عملة كل متجر بعكس معامل العرض نفسه:
+   * المعروض round(س × م) ≥ الأدنى ⇔ س ≥ ⌈(الأدنى − ½) ÷ م⌉، و ≤ الأعلى ⇔
+   * س ≤ ⌈(الأعلى + ½) ÷ م⌉ − 1. والحدّان في مرشّح متغيّر واحد: كانا مفتاحين
+   * منفصلين فيكتب الثاني فوق الأول، ومن حدّد الأدنى والأعلى معاً رأى ما تحت الأدنى.
+   */
+  private async priceBounds(min: number | undefined, max: number | undefined, fx: DisplayFx): Promise<Prisma.ProductWhereInput[]> {
+    const currencies = (
+      await this.prisma.vendor.findMany({ distinct: ['settlementCurrency'], select: { settlementCurrency: true } })
+    ).map((v) => v.settlementCurrency);
+    const out: Prisma.ProductWhereInput[] = [];
+    for (const currency of currencies) {
+      const f = fx.factor(currency);
+      if (f === null) continue; // بلا سعر صرف لا يُقارن بعملة العرض
+      const price: Prisma.BigIntFilter = {
+        ...(min !== undefined ? { gte: f === 1 ? BigInt(min) : BigInt(Math.max(0, Math.ceil((min - 0.5) / f))) } : {}),
+        ...(max !== undefined ? { lte: f === 1 ? BigInt(max) : BigInt(Math.ceil((max + 0.5) / f) - 1) } : {}),
+      };
+      out.push({
+        vendor: { settlementCurrency: currency },
+        variants: { some: { archivedAt: null, isActive: true, priceMinorUnits: price } },
+      });
+    }
+    // لا عملة تُقارن: لا نتيجة، لا كل شيء
+    return out.length > 0 ? out : [{ id: { in: [] } }];
+  }
+
+  /**
    * المنتجات المميّزة بترتيب الإدارة (AD-19). قاعدة الرؤية نفسها: منتج صار
    * مخفياً بعد تمييزه يسقط من القسم بصمت ولا يظهر مكسوراً.
    */
-  async featured(): Promise<StorefrontProductCard[]> {
+  async featured(currency?: string): Promise<StorefrontProductCard[]> {
     const row = await this.prisma.setting.findUnique({ where: { key: 'home_featured_product_ids' } });
     const ids = Array.isArray(row?.valueJson) ? (row.valueJson as string[]) : [];
-    return this.cardsByIds(ids);
+    return this.cardsByIds(ids, currency);
   }
 
   /**
    * بطاقات منتجات بترتيب المعرّفات المعطاة، بقاعدة الرؤية نفسها — للمميّز
    * ولحملات الرئيسية (AD-17): ما صار مخفياً يسقط بصمت ولا يظهر مكسوراً.
    */
-  async cardsByIds(ids: readonly string[]): Promise<StorefrontProductCard[]> {
+  async cardsByIds(ids: readonly string[], currency?: string): Promise<StorefrontProductCard[]> {
     if (ids.length === 0) return [];
-    const rows = await this.prisma.product.findMany({ where: { ...VISIBLE, id: { in: [...ids] } }, include: CARD_INCLUDE });
+    const [rows, fx] = await Promise.all([
+      this.prisma.product.findMany({ where: { ...VISIBLE, id: { in: [...ids] } }, include: CARD_INCLUDE }),
+      this.display.resolve(currency),
+    ]);
     const byId = new Map(rows.map((r) => [r.id, r]));
-    return this.cards(ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])));
+    return this.cards(ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])), fx);
   }
 
   /**
@@ -303,7 +359,7 @@ export class StorefrontService implements OnModuleInit {
     };
   }
 
-  private async cards(rows: readonly CardRow[]): Promise<StorefrontProductCard[]> {
+  private async cards(rows: readonly CardRow[], fx: DisplayFx): Promise<StorefrontProductCard[]> {
     const levels = new Map(
       (await this.inventory.levels(rows.flatMap((r) => r.variants.map((v) => v.id)))).map((l) => [
         l.variantId,
@@ -317,16 +373,16 @@ export class StorefrontService implements OnModuleInit {
         (sum, v) => sum + (levels.get(v.id)?.available ?? 0),
         0,
       );
-      // سعر المنتج يُفسَّر بعملة تسوية بائعه — ADR-013
+      // سعر المنتج بعملة تسوية بائعه (ADR-013)، ويُعرض بعملة المشتري
       const currency = r.vendor.settlementCurrency;
       return {
         id: r.id,
         slug: r.slug,
         nameAr: r.nameAr,
         nameEn: r.nameEn,
-        price: priceView(cheapest?.priceMinorUnits ?? 0n, currency),
+        price: displayedPrice(fx, cheapest?.priceMinorUnits ?? 0n, currency).price,
         compareAtPrice: cheapest?.compareAtPriceMinorUnits
-          ? priceView(cheapest.compareAtPriceMinorUnits, currency)
+          ? displayedPrice(fx, cheapest.compareAtPriceMinorUnits, currency).price
           : null,
         vendor: { id: r.vendor.id, slug: r.vendor.slug, nameAr: r.vendor.nameAr },
         thumbnail: r.images[0] ? `/uploads/${r.images[0].fileKey}/thumb.webp` : null,
@@ -389,10 +445,10 @@ export class StorefrontService implements OnModuleInit {
    * الأوجه تُحسب من القاعدة لا من الفهرس: العدّ يجب أن يطابق ما سيراه
    * المشتري إن ضغط الوجه، والفهرس قد يتأخّر لحظة عن القاعدة.
    */
-  private async facets(input: SearchInput): Promise<StorefrontFacets> {
-    const base = await this.whereOf({ ...input, attributeValueIds: [], q: undefined });
+  private async facets(input: SearchInput, fx: DisplayFx): Promise<StorefrontFacets> {
+    const base = await this.whereOf({ ...input, attributeValueIds: [], q: undefined }, fx);
 
-    const [brands, vendors, attrValues, priceAgg] = await Promise.all([
+    const [brands, vendors, attrValues] = await Promise.all([
       this.prisma.product.groupBy({
         by: ['brandId'],
         where: { ...base, brandId: { not: null } },
@@ -404,11 +460,6 @@ export class StorefrontService implements OnModuleInit {
         where: { product: base, attributeValueId: { not: null } },
         _count: { _all: true },
       }),
-      this.prisma.productVariant.aggregate({
-        where: { archivedAt: null, isActive: true, product: base },
-        _min: { priceMinorUnits: true },
-        _max: { priceMinorUnits: true },
-      }),
     ]);
 
     const [brandRows, vendorRows, valueRows] = await Promise.all([
@@ -418,13 +469,15 @@ export class StorefrontService implements OnModuleInit {
       }),
       this.prisma.vendor.findMany({
         where: { id: { in: vendors.map((v) => v.vendorId) } },
-        select: { id: true, nameAr: true },
+        select: { id: true, nameAr: true, settlementCurrency: true },
       }),
       this.prisma.attributeValue.findMany({
         where: { id: { in: attrValues.flatMap((a) => (a.attributeValueId ? [a.attributeValueId] : [])) } },
         select: { id: true, valueAr: true, attributeId: true, attribute: { select: { nameAr: true } } },
       }),
     ]);
+
+    const priceRange = await this.priceRange(base, [...new Set(vendorRows.map((v) => v.settlementCurrency))], fx);
 
     const byAttribute = new Map<string, { nameAr: string; values: FacetBucket[] }>();
     for (const row of valueRows) {
@@ -450,20 +503,43 @@ export class StorefrontService implements OnModuleInit {
         nameAr: entry.nameAr,
         values: entry.values.sort((a, b) => b.count - a.count),
       })),
-      priceRange:
-        priceAgg._min.priceMinorUnits !== null && priceAgg._max.priceMinorUnits !== null
-          ? {
-              minMinor: priceAgg._min.priceMinorUnits.toString(),
-              maxMinor: priceAgg._max.priceMinorUnits.toString(),
-            }
-          : null,
+      priceRange,
     };
+  }
+
+  /**
+   * أرخص وأغلى ما في النتيجة بعملة العرض. الأدنى والأعلى لكل عملة متجر ثم
+   * يُحوَّلان: مقارنة الوحدات الخام بين عملتين تجعل 10 دنانير أرخص من 20 ريالاً.
+   */
+  private async priceRange(
+    base: Prisma.ProductWhereInput,
+    currencies: readonly string[],
+    fx: DisplayFx,
+  ): Promise<StorefrontFacets['priceRange']> {
+    const bounds = await Promise.all(
+      currencies.map(async (currency) => {
+        const agg = await this.prisma.productVariant.aggregate({
+          where: { archivedAt: null, isActive: true, product: { AND: [base, { vendor: { settlementCurrency: currency } }] } },
+          _min: { priceMinorUnits: true },
+          _max: { priceMinorUnits: true },
+        });
+        if (agg._min.priceMinorUnits === null || agg._max.priceMinorUnits === null) return null;
+        const lo = fx.convert(agg._min.priceMinorUnits, currency);
+        const hi = fx.convert(agg._max.priceMinorUnits, currency);
+        return lo === null || hi === null ? null : { lo, hi };
+      }),
+    );
+    const known = bounds.filter((b): b is { lo: bigint; hi: bigint } => b !== null);
+    if (known.length === 0) return null;
+    const lo = known.reduce((a, b) => (b.lo < a ? b.lo : a), known[0]!.lo);
+    const hi = known.reduce((a, b) => (b.hi > a ? b.hi : a), known[0]!.hi);
+    return { minMinor: lo.toString(), maxMinor: hi.toString(), currency: fx.currency };
   }
 
   // ------------------------------------------------------------ التفاصيل
 
   /** صفحة المنتج — ST-07. تُقرأ بالرابط لا بالمعرّف: الرابط ما يُفهرَس. */
-  async bySlug(slug: string) {
+  async bySlug(slug: string, displayCurrency?: string) {
     const product = await this.prisma.product.findFirst({
       where: { ...VISIBLE, slug },
       include: {
@@ -515,26 +591,37 @@ export class StorefrontService implements OnModuleInit {
 
     if (!product) throw new NotFoundError('المنتج غير موجود أو لم يعد معروضاً.', { slug });
 
-    const levels = new Map(
-      (await this.inventory.levels(product.variants.map((v) => v.id))).map((l) => [l.variantId, l]),
-    );
-    const currency = product.vendor.settlementCurrency;
+    const [stock, fx] = await Promise.all([
+      this.inventory.levels(product.variants.map((v) => v.id)),
+      this.display.resolve(displayCurrency),
+    ]);
+    const levels = new Map(stock.map((l) => [l.variantId, l]));
+    const storeCurrency = product.vendor.settlementCurrency;
+    // بلا سعر صرف نافذ تبقى الصفحة كلها بعملة المتجر
+    const currency = fx.factor(storeCurrency) === null ? storeCurrency : fx.currency;
 
-    const variants = product.variants.map((v) => ({
-      id: v.id,
-      sku: v.sku,
-      price: priceView(v.priceMinorUnits, currency),
-      compareAtPrice: v.compareAtPriceMinorUnits ? priceView(v.compareAtPriceMinorUnits, currency) : null,
-      available: levels.get(v.id)?.available ?? 0,
-      options: v.optionValues.map((o) => ({
-        attributeId: o.attributeId,
-        nameAr: o.attribute.nameAr,
-        code: o.attribute.code,
-        valueId: o.attributeValue.id,
-        valueAr: o.attributeValue.valueAr,
-        hexColor: o.attributeValue.hexColor,
-      })),
-    }));
+    const variants = product.variants.map((v) => {
+      const shown = displayedPrice(fx, v.priceMinorUnits, storeCurrency);
+      return {
+        id: v.id,
+        sku: v.sku,
+        price: shown.price,
+        /** سعر المتجر بعملته — يُعرض تحت المحوَّل حين تختلف العملتان */
+        originalPrice: shown.original,
+        compareAtPrice: v.compareAtPriceMinorUnits
+          ? displayedPrice(fx, v.compareAtPriceMinorUnits, storeCurrency).price
+          : null,
+        available: levels.get(v.id)?.available ?? 0,
+        options: v.optionValues.map((o) => ({
+          attributeId: o.attributeId,
+          nameAr: o.attribute.nameAr,
+          code: o.attribute.code,
+          valueId: o.attributeValue.id,
+          valueAr: o.attributeValue.valueAr,
+          hexColor: o.attributeValue.hexColor,
+        })),
+      };
+    });
 
     const available = variants.reduce((sum, v) => sum + v.available, 0);
 
@@ -544,7 +631,9 @@ export class StorefrontService implements OnModuleInit {
       nameAr: product.nameAr,
       nameEn: product.nameEn,
       descriptionAr: product.descriptionAr,
+      /** عملة الأسعار المعروضة — عملة المشتري، أو عملة المتجر إن تعذّر الصرف */
       currency,
+      storeCurrency,
       /** فئة المنتج في متجره — مسار التنقّل: المتجر ← فئته ← المنتج */
       storeCategory: product.vendorCategory,
       brand: product.brand,
@@ -590,7 +679,10 @@ export class StorefrontService implements OnModuleInit {
    * صفحة البائع — ST-11، والمعلَّق يردّ ST-12 لا 404. فئات المتجر أزرار تصفية
    * فوق منتجاته: الفئة التي لا منتج معروضاً فيها لا تظهر للمشتري.
    */
-  async shopBySlug(slug: string, opts: { category?: string | undefined; page?: number | undefined } = {}) {
+  async shopBySlug(
+    slug: string,
+    opts: { category?: string | undefined; page?: number | undefined; currency?: string | undefined } = {},
+  ) {
     const vendor = await this.prisma.vendor.findFirst({
       where: { slug },
       select: {
@@ -619,6 +711,7 @@ export class StorefrontService implements OnModuleInit {
           this.list({
             vendorId: vendor.id,
             ...(opts.category ? { storeCategoryId: opts.category } : {}),
+            displayCurrency: opts.currency,
             page: opts.page ?? 1,
             pageSize: 24,
           }),
@@ -673,14 +766,15 @@ export class StorefrontService implements OnModuleInit {
       },
     });
 
-    const levels = new Map(
-      (await this.inventory.levels(rows.flatMap((r) => r.variants.map((v) => v.id)))).map((l) => [
-        l.variantId,
-        l,
-      ]),
-    );
+    const [stock, fx] = await Promise.all([
+      this.inventory.levels(rows.flatMap((r) => r.variants.map((v) => v.id))),
+      this.display.resolve(),
+    ]);
+    const levels = new Map(stock.map((l) => [l.variantId, l]));
 
     return rows.map((r) => {
+      const cheapest = r.variants[0]?.priceMinorUnits ?? 0n;
+      const usd = fx.usd(cheapest, r.vendor.settlementCurrency);
       return {
         id: r.id,
         slug: r.slug,
@@ -698,8 +792,9 @@ export class StorefrontService implements OnModuleInit {
         attributeValuesAr: r.attrValues.flatMap((a) =>
           a.attributeValue ? [a.attributeValue.valueAr] : [],
         ),
-        priceMinor: Number(r.variants[0]?.priceMinorUnits ?? 0n),
+        priceMinor: Number(cheapest),
         currency: r.vendor.settlementCurrency,
+        ...(usd !== null ? { priceUsd: usd } : {}),
         available: r.variants.reduce((sum, v) => sum + (levels.get(v.id)?.available ?? 0), 0),
         createdAt: Math.floor((r.publishedAt ?? r.createdAt).getTime() / 1000),
       };
@@ -724,6 +819,17 @@ export class StorefrontService implements OnModuleInit {
   /** منتجات متجر كلها — بعد تغيّر حالته. syncIndex يضيف المرئي ويحذف ما سواه */
   async syncVendor(vendorId: string): Promise<void> {
     const ids = (await this.prisma.product.findMany({ where: { vendorId, deletedAt: null }, select: { id: true } })).map((p) => p.id);
+    for (let i = 0; i < ids.length; i += 500) await this.syncIndex(ids.slice(i, i + 500));
+  }
+
+  /**
+   * منتجات المتاجر بعملة تغيّر سعر صرفها — دولار الفهرس (priceUsd) يُحسب بالسعر
+   * النافذ، فترتيب البحث بالسعر يتبع السعر الجديد.
+   */
+  async syncCurrency(currency: string): Promise<void> {
+    const ids = (
+      await this.prisma.product.findMany({ where: { ...VISIBLE, vendor: { status: 'approved', settlementCurrency: currency } }, select: { id: true } })
+    ).map((p) => p.id);
     for (let i = 0; i < ids.length; i += 500) await this.syncIndex(ids.slice(i, i + 500));
   }
 

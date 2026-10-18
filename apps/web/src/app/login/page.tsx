@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
+import { syncAccountCurrency } from '@/lib/currency';
 import { digitsOnly } from '@/lib/digits';
 import { Icon } from '@/components/icons';
 import { Field, TextInput } from '@/components/ui';
@@ -90,6 +91,8 @@ function LoginForm() {
         body: { email, password, ...(totp ? { totp } : {}) },
       });
       session.write(res.tokens);
+      // عملة الحساب تتبعه إلى هذا الجهاز قبل أن تُصيَّر أول صفحة
+      await syncAccountCurrency();
       router.push(res.requiresTotpSetup ? '/account/2fa' : (next ?? homeFor(session.roles())));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'تعذّر تسجيل الدخول.';
