@@ -28,6 +28,9 @@ interface VendorDetail extends SubOrderView {
     commissionMinorUnits: string;
     commissionRateBps: number;
     netMinorUnits: string;
+    /** ما رجع من نصيبك للمشتري، وصافيك بعده كما في دفترك */
+    refundedMinorUnits: string;
+    netAfterRefundsMinorUnits: string;
   };
 }
 
@@ -325,7 +328,17 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                   </span>
                   <span className="num vm-line__qty">
                     × {i.qty}
-                    {i.refundedQty ? <span className="vm-line__refund"> (أُرجع {i.refundedQty})</span> : null}
+                    {/* «أُرجع» لما عاد بإرجاع وحده — ما رُدّ ثمنه برفض أو إلغاء «أُلغي» (J-03) */}
+                    {i.refundedQty ? (
+                      <span className="vm-line__refund">
+                        {' '}
+                        (
+                        {[i.returnedQty ? `أُرجع ${i.returnedQty}` : '', i.refundedQty > i.returnedQty ? `أُلغي ${i.refundedQty - i.returnedQty}` : '']
+                          .filter(Boolean)
+                          .join(' · ')}
+                        )
+                      </span>
+                    ) : null}
                   </span>
                   <span className="money num vm-line__total">{money(i.lineTotalMinorUnits, order.currency)}</span>
                 </li>
@@ -382,9 +395,16 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                 <dt>الشحن</dt>
                 <dd className="money num">+{money(f.shippingMinorUnits, order.currency)}</dd>
               </div>
+              {BigInt(f.refundedMinorUnits) > 0n ? (
+                <div>
+                  <dt>رُدّ للمشتري من نصيبك</dt>
+                  <dd className="money num">−{money(f.refundedMinorUnits, order.currency)}</dd>
+                </div>
+              ) : null}
+              {/* من الدفتر لا من لقطة الطلب — طلب رُدّ كله صافيه صفر لا 92.000 (J-03) */}
               <div className="vm-amounts__total">
                 <dt>صافي أرباحك</dt>
-                <dd className="money num">{money(f.netMinorUnits, order.currency)}</dd>
+                <dd className="money num">{money(f.netAfterRefundsMinorUnits, order.currency)}</dd>
               </div>
             </dl>
             <p className="vm-hint">العمولة {rate}% على القطع لا على الشحن.</p>

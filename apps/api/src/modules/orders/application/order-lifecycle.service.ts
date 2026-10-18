@@ -661,6 +661,21 @@ export class OrderLifecycleService {
         tx,
       );
     }
+    // البائع يعرف بإلغاء لم يقم به هو، فلا يجهّز ما أُلغي — J-03 (18 أكتوبر 2026)
+    if (to === 'canceled_by_admin' || to === 'canceled_by_customer') {
+      await this.notifications.enqueueVendor(
+        {
+          code: 'vendor_order_canceled',
+          vendorId: s.vendorId,
+          vars: {
+            order_number: s.subOrderNumber,
+            reason: input.reason?.trim() || (to === 'canceled_by_customer' ? 'ألغاه المشتري' : 'ألغته الإدارة'),
+            link: `/vendor/orders/${subOrderId}`,
+          },
+        },
+        tx,
+      );
+    }
     if (to === 'return_requested') {
       await this.notifications.enqueueVendor(
         { code: 'return_requested', vendorId: s.vendorId, vars: { order_number: s.subOrderNumber, reason: input.reason?.trim() || 'غير محدّد', link: `/vendor/orders/${subOrderId}` } },

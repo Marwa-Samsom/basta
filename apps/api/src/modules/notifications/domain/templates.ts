@@ -113,6 +113,15 @@ export const EVENTS: readonly EventDef[] = [
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', amount: '42.000 د.أ', reference: 'CLQ-88123', link: '/account/orders/BST-260921-A1B2C3' },
   },
   {
+    // ما لم يلغِه البائع بنفسه: انقضاء مهلة القبول أو الإدارة أو المشتري — كان يعرفه
+    // من صفحة طلباته وحدها فقد يجهّز طلباً مُلغى (J-03، 18 أكتوبر 2026)
+    code: 'vendor_order_canceled',
+    labelAr: 'إلغاء طلب للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'reason', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يقبله البائع خلال 48 ساعة', link: '/vendor/orders' },
+  },
+  {
     code: 'return_requested',
     labelAr: 'طلب إرجاع للبائع',
     audience: 'vendor',
@@ -369,6 +378,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'طلب جديد {{order_number}}'),
   t('vendor_new_order', 'whatsapp', 'بسطة: طلب جديد {{order_number}} بقيمة {{amount}} لمتجر {{store_name}}. اقبلوه خلال {{deadline_hours}} ساعة من لوحة البائع.'),
   t('vendor_new_order', 'in_app', 'طلب جديد {{order_number}} — {{amount}}. المهلة {{deadline_hours}} ساعة.'),
+
+  t('vendor_order_canceled', 'email',
+    'فريق {{store_name}}،\n\nأُلغي الطلب {{order_number}}. السبب: {{reason}}.\n\nرُدّ مبلغه للمشتري وعادت قطعه إلى مخزونكم، فلا تجهّزوه ولا تشحنوه.\n\n{{link}}\n\nبسطة',
+    'أُلغي الطلب {{order_number}}'),
+  t('vendor_order_canceled', 'in_app', 'أُلغي الطلب {{order_number}}: {{reason}}. لا تجهّزه.'),
 
   t('return_requested', 'email',
     'فريق {{store_name}}،\n\nطلب المشتري إرجاع قطع من الطلب {{order_number}}. السبب: {{reason}}.\n\nعند استلامكم القطع أكّدوا ذلك من اللوحة، فتعود للمخزون ويُردّ نصيبها للمشتري.\n\n{{link}}\n\nبسطة',
