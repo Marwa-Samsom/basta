@@ -138,6 +138,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
   const storeCount =
     order.stores.length === 1 ? 'متجر واحد' : order.stores.length === 2 ? 'متجران' : `${order.stores.length} متاجر`;
   const unsplit = order.stores.length === 0;
+  const refunded = refundTotals(order.stores);
 
   const cancelTransfer = async () => {
     if (!window.confirm('تلغي الطلب؟ تعود القطع للمتاجر ولا يُؤخذ منك شيء.')) return;
@@ -250,6 +251,26 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
                 <dt>الإجمالي</dt>
                 <dd className="money num">{money(order.grandTotalMinorUnits, order.currency)}</dd>
               </div>
+              {refunded.done > 0n || refunded.pending > 0n ? (
+                <>
+                  {refunded.done > 0n ? (
+                    <div>
+                      <dt>المُسترَد</dt>
+                      <dd className="num sp-sum__saving">− {money(refunded.done, order.currency)}</dd>
+                    </div>
+                  ) : null}
+                  {refunded.pending > 0n ? (
+                    <div>
+                      <dt>استرداد قيد التنفيذ</dt>
+                      <dd className="num">{money(refunded.pending, order.currency)}</dd>
+                    </div>
+                  ) : null}
+                  <div className="sp-sum__total">
+                    <dt>صافي ما دفعته</dt>
+                    <dd className="money num">{money(BigInt(order.grandTotalMinorUnits) - refunded.done, order.currency)}</dd>
+                  </div>
+                </>
+              ) : null}
             </dl>
           </div>
         </aside>
@@ -407,6 +428,11 @@ function StoreCard({
           {s.items.map((i) => {
             const src = thumbOf(i.imageKeySnapshot);
             const rating = i.review?.rating ?? null;
+            // المسترَدّ نوعان: قطع عادت بإرجاع، وقطع أُلغيت (رفض المتجر أو إلغاء) — «أُرجع» للأولى وحدها
+            const returned = Math.min(i.refundedQty, returnedQtyOf(s, i.id));
+            const refundNote = [returned ? `أُرجع ${returned}` : '', i.refundedQty > returned ? `أُلغي ${i.refundedQty - returned}` : '']
+              .filter(Boolean)
+              .join(' · ');
             return (
               <li key={i.id} className="sp-items__row">
                 <span className="sp-thumb sp-thumb--sm" aria-hidden>
@@ -419,11 +445,11 @@ function StoreCard({
                 </span>
                 <span className="sp-items__text">
                   <span className="sp-items__name">{i.productNameSnapshotAr}</span>
-                  {i.variantLabelSnapshot || i.refundedQty ? (
+                  {i.variantLabelSnapshot || refundNote ? (
                     <span className="sp-items__sub">
                       {i.variantLabelSnapshot}
-                      {i.variantLabelSnapshot && i.refundedQty ? ' · ' : ''}
-                      {i.refundedQty ? `أُرجع ${i.refundedQty}` : ''}
+                      {i.variantLabelSnapshot && refundNote ? ' · ' : ''}
+                      {refundNote}
                     </span>
                   ) : null}
                 </span>
@@ -602,6 +628,26 @@ function refundState(r: { status: string; transferReference?: string | null }) {
   }
   if (r.status === 'awaiting_transfer') return 'نحوّله لحسابك — نبلغك بمرجع التحويل حين يخرج';
   return 'قيد التنفيذ';
+}
+
+/** القطع التي عادت من هذا السطر بإرجاع لم يُرفض — ما زاد عليها من المسترَدّ أُلغي ولم يُرجَع */
+function returnedQtyOf(s: Store, orderItemId: string): number {
+  return s.returns
+    .filter((r) => r.status !== 'rejected')
+    .flatMap((r) => r.itemsJson)
+    .filter((l) => l.orderItemId === orderItemId)
+    .reduce((n, l) => n + l.qty, 0);
+}
+
+/** مجموع الاستردادات على الطلب كله بعملة الدفع: ما رُدّ فعلاً، وما زال في الطريق */
+function refundTotals(stores: Store[]): { done: bigint; pending: bigint } {
+  let done = 0n;
+  let pending = 0n;
+  for (const r of stores.flatMap((s) => s.refunds)) {
+    if (r.status === 'succeeded') done += BigInt(r.amountMinorUnits);
+    else if (r.status !== 'failed') pending += BigInt(r.amountMinorUnits);
+  }
+  return { done, pending };
 }
 
 function ReasonSelect({ options, value, onChange }: { options: Record<string, string>; value: string; onChange: (v: string) => void }) {
