@@ -798,7 +798,8 @@
 .sp-items__name { font-size: var(--text-sm); color: var(--text-strong); }
 .sp-items__sub { font-size: var(--text-2xs); color: var(--text-muted); }
 .sp-items__qty { font-size: var(--text-xs); color: var(--text-muted); flex: none; }
-.sp-items__total { font-size: var(--text-sm); font-weight: var(--weight-semi); flex: none; }
+.sp-items__total { font-size: var(--text-sm); font-weight: var(--weight-semi); flex: none; display: grid; justify-items: end; gap: 2px; }
+.sp-items__store { font-size: var(--text-2xs); font-weight: var(--weight-normal); color: var(--text-faint); }
 
 /* ST-22 التقييم بالنجوم */
 .sp-rate { display: inline-flex; align-items: center; gap: 2px; flex-basis: 100%; padding-inline-start: 44px; }

@@ -275,6 +275,31 @@ describe('بوابة 09 · البند 1 — الانتقال غير المسمو
   });
 });
 
+describe('تفاصيل طلب المشتري — أسطر القطع بعملة الدفع (18 أكتوبر 2026)', () => {
+  it('أسطر القطع تجمع «قيمة المنتجات» بالضبط، ومع قطعة الريال سعرها بعملة المتجر', async () => {
+    if (!dbUp) return;
+    const { order } = await placeOrder([2, 1]);
+    const res = await call('GET', `/me/orders/${order.orderNumber}`, buyer.token);
+    expect(res.statusCode, res.body).toBe(200);
+    const view = res.json() as {
+      currency: string;
+      itemsSubtotalMinorUnits: string;
+      stores: { currency: string; items: { qty: number; lineSubtotalMinorUnits: string; chargeSubtotalMinorUnits: string }[] }[];
+    };
+    expect(view.currency).toBe('JOD');
+    const lines = view.stores.flatMap((s) => s.items);
+    // كان السطر بعملة المتجر شاملاً الضريبة والملخّص بعملة الدفع بلاها، فلا يُقارَنان
+    expect(String(lines.reduce((a, l) => a + BigInt(l.chargeSubtotalMinorUnits), 0n))).toBe(view.itemsSubtotalMinorUnits);
+
+    const sar = view.stores.find((s) => s.currency === 'SAR')!.items[0]!;
+    expect(sar.lineSubtotalMinorUnits).toBe('39800');
+    expect(sar.chargeSubtotalMinorUnits).not.toBe('39800');
+    const jod = view.stores.find((s) => s.currency === 'JOD')!.items[0]!;
+    expect(jod.chargeSubtotalMinorUnits).toBe(jod.lineSubtotalMinorUnits);
+    expect(jod.chargeSubtotalMinorUnits).toBe('12500');
+  });
+});
+
 describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => {
   it('قطعة من ثلاث: يُردّ نصيبها بسعر اللقطة، وتعود قطعة واحدة للمخزون', async () => {
     if (!dbUp) return;

@@ -94,6 +94,8 @@ export interface OrderItemView {
   unitPriceMinorUnits: string;
   qty: number;
   refundedQty: number;
+  /** بعملة المتجر قبل الخصم والضريبة: سعر القطعة × الكمية */
+  lineSubtotalMinorUnits: string;
   lineTotalMinorUnits: string;
   review: { id: string; rating: number } | null;
 }

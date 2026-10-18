@@ -22,6 +22,8 @@ import { imageUrl } from '@/lib/storefront';
 
 interface Item extends OrderItemView {
   imageKeySnapshot?: string | null;
+  /** السطر بعملة الدفع قبل الضريبة والخصم — جزء «قيمة المنتجات» في الملخّص */
+  chargeSubtotalMinorUnits: string;
 }
 
 interface Store extends Omit<SubOrderView, 'items'> {
@@ -454,8 +456,18 @@ function StoreCard({
                   ) : null}
                 </span>
                 <span className="sp-items__qty num">× {i.qty}</span>
-                {/* سطر القطعة بعملة المتجر كما في السلة — كان يُسمّى بعملة الدفع فيُقرأ «19.900 د.أ» وهو بالريال */}
-                <span className="sp-items__total money num">{money(i.lineTotalMinorUnits, s.currency)}</span>
+                {/*
+                 * بعملة الدفع وقبل الضريبة، كما في «قيمة المنتجات» — فأسطر الطلب تجمع الملخّص.
+                 * كان بعملة المتجر شاملاً الضريبة (23.00 ر.س) والملخّص بالدينار بلاها، فلا يُقارَنان.
+                 */}
+                <span className="sp-items__total">
+                  <span className="money num">{money(i.chargeSubtotalMinorUnits, currency)}</span>
+                  {s.currency !== currency ? (
+                    <span className="sp-items__store">
+                      <span className="num">{money(i.lineSubtotalMinorUnits, s.currency)}</span> بعملة المتجر
+                    </span>
+                  ) : null}
+                </span>
 
                 {s.reviewable && !i.review && i.refundedQty < i.qty ? (
                   <span className="sp-rate" role="group" aria-label="قيّم المنتج">
@@ -497,7 +509,9 @@ function StoreCard({
           <span className="sp-kv__v money num">{money(s.chargeTotalMinorUnits, currency)}</span>
         </p>
         {s.currency !== currency ? (
-          <p className="sp-transfer__hint">أسعار القطع بعملة المتجر، وحصّته من دفعتك محوّلة بسعر الصرف لحظة الطلب.</p>
+          <p className="sp-transfer__hint">
+            المبالغ بعملة دفعتك بسعر الصرف لحظة الطلب، وسعر المتجر بعملته تحت قطعته؛ الضريبة والشحن في ملخّص الدفع.
+          </p>
         ) : null}
 
         {s.refunds.length ? (
