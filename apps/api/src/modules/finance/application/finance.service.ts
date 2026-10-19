@@ -236,8 +236,8 @@ export class FinanceService {
 
     return this.prisma.$transaction(async (tx) => {
       // الموقوف لا يسحب: الإيقاف يجمّد المال حتى يُحسم سببه (نزاع، احتيال، KYC)
-      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true } });
-      if (vendor?.status !== 'approved') {
+      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true, nameAr: true } });
+      if (!vendor || vendor.status !== 'approved') {
         throw new ConflictError('حساب المتجر موقوف، والسحب متوقّف معه. راسل الدعم.', { status: vendor?.status ?? null });
       }
       const wallet = await this.ledger.lockWallet(tx, vendorId, input.currency);
@@ -279,6 +279,19 @@ export class FinanceService {
       await tx.auditLog.create({
         data: { actorUserId: userId, actorRole: 'vendor_owner', action: 'payout.request', entityType: 'PayoutRequest', entityId: payout.id, afterJson: { amount: input.amountMinorUnits.toString(), currency: input.currency } },
       });
+      // من يقرّ السحوبات يعرف: مال المتجر خرج من رصيده المتاح وينتظر موافقة (19 أكتوبر 2026)
+      await this.notifications.enqueueAdmins(
+        {
+          code: 'admin_payout_requested',
+          permission: 'payouts.approve',
+          vars: {
+            store_name: vendor.nameAr,
+            amount: formatMoney(money(input.amountMinorUnits, input.currency)),
+            link: '/admin/payouts',
+          },
+        },
+        tx,
+      );
       return present(payout);
     });
   }

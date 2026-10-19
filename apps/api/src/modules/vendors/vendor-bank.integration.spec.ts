@@ -158,6 +158,9 @@ describe('VD-20 · إضافة حساب بنكي', () => {
     expect(audit?.actorUserId).toBe(owner.userId);
     const alerts = await queued(owner.userId, 'bank_account_added');
     expect(alerts.map((a) => a.channel).sort()).toEqual(['email', 'in_app']);
+    // ومن يوثّق الحسابات يعرف أن حساباً ينتظره (19 أكتوبر 2026)
+    const toReviewer = (await queued(reviewer.userId, 'admin_bank_account_added')).map((a) => a.payloadJson as Record<string, string>);
+    expect(toReviewer.some((v) => v['iban_tail'] === body.iban.slice(-4) && v['link'] === `/admin/vendors/${owner.vendorId}`)).toBe(true);
 
     await call('PUT', '/me/notifications/prefs', owner.token, { prefs: Object.fromEntries(Object.keys(off).map((k) => [k, true])) });
   });

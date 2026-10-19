@@ -48,6 +48,9 @@ const CELL: Record<'empty' | 'off' | 'reviewed' | 'unreviewed' | 'locked', { lab
  * ومعاينة ببيانات عيّنة، و«أرسل تجربة» تصل حسابك فعلاً. التعديل يُسقط
  * المراجعة اللغوية حتى يوقّعها مراجِع — بوابة 11 البند الثالث.
  */
+/** لمن يصل الحدث — admin: من يحمل صلاحيته من المديرين وحدهم */
+const AUDIENCE_AR: Record<string, string> = { customer: 'للمشتري', vendor: 'للبائع', admin: 'للإدارة' };
+
 export default function AdminNotificationsPage() {
   const { data, error, forbidden, reload } = useAdminData<Matrix>('/admin/notifications/templates');
   const [sel, setSel] = useState<{ code: string; channel: string } | null>(null);
@@ -82,7 +85,7 @@ export default function AdminNotificationsPage() {
                   <td>
                     <span className="ac2-cell">
                       <span className="ac2-cell__main">{e.labelAr}</span>
-                      <span className="ac2-cell__sub">{e.audience === 'vendor' ? 'للبائع' : 'للمشتري'}</span>
+                      <span className="ac2-cell__sub">{AUDIENCE_AR[e.audience] ?? e.audience}</span>
                     </span>
                   </td>
                   {data.channels.map((c) => {

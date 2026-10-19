@@ -1442,6 +1442,15 @@ model NotificationTemplate {
   @@map("notification_templates")
 }
 
+/// تنبيه إدارة أُرسل مرة — مفتاحه الحالة نفسها («return_stalled:<id>»، «audit_drift:<منظر>:<يوم>»).
+/// المهمة الدورية تراه في كل دورة، والمفتاح الفريد يجعل إرساله مرة واحدة ولو تزامنت دورتان
+model AdminAlert {
+  key       String   @id
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@map("admin_alerts")
+}
+
 model Notification {
   id           String    @id @default(uuid()) @db.Uuid
   userId       String    @db.Uuid

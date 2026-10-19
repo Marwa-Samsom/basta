@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor, VendorScope } from '../../../common/security/actor';
 import { AuditService, AuthService, TokenService, type TokenPair } from '../../identity/public';
+import { NotificationsService } from '../../notifications/public';
 import { VendorDocumentStorage } from '../infrastructure/document-storage';
 import {
   assertCurrencyChangeable,
@@ -94,6 +95,7 @@ export class VendorOnboardingService {
     private readonly audit: AuditService,
     private readonly auth: AuthService,
     private readonly tokens: TokenService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ----------------------------------------------------------- التسجيل
@@ -568,6 +570,16 @@ export class VendorOnboardingService {
       entityId: scope.vendorId,
       ip: meta.ip ?? null,
       userAgent: null,
+    });
+    // من يراجع المتاجر يعرف أن متجراً لا يبيع حتى يُعتمد — كان يعرف من قائمة اللوحة وحدها
+    await this.notifications.enqueueAdmins({
+      code: 'admin_vendor_submitted',
+      permission: 'vendors.review',
+      vars: {
+        store_name: vendor.nameAr,
+        kind: status === 'rejected' ? 'أعاد إرسال طلبه بعد الرفض' : 'أرسل طلب انضمامه',
+        link: `/admin/vendors/${scope.vendorId}`,
+      },
     });
 
     return this.view(scope.vendorId);
