@@ -183,6 +183,24 @@ export class DisputesService {
         customer: party.kind === 'customer' ? null : { code: 'dispute_escalated', vars: {} },
         vendor: party.kind === 'vendor' ? null : { code: 'vendor_dispute_escalated', vars: {} },
       });
+      // ومن يحسم من المديرين: النزاع المصعَّد يجمّد مال المتجر حتى يتحرّك أحدهم
+      const d = await tx.dispute.findUniqueOrThrow({
+        where: { id },
+        select: { reasonCode: true, subOrder: { select: { subOrderNumber: true, vendor: { select: { nameAr: true } } } } },
+      });
+      await this.notifications.enqueueAdmins(
+        {
+          code: 'admin_dispute_escalated',
+          permission: 'disputes.resolve',
+          vars: {
+            store_name: d.subOrder.vendor.nameAr,
+            order_number: d.subOrder.subOrderNumber,
+            reason: REASON_AR[d.reasonCode] ?? d.reasonCode,
+            link: '/admin/disputes',
+          },
+        },
+        tx,
+      );
     });
   }
 

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import '@/styles/screens/admin-operations.css';
 import '@/styles/screens/admin-catalog-system.css';
 import { LogoutButton } from '@/components/logout-button';
+import { NotificationBell } from '@/components/notification-bell';
 import { DashIdent, DashShell, type DashNavGroup } from '@/components/dash-shell';
 import type { IconName } from '@/components/icons';
 import { Alert, Spinner } from '@/components/ui';
@@ -111,6 +112,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
         groups={groups}
         exitHref="/account"
+        // الجرس نفسه الذي في لوحة البائع: يصل المدير ما يخصّ صلاحياته — نزاع مصعَّد، طلب سحب
+        tools={<NotificationBell />}
         sideFoot={
           <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login?next=/admin">
             خروج

@@ -862,6 +862,8 @@ describe('إشعارات النزاع — التاجر بالفتح والتصع
     const { a, b } = await placeOrder([1, 1]);
     await deliver(0, a.id);
     await deliver(1, b.id);
+    // مدير لا يحمل disputes.resolve: لا يصله نزاع لا يملك حسمه
+    const bystander = await user('admin-no-disputes', 'admin', ['orders.manage']);
     const since = new Date();
 
     const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_received', message: 'لم يصلني شيء' });
@@ -878,6 +880,13 @@ describe('إشعارات النزاع — التاجر بالفتح والتصع
     expect(await codes(vendors[0]!.userId, since)).toContain('vendor_dispute_escalated');
     // من صعّد لا يُبلَّغ بما فعله هو
     expect(await codes(buyer.userId, since)).not.toContain('dispute_escalated');
+    // ومن يحسم من المديرين يعرف أن نزاعاً يجمّد مال متجر ينتظره — ومن لا يحسم لا
+    expect(await payloadOf(admin.userId, since, 'admin_dispute_escalated')).toMatchObject({
+      order_number: a.subOrderNumber,
+      reason: 'لم يصلني الطلب',
+      link: '/admin/disputes',
+    });
+    expect(await codes(bystander.id, since)).toEqual([]);
 
     const resolved = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: 'أثبت المتجر التسليم بتوقيع المستلم' });
     expect(resolved.statusCode, resolved.body).toBe(204);

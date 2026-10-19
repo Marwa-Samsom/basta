@@ -23,7 +23,8 @@ export const CHANNEL_LABELS: Record<Channel, string> = {
 export interface EventDef {
   readonly code: string;
   readonly labelAr: string;
-  readonly audience: 'customer' | 'vendor';
+  /** admin: يصل من يحمل صلاحيته من المديرين وحدهم — enqueueAdmins */
+  readonly audience: 'customer' | 'vendor' | 'admin';
   readonly variables: readonly string[];
   readonly sample: Readonly<Record<string, string>>;
   /**
@@ -183,6 +184,23 @@ export const EVENTS: readonly EventDef[] = [
       resolution: 'أثبت المتجر التسليم بتوقيع المستلم.',
       link: '/vendor/disputes',
     },
+  },
+  // للإدارة: ما يوقف مال أحد حتى يتحرّك مدير — لمن يحمل صلاحيته وحده (enqueueAdmins).
+  // كانت الإدارة تعرف من بطاقات لوحتها وحدها، فنزاع مصعَّد يجمّد مال متجر لا يراه أحد
+  // ما لم يفتح اللوحة (19 أكتوبر 2026)
+  {
+    code: 'admin_dispute_escalated',
+    labelAr: 'نزاع مصعَّد ينتظر الحسم',
+    audience: 'admin',
+    variables: ['store_name', 'order_number', 'reason', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يصلني الطلب', link: '/admin/disputes' },
+  },
+  {
+    code: 'admin_payout_requested',
+    labelAr: 'طلب سحب ينتظر الموافقة',
+    audience: 'admin',
+    variables: ['store_name', 'amount', 'link'],
+    sample: { store_name: 'متجر الورد', amount: '1,250.00 ر.س', link: '/admin/payouts' },
   },
   {
     code: 'payout_paid',
@@ -467,6 +485,17 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'فريق {{store_name}}،\n\nحسمت إدارة بسطة النزاع على الطلب {{order_number}}: {{outcome}}.\n\nسبب القرار: {{resolution}}\n\nالتفاصيل: {{link}}\n\nبسطة',
     'حُسم نزاع الطلب {{order_number}}'),
   t('vendor_dispute_resolved', 'in_app', 'حُسم نزاع الطلب {{order_number}}: {{outcome}}.'),
+
+  // ----------------------------------------------------------------- الإدارة
+  t('admin_dispute_escalated', 'email',
+    'صُعِّد نزاع على الطلب {{order_number}} من متجر {{store_name}} إلى الإدارة. سبب المشتري: {{reason}}.\n\nمال الطلب مجمَّد حتى يُحسم. اقرأ الخيط واحسم من هنا: {{link}}\n\nبسطة',
+    'نزاع مصعَّد على {{order_number}}'),
+  t('admin_dispute_escalated', 'in_app', 'نزاع مصعَّد على {{order_number}} ({{store_name}}): {{reason}}. ينتظر حسمك.'),
+
+  t('admin_payout_requested', 'email',
+    'طلب متجر {{store_name}} سحب {{amount}} إلى حسابه البنكي الموثَّق.\n\nوافق عليه أو ارفضه من هنا: {{link}}\n\nبسطة',
+    'طلب سحب {{amount}} من {{store_name}}'),
+  t('admin_payout_requested', 'in_app', 'طلب سحب {{amount}} من {{store_name}} ينتظر موافقتك.'),
 
   t('payout_paid', 'email',
     'فريق {{store_name}}،\n\nحوّلنا {{amount}} إلى حسابكم البنكي. مرجع التحويل: {{reference}}.\n\nكشف الحساب: {{link}}\n\nبسطة',

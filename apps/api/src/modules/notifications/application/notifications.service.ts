@@ -172,6 +172,29 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     return this.enqueue({ code: input.code, userId: v.ownerUserId, vars: { store_name: v.nameAr, ...input.vars } }, db);
   }
 
+  /**
+   * لمديري المنصة الذين يحملون الصلاحية وحدهم — لا كل مدير: نزاع لا يحسمه إلا من يحمل
+   * disputes.resolve، وسحب لا يقرّه إلا من يحمل payouts.approve. المالك كغيره بصلاحياته
+   * المحفوظة، كما يفحصها الحارس. والمعلَّق أو المحذوف لا يصله شيء.
+   */
+  async enqueueAdmins(
+    input: { code: string; permission: string; vars: Record<string, string> },
+    db: Db = this.prisma,
+  ): Promise<number> {
+    const admins = await db.user.findMany({
+      where: {
+        status: 'active',
+        deletedAt: null,
+        roles: { some: { role: 'admin' } },
+        permissions: { some: { permission: input.permission } },
+      },
+      select: { id: true },
+    });
+    let queued = 0;
+    for (const a of admins) queued += await this.enqueue({ code: input.code, userId: a.id, vars: input.vars }, db);
+    return queued;
+  }
+
   // ------------------------------------------------------------- الإرسال
 
   async dispatch(limit = 50): Promise<{ sent: number; failed: number; skipped: number }> {

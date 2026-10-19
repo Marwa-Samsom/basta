@@ -329,8 +329,14 @@ describe('بوابة 10 · البند 3 — الإرجاع بعد التحرير
 
     // البائع يسحب متاحه كله
     const w0 = await wallet(i);
+    const asked = new Date();
     const out = await call('POST', '/vendor/finance/payouts', vendors[i]!.token, { currency: 'JOD', amountMinorUnits: w0.balanceAvailableMinorUnits.toString() });
     expect(out.statusCode, out.body).toBe(201);
+    // ومن يقرّ السحوبات يعرف أن طلباً ينتظره (19 أكتوبر 2026)
+    const told = await prisma.notification.findFirst({
+      where: { userId: admin.userId, templateCode: 'admin_payout_requested', channel: 'in_app', createdAt: { gte: asked } },
+    });
+    expect(told?.payloadJson).toMatchObject({ link: '/admin/payouts' });
     expect((await wallet(i)).balanceAvailableMinorUnits).toBe(0n);
 
     // ثم يُرجع المشتري قطعة: الخصم من المتاح (مال هذا الطلب حُرِّر)، فيصير سالباً
