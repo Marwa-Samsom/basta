@@ -1362,6 +1362,7 @@ model ReturnRequest {
   reasonCode  String
   description String?
   mediaKeys   String[]
+  /// فهرس فريد جزئي في المهاجرة: طلب «requested» واحد لكل فرعي — يُكتب في معاملة انتقاله
   status      String    @default("requested")
   requestedAt DateTime  @default(now()) @db.Timestamptz
   resolvedBy  String?   @db.Uuid

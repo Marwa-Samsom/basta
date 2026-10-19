@@ -574,7 +574,8 @@ function StoreCard({
               اختر القطع وكمياتها. يُردّ نصيبها فور استلام البائع لها — لا يُردّ الشحن في الإرجاع الجزئي.
             </p>
             <div className="sp-panel__lines">
-              {s.items.map((i) => (
+              {/* بعد إرجاع جزئي يبقى الطلب «تم التسليم»: ما رُدّ كله لا يُعرض بقائمة «0» وحدها */}
+              {s.items.filter((i) => i.refundedQty < i.qty).map((i) => (
                 <label key={i.id} className="sp-panel__line">
                   <span>{i.productNameSnapshotAr}</span>
                   <select

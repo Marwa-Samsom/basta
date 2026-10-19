@@ -342,7 +342,75 @@ describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => 
     expect(item.refundedQty).toBe(1);
     const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } });
     expect(payment.status).toBe('partially_refunded');
+    // بقيت قطعتان عند المشتري: «تم التسليم» لا «مُسترَد» نهائياً (J-05، 19 أكتوبر 2026)
+    expect(await statusOf(a.id)).toBe('delivered');
+  });
+
+  it('بعد إرجاع جزئي: يُرجَع الباقي في مهلته، و«مُسترَد» حين لا يبقى شيء — بلا إشعار تسليم ثانٍ', async () => {
+    if (!dbUp) return;
+    const { a, order } = await placeOrder([2, 1]);
+    await deliver(0, a.id);
+    const line = a.items[0]!;
+    const returnOf = (qty: number) =>
+      call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+        items: [{ orderItemId: line.id, qty }],
+        reasonCode: 'size_issue',
+      });
+    const deliveredNotices = () =>
+      prisma.notification.count({
+        where: { userId: buyer.userId, templateCode: 'order_status_changed', payloadJson: { path: ['order_number'], equals: order.orderNumber } },
+      });
+
+    const first = await returnOf(1);
+    expect(first.statusCode, first.body).toBe(201);
+    const notices = await deliveredNotices();
+    expect((await vendorMove(0, a.id, 'returned')).statusCode).toBe(200);
+    expect(await statusOf(a.id)).toBe('delivered');
+    const back = await prisma.subOrderStatusHistory.findFirst({
+      where: { subOrderId: a.id, fromStatus: 'returned', toStatus: 'delivered' },
+    });
+    expect(back?.actorRole).toBeNull();
+    // ما وصله لم يتغيّر: لا «تم التسليم» ثانية في بريده
+    expect(await deliveredNotices()).toBe(notices);
+
+    // المتبقّي وحده يُرجَع — والزائد عليه يُرفض برقمه
+    const tooMany = await returnOf(2);
+    expect(tooMany.statusCode).toBe(400);
+    expect(tooMany.json().message).toBe('الكمية المتاحة للإرجاع 1.');
+    const second = await returnOf(1);
+    expect(second.statusCode, second.body).toBe(201);
+    expect((await vendorMove(0, a.id, 'returned')).statusCode).toBe(200);
+
+    // لا قطعة باقية: «مُسترَد»، واستردادان بمجموع السطر كله
     expect(await statusOf(a.id)).toBe('refunded');
+    const refunds = await prisma.refund.findMany({ where: { subOrderId: a.id } });
+    expect(refunds).toHaveLength(2);
+    expect(await prisma.orderItem.findUniqueOrThrow({ where: { id: line.id } })).toMatchObject({ refundedQty: 2 });
+  });
+
+  it('طلبا إرجاع متزامنان: واحد يُسجَّل بصفّ واحد، والآخر يُرفض بلا أثر', async () => {
+    if (!dbUp) return;
+    const { a, order } = await placeOrder([2, 1]);
+    await deliver(0, a.id);
+    const body = { items: [{ orderItemId: a.items[0]!.id, qty: 1 }], reasonCode: 'damaged' };
+    const url = `/me/orders/${order.orderNumber}/stores/${a.id}/return`;
+    const results = await Promise.all([call('POST', url, buyer.token, body), call('POST', url, buyer.token, body)]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    // كان الخاسر يترك صفّاً «requested» يتيماً: مكرَّراً عند الإدارة ومانعاً تحرير الرصيد
+    const rows = await prisma.returnRequest.findMany({ where: { subOrderId: a.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(results.find((r) => r.statusCode === 201)!.json().returnRequestId);
+
+    // وطلب ثالث والأول قائم يسمع السبب الحقيقي، لا «بعد التسليم وحده»
+    const third = await call('POST', url, buyer.token, body);
+    expect(third.statusCode).toBe(409);
+    expect(third.json().message).toMatch(/طلب إرجاع قائم/);
+    expect(await prisma.returnRequest.count({ where: { subOrderId: a.id } })).toBe(1);
+
+    // والقاعدة نفسها ترفض صفّاً قائماً ثانياً ولو كتبه غير هذا المسار
+    await expect(
+      prisma.returnRequest.create({ data: { subOrderId: a.id, itemsJson: body.items, reasonCode: 'damaged', mediaKeys: [] } }),
+    ).rejects.toThrow(/return_requests_one_open_idx|Unique constraint/);
   });
 
   it('لا إرجاع لأكثر مما اشتُري، ولا قبل التسليم', async () => {

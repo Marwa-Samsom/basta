@@ -80,7 +80,12 @@ const RULES: Readonly<Record<SubOrderStatus, readonly Rule[]>> = Object.freeze({
     // حسم نزاع لصالح المشتري (disputes.resolve): النظام وحده — لا طريق للإدارة إليه من مسار الانتقال العام
     { to: 'refunded', actors: ['system'] },
   ],
-  returned: [{ to: 'refunded', actors: ['system', 'admin'] }],
+  returned: [
+    { to: 'refunded', actors: ['system', 'admin'] },
+    // إرجاع جزئي رُدّ نصيبه وبقيت عند المشتري قطع: يعود «تم التسليم» — يُرجع الباقي في مهلته،
+    // ويُكمَل ويُحرَّر رصيده بموعده. «مُسترَد» نهائي كان يغلق ذلك كله (J-05، 19 أكتوبر 2026)
+    { to: 'delivered', actors: ['system'] },
+  ],
   rejected_by_vendor: [{ to: 'refunded', actors: ['system'] }],
   canceled_by_customer: [{ to: 'refunded', actors: ['system'] }],
   canceled_by_admin: [{ to: 'refunded', actors: ['system'] }],

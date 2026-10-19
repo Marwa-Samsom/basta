@@ -39,7 +39,8 @@ stateDiagram-v2
     return_requested --> returned : الإرجاع مقبول ومستلم
     return_requested --> delivered : الإرجاع مرفوض
 
-    returned --> refunded : تنفيذ الاسترداد
+    returned --> refunded : تنفيذ الاسترداد — لم يبقَ شيء
+    returned --> delivered : رُدّ نصيب المرتجع وبقيت قطع
 
     rejected_by_vendor --> refunded : استرداد آلي
     canceled_by_customer --> refunded : استرداد آلي
@@ -66,7 +67,8 @@ stateDiagram-v2
 | `delivered` | `return_requested` | المشتري | داخل مهلة الإرجاع | **تجميد `hold_release_at`** |
 | `return_requested` | `returned` | البائع / الإدارة | استلام البضاعة | إعادة المخزون |
 | `return_requested` | `delivered` | البائع / الإدارة | سبب رفض إلزامي | رفع التجميد، استئناف العدّ |
-| `returned` | `refunded` | النظام / الإدارة | — | `refund_debit` + عكس العمولة |
+| `returned` | `refunded` | النظام / الإدارة | بعد خروج المال، ولم تبقَ قطعة عند المشتري | `refund_debit` + عكس العمولة |
+| `returned` | `delivered` | النظام | بعد خروج المال، وبقيت قطع عند المشتري (إرجاع جزئي) | الباقي يُرجَع في مهلته من التسليم الأول، ويُكمَل ويُحرَّر رصيده بموعده — بلا إشعار تسليم ثانٍ (J-05، 19 أكتوبر 2026) |
 | `delivered` | `completed` | **النظام فقط** | مضى 14 يوماً **و** لا نزاع مفتوح | `hold_release_out` + `hold_release_in` |
 
 ### انتقالات مرفوضة صراحةً — يفحصها اختبار آلي
