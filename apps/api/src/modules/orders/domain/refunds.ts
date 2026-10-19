@@ -7,11 +7,14 @@
  */
 
 import { InvalidInputError } from '../../../common/errors/domain-error';
+import { shareBetween } from '../../../common/money/money';
 
 export interface RefundLine {
   readonly orderItemId: string;
   /** إجمالي السطر بعملة البائع كما دُفع (بعد خصمه، وبضريبته إن كانت مضافة) */
   readonly lineTotalMinor: bigint;
+  /** ما دفعه المشتري لهذا السطر بعملة الدفع — حصّته من مدفوع القطع في اللقطة */
+  readonly chargeMinor: bigint;
   readonly qty: number;
   readonly refundedQty: number;
   readonly commissionMinor: bigint;
@@ -28,19 +31,22 @@ export interface RefundPlan {
 }
 
 /**
- * استرداد جزئي بالقطع المرتجعة. نصيب كل قطعة بالتقريب لأسفل، ولا يُردّ
- * الشحن في الإرجاع الجزئي — وصلت الشحنة، والإرجاع لبعضها.
+ * استرداد جزئي بالقطع المرتجعة، ولا يُردّ الشحن فيه — وصلت الشحنة، والإرجاع لبعضها.
+ *
+ * كل مبلغ بنصيبه التراكمي من سطره (`shareBetween`): لأسفل، وآخر قطعة تكمل الباقي، فإرجاع
+ * السطر كله قطعةً قطعة يردّ ما دُفع له بالضبط. وما يُردّ للمشتري من مدفوعه هو بعملة الدفع
+ * (`chargeMinor`)، لا تحويل نصيب البائع قطعةً قطعة: ذاك قرّب كل قطعة لأقرب سنت فزاد
+ * المجموع على المدفوع (J-05، 19 أكتوبر 2026).
  */
 export function planPartialRefund(input: {
   readonly lines: readonly RefundLine[];
   readonly returned: readonly { orderItemId: string; qty: number }[];
-  /** وحدات البائع الصغرى لكل وحدة صغرى من عملة الدفع — لقطة الطلب */
-  readonly fxRateSnapshot: string;
   readonly chargeTotalMinor: bigint;
   readonly alreadyRefundedChargeMinor: bigint;
 }): RefundPlan {
   let vendorMinor = 0n;
   let commission = 0n;
+  let charge = 0n;
   const lines: { orderItemId: string; qty: number }[] = [];
 
   for (const r of input.returned) {
@@ -51,12 +57,13 @@ export function planPartialRefund(input: {
     if (r.qty > remaining) {
       throw new InvalidInputError(`لا يمكن إرجاع ${r.qty} من سطر بقي منه ${remaining}.`);
     }
-    vendorMinor += (line.lineTotalMinor * BigInt(r.qty)) / BigInt(line.qty);
-    commission += (line.commissionMinor * BigInt(r.qty)) / BigInt(line.qty);
+    const [from, to] = [line.refundedQty, line.refundedQty + r.qty];
+    vendorMinor += shareBetween(line.lineTotalMinor, from, to, line.qty);
+    commission += shareBetween(line.commissionMinor, from, to, line.qty);
+    charge += shareBetween(line.chargeMinor, from, to, line.qty);
     lines.push({ orderItemId: r.orderItemId, qty: r.qty });
   }
 
-  const charge = toCharge(vendorMinor, input.fxRateSnapshot);
   const ceiling = input.chargeTotalMinor - input.alreadyRefundedChargeMinor;
   return {
     vendorMinor,

@@ -73,15 +73,14 @@ describe('حالة الأب مشتقّة (ORDER-STATES §2)', () => {
 
 describe('الاسترداد', () => {
   const lines = [
-    { orderItemId: 'a', lineTotalMinor: 30_000n, qty: 3, refundedQty: 0, commissionMinor: 3_000n },
-    { orderItemId: 'b', lineTotalMinor: 10_000n, qty: 1, refundedQty: 0, commissionMinor: 1_000n },
+    { orderItemId: 'a', lineTotalMinor: 30_000n, chargeMinor: 30_000n, qty: 3, refundedQty: 0, commissionMinor: 3_000n },
+    { orderItemId: 'b', lineTotalMinor: 10_000n, chargeMinor: 10_000n, qty: 1, refundedQty: 0, commissionMinor: 1_000n },
   ];
 
   it('إرجاع قطعة من ثلاث يردّ ثلث السطر ويعكس ثلث عمولته', () => {
     const plan = planPartialRefund({
       lines,
       returned: [{ orderItemId: 'a', qty: 1 }],
-      fxRateSnapshot: '1.0000000000',
       chargeTotalMinor: 42_500n,
       alreadyRefundedChargeMinor: 0n,
     });
@@ -100,7 +99,6 @@ describe('الاسترداد', () => {
       planPartialRefund({
         lines: [{ ...lines[0]!, refundedQty: 2 }],
         returned: [{ orderItemId: 'a', qty: 2 }],
-        fxRateSnapshot: '1',
         chargeTotalMinor: 42_500n,
         alreadyRefundedChargeMinor: 0n,
       }),
@@ -109,16 +107,46 @@ describe('الاسترداد', () => {
 
   it('لا يُردّ أكثر من المدفوع ولو اجتمعت فروق التقريب', () => {
     const plan = planPartialRefund({
-      lines,
+      lines: lines.map((l) => ({ ...l, chargeMinor: l.chargeMinor + 3n })),
       returned: [
         { orderItemId: 'a', qty: 3 },
         { orderItemId: 'b', qty: 1 },
       ],
-      fxRateSnapshot: '0.9999',
       chargeTotalMinor: 40_000n,
       alreadyRefundedChargeMinor: 0n,
     });
     expect(plan.chargeMinor).toBe(40_000n);
+  });
+
+  it('قطعةً قطعة: آخر قطعة تكمل الباقي — بلوزتان دُفعتا 66.17 $ تُردّان 33.08 ثم 33.09 (J-05)', () => {
+    // 46.000 د.أ دُفعت 66.17 $؛ كل قطعة 33.0889 $ — وكانت تُقرَّب لأقرب سنت فتُردّ 33.09 مرتين
+    const blouse = { orderItemId: 'x', lineTotalMinor: 46_000n, chargeMinor: 6_617n, qty: 2, refundedQty: 0, commissionMinor: 4_600n };
+    const step = (refundedQty: number) =>
+      planPartialRefund({
+        lines: [{ ...blouse, refundedQty }],
+        returned: [{ orderItemId: 'x', qty: 1 }],
+        chargeTotalMinor: 7_049n,
+        alreadyRefundedChargeMinor: 0n,
+      });
+    const [first, last] = [step(0), step(1)];
+    expect([first.chargeMinor, last.chargeMinor]).toEqual([3_308n, 3_309n]);
+    expect(first.chargeMinor + last.chargeMinor).toBe(blouse.chargeMinor);
+    expect(first.vendorMinor + last.vendorMinor).toBe(46_000n);
+    expect(first.commissionReversedMinor + last.commissionReversedMinor).toBe(4_600n);
+  });
+
+  it('100.00 ÷ 3 قطعةً قطعة = 33.33 + 33.33 + 33.34 — لا 99.99', () => {
+    const line = { orderItemId: 'a', lineTotalMinor: 10_000n, chargeMinor: 10_000n, qty: 3, refundedQty: 0, commissionMinor: 1_000n };
+    const shares = [0, 1, 2].map(
+      (refundedQty) =>
+        planPartialRefund({
+          lines: [{ ...line, refundedQty }],
+          returned: [{ orderItemId: 'a', qty: 1 }],
+          chargeTotalMinor: 10_000n,
+          alreadyRefundedChargeMinor: 0n,
+        }).chargeMinor,
+    );
+    expect(shares).toEqual([3_333n, 3_333n, 3_334n]);
   });
 
   it('الكامل = ما بقي من المدفوع بالضبط، بلا تحويل ولا تقريب', () => {

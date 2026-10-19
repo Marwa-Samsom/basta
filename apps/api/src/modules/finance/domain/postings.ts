@@ -9,6 +9,7 @@
  * كل قيد هنا يحفظ المساواة بالبناء، والمنظر audit_money_conservation يفحصها
  * من ثلاثة جداول مستقلة — فالخطأ في دالة هنا يظهر هناك.
  */
+import { shareBetween } from '../../../common/money/money';
 
 export type Direction = 'credit' | 'debit';
 
@@ -104,8 +105,9 @@ export function salePostings(s: SubOrderMoney): { vendor: VendorPosting[]; platf
  * إرجاع جزئي: q قطعة من سطر فيه Q. المشتري يستردّ نصيب السطر كما دفعه
  * (بخصمه وضريبته، بلا شحن)؛ البائع يُنقص نصيب ما قُيِّد له ويستردّ نصيب
  * العمولة؛ المنصة تعيد نصيب العمولة والضريبة وتستعيد نصيب دعمها.
- * كل حصة بالتقريب لأسفل، وفرق التقريب قيد «rounding» صريح على المنصة —
- * لا يُخفى في رقم آخر.
+ * كل حصة بنصيبها التراكمي من السطر (`shareBetween`): لأسفل، وآخر قطعة تكمل الباقي —
+ * فإرجاع السطر كله قطعةً قطعة يعكس قيوده بالضبط، لا 99.99 من 100.00. وفرق التقريب بين
+ * المكوّنات قيد «rounding» صريح على المنصة — لا يُخفى في رقم آخر.
  */
 export function partialRefundPostings(
   s: SubOrderMoney,
@@ -123,7 +125,7 @@ export function partialRefundPostings(
     const l = lines.find((x) => x.orderItemId === r.orderItemId);
     if (!l) throw new Error(`سطر ليس في الفرعي: ${r.orderItemId}`);
     if (r.qty < 1 || r.qty > l.qty - l.refundedQty) throw new Error('كمية إرجاع خارج المتاح.');
-    const share = (v: bigint): bigint => (v * BigInt(r.qty)) / BigInt(l.qty);
+    const share = (v: bigint): bigint => shareBetween(v, l.refundedQty, l.refundedQty + r.qty, l.qty);
     const exclusive = l.lineTotal === l.lineSubtotal - l.lineDiscount + l.lineTax && l.lineTax > 0n;
     buyerGets += share(l.lineTotal);
     saleBack += share(l.lineSubtotal - (vf ? l.lineDiscount : 0n));
