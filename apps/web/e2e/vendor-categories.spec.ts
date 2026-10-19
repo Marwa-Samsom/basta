@@ -42,3 +42,35 @@ test('فئة جديدة من قائمة المحرّر: تُنشأ وتُختا�
   await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
   await expect(page.getByText(v.productName)).toBeVisible();
 });
+
+/**
+ * J-05 (19 أكتوبر 2026): مسوّدة قديمة بلا فئة، اختار البائع فئتها ثم ضغط «انشر» دون «احفظ»
+ * فرُفض النشر بـ«اختر فئة» والفئة ظاهرة في الحقل والملخّص — كان النشر يقرأ آخر حفظ.
+ * الآن «انشر» يحفظ ما على الشاشة أولاً.
+ */
+test('«انشر» يحفظ ما على الشاشة أولاً: فئة اختيرت بلا حفظ لا تُرفض بـ«اختر فئة»', async ({ page }) => {
+  const t = tag();
+  const v = await makeVendor(t);
+  // كمسوّدات ما قبل 18 أكتوبر: بلا فئة
+  const product = await prisma.product.update({
+    where: { slug: v.productSlug },
+    data: { status: 'draft', publishedAt: null, vendorCategoryId: null },
+  });
+  const category = await prisma.vendorCategory.findFirstOrThrow({ where: { vendorId: v.vendorId }, orderBy: { sort: 'asc' } });
+
+  await page.goto(`/login?next=${encodeURIComponent(`/vendor/products/${product.id}`)}`);
+  await page.getByLabel('البريد الإلكتروني').fill(v.email);
+  await page.getByLabel('كلمة المرور').fill(PASSWORD);
+  await page.getByRole('button', { name: 'دخول' }).click();
+
+  await page.getByLabel('الفئة في متجرك').selectOption({ label: category.nameAr });
+  await page.getByRole('button', { name: 'انشر', exact: true }).click();
+
+  // منتج الاختبار بلا صورة: يبقى عائق الصورة وحده، ولا «اختر فئة» — والفئة حُفظت
+  const blockers = page.getByRole('alert').filter({ hasText: 'لا يمكن النشر' });
+  await expect(blockers).toContainText('أضف صورة واحدة على الأقل');
+  await expect(blockers).not.toContainText('اختر فئة');
+  const saved = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+  expect(saved.vendorCategoryId).toBe(category.id);
+  expect(saved.status).toBe('draft');
+});
