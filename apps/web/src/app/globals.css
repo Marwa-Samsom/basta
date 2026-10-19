@@ -602,6 +602,48 @@ textarea.field__control {
   cursor: pointer;
 }
 
+/* ------------------------------------------------------------ نافذة التأكيد */
+/* components/confirm.tsx — بدل window.confirm. الزرّ الأحمر المعبّأ هنا وحده (DESIGN-BRIEF) */
+
+.confirm-dialog {
+  inline-size: min(440px, calc(100% - 2 * var(--space-6)));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+  color: var(--text-body);
+}
+.confirm-dialog::backdrop { background: color-mix(in srgb, var(--surface-inverse) 55%, transparent); }
+.confirm-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 18px var(--space-5) var(--space-2);
+}
+.confirm-dialog__title { font-size: var(--text-md); font-weight: var(--weight-bold); line-height: var(--leading-normal); color: var(--text-strong); }
+.confirm-dialog__body {
+  padding: 0 var(--space-5) var(--space-4);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  color: var(--text-muted);
+}
+.confirm-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+}
+.confirm-dialog .btn--danger { --btn-bg: var(--danger); --btn-fg: var(--text-on-brand); }
+.confirm-dialog .btn--danger:hover:not(:disabled) { --btn-bg: var(--danger-text); --btn-border: var(--danger-text); }
+
+@media (max-width: 480px) {
+  .confirm-dialog__foot { flex-direction: column-reverse; }
+  .confirm-dialog__foot .btn { inline-size: 100%; }
+}
+
 /* ----------------------------------------------------------------- مساعدات */
 
 .muted { color: var(--text-muted); }

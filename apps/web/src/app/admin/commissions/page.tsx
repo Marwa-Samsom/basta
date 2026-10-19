@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
@@ -31,6 +32,7 @@ export default function AdminCommissionsPage() {
   const { data, error, forbidden, reload } = useAdminData<Rule[]>('/admin/finance/commissions');
   const { data: vendors } = useAdminData<{ items: VendorItem[] }>('/admin/vendors?status=approved&limit=100');
   const act = useAction();
+  const ask = useConfirm();
   const [scope, setScope] = useState<'global' | 'vendor'>('global');
   const [target, setTarget] = useState('');
   const [rate, setRate] = useState('');
@@ -61,9 +63,16 @@ export default function AdminCommissionsPage() {
       reload();
     }, 'سُجّلت النسبة الجديدة وأُنهيت السابقة. الطلبات السابقة لم تتغيّر.');
 
-  const endCustom = (r: Rule) => {
-    const back = global ? ` ويعود إلى النسبة العامة ${pct(global.rateBps)}` : '';
-    if (!r.vendorId || !window.confirm(`إلغاء نسبة «${r.vendor?.nameAr ?? 'المتجر'}» الخاصة من الآن${back}؟ الطلبات السابقة لا تتأثر.`)) return;
+  const endCustom = async (r: Rule) => {
+    if (!r.vendorId) return;
+    const back = global ? `، ويعود المتجر إلى النسبة العامة ${pct(global.rateBps)}` : '';
+    const sure = await ask({
+      title: `تلغي نسبة «${r.vendor?.nameAr ?? 'المتجر'}» الخاصة؟`,
+      body: `من الآن${back}. الطلبات السابقة لا تتأثر.`,
+      confirmLabel: 'ألغِ النسبة الخاصة',
+      danger: true,
+    });
+    if (!sure) return;
     void act.run(async () => {
       await api(`/admin/finance/commissions/vendor/${r.vendorId}`, { method: 'DELETE' });
       reload();
@@ -164,7 +173,7 @@ export default function AdminCommissionsPage() {
                         <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => startRule('vendor', r.vendorId ?? '')}>
                           غيّر
                         </button>
-                        <button type="button" className="btn btn--ghost btn--sm" disabled={act.busy} onClick={() => endCustom(r)}>
+                        <button type="button" className="btn btn--ghost btn--sm" disabled={act.busy} onClick={() => void endCustom(r)}>
                           أعده إلى العامة
                         </button>
                       </span>
@@ -210,8 +219,13 @@ export default function AdminCommissionsPage() {
               type="button"
               className="btn btn--primary"
               disabled={act.busy || !validRate || (scope === 'vendor' && !target)}
-              onClick={() => {
-                if (window.confirm(`اعتماد ${rate}% ${scope === 'global' ? 'نسبةً عامة' : 'لهذا المتجر'} من الآن؟ الطلبات السابقة لا تتأثر.`)) void save();
+              onClick={async () => {
+                const sure = await ask({
+                  title: `تعتمد ${rate}% ${scope === 'global' ? 'نسبةً عامة' : 'لهذا المتجر'} من الآن؟`,
+                  body: 'تنتهي النسبة السابقة، والطلبات السابقة لا تتأثر.',
+                  confirmLabel: 'اعتمد النسبة',
+                });
+                if (sure) void save();
               }}
             >
               اعتماد من الآن
