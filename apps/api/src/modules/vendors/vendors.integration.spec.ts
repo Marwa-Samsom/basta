@@ -384,6 +384,13 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(resubmit.statusCode, resubmit.body).toBe(200);
     expect(resubmit.json().status).toBe('in_review');
     expect(resubmit.json().rejectionReason).toBeNull();
+    // ومن يراجع المتاجر يعرف أنه أعاد الإرسال (19 أكتوبر 2026)
+    const reviewer = await prisma.user.findUniqueOrThrow({ where: { email: `admin.${SUFFIX}@basta.test` } });
+    const told = await prisma.notification.findFirst({
+      where: { userId: reviewer.id, templateCode: 'admin_vendor_submitted', channel: 'in_app', payloadJson: { path: ['link'], equals: `/admin/vendors/${vendorId}` } },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(told?.payloadJson).toMatchObject({ kind: 'أعاد إرسال طلبه بعد الرفض' });
 
     const approve = await app.inject({
       method: 'POST',

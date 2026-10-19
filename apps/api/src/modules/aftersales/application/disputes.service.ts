@@ -167,6 +167,14 @@ export class DisputesService {
         vars: { name: v.nameAr, order_number: d.subOrder.subOrderNumber, link: `/vendor/disputes/${id}` },
       });
     }
+    // بعد التصعيد صار الحسم للإدارة: ما يضيفه طرف يقرؤه من يحسم قبل قراره
+    if (d.status === 'escalated' && party.kind !== 'admin') {
+      await this.notifications.enqueueAdmins({
+        code: 'admin_dispute_message',
+        permission: 'disputes.resolve',
+        vars: { order_number: d.subOrder.subOrderNumber, sender: party.kind === 'customer' ? 'المشتري' : 'المتجر', link: '/admin/disputes' },
+      });
+    }
   }
 
   /** تصعيد للإدارة — من المشتري أو البائع حين لا يتّفقان */

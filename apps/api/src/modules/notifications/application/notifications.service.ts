@@ -195,6 +195,22 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     return queued;
   }
 
+  /**
+   * تنبيه الإدارة مرة لكل حالة — للمهام الدورية التي ترى الحالة في كل دورة. المفتاح يصف
+   * الحالة نفسها، و `skipDuplicates` على مفتاح فريد يجعل دورتين متزامنتين ترسلان مرة.
+   * يعيد هل أُرسل الآن.
+   */
+  async alertAdminsOnce(
+    key: string,
+    input: { code: string; permission: string; vars: Record<string, string> },
+    db: Db = this.prisma,
+  ): Promise<boolean> {
+    const { count } = await db.adminAlert.createMany({ data: [{ key }], skipDuplicates: true });
+    if (count === 0) return false;
+    await this.enqueueAdmins(input, db);
+    return true;
+  }
+
   // ------------------------------------------------------------- الإرسال
 
   async dispatch(limit = 50): Promise<{ sent: number; failed: number; skipped: number }> {

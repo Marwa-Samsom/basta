@@ -374,6 +374,20 @@ export class CheckoutService {
         },
         tx,
       );
+      // ومن يؤكّد التحويلات يعرف: الطلب لا يصل المتاجر قبل تأكيده، ويُلغى آلياً بعد المهلة
+      await this.notifications.enqueueAdmins(
+        {
+          code: 'admin_transfer_awaiting',
+          permission: 'payouts.approve',
+          vars: {
+            order_number: order.orderNumber,
+            amount: formatMoney(money(order.grandTotalMinorUnits, order.currency)),
+            hours: String(details.windowHours),
+            link: '/admin/transfers',
+          },
+        },
+        tx,
+      );
     });
   }
 

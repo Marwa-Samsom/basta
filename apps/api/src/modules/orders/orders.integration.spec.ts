@@ -11,9 +11,10 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { NobleCryptoPlugin, ScureBase32Plugin, generateSecret, generateSync } from 'otplib';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
+import { AdminAlertsScheduler, ReportsService } from '../admin/public';
 import { hashPassword } from '../identity/public';
 import { LedgerService } from '../finance/public';
 import { NotificationsService } from '../notifications/public';
@@ -887,6 +888,9 @@ describe('إشعارات النزاع — التاجر بالفتح والتصع
       link: '/admin/disputes',
     });
     expect(await codes(bystander.id, since)).toEqual([]);
+    // وما يضيفه طرف بعد التصعيد يقرؤه من يحسم
+    expect((await call('POST', `/me/disputes/${id}/messages`, buyer.token, { body: 'صورة الطرد المفتوح مرفقة' })).statusCode).toBe(204);
+    expect(await payloadOf(admin.userId, since, 'admin_dispute_message')).toMatchObject({ order_number: a.subOrderNumber, sender: 'المشتري' });
 
     const resolved = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: 'أثبت المتجر التسليم بتوقيع المستلم' });
     expect(resolved.statusCode, resolved.body).toBe(204);
@@ -926,6 +930,73 @@ describe('إشعارات النزاع — التاجر بالفتح والتصع
     });
     // والردّ نفسه ما زال يصل كما كان
     expect(await codes(buyer.userId, since)).toContain('refund_issued');
+  });
+});
+
+describe('تنبيهات الإدارة الدورية — مرة لكل حالة، لمن يحمل صلاحيتها (19 أكتوبر 2026)', () => {
+  const toAdmin = (code: string) =>
+    prisma.notification.findMany({ where: { userId: admin.userId, templateCode: code, channel: 'in_app' }, select: { payloadJson: true } });
+  const about = async (code: string, orderNumber: string) =>
+    (await toAdmin(code)).filter((n) => (n.payloadJson as Record<string, string>)['order_number'] === orderNumber);
+
+  it('مرتجع لم يُستلم بعد 3 أيام: يُنبَّه من يدير الطلبات مرة واحدة', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const { a, order } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const req = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+      items: [{ orderItemId: a.items[0]!.id, qty: 1 }],
+      reasonCode: 'damaged',
+    });
+    expect(req.statusCode, req.body).toBe(201);
+    // قبل العتبة: لا شيء
+    await alerts.stalledReturns(new Date());
+    expect(await about('admin_return_stalled', a.subOrderNumber)).toHaveLength(0);
+
+    await prisma.returnRequest.update({ where: { id: req.json().returnRequestId }, data: { requestedAt: new Date(Date.now() - 4 * 86_400_000) } });
+    await alerts.stalledReturns(new Date());
+    await alerts.stalledReturns(new Date());
+    const told = await about('admin_return_stalled', a.subOrderNumber);
+    expect(told).toHaveLength(1);
+    expect(told[0]!.payloadJson).toMatchObject({ days: '4', link: '/admin/returns' });
+  });
+
+  it('طلب لم يُقبل في آخر 12 ساعة قبل إلغائه الآلي: يُنبَّه مرة — وما فاتت مهلته لا', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const { a, b } = await placeOrder([1, 1]);
+    // المهلة 48 ساعة: a بقيت له 8، و b فاتت مهلته (تلغيه مهمة الطلبات، لا تنبيه)
+    await prisma.subOrder.update({ where: { id: a.id }, data: { placedAt: new Date(Date.now() - 40 * 3_600_000) } });
+    await prisma.subOrder.update({ where: { id: b.id }, data: { placedAt: new Date(Date.now() - 50 * 3_600_000) } });
+    await alerts.acceptanceDue(new Date());
+    await alerts.acceptanceDue(new Date());
+    const told = await about('admin_acceptance_due', a.subOrderNumber);
+    expect(told).toHaveLength(1);
+    expect(told[0]!.payloadJson).toMatchObject({ hours: '8', link: '/admin/orders?due=acceptance' });
+    expect(await about('admin_acceptance_due', b.subOrderNumber)).toHaveLength(0);
+  });
+
+  it('انحراف في التدقيق: يُنبَّه من يرى التقارير مرة في اليوم لكل منظر — لا من لا يراها', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const auditor = await user('admin-reports', 'admin', ['reports.view']);
+    const drift = vi.spyOn(app.get(ReportsService), 'drift').mockResolvedValue([
+      { view: 'audit_wallet_drift', rows: 2 },
+      { view: 'audit_inventory_drift', rows: 0 },
+    ]);
+    try {
+      // يوم لم يمرّ على قاعدة الاختبار قبل هذا التشغيل: مفتاح التنبيه بيومه
+      const day = new Date(Date.UTC(3000, 0, 1) + Math.floor(Math.random() * 100_000) * 86_400_000);
+      expect(await alerts.auditDrift(day)).toBe(1);
+      expect(await alerts.auditDrift(day)).toBe(0);
+    } finally {
+      drift.mockRestore();
+    }
+    const told = await prisma.notification.findMany({ where: { userId: auditor.id, templateCode: 'admin_audit_drift', channel: 'in_app' } });
+    expect(told).toHaveLength(1);
+    expect(told[0]!.payloadJson).toMatchObject({ check: 'رصيد محفظة لا يطابق دفترها', rows: '2' });
+    // مدير الطلبات لا يرى التقارير: لا يصله
+    expect(await toAdmin('admin_audit_drift')).toHaveLength(0);
   });
 });
 

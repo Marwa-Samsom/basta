@@ -296,6 +296,11 @@ describe('التحويل اليدوي · الحجز والتأكيد', () => {
     expect(vars['order_number']).toBe(body.orderNumber);
     expect(vars['pay_to']).toContain('كليك: BASTA');
     expect(vars['pay_to']).toContain('المستفيد: شركة بسطة للتجارة');
+    // ومن يؤكّد التحويلات يعرف أن طلباً ينتظره (19 أكتوبر 2026) — لا مدير المحتوى
+    const toFinance = (await notices(financeId, 'admin_transfer_awaiting')).map((n) => n.payloadJson as Record<string, string>);
+    expect(toFinance.some((v) => v['order_number'] === body.orderNumber && v['link'] === '/admin/transfers')).toBe(true);
+    const contentId = (await prisma.user.findUniqueOrThrow({ where: { email: `content.${SUFFIX}@basta.test` } })).id;
+    expect(await notices(contentId, 'admin_transfer_awaiting')).toHaveLength(0);
 
     // سؤال الحالة يعيدها كما هي — المصالحة لا تحسمها فشلاً
     const status = await call('GET', `/checkout/orders/${body.orderNumber}`, { token: buyer.token });
@@ -470,6 +475,9 @@ describe('التحويل اليدوي · الردّ', () => {
     const refund = await prisma.refund.findFirstOrThrow({ where: { subOrderId: sub.id } });
     expect(refund.status).toBe('awaiting_transfer');
     expect(refund.amountMinorUnits).toBe(BigInt(total.minorUnits));
+    // ومن يحوّل الردود يعرف أن مشترياً ينتظر ماله
+    const waiting = (await notices(financeId, 'admin_refund_awaiting_transfer')).map((n) => n.payloadJson as Record<string, string>);
+    expect(waiting.some((v) => v['order_number'] === number && v['link'] === '/admin/transfers')).toBe(true);
     expect((await prisma.subOrder.findUniqueOrThrow({ where: { id: sub.id } })).status).toBe('canceled_by_customer');
     expect(await notices(buyer.id, 'refund_issued')).toHaveLength(0);
 

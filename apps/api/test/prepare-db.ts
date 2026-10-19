@@ -72,6 +72,20 @@ export async function prepareTestDatabase(cwd: string): Promise<string> {
     if (r.status !== 0)
       throw new Error(`قاعدة الاختبار «${name}» — فشل ${label}:\n${r.stdout}${r.stderr}`);
   }
+
+  // القاعدة تبقى بين التشغيلات ومديروها معها: كل إشعار للإدارة يصل كل من يحمل صلاحيته
+  // (enqueueAdmins)، فتراكم مديري التشغيلات السابقة ضاعف الطابور إلى آلاف الرسائل، وصار
+  // ما ينتظر إرساله في هذا التشغيل (رمز الاستعادة بالبريد) ينتظر خلفها حتى تنقضي مهلته.
+  // كل ملف ينشئ مديريه، فصلاحيات من سبقه لا يحتاجها أحد — ولا رسائلهم المعلّقة
+  const db = new PrismaClient({ datasourceUrl: owner });
+  try {
+    await db.$executeRawUnsafe(`DELETE FROM "admin_permissions"`);
+    await db.$executeRawUnsafe(
+      `UPDATE "notifications" SET "status" = 'skipped', "error" = 'من تشغيل اختبار سابق' WHERE "status" IN ('queued', 'sending')`,
+    );
+  } finally {
+    await db.$disconnect();
+  }
   return name;
 }
 

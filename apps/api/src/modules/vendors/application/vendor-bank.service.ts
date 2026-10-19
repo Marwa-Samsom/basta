@@ -86,7 +86,7 @@ export class VendorBankService {
     proof: { password: string; code?: string | undefined },
     meta: { ip?: string | undefined; userAgent?: string | undefined },
   ): Promise<BankAccountView> {
-    const vendor = await this.prisma.vendor.findUnique({ where: { id: scope.vendorId }, select: { status: true } });
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: scope.vendorId }, select: { status: true, nameAr: true } });
     if (!vendor) throw new NotFoundError('المتجر غير موجود.');
     if (vendor.status !== 'approved' && vendor.status !== 'suspended') {
       throw new ConflictError('أثناء التسجيل يُعدَّل الحساب البنكي من خطوات التسجيل نفسها.');
@@ -140,6 +140,15 @@ export class VendorBankService {
       });
       await this.notifications.enqueueVendor(
         { code: 'bank_account_added', vendorId: scope.vendorId, vars: { bank: bankName, iban_tail: tail(iban), link: LINK } },
+        tx,
+      );
+      // ومن يوثّق الحسابات يعرف: لا يُحوَّل إليه شيء قبل توثيقه، ولا قائمة تجمعها في اللوحة
+      await this.notifications.enqueueAdmins(
+        {
+          code: 'admin_bank_account_added',
+          permission: 'vendors.review',
+          vars: { store_name: vendor.nameAr, bank_name: bankName, iban_tail: tail(iban), link: `/admin/vendors/${scope.vendorId}` },
+        },
         tx,
       );
       return view(row);

@@ -476,7 +476,27 @@ export class OrderLifecycleService {
       // لا يخرج المال آلياً (تحويل يدوي): ينتظر أن تحوّله الإدارة وتسجّل مرجعه.
       // لا إشعار ولا «مُسترَد» قبل ذلك، والمهمة لا تعيده — ليس متعثّراً بل ينتظر إنساناً
       if (result.status === 'manual') {
-        await this.prisma.refund.updateMany({ where: { id: refundId, status: 'processing' }, data: { status: AWAITING_TRANSFER } });
+        await this.prisma.$transaction(async (tx) => {
+          const { count } = await tx.refund.updateMany({ where: { id: refundId, status: 'processing' }, data: { status: AWAITING_TRANSFER } });
+          if (count === 0) return;
+          // ومن يحوّل الردود يعرف أن مشترياً ينتظر ماله — كان الردّ ينتظر في القائمة وحده
+          const o = await tx.subOrder.findUniqueOrThrow({
+            where: { id: refund.subOrderId },
+            select: { order: { select: { orderNumber: true, currency: true } } },
+          });
+          await this.notifications.enqueueAdmins(
+            {
+              code: 'admin_refund_awaiting_transfer',
+              permission: 'payouts.approve',
+              vars: {
+                order_number: o.order.orderNumber,
+                amount: formatMoney(money(refund.amountMinorUnits, o.order.currency)),
+                link: '/admin/transfers',
+              },
+            },
+            tx,
+          );
+        });
         return false;
       }
 
