@@ -191,7 +191,8 @@ function DisputeDetail({ id, onChange }: { id: string; onChange: () => void }) {
                   <input type="radio" name={`outcome-${id}`} checked={outcome === 'customer'} onChange={() => setOutcome('customer')} />
                   <span className="ao-option__text">
                     <span className="ao-option__label">لصالح المشتري</span>
-                    <span className="ao-option__hint">أكمل الاسترداد من «الطلبات» (إلغاء) أو «المرتجعات» (استلام) — كلاهما يقيّد الدفتر ويردّ المال.</span>
+                    {/* الردّ آلي مع القرار (refundForDispute) — كان التلميح يدعو لردّ يدوي ثانٍ (J-06، ADM-070) */}
+                    <span className="ao-option__hint">يُردّ للمشتري ما بقي من مبلغ هذا المتجر تلقائياً مع القرار، بقيوده في الدفتر — لا إلغاء ولا إرجاع يدوي بعده.</span>
                   </span>
                 </label>
                 <label className="ao-option">

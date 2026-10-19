@@ -846,6 +846,80 @@ describe('حسم النزاع لصالح المشتري يردّ ماله — و
   });
 });
 
+describe('إشعارات النزاع — التاجر بالفتح والتصعيد، والطرفان بالقرار (J-06، 19 أكتوبر 2026)', () => {
+  // داخل الموقع وحده يكفي للعدّ: كل حدث له نسخة in_app مهما أُطفئ بريده
+  const told = async (userId: string, since: Date) =>
+    prisma.notification.findMany({
+      where: { userId, channel: 'in_app', createdAt: { gte: since } },
+      select: { templateCode: true, payloadJson: true },
+    });
+  const codes = async (userId: string, since: Date) => (await told(userId, since)).map((n) => n.templateCode);
+  const payloadOf = async (userId: string, since: Date, code: string) =>
+    (await told(userId, since)).find((n) => n.templateCode === code)?.payloadJson;
+
+  it('المشتري يفتح ويصعّد: التاجر يعرف بكلٍّ — والحسم للمتجر يصل الطرفين بسببه، ولا يصل المتجر الآخر شيء', async () => {
+    if (!dbUp) return;
+    const { a, b } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    await deliver(1, b.id);
+    const since = new Date();
+
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_received', message: 'لم يصلني شيء' });
+    expect(opened.statusCode, opened.body).toBe(201);
+    const id = opened.json().id as string;
+    // كان التاجر لا يعرف بنزاع جمّد ماله إلا إن فتح صفحته
+    expect(await payloadOf(vendors[0]!.userId, since, 'vendor_dispute_opened')).toMatchObject({
+      order_number: a.subOrderNumber,
+      reason: 'لم يصلني الطلب',
+      link: `/vendor/disputes/${id}`,
+    });
+
+    expect((await call('POST', `/me/disputes/${id}/escalate`, buyer.token)).statusCode).toBe(204);
+    expect(await codes(vendors[0]!.userId, since)).toContain('vendor_dispute_escalated');
+    // من صعّد لا يُبلَّغ بما فعله هو
+    expect(await codes(buyer.userId, since)).not.toContain('dispute_escalated');
+
+    const resolved = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: 'أثبت المتجر التسليم بتوقيع المستلم' });
+    expect(resolved.statusCode, resolved.body).toBe(204);
+    expect(await payloadOf(buyer.userId, since, 'dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالح المتجر',
+      resolution: 'أثبت المتجر التسليم بتوقيع المستلم',
+      link: `/account/disputes/${id}`,
+    });
+    expect(await payloadOf(vendors[0]!.userId, since, 'vendor_dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالحكم، ويُحرَّر مال الطلب بموعده',
+      resolution: 'أثبت المتجر التسليم بتوقيع المستلم',
+    });
+    // المتجر الآخر في الطلب نفسه: لا شيء من نزاع غيره
+    expect((await codes(vendors[1]!.userId, since)).filter((c) => c.includes('dispute'))).toEqual([]);
+  });
+
+  it('التاجر يصعّد: المشتري يُبلَّغ — والحسم للمشتري يقول لكلٍّ ما يعنيه لماله', async () => {
+    if (!dbUp) return;
+    const { a } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const since = new Date();
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'damaged', message: 'وصلت مكسورة' });
+    const id = opened.json().id as string;
+
+    expect((await call('POST', `/vendor/disputes/${id}/escalate`, vendors[0]!.token)).statusCode).toBe(204);
+    expect(await codes(buyer.userId, since)).toContain('dispute_escalated');
+    expect(await codes(vendors[0]!.userId, since)).not.toContain('vendor_dispute_escalated');
+
+    const resolved = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'customer', resolution: 'الكسر ظاهر في الصور' });
+    expect(resolved.statusCode, resolved.body).toBe(204);
+    expect(await payloadOf(buyer.userId, since, 'dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالحك، ويُردّ لك ما بقي من مبلغ هذا المتجر إلى وسيلة دفعك',
+    });
+    expect(await payloadOf(vendors[0]!.userId, since, 'vendor_dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالح المشتري، ورُدّ له ما بقي من مبلغ الطلب',
+      resolution: 'الكسر ظاهر في الصور',
+    });
+    // والردّ نفسه ما زال يصل كما كان
+    expect(await codes(buyer.userId, since)).toContain('refund_issued');
+  });
+});
+
 describe('قائمة طلبات المتجر — تصفية بحالة أو أكثر', () => {
   it('تبويب «ملغى أو مُسترَد» يجمع حالاته الأربع، وحالة مفردة لا تُظهر غيرها، والمجهولة تُرفض', async () => {
     if (!dbUp) return;
