@@ -225,18 +225,28 @@ export function ProductEditor({ productId }: { productId?: string }) {
     }
   }
 
-  async function save(): Promise<void> {
+  /** ما يمنع الحفظ قبل إرساله — يُقال بالاسم بدل رفض الخادم العام، أو null */
+  function unsavable(): string | null {
     // لا منتج بلا فئة (18 أكتوبر 2026) — والقديم بلا فئة يُصنَّف عند أوّل حفظ
-    if (!form.vendorCategoryId) {
-      setNotice(null);
-      setFailure('اختر فئة للمنتج من «الفئة في متجرك»، أو أضف فئة جديدة.');
-      return;
-    }
-    // محور مختار بلا قيمة في صفّ: يُقال بالاسم هنا بدل رفض الخادم العام
+    if (!form.vendorCategoryId) return 'اختر فئة للمنتج من «الفئة في متجرك»، أو أضف فئة جديدة.';
+    // محور مختار بلا قيمة في صفّ
     const unset = axes.find((a) => variants.some((v) => !v.options[a.attributeId]));
-    if (unset) {
+    if (unset) return `اختر «${unset.nameAr}» لكل متغيّر، أو أزله من «ما يميّز متغيّراتك».`;
+    return null;
+  }
+
+  /** يكتب ما في النموذج: منتج جديد بلا معرّف، أو تعديل المنتج ذي المعرّف */
+  function write(id: string | null | undefined): Promise<ProductDetail> {
+    return id
+      ? api<ProductDetail>(`/vendor/products/${id}`, { method: 'PATCH', body: payload() })
+      : api<ProductDetail>('/vendor/products', { method: 'POST', body: payload() });
+  }
+
+  async function save(): Promise<void> {
+    const problem = unsavable();
+    if (problem) {
       setNotice(null);
-      setFailure(`اختر «${unset.nameAr}» لكل متغيّر، أو أزله من «ما يميّز متغيّراتك».`);
+      setFailure(problem);
       return;
     }
     setBusy(true);
@@ -244,12 +254,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
     setNotice(null);
     setBlockers([]);
     try {
-      const saved = isNew
-        ? await api<ProductDetail>('/vendor/products', { method: 'POST', body: payload() })
-        : await api<ProductDetail>(`/vendor/products/${productId}`, {
-            method: 'PATCH',
-            body: payload(),
-          });
+      const saved = await write(isNew ? null : productId);
       setProduct(saved);
       setNotice('حُفظ المنتج.');
       if (isNew) router.replace(`/vendor/products/${saved.id}`);
@@ -273,10 +278,20 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
   async function publish(): Promise<void> {
     if (!product) return;
+    // يُنشر ما على الشاشة لا آخر حفظ: فئة اختيرت ولم تُحفظ كان النشر يُرفض بـ«اختر فئة»
+    // وهي ظاهرة في الحقل والملخّص (J-05، 19 أكتوبر 2026). فالنشر يحفظ أولاً
+    const problem = unsavable();
+    if (problem) {
+      setNotice(null);
+      setFailure(problem);
+      return;
+    }
     setBusy(true);
     setFailure(null);
+    setNotice(null);
     setBlockers([]);
     try {
+      setProduct(await write(product.id));
       const next = await api<ProductDetail>(`/vendor/products/${product.id}/publish`, {
         method: 'POST',
       });
