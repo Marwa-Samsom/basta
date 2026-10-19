@@ -11,7 +11,8 @@ import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type PaymentProvider } from '../../payments/public';
-import { planFullRefund, planPartialRefund } from '../domain/refunds';
+import { allocate } from '../../pricing/public';
+import { planFullRefund, planPartialRefund, toCharge } from '../domain/refunds';
 import {
   assertTransition,
   deriveParent,
@@ -346,24 +347,28 @@ export class OrderLifecycleService {
       where: { id: subOrderId },
       select: {
         orderId: true,
+        vendorId: true,
         fxRateSnapshot: true,
         chargeTotalMinorUnits: true,
+        order: { select: { pricingSnapshot: true } },
         refunds: { select: { amountMinorUnits: true } },
         items: {
           select: { id: true, lineTotalMinorUnits: true, qty: true, refundedQty: true, commissionMinorUnits: true },
         },
       },
     });
+    const totals = sub.items.map((i) => i.lineTotalMinorUnits);
+    const charged = allocate(itemsCharge(sub, totals), totals);
     const plan = planPartialRefund({
-      lines: sub.items.map((i) => ({
+      lines: sub.items.map((i, k) => ({
         orderItemId: i.id,
         lineTotalMinor: i.lineTotalMinorUnits,
+        chargeMinor: charged[k] ?? 0n,
         qty: i.qty,
         refundedQty: i.refundedQty,
         commissionMinor: i.commissionMinorUnits,
       })),
       returned: items,
-      fxRateSnapshot: sub.fxRateSnapshot.toString(),
       chargeTotalMinor: sub.chargeTotalMinorUnits ?? 0n,
       alreadyRefundedChargeMinor: sub.refunds.reduce((a, r) => a + r.amountMinorUnits, 0n),
     });
@@ -701,6 +706,23 @@ export class OrderLifecycleService {
     const value = Number(row?.valueJson);
     return Number.isFinite(value) && value > 0 ? value : fallback;
   }
+}
+
+/**
+ * ما دفعه المشتري لقطع الفرعي بعملة الدفع (بعد الخصم وبالضريبة كما في أسطرها): مدفوع الفرعي
+ * في اللقطة ناقص شحنه. طلب بلا لقطة: مجموع الأسطر محوَّلاً بلقطة صرف الفرعي.
+ */
+function itemsCharge(
+  sub: { vendorId: string; fxRateSnapshot: Prisma.Decimal; order: { pricingSnapshot: Prisma.JsonValue } },
+  lineTotals: readonly bigint[],
+): bigint {
+  type Snap = { subOrders?: { vendorId?: string; charge?: { total?: string; shipping?: string } }[] };
+  const charge = (sub.order.pricingSnapshot as Snap | null)?.subOrders?.find((s) => s.vendorId === sub.vendorId)?.charge;
+  if (charge?.total !== undefined && charge.shipping !== undefined) return BigInt(charge.total) - BigInt(charge.shipping);
+  return toCharge(
+    lineTotals.reduce((a, b) => a + b, 0n),
+    sub.fxRateSnapshot.toString(),
+  );
 }
 
 /** الاسم الأول للتحية — `\s` لا `s`: كان يقصّ «Thomas» عند أول حرف s */

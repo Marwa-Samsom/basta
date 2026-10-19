@@ -19,7 +19,6 @@ import { LedgerService } from '../finance/public';
 import { NotificationsService } from '../notifications/public';
 import { FakePaymentProvider } from '../payments/public';
 import { TrackingService } from '../shipping/public';
-import { toCharge } from './domain/refunds';
 import { OrderLifecycleService, OrderScheduler } from './public';
 import { REFUND_STALE_MS, stalledRefund } from './application/order-lifecycle.service';
 
@@ -327,8 +326,11 @@ describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => 
     });
     expect(movement?.delta).toBe(1);
 
-    // المبلغ: ثلث السطر بعملة البائع، محوَّلاً لعملة الدفع بسعر اللقطة لا سعر اليوم
-    const expected = toCharge(line.lineTotalMinorUnits / 3n, a.fxRateSnapshot.toString());
+    // المبلغ: ثلث ما دفعه المشتري لقطع المتجر بعملة الدفع — مدفوع الفرعي في اللقطة ناقص
+    // شحنه، لأسفل. لا تحويل نصيب البائع قطعةً قطعة: ذاك كان يقرّب لأقرب (J-05)
+    type Snap = { subOrders: { vendorId: string; charge: { total: string; shipping: string } }[] };
+    const paid = (order.pricingSnapshot as unknown as Snap).subOrders.find((x) => x.vendorId === vendors[0]!.vendorId)!.charge;
+    const expected = (BigInt(paid.total) - BigInt(paid.shipping)) / 3n;
     const refunds = await prisma.refund.findMany({ where: { subOrderId: a.id } });
     expect(refunds).toHaveLength(1);
     expect(refunds[0]!.amountMinorUnits).toBe(expected);

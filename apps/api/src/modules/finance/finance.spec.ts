@@ -141,6 +141,24 @@ describe('حفظ المال — 2,000 فرعي عشوائي بإرجاعات ج�
     }
   });
 
+  it('إرجاع السطر كله قطعةً قطعة يعكس بيعه وعمولته بالضبط — آخر قطعة تكمل الباقي', () => {
+    const { sub, lines } = build({ lines: [{ unit: 3_333n, qty: 3, bps: 1000 }], discountItems: 0n, shipping: 0n, taxBps: 0, inclusive: true, fundedBy: 'platform' });
+    const state = lines.map((l) => ({ ...l }));
+    let buyer = 0n;
+    let commission = 0n;
+    let sale = 0n;
+    for (let k = 0; k < 3; k++) {
+      const r = partialRefundPostings(sub, state, [{ orderItemId: 'line-0', qty: 1 }]);
+      buyer += r.buyerGets;
+      sale += r.vendor.find((p) => p.entryType === 'refund_debit')?.amount ?? 0n;
+      commission += r.vendor.find((p) => p.entryType === 'commission_debit')?.amount ?? 0n;
+      state[0]!.refundedQty += 1;
+    }
+    expect(buyer).toBe(state[0]!.lineTotal);
+    expect(sale).toBe(state[0]!.lineSubtotal);
+    expect(commission).toBe(state[0]!.commission);
+  });
+
   it('لا يُرجع أكثر مما بقي من السطر', () => {
     const { sub, lines } = build({ lines: [{ unit: 1_000n, qty: 2, bps: 1000 }], discountItems: 0n, shipping: 0n, taxBps: 0, inclusive: true, fundedBy: 'platform' });
     expect(() => partialRefundPostings(sub, lines, [{ orderItemId: 'line-0', qty: 3 }])).toThrow();

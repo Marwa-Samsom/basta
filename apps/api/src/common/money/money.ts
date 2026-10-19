@@ -126,6 +126,22 @@ export function proRata(amount: Money, numerator: number, denominator: number): 
 }
 
 /**
+ * نصيب القطع المرجَعة من مبلغ سطر فيه `qty` قطعة: من القطعة `from` (ما أُرجع قبلها) إلى
+ * `to` (ما أُرجع معها). بالتراكم لا بالقطعة: كل نصيب لأسفل، والقطعة الأخيرة تكمل الباقي —
+ * فمجموع الأنصبة = المبلغ بالضبط مهما تفرّقت الإرجاعات.
+ *
+ * نصيب كل إرجاع وحده لأسفل كان يترك فرقاً يتراكم (100.00 ÷ 3 = 33.33 × 3 = 99.99)، ونصيبه
+ * بالتقريب لأقرب كان يزيد: بلوزتان دُفعتا 66.17 $ فرُدّت كل واحدة 33.09 $ (J-05، 19 أكتوبر 2026).
+ */
+export function shareBetween(amount: bigint, from: number, to: number, qty: number): bigint {
+  if (!Number.isInteger(qty) || qty <= 0 || from < 0 || to < from || to > qty) {
+    throw new MoneyError(`نصيب خارج السطر: ${from}..${to} من ${qty}`);
+  }
+  const upTo = (k: number): bigint => (k === qty ? amount : (amount * BigInt(k)) / BigInt(qty));
+  return upTo(to) - upTo(from);
+}
+
+/**
  * التحويل بين عملتين بسعر صرف **ملقوط** — ADR-013.
  *
  * السعر يُمرَّر صراحةً ولا يُقرأ من مصدر حيّ داخل الدالة: مستحقات طلب
