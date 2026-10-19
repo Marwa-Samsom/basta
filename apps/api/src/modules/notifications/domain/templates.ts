@@ -135,6 +135,55 @@ export const EVENTS: readonly EventDef[] = [
     variables: ['name', 'order_number', 'link'],
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3-1', link: '/account/disputes' },
   },
+  // النزاع بعد الرسالة: كان التاجر لا يعرف بنزاع عليه إلا إن فتح صفحته، ولا الطرفان
+  // بقرار الإدارة إلا من الصفحة نفسها (J-06، 19 أكتوبر 2026)
+  {
+    code: 'vendor_dispute_opened',
+    labelAr: 'نزاع جديد على طلب للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'reason', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يصلني الطلب', link: '/vendor/disputes' },
+  },
+  {
+    code: 'dispute_escalated',
+    labelAr: 'تصعيد نزاع للإدارة — للمشتري',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'link'],
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3-1', link: '/account/disputes' },
+  },
+  {
+    code: 'vendor_dispute_escalated',
+    labelAr: 'تصعيد نزاع للإدارة — للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', link: '/vendor/disputes' },
+  },
+  {
+    code: 'dispute_resolved',
+    labelAr: 'قرار النزاع — للمشتري',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'outcome', 'resolution', 'link'],
+    sample: {
+      name: 'سارة',
+      order_number: 'BST-260921-A1B2C3-1',
+      outcome: 'حُسم لصالحك، ويُردّ لك ما بقي من مبلغ هذا المتجر',
+      resolution: 'لم يقدّم المتجر ما يثبت التسليم.',
+      link: '/account/disputes',
+    },
+  },
+  {
+    code: 'vendor_dispute_resolved',
+    labelAr: 'قرار النزاع — للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'outcome', 'resolution', 'link'],
+    sample: {
+      store_name: 'متجر الورد',
+      order_number: 'BST-260921-A1B2C3-1',
+      outcome: 'حُسم لصالحكم، ويُحرَّر مال الطلب بموعده',
+      resolution: 'أثبت المتجر التسليم بتوقيع المستلم.',
+      link: '/vendor/disputes',
+    },
+  },
   {
     code: 'payout_paid',
     labelAr: 'تحويل سحب',
@@ -276,7 +325,12 @@ export const PREF_CATEGORIES = [
   { key: 'orders', labelAr: 'طلب جديد', noteAr: 'عند كل طلب فرعي جديد', codes: ['vendor_new_order'] },
   { key: 'products', labelAr: 'إيقاف منتج', noteAr: 'حين توقف الإدارة منتجاً منشوراً، مع السبب', codes: ['product_rejected'] },
   { key: 'stock', labelAr: 'مخزون منخفض', noteAr: 'عند بلوغ حدّ التنبيه', codes: ['low_stock'] },
-  { key: 'returns', labelAr: 'مرتجع أو نزاع', noteAr: 'طلب إرجاع جديد أو رسالة في نزاع', codes: ['return_requested', 'dispute_message'] },
+  {
+    key: 'returns',
+    labelAr: 'مرتجع أو نزاع',
+    noteAr: 'طلب إرجاع جديد، أو نزاع جديد أو رسالة أو تصعيد فيه — قرار النزاع يصل دائماً',
+    codes: ['return_requested', 'dispute_message', 'vendor_dispute_opened', 'dispute_escalated', 'vendor_dispute_escalated'],
+  },
   { key: 'payouts', labelAr: 'حالة التحويلات', noteAr: 'التحويل والرفض', codes: ['payout_paid', 'payout_rejected'] },
   { key: 'messages', labelAr: 'رسائل المشترين', noteAr: 'أول رسالة غير مقروءة في كل محادثة', codes: ['message_to_vendor'] },
 ] as const;
@@ -346,6 +400,16 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'رسالة جديدة في نزاع الطلب {{order_number}}'),
   t('dispute_message', 'in_app', 'رسالة جديدة في نزاع الطلب {{order_number}}.'),
 
+  t('dispute_escalated', 'email',
+    'مرحباً {{name}}،\n\nصُعِّد النزاع على الطلب {{order_number}} إلى إدارة بسطة لتحسمه. يصلك قرارها وسببه هنا وبالبريد، وتستطيع حتى ذلك أن تضيف في النزاع ما يوضّح موقفك: {{link}}\n\nبسطة',
+    'صُعِّد نزاع الطلب {{order_number}} للإدارة'),
+  t('dispute_escalated', 'in_app', 'صُعِّد نزاع الطلب {{order_number}} للإدارة لتحسمه.'),
+
+  t('dispute_resolved', 'email',
+    'مرحباً {{name}}،\n\nحسمت إدارة بسطة النزاع على الطلب {{order_number}}: {{outcome}}.\n\nسبب القرار: {{resolution}}\n\nالتفاصيل: {{link}}\n\nبسطة',
+    'حُسم نزاع الطلب {{order_number}}'),
+  t('dispute_resolved', 'in_app', 'حُسم نزاع الطلب {{order_number}}: {{outcome}}.'),
+
   // ----------------------------------------------------------------- الهوية
   // الرمز لا يوضع في العنوان: سجلّ الإرسال في لوحة الإدارة يعرض العنوان
   t('email_verify_code', 'email',
@@ -388,6 +452,21 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'فريق {{store_name}}،\n\nطلب المشتري إرجاع قطع من الطلب {{order_number}}. السبب: {{reason}}.\n\nعند استلامكم القطع أكّدوا ذلك من اللوحة، فتعود للمخزون ويُردّ نصيبها للمشتري.\n\n{{link}}\n\nبسطة',
     'طلب إرجاع على {{order_number}}'),
   t('return_requested', 'in_app', 'طلب إرجاع على {{order_number}}: {{reason}}.'),
+
+  t('vendor_dispute_opened', 'email',
+    'فريق {{store_name}}،\n\nفتح المشتري نزاعاً على الطلب {{order_number}}. السبب: {{reason}}.\n\nمال هذا الطلب مجمَّد حتى يُحسم النزاع. اقرؤوا رسالته وردّوا عليه من هنا، فإن لم تتّفقا صعّده أحدكما للإدارة: {{link}}\n\nبسطة',
+    'نزاع على الطلب {{order_number}}'),
+  t('vendor_dispute_opened', 'in_app', 'نزاع على الطلب {{order_number}}: {{reason}}. ماله مجمَّد حتى يُحسم.'),
+
+  t('vendor_dispute_escalated', 'email',
+    'فريق {{store_name}}،\n\nصُعِّد النزاع على الطلب {{order_number}} إلى إدارة بسطة لتحسمه. يصلكم قرارها وسببه هنا وبالبريد، وتستطيعون حتى ذلك أن تضيفوا في النزاع ما يوضّح موقفكم: {{link}}\n\nبسطة',
+    'صُعِّد نزاع الطلب {{order_number}} للإدارة'),
+  t('vendor_dispute_escalated', 'in_app', 'صُعِّد نزاع الطلب {{order_number}} للإدارة لتحسمه.'),
+
+  t('vendor_dispute_resolved', 'email',
+    'فريق {{store_name}}،\n\nحسمت إدارة بسطة النزاع على الطلب {{order_number}}: {{outcome}}.\n\nسبب القرار: {{resolution}}\n\nالتفاصيل: {{link}}\n\nبسطة',
+    'حُسم نزاع الطلب {{order_number}}'),
+  t('vendor_dispute_resolved', 'in_app', 'حُسم نزاع الطلب {{order_number}}: {{outcome}}.'),
 
   t('payout_paid', 'email',
     'فريق {{store_name}}،\n\nحوّلنا {{amount}} إلى حسابكم البنكي. مرجع التحويل: {{reference}}.\n\nكشف الحساب: {{link}}\n\nبسطة',

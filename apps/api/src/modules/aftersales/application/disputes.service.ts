@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Role } from '@prisma/client';
+import type { Prisma, Role } from '@prisma/client';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
@@ -15,6 +15,27 @@ export type Party =
   | { kind: 'admin'; userId: string };
 
 const ROLE: Record<Party['kind'], Role> = { customer: 'customer', vendor: 'vendor_owner', admin: 'admin' };
+
+type Db = Prisma.TransactionClient | PrismaService;
+
+/** سبب النزاع كما اختاره المشتري — للإشعار؛ الرمز نفسه إن جدّ سبب لم يُترجم */
+const REASON_AR: Readonly<Record<string, string>> = {
+  not_received: 'لم يصلني الطلب',
+  damaged: 'وصل تالفاً',
+  not_as_described: 'لا يطابق الوصف',
+  return_refused: 'رُفض إرجاعي',
+  refund_missing: 'لم يصلني الاسترداد',
+  other: 'مشكلة أخرى',
+};
+
+/** القرار كما يقرؤه كل طرف — لمن حُسم، وما يعنيه لماله */
+const OUTCOME_AR = {
+  customer: { customer: 'حُسم لصالحك، ويُردّ لك ما بقي من مبلغ هذا المتجر إلى وسيلة دفعك', vendor: 'حُسم لصالح المتجر' },
+  vendor: { customer: 'حُسم لصالح المشتري، ورُدّ له ما بقي من مبلغ الطلب', vendor: 'حُسم لصالحكم، ويُحرَّر مال الطلب بموعده' },
+} as const;
+
+/** الاسم الأول للتحية — `\s` لا `s`: «Thomas» كان يُقصّ عند أول حرف s */
+const firstName = (full: string | null | undefined): string => (full ?? '').trim().split(/\s+/)[0] || 'عميلنا';
 
 /**
  * النزاعات — ST-21 · VD-17 · AD-12.
@@ -38,7 +59,12 @@ export class DisputesService {
   ): Promise<{ id: string }> {
     const sub = await this.prisma.subOrder.findFirst({
       where: { id: subOrderId, order: { customerUserId } },
-      select: { status: true, disputes: { where: { status: { in: OPEN } }, select: { id: true } } },
+      select: {
+        status: true,
+        vendorId: true,
+        subOrderNumber: true,
+        disputes: { where: { status: { in: OPEN } }, select: { id: true } },
+      },
     });
     if (!sub) throw new NotFoundError('الطلب غير موجود.', { subOrderId });
     if (!(DISPUTABLE as readonly string[]).includes(sub.status)) {
@@ -57,6 +83,19 @@ export class DisputesService {
       await tx.auditLog.create({
         data: { actorUserId: customerUserId, actorRole: 'customer', action: 'dispute.open', entityType: 'Dispute', entityId: d.id, afterJson: { subOrderId, reasonCode: input.reasonCode } },
       });
+      // مال طلبه جُمّد للتوّ: كان لا يعرف بالنزاع إلا إن فتح صفحته (J-06)
+      await this.notifications.enqueueVendor(
+        {
+          code: 'vendor_dispute_opened',
+          vendorId: sub.vendorId,
+          vars: {
+            order_number: sub.subOrderNumber,
+            reason: REASON_AR[input.reasonCode] ?? input.reasonCode,
+            link: `/vendor/disputes/${d.id}`,
+          },
+        },
+        tx,
+      );
       return d;
     });
   }
@@ -114,7 +153,7 @@ export class DisputesService {
         code: 'dispute_message',
         userId: s.order.customerUserId,
         vars: {
-          name: (s.order.customer?.fullName ?? '').trim().split(/\s+/)[0] || 'عميلنا',
+          name: firstName(s.order.customer?.fullName),
           order_number: d.subOrder.subOrderNumber,
           link: `/account/disputes/${id}`,
         },
@@ -133,10 +172,17 @@ export class DisputesService {
   /** تصعيد للإدارة — من المشتري أو البائع حين لا يتّفقان */
   async escalate(party: Party, id: string): Promise<void> {
     await this.get(party, id);
-    const { count } = await this.prisma.dispute.updateMany({ where: { id, status: 'open' }, data: { status: 'escalated' } });
-    if (count === 0) throw new ConflictError('لا يُصعَّد إلا نزاع مفتوح.');
-    await this.prisma.auditLog.create({
-      data: { actorUserId: party.userId, actorRole: ROLE[party.kind], action: 'dispute.escalate', entityType: 'Dispute', entityId: id },
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.dispute.updateMany({ where: { id, status: 'open' }, data: { status: 'escalated' } });
+      if (count === 0) throw new ConflictError('لا يُصعَّد إلا نزاع مفتوح.');
+      await tx.auditLog.create({
+        data: { actorUserId: party.userId, actorRole: ROLE[party.kind], action: 'dispute.escalate', entityType: 'Dispute', entityId: id },
+      });
+      // من صعّده يعرف؛ الآخر يُبلَّغ أن القرار صار للإدارة
+      await this.notifyParties(tx, id, {
+        customer: party.kind === 'customer' ? null : { code: 'dispute_escalated', vars: {} },
+        vendor: party.kind === 'vendor' ? null : { code: 'vendor_dispute_escalated', vars: {} },
+      });
     });
   }
 
@@ -160,7 +206,7 @@ export class DisputesService {
    */
   async resolve(adminUserId: string, id: string, input: { outcome: 'customer' | 'vendor'; resolution: string }): Promise<void> {
     const resolution = input.resolution.trim();
-    const close = async (db: Pick<PrismaService, 'dispute' | 'auditLog'>) => {
+    const close = async (db: Db) => {
       const { count } = await db.dispute.updateMany({
         where: { id, status: { in: OPEN } },
         data: {
@@ -174,13 +220,58 @@ export class DisputesService {
       await db.auditLog.create({
         data: { actorUserId: adminUserId, actorRole: 'admin', action: 'dispute.resolve', entityType: 'Dispute', entityId: id, afterJson: input },
       });
+      // كان القرار لا يصل أحداً: يراه من يفتح الصفحة وحده (J-06 — ADM-069، BUY-061)
+      await this.notifyParties(db, id, {
+        customer: { code: 'dispute_resolved', vars: { outcome: OUTCOME_AR.customer[input.outcome], resolution } },
+        vendor: { code: 'vendor_dispute_resolved', vars: { outcome: OUTCOME_AR.vendor[input.outcome], resolution } },
+      });
     };
 
-    if (input.outcome === 'vendor') return close(this.prisma);
+    if (input.outcome === 'vendor') return this.prisma.$transaction((tx) => close(tx));
 
     const d = await this.prisma.dispute.findUnique({ where: { id }, select: { subOrderId: true } });
     if (!d) throw new ConflictError('النزاع مغلق أو غير موجود.');
     await this.lifecycle.refundForDispute(d.subOrderId, adminUserId, `حسم النزاع لصالح المشتري: ${resolution}`, close);
+  }
+
+  /** إشعار طرفي النزاع أو أحدهما — المشتري باسمه الأول، والبائع لمالك متجره */
+  private async notifyParties(
+    db: Db,
+    id: string,
+    to: {
+      customer: { code: string; vars: Record<string, string> } | null;
+      vendor: { code: string; vars: Record<string, string> } | null;
+    },
+  ): Promise<void> {
+    const d = await db.dispute.findUniqueOrThrow({
+      where: { id },
+      select: {
+        subOrder: {
+          select: {
+            subOrderNumber: true,
+            vendorId: true,
+            order: { select: { customerUserId: true, customer: { select: { fullName: true } } } },
+          },
+        },
+      },
+    });
+    const s = d.subOrder;
+    if (to.customer) {
+      await this.notifications.enqueue(
+        {
+          code: to.customer.code,
+          userId: s.order.customerUserId,
+          vars: { name: firstName(s.order.customer?.fullName), order_number: s.subOrderNumber, link: `/account/disputes/${id}`, ...to.customer.vars },
+        },
+        db,
+      );
+    }
+    if (to.vendor) {
+      await this.notifications.enqueueVendor(
+        { code: to.vendor.code, vendorId: s.vendorId, vars: { order_number: s.subOrderNumber, link: `/vendor/disputes/${id}`, ...to.vendor.vars } },
+        db,
+      );
+    }
   }
 
   private scope(party: Party) {
