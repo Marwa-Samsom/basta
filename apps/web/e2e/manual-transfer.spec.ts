@@ -37,6 +37,7 @@ async function setSetting(page: Page, label: string, value: string) {
   const row = page.locator('.ac2-setting').filter({ has: page.getByLabel(label, { exact: true }) });
   await row.getByLabel(label, { exact: true }).fill(value);
   await row.getByRole('button', { name: 'حفظ' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'احفظ الإعداد' }).click();
   await expect(page.getByText('حُفظ الإعداد.')).toBeVisible();
 }
 
@@ -47,11 +48,9 @@ test('التحويل اليدوي: يؤكّد المشتري فيرى كيف ي�
   const t = tag();
   const v = await makeVendor(t);
   const admin = await makeAdmin(t, ['payouts.approve', 'settings.edit']);
-  page.on('dialog', (d) => void d.accept());
 
   // 1 · المدير يضبط ما يراه المشتري
   const adminPage = await (await browser.newContext()).newPage();
-  adminPage.on('dialog', (d) => void d.accept());
   await adminLogin(adminPage, admin.email, admin.totp, '/admin/settings');
   await expect(adminPage.getByRole('heading', { name: 'الدفع بالتحويل' })).toBeVisible();
   await setSetting(adminPage, 'اسم المستفيد', 'شركة بسطة للتجارة');
@@ -104,6 +103,7 @@ test('التحويل اليدوي: يؤكّد المشتري فيرى كيف ي�
   // 4 · المشتري يلغي بعد الدفع — الردّ ينتظر تحويل المدير، لا «رُدّ المبلغ»
   await page.goto(`/account/orders/${encodeURIComponent(number)}`);
   await page.getByRole('button', { name: 'إلغاء هذا المتجر' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'ألغِ هذا المتجر' }).click();
   await expect(page.getByText('نحوّله لحسابك', { exact: false })).toBeVisible();
 
   await adminPage.goto('/admin/transfers');

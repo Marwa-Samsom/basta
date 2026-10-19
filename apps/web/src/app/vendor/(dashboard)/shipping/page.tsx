@@ -4,6 +4,7 @@ import '@/styles/screens/vendor-extra.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, EmptyState, Field, PageHead, TextInput } from '@/components/ui';
 import { digitsOnly } from '@/lib/digits';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { minorUnitDigits } from '@/lib/money';
@@ -397,6 +398,7 @@ function ZoneEditor({
   onDeleted: (id: string) => void;
   onError: (msg: string | null) => void;
 }) {
+  const ask = useConfirm();
   const [name, setName] = useState(zone?.nameAr ?? '');
   const [regions, setRegions] = useState<Region[]>(zone?.regions.map((r) => ({ country: r.country, region: r.region, city: r.city })) ?? []);
   const [draft, setDraft] = useState<RateDraft>(emptyDraft);
@@ -442,7 +444,13 @@ function ZoneEditor({
 
   const remove = async () => {
     if (!zone) return;
-    if (!window.confirm(`احذف «${zone.nameAr}»؟ المشترون في تغطيتها لن يستطيعوا الشراء منك إلا إن غطّتهم منطقة أخرى. الطلبات القائمة لا تتأثّر.`)) return;
+    const sure = await ask({
+      title: `تحذف «${zone.nameAr}»؟`,
+      body: 'المشترون في تغطيتها لن يستطيعوا الشراء منك إلا إن غطّتهم منطقة أخرى. الطلبات القائمة لا تتأثّر.',
+      confirmLabel: 'احذف المنطقة',
+      danger: true,
+    });
+    if (!sure) return;
     const ok = await run(() => api(`/vendor/shipping/zones/${zone.id}`, { method: 'DELETE' }));
     if (ok !== null) onDeleted(zone.id);
   };

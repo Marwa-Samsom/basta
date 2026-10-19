@@ -17,6 +17,7 @@ import './globals.css';
 // أنماط الحساب والصفحات المشتركة (الدخول، التسجيل، بلا اتصال، الخطأ) — تظهر خارج
 // الأقسام كلها. أنماط كل قسم تُستورد في قشرته وحدها: المشتري لا ينزّل أنماط اللوحات.
 import '@/styles/screens/account-shared.css';
+import { ConfirmProvider } from '@/components/confirm';
 import { IconSprite } from '@/components/icons';
 import { SessionExpiredRedirect } from '@/components/session-expired';
 import { ServiceWorkerRegister } from '@/components/sw-register';
@@ -58,7 +59,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <IconSprite />
-        {children}
+        {/* نافذة تأكيد واحدة للموقع كله بلغة الصفحة — بدل window.confirm (components/confirm) */}
+        <ConfirmProvider>{children}</ConfirmProvider>
         <SessionExpiredRedirect />
         <ServiceWorkerRegister />
       </body>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
 import { AskShop } from '@/components/ask-shop';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
@@ -90,6 +91,7 @@ const thumbOf = (key: string | null | undefined): string | null =>
 export default function MyOrderPage({ params }: { params: Promise<{ number: string }> }) {
   const { number } = use(params);
   const router = useRouter();
+  const ask = useConfirm();
   const [order, setOrder] = useState<OrderView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -143,7 +145,13 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
   const refunded = refundTotals(order.stores);
 
   const cancelTransfer = async () => {
-    if (!window.confirm('تلغي الطلب؟ تعود القطع للمتاجر ولا يُؤخذ منك شيء.')) return;
+    const sure = await ask({
+      title: 'تلغي الطلب؟',
+      body: 'تعود القطع للمتاجر ولا يُؤخذ منك شيء.',
+      confirmLabel: 'ألغِ الطلب',
+      danger: true,
+    });
+    if (!sure) return;
     setError(null);
     try {
       await api(`/checkout/orders/${encodeURIComponent(order.number)}/cancel`, { method: 'POST' });
@@ -294,6 +302,7 @@ function StoreCard({
   onChange: (o: OrderView | null, msg: string) => void;
   onError: (m: string) => void;
 }) {
+  const ask = useConfirm();
   const [mode, setMode] = useState<'return' | 'dispute' | null>(null);
   const [busy, setBusy] = useState(false);
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -321,7 +330,13 @@ function StoreCard({
 
   const cancel = () =>
     run(async () => {
-      if (!window.confirm(`إلغاء ما طلبته من ${s.vendor.nameAr}؟ يُردّ مبلغه كاملاً، وباقي الطلب يكمل كما هو.`)) return;
+      const sure = await ask({
+        title: `تلغي ما طلبته من ${s.vendor.nameAr}؟`,
+        body: 'يُردّ مبلغه كاملاً إلى وسيلة دفعك، وباقي الطلب يكمل كما هو.',
+        confirmLabel: 'ألغِ هذا المتجر',
+        danger: true,
+      });
+      if (!sure) return;
       const o = await api<OrderView>(`/me/orders/${orderNumber}/stores/${s.id}/cancel`, { method: 'POST', body: {} });
       onChange(o, `أُلغي طلبك من ${s.vendor.nameAr} ويُردّ مبلغه إلى وسيلة دفعك.`);
     });

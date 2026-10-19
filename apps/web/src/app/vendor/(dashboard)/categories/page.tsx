@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Alert, EmptyState, PageHead, Spinner } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { num, type Page, type ProductListItem, type VendorCategory } from '@/lib/catalog';
 
@@ -22,6 +23,7 @@ function categoriesLabel(n: number): string {
  * فيها منتجات لا تُحذف قبل نقلها — لا منتج بلا فئة.
  */
 export default function VendorCategoriesPage() {
+  const ask = useConfirm();
   const [items, setItems] = useState<VendorCategory[] | null>(null);
   const [uncategorized, setUncategorized] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,13 +107,19 @@ export default function VendorCategoriesPage() {
     void run(() => api('/vendor/categories/order', { method: 'PUT', body: { ids } }), 'حُفظ الترتيب.');
   };
 
-  const remove = (c: VendorCategory): void => {
+  const remove = async (c: VendorCategory): Promise<void> => {
     if (c.productCount > 0) {
       setNotice(null);
       setError(`«${c.nameAr}» فيها ${num(c.productCount)} ${c.productCount === 1 ? 'منتج' : 'منتجات'} — انقلها إلى فئة أخرى من محرّر كل منتج قبل حذفها.`);
       return;
     }
-    if (!window.confirm(`حذف فئة «${c.nameAr}»؟`)) return;
+    const sure = await ask({
+      title: `تحذف فئة «${c.nameAr}»؟`,
+      body: 'تختفي من صفحة متجرك ومن قائمة الفئات في محرّر المنتج. لا منتج فيها.',
+      confirmLabel: 'احذف الفئة',
+      danger: true,
+    });
+    if (!sure) return;
     void run(() => api(`/vendor/categories/${c.id}`, { method: 'DELETE' }), `حُذفت «${c.nameAr}».`);
   };
 
@@ -248,7 +256,7 @@ export default function VendorCategoriesPage() {
                       className="icon-btn icon-btn--sm"
                       aria-label={`احذف «${c.nameAr}»`}
                       disabled={busy}
-                      onClick={() => remove(c)}
+                      onClick={() => void remove(c)}
                     >
                       <Icon name="trash" size={14} />
                     </button>
