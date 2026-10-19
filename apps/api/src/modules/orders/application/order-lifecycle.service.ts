@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Prisma, Role } from '@prisma/client';
 import {
@@ -38,6 +39,13 @@ export interface TransitionInput {
   readonly returnRequestId?: string | null;
   /** يُردّ كل ما بقي من الفرعي — حسم النزاع لصالح المشتري وحده يمرّره (refundForDispute) */
   readonly fullRefund?: boolean;
+  /** لطلب الإرجاع: صفّه يُكتب في معاملة الانتقال نفسها — الطلب الخاسر في سباق لا يترك صفّاً */
+  readonly returnRequest?: {
+    readonly id: string;
+    readonly items: readonly { orderItemId: string; qty: number }[];
+    readonly reasonCode: string;
+    readonly description: string | null;
+  };
 }
 
 /**
@@ -231,6 +239,20 @@ export class OrderLifecycleService {
     }
     if (to === 'delivered' && from === 'shipped') {
       await tx.shipment.updateMany({ where: { subOrderId: sub.id }, data: { status: 'delivered', deliveredAt: now } });
+    }
+    // بعد شرط الحالة أعلاه: طلبان متزامنان يكتب أحدهما صفّه، والآخر يُرفض قبل أن يكتب شيئاً
+    if (to === 'return_requested' && input.returnRequest) {
+      const r = input.returnRequest;
+      await tx.returnRequest.create({
+        data: {
+          id: r.id,
+          subOrderId: sub.id,
+          itemsJson: r.items as unknown as Prisma.InputJsonValue,
+          reasonCode: r.reasonCode,
+          description: r.description,
+          mediaKeys: [],
+        },
+      });
     }
 
     // الإلغاء: القطع تعود كلها، والمبلغ كله يُردّ
@@ -554,7 +576,17 @@ export class OrderLifecycleService {
       select: { id: true, orderId: true, vendorId: true, status: true },
     });
     const from = sub.status as SubOrderStatus;
-    if (isCancellation(from) || from === 'returned') {
+    // إرجاع جزئي: بقيت قطع عند المشتري فيعود الفرعي «تم التسليم»، لا «مُسترَد» نهائياً
+    const kept =
+      from === 'returned' &&
+      (await tx.orderItem.findMany({ where: { subOrderId: sub.id }, select: { qty: true, refundedQty: true } })).some(
+        (i) => i.refundedQty < i.qty,
+      );
+    if (kept) {
+      const reason = 'رُدّ نصيب المرتجع وبقيت قطع لم تُرجع';
+      assertTransition(from, 'delivered', 'system', { reason });
+      await this.apply(tx, sub, from, 'delivered', { kind: 'system', userId: null }, { reason });
+    } else if (isCancellation(from) || from === 'returned') {
       assertTransition(from, 'refunded', 'system');
       await this.apply(tx, sub, from, 'refunded', { kind: 'system', userId: null }, {});
     }
@@ -583,6 +615,13 @@ export class OrderLifecycleService {
     if (!sub || sub.order.customerUserId !== customerUserId) {
       throw new NotFoundError('الطلب غير موجود.', { subOrderId });
     }
+    // كان كل ما ليس «تم التسليم» يسمع «الإرجاع متاح بعد التسليم وحده» — والطلب مسلَّم وله إرجاع قائم
+    if (sub.status === 'return_requested') {
+      throw new ConflictError('لهذا المتجر طلب إرجاع قائم — انتظر ردّ المتجر عليه، ثم اطلب إرجاع غيره.', { status: sub.status });
+    }
+    if (sub.status === 'returned') {
+      throw new ConflictError('استلم المتجر مرتجعك ويُردّ مبلغه الآن — اطلب إرجاع غيره بعد أن يُردّ.', { status: sub.status });
+    }
     if (sub.status !== 'delivered' || !sub.deliveredAt) {
       throw new ConflictError('الإرجاع متاح بعد التسليم وحده.', { status: sub.status });
     }
@@ -599,20 +638,19 @@ export class OrderLifecycleService {
       }
     }
 
-    const ret = await this.prisma.returnRequest.create({
-      data: {
-        subOrderId,
-        itemsJson: input.items as unknown as Prisma.InputJsonValue,
-        reasonCode: input.reasonCode,
-        description: input.description?.trim() || null,
-        mediaKeys: [],
-      },
-      select: { id: true },
-    });
+    // كان الصفّ يُكتب قبل الانتقال وخارج معاملته: الطلب الخاسر في سباق يُرفض ويبقى صفّه
+    // «requested» يتيماً — مكرَّراً عند الإدارة، ومانعاً تحرير رصيد البائع (J-05)
+    const id = randomUUID();
     await this.transition(subOrderId, 'return_requested', { kind: 'customer', userId: customerUserId }, {
       reason: input.reasonCode,
+      returnRequest: {
+        id,
+        items: input.items,
+        reasonCode: input.reasonCode,
+        description: input.description?.trim() || null,
+      },
     });
-    return ret.id;
+    return id;
   }
 
   private async acceptedReturn(
@@ -652,7 +690,8 @@ export class OrderLifecycleService {
       link: `/account/orders/${s.order.orderNumber}`,
     };
     if (to === 'shipped' || to === 'delivered' || to === 'delivery_failed') {
-      if (to === 'delivered' && from === 'return_requested') return;
+      // العودة إلى «تم التسليم» بعد رفض إرجاع أو ردّ إرجاع جزئي ليست تسليماً: وصله ما يخصّه
+      if (to === 'delivered' && (from === 'return_requested' || from === 'returned')) return;
       await this.notifications.enqueue({ code: 'order_status_changed', userId: s.order.customerUserId, vars: { ...common, status: STATUS_LABELS[to] } }, tx);
     }
     if (isCancellation(to) && to !== 'canceled_by_customer') {
