@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "test": "dotenv -e ../../.env -- vitest run",
     "test:watch": "dotenv -e ../../.env -- vitest",
-    "test:db": "dotenv -e ../../.env -- tsx test/prepare-db.ts",
     "db:generate": "dotenv -e ../../.env -- prisma generate",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev && npm run db:app-role",
     "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy && npm run db:app-role",

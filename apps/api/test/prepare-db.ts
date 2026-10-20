@@ -1,115 +1,36 @@
 /**
- * إعداد vitest العام: قاعدة الاختبار جاهزة قبل أول ملف، ومجلد التشغيل يُمحى بعد آخره.
+ * إعداد vitest العام. الاختبارات على قاعدة التطوير نفسها — رجعت إليها 20 أكتوبر 2026 بقرار
+ * صاحبة المشروع، بعد أن فصلها #24 في basta_test. قبل أول ملف:
  *
- *   npm run test:db      التحضير وحده — يستدعيه verify-local.sh قبل فحوص القاعدة
+ *   · لا قاعدة على خادم بعيد: `.env` يُوجَّه إلى Supabase وقت النشر، والاختبار يكتب آلاف الصفوف
+ *   · مديرو التشغيلات السابقة بلا صلاحيات، ورسائلهم المعلّقة متروكة: كل إشعار للإدارة يصل كل
+ *     من يحمل صلاحيته (enqueueAdmins)، فتراكمهم ضاعف الطابور إلى آلاف الرسائل، وصار ما ينتظر
+ *     إرساله في التشغيل التالي (رمز الاستعادة بالبريد) ينتظر خلفها حتى تنقضي مهلته. كل ملف
+ *     ينشئ مديريه، فلا يحتاج أحد صلاحيات من سبقه. حسابات التجربة اليدوية لا تُمسّ (test-users.ts)
  *
- * التحضير كما يُحضَّر الخادم الحقيقي لا نسخة مختصرة منه: `prisma migrate deploy` ثم
- * db:app-role ثم البذور، بالأوامر نفسها. كلها تُعاد بلا أثر، فمهاجرة جديدة في الفرع
- * تصل قاعدة الاختبار في التشغيل التالي دون أمر يُتذكَّر.
+ * لا مهاجرة ولا بذور هنا: القاعدة قاعدة التطوير، تُهاجَر بـ `npm run db:deploy` كما قبل الفصل.
  */
-import { spawnSync } from 'node:child_process';
-import { mkdir, readdir, rm, stat } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
-import { PrismaClient } from '@prisma/client';
-import {
-  TEST_RUNS_DIR,
-  TEST_RUN_DIR,
-  TEST_SUFFIX,
-  databaseName,
-  testEnv,
-  withDatabase,
-} from './test-env';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { TEST_EMAIL_PATTERN } from './test-users';
 
-const IDENT = /^[a-z_][a-z0-9_]{0,62}$/;
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
-const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** مسار أداة سطر أوامر من حزمتها — بلا npx ولا صدفة، فيعمل كما هو على ويندوز و CI */
-function cli(cwd: string, pkg: string, bin: string): string {
-  const require = createRequire(join(cwd, 'package.json'));
-  const manifest = require.resolve(`${pkg}/package.json`);
-  const bins = (require(manifest) as { bin: string | Record<string, string> }).bin;
-  return resolve(dirname(manifest), typeof bins === 'string' ? bins : (bins[bin] as string));
-}
-
-export async function prepareTestDatabase(cwd: string): Promise<string> {
-  const env = { ...process.env, ...testEnv(process.env) };
-  const owner = env['DATABASE_MIGRATE_URL'];
-  if (!owner)
-    throw new Error('DATABASE_MIGRATE_URL غير معرَّف — المالك يُنشئ قاعدة الاختبار ويهاجرها.');
-  const name = databaseName(owner);
-  // حارس أخير قبل أي كتابة: لا تحضير لقاعدة ليست قاعدة اختبار مهما وصل من البيئة
-  if (!name.endsWith(TEST_SUFFIX) || !IDENT.test(name))
-    throw new Error(`«${name}» ليست قاعدة اختبار.`);
-  // ولا على خادم بعيد: .env يُوجَّه إلى Supabase وقت النشر، والاختبار يُنشئ قاعدة ويكتب
-  // آلاف الصفوف — مكانه خادم التطوير أو خادم CI المؤقّت، لا خادم المنصة الحقيقي
-  const host = new URL(owner).hostname;
+export async function setup(): Promise<void> {
+  const url = process.env['DATABASE_URL'];
+  if (!url) return; // بلا قاعدة تتخطّى اختبارات التكامل نفسها
+  const host = new URL(url).hostname;
   if (!LOCAL_HOSTS.has(host))
     throw new Error(`القاعدة على خادم بعيد (${host}) — اختبارات الخادم على خادم محلي فقط.`);
 
-  // قاعدة الصيانة «postgres» موجودة على كل خادم: لا نفترض وجود قاعدة التطوير نفسها
-  const server = new PrismaClient({ datasourceUrl: withDatabase(owner, 'postgres') });
+  // المالك يمحو كما يهاجر — مستخدم التشغيل لا يُفترض أن يحذف صلاحيات
+  const db = new PrismaClient({ datasourceUrl: process.env['DATABASE_MIGRATE_URL'] ?? url });
   try {
-    const [row] = await server.$queryRaw<{ exists: boolean }[]>`
-      SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = ${name}) AS "exists"`;
-    if (!row?.exists) await server.$executeRawUnsafe(`CREATE DATABASE "${name}"`);
-  } catch (err) {
-    throw new Error(
-      `تعذّر إنشاء قاعدة الاختبار «${name}» — المالك يحتاج CREATEDB:\n${(err as Error).message}`,
-    );
-  } finally {
-    await server.$disconnect();
-  }
-
-  const steps: [string, string[]][] = [
-    ['المهاجرات', [cli(cwd, 'prisma', 'prisma'), 'migrate', 'deploy']],
-    ['مستخدم التشغيل', [cli(cwd, 'tsx', 'tsx'), 'scripts/db-app-role.ts']],
-    ['البذور', [cli(cwd, 'tsx', 'tsx'), 'prisma/seed.ts']],
-  ];
-  for (const [label, args] of steps) {
-    const r = spawnSync(process.execPath, args, { cwd, env, encoding: 'utf8' });
-    if (r.status !== 0)
-      throw new Error(`قاعدة الاختبار «${name}» — فشل ${label}:\n${r.stdout}${r.stderr}`);
-  }
-
-  // القاعدة تبقى بين التشغيلات ومديروها معها: كل إشعار للإدارة يصل كل من يحمل صلاحيته
-  // (enqueueAdmins)، فتراكم مديري التشغيلات السابقة ضاعف الطابور إلى آلاف الرسائل، وصار
-  // ما ينتظر إرساله في هذا التشغيل (رمز الاستعادة بالبريد) ينتظر خلفها حتى تنقضي مهلته.
-  // كل ملف ينشئ مديريه، فصلاحيات من سبقه لا يحتاجها أحد — ولا رسائلهم المعلّقة
-  const db = new PrismaClient({ datasourceUrl: owner });
-  try {
-    await db.$executeRawUnsafe(`DELETE FROM "admin_permissions"`);
-    await db.$executeRawUnsafe(
-      `UPDATE "notifications" SET "status" = 'skipped', "error" = 'من تشغيل اختبار سابق' WHERE "status" IN ('queued', 'sending')`,
-    );
+    const testUsers = Prisma.sql`SELECT "id" FROM "users" WHERE "email" ~* ${TEST_EMAIL_PATTERN}`;
+    await db.$executeRaw`DELETE FROM "admin_permissions" WHERE "userId" IN (${testUsers})`;
+    await db.$executeRaw`
+      UPDATE "notifications" SET "status" = 'skipped', "error" = 'من تشغيل اختبار سابق'
+      WHERE "status" IN ('queued', 'sending') AND "userId" IN (${testUsers})`;
   } finally {
     await db.$disconnect();
   }
-  return name;
-}
-
-export async function setup(project: { config: { root: string } }): Promise<() => Promise<void>> {
-  if (process.env['DATABASE_URL']) await prepareTestDatabase(project.config.root);
-
-  // مجلدات تشغيلات قُطعت قبل تنظيفها (Ctrl+C) — لا تتراكم في مجلد المؤقّتات
-  await mkdir(TEST_RUN_DIR, { recursive: true });
-  for (const entry of await readdir(TEST_RUNS_DIR)) {
-    const dir = join(TEST_RUNS_DIR, entry);
-    if (dir !== TEST_RUN_DIR && Date.now() - (await stat(dir)).mtimeMs > DAY_MS) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-  return () => rm(TEST_RUN_DIR, { recursive: true, force: true });
-}
-
-// تشغيل مباشر: npm run test:db
-if (process.argv[1] && /prepare-db\.ts$/.test(process.argv[1])) {
-  prepareTestDatabase(process.cwd()).then(
-    (name) => console.log(`✓ قاعدة الاختبار «${name}» مهاجَرة ومبذورة.`),
-    (err: Error) => {
-      console.error(`✗ ${err.message}`);
-      process.exit(1);
-    },
-  );
 }

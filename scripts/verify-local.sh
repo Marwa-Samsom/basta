@@ -6,12 +6,12 @@
 # المطلوب أن تكون إعادة بناء البيئة كاملةً من الصفر **عملية مملّة ومكرَّرة**،
 # لا طقساً يدوياً يعرفه شخص واحد.
 #
-# هذا السكربت يهدم قاعدة الاختبار ويبنيها ويهاجرها ويبذرها ويشغّل كل فحص،
+# هذا السكربت يهدم قاعدة البيانات ويبنيها ويهاجرها ويبذرها ويشغّل كل فحص،
 # فإن مرّ فالبيئة قابلة لإعادة الإنتاج — وهي عين ما يثبته النشر الآلي.
-# قاعدة الاختبار (basta_test) لا قاعدة التطوير: الهدم كان يمحو كل ما جُرّب عليه
-# يدوياً من حسابات وطلبات. قاعدة التطوير لا يمسّها هذا السكربت (apps/api/test/test-env.ts)
+# القاعدة قاعدة التطوير نفسها (الاختبارات رجعت إليها 20 أكتوبر 2026): الهدم يمحو ما جُرّب
+# عليه يدوياً من حسابات وطلبات. أثناء التجربة اليدوية: --keep
 #
-#   ./scripts/verify-local.sh          الفحص الكامل (يهدم قاعدة الاختبار)
+#   ./scripts/verify-local.sh          الفحص الكامل (يهدم قاعدة التطوير)
 #   ./scripts/verify-local.sh --keep   بلا هدم — للتشغيل السريع أثناء العمل
 # =============================================================================
 set -euo pipefail
@@ -23,7 +23,6 @@ PGBIN="${PGBIN:-$ROOT/.localdb/pgsql/bin}"
 # shellcheck source=lib/pg-password.sh
 source "$ROOT/scripts/lib/pg-password.sh"
 KEEP_DB=false
-TEST_DB=basta_test
 [[ "${1:-}" == "--keep" ]] && KEEP_DB=true
 
 step=0
@@ -60,27 +59,27 @@ ok "Meilisearch جاهز"
 
 # -----------------------------------------------------------------------------
 if [[ "$KEEP_DB" == false ]]; then
-  say "هدم قاعدة الاختبار وإعادة بنائها من الصفر"
+  say "هدم القاعدة وإعادة بنائها من الصفر"
   # الاختبار الحقيقي: هل تقوم البيئة من لا شيء، أم تعتمد على حالة متراكمة؟
-  if [[ "$("$PGBIN/psql" -h localhost -p 5432 -U basta -d postgres -tAc \
-        "SELECT 1 FROM pg_database WHERE datname = '$TEST_DB'" | tr -d ' \r')" == "1" ]]; then
-    "$PGBIN/psql" -h localhost -p 5432 -U basta -d "$TEST_DB" -q \
-      -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" >/dev/null
-  fi
+  "$PGBIN/psql" -h localhost -p 5432 -U basta -d basta -q \
+    -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" >/dev/null
   ok "الخطّة نُظّفت"
 
-  say "المهاجرات ومستخدم التشغيل والبذور"
-  # الأوامر نفسها التي تحضّر الخادم: migrate deploy ثم db:app-role ثم البذور
-  npm run test:db -w @basta/api >/dev/null 2>&1 || die "فشل تحضير قاعدة الاختبار"
-  ok "كل المهاجرات طُبّقت والقيم المؤسِّسة مزروعة"
+  say "تطبيق المهاجرات"
+  npm run db:deploy -w @basta/api >/dev/null 2>&1 || die "فشلت المهاجرة"
+  ok "كل المهاجرات طُبّقت"
+
+  say "البذور"
+  npm run db:seed -w @basta/api >/dev/null 2>&1 || die "فشلت البذور"
+  ok "القيم المؤسِّسة مزروعة"
 fi
 
 # -----------------------------------------------------------------------------
 say "حرّاس قاعدة البيانات يرفضون الخرق"
-q() { "$PGBIN/psql" -h localhost -p 5432 -U basta -d "$TEST_DB" -tAc "$1" 2>/dev/null | tr -d ' \r'; }
+q() { "$PGBIN/psql" -h localhost -p 5432 -U basta -d basta -tAc "$1" 2>/dev/null | tr -d ' \r'; }
 
 for tbl in ledger_entries platform_ledger_entries audit_logs inventory_movements; do
-  if "$PGBIN/psql" -h localhost -p 5432 -U basta -d "$TEST_DB" \
+  if "$PGBIN/psql" -h localhost -p 5432 -U basta -d basta \
        -c "TRUNCATE TABLE \"$tbl\";" >/dev/null 2>&1; then
     die "$tbl قابل للمحو — حارس ADR-005 معطّل"
   fi
@@ -103,7 +102,7 @@ say "النسخ الاحتياطي والاستعادة"
 # في مجلد يزامنه OneDrive). الفحص يثبت الآلية، لا يراكم نسخاً ولا يمسّ مفتاح صاحب المشروع
 bk="$(mktemp -d)"
 (
-  export BACKUP_DIR="$bk/out" BACKUP_PUBLIC_KEY="$bk/k.pub" BACKUP_PRIVATE_KEY="$bk/k.pem" PGDATABASE="$TEST_DB"
+  export BACKUP_DIR="$bk/out" BACKUP_PUBLIC_KEY="$bk/k.pub" BACKUP_PRIVATE_KEY="$bk/k.pem"
   bash scripts/db-backup.sh keygen >/dev/null
   bash scripts/db-backup.sh backup >/dev/null
   enc="$(ls "$bk/out"/*.dump.enc)"
