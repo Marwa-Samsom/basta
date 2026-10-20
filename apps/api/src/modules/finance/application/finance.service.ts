@@ -235,9 +235,23 @@ export class FinanceService {
     if (input.amountMinorUnits <= 0n) throw new InvalidInputError('مبلغ السحب موجب.');
 
     return this.prisma.$transaction(async (tx) => {
-      // الموقوف لا يسحب: الإيقاف يجمّد المال حتى يُحسم سببه (نزاع، احتيال، KYC)
-      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true, nameAr: true } });
-      if (!vendor || vendor.status !== 'approved') {
+      /**
+       * المعلَّق يسحب بعد حجز احترازي من تعليقه — القرار الملزم 13 كما حسمته صاحبة المشروع
+       * (20 أكتوبر 2026): التعليق يوقف البيع ولا يصادر مستحقاً، لكن ما قد يُستردّ لمشترٍ (نزاع،
+       * احتيال) يبقى محجوزاً مدّته. كان الرفض مطلقاً حتى يُعاد المتجر، خلافاً للقرار ولتلميح التعليق.
+       */
+      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true, nameAr: true, suspendedAt: true } });
+      if (vendor?.status === 'suspended' && vendor.suspendedAt) {
+        const row = await tx.setting.findUnique({ where: { key: 'suspension_payout_hold_days' } });
+        const days = Number(row?.valueJson ?? 90);
+        const until = new Date(vendor.suspendedAt.getTime() + (Number.isFinite(days) && days >= 0 ? days : 90) * 86_400_000);
+        if (until > new Date()) {
+          throw new ConflictError(
+            `المتجر معلَّق، ورصيده محجوز احترازياً حتى ${until.toISOString().slice(0, 10)} — يمكن طلب السحب بعدها.`,
+            { status: vendor.status, holdUntil: until.toISOString() },
+          );
+        }
+      } else if (!vendor || vendor.status !== 'approved') {
         throw new ConflictError('حساب المتجر موقوف، والسحب متوقّف معه. راسل الدعم.', { status: vendor?.status ?? null });
       }
       const wallet = await this.ledger.lockWallet(tx, vendorId, input.currency);
