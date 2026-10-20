@@ -52,12 +52,13 @@ async function main(): Promise<void> {
         shippingZones: { create: { nameAr: 'الخليج والأردن', regions: { create: [{ country: 'SA' }, { country: 'AE' }, { country: 'JO' }, { country: 'KW' }] }, rates: { create: { method: 'flat', priceMinorUnits: 2_000n } } } },
       },
     }));
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
 
+  // المتجر يبدأ بالفئات الثماني المقترحة (مشغِّل القاعدة)، ولا منتج بلا فئة
+  const category = await prisma.vendorCategory.findFirstOrThrow({ where: { vendorId: vendor.id }, orderBy: { sort: 'asc' } });
   for (const p of PRODUCTS) {
     if (await prisma.product.findUnique({ where: { slug: p.slug } })) continue;
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: category.id, slug: p.slug, nameAr: p.nameAr, descriptionAr: `${p.nameAr} — منتج عرض بصورة بحجم الإنتاج.`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, vendorCategoryId: category.id, slug: p.slug, nameAr: p.nameAr, descriptionAr: `${p.nameAr} — منتج عرض بصورة بحجم الإنتاج.`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `DEMO-${p.slug}`.toUpperCase(), priceMinorUnits: p.price, optionsKey: '', isActive: true },

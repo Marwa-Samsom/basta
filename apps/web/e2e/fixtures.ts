@@ -42,7 +42,6 @@ export async function makeVendor(t: string) {
   const email = `vendor.${t}@basta.test`;
   const userId = await register(email, `بائع ${t}`);
   await prisma.userRole.create({ data: { userId, role: 'vendor_owner' } });
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   const vendor = await prisma.vendor.create({
     data: {
       ownerUserId: userId, slug: `store-${t}`, nameAr: `متجر ${t}`, status: 'approved', approvedAt: new Date(), settlementCurrency: 'SAR', country: 'SA',
@@ -50,8 +49,10 @@ export async function makeVendor(t: string) {
       bankAccounts: { create: { holderName: `بائع ${t}`, iban: 'SA0380000000608010167519', bankName: 'بنك تجريبي', isDefault: true, verifiedAt: new Date() } },
     },
   });
+  // المتجر يبدأ بالفئات الثماني المقترحة (مشغِّل القاعدة)، ولا منتج بلا فئة
+  const category = await prisma.vendorCategory.findFirstOrThrow({ where: { vendorId: vendor.id }, orderBy: { sort: 'asc' } });
   const product = await prisma.product.create({
-    data: { vendorId: vendor.id, categoryId: category.id, slug: `product-${t}`, nameAr: `منتج اختبار ${t}`, descriptionAr: 'منتج لاختبار E2E.', status: 'active', publishedAt: new Date() },
+    data: { vendorId: vendor.id, vendorCategoryId: category.id, slug: `product-${t}`, nameAr: `منتج اختبار ${t}`, descriptionAr: 'منتج لاختبار E2E.', status: 'active', publishedAt: new Date() },
   });
   const variant = await prisma.productVariant.create({
     data: { productId: product.id, vendorId: vendor.id, sku: `E2E-${t}`.toUpperCase(), priceMinorUnits: 25_000n, optionsKey: '', isActive: true },

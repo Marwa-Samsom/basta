@@ -96,6 +96,12 @@ export function VariantPicker({ variants, actions }: { variants: Variant[]; acti
             ) : null}
           </>
         ) : null}
+        {current.originalPrice ? (
+          // ما سعّر به المتجر — المحوَّل أعلاه بسعر صرف اليوم، وهو ما يُدفع
+          <span className="sd-price__store">
+            <span className="num">{current.originalPrice.formatted}</span> بعملة المتجر
+          </span>
+        ) : null}
       </div>
 
       {axes.map(([attributeId, axis]) => {

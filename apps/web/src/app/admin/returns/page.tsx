@@ -34,6 +34,7 @@ interface Data {
 const RETURN_STATUS: Record<string, string> = { requested: 'بانتظار البائع', received: 'استُلم', rejected: 'رُفض' };
 
 /** ثلاثة أيام بلا ردّ من المتجر — يظهر العمر بالأحمر ويصير التدخّل الإجراء الأوّل */
+// العتبة نفسها التي ينبّه بها الخادم المديرين (RETURN_STALL_DAYS في admin-alerts.scheduler)
 const STALL_MS = 3 * 24 * 3_600_000;
 
 /**

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
@@ -39,15 +40,27 @@ const COUNTRIES: Record<string, string> = { SA: 'السعودية', AE: 'الإ�
 export default function AdminSettingsPage() {
   const { data, error, forbidden, reload } = useAdminData<{ settings: Setting[]; taxes: Tax[] }>('/admin/settings');
   const act = useAction();
+  const ask = useConfirm();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [tax, setTax] = useState({ country: 'SA', rate: '', inclusive: false });
   if (!data) return <Loading error={error} forbidden={forbidden} />;
 
-  const save = (s: Setting) => {
+  const save = async (s: Setting) => {
     const raw = draft[s.key] ?? '';
     const value = s.kind === 'int' ? Number(raw) : raw;
-    const msg = `${s.labelAr}: ${String(s.value ?? '—')} ← ${raw || '—'}${s.financial ? `\n\n${s.financial}` : ''}`;
-    if (!window.confirm(msg)) return;
+    const sure = await ask({
+      title: `تغيّر «${s.labelAr}»؟`,
+      body: (
+        <>
+          <p>
+            <bdi className="num">{String(s.value ?? '—')}</bdi> ← <bdi className="num">{raw || '—'}</bdi>
+          </p>
+          {s.financial ? <p>{s.financial}</p> : null}
+        </>
+      ),
+      confirmLabel: 'احفظ الإعداد',
+    });
+    if (!sure) return;
     void act.run(async () => {
       await api(`/admin/settings/${s.key}`, { method: 'PUT', body: { value } });
       setDraft(({ [s.key]: _, ...rest }) => rest);
@@ -105,7 +118,7 @@ export default function AdminSettingsPage() {
               ))}
             </select>
           )}
-          <button type="button" className={`btn btn--sm ${changed ? 'btn--primary' : 'btn--secondary'}`} disabled={act.busy || !changed} onClick={() => save(s)}>
+          <button type="button" className={`btn btn--sm ${changed ? 'btn--primary' : 'btn--secondary'}`} disabled={act.busy || !changed} onClick={() => void save(s)}>
             حفظ
           </button>
         </div>
@@ -208,8 +221,13 @@ export default function AdminSettingsPage() {
               type="button"
               className="btn btn--primary"
               disabled={act.busy || tax.rate === '' || Number.isNaN(Number(tax.rate))}
-              onClick={() => {
-                if (!window.confirm(`ضريبة ${COUNTRIES[tax.country]} ${tax.rate}% ${tax.inclusive ? 'شاملة' : 'مضافة'} — تسري على الطلبات الجديدة فقط.`)) return;
+              onClick={async () => {
+                const sure = await ask({
+                  title: `تعتمد ضريبة ${COUNTRIES[tax.country]} ${tax.rate}% ${tax.inclusive ? 'شاملة في السعر' : 'مضافة على السعر'}؟`,
+                  body: 'تسري على الطلبات الجديدة فقط.',
+                  confirmLabel: 'اعتمد الضريبة',
+                });
+                if (!sure) return;
                 void act.run(async () => {
                   await api(`/admin/taxes/${tax.country}`, { method: 'PUT', body: { rateBps: Math.round(Number(tax.rate) * 100), isPriceInclusive: tax.inclusive } });
                   setTax({ ...tax, rate: '' });

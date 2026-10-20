@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { use, useEffect, useState, useSyncExternalStore } from 'react';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, Spinner } from '@/components/ui';
@@ -62,6 +63,7 @@ const FAIL_TIPS = [
  */
 export default function OrderResultPage({ params }: { params: Promise<{ number: string }> }) {
   const { number } = use(params);
+  const ask = useConfirm();
   const [order, setOrder] = useState<OrderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -156,7 +158,13 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
 
   if (order.outcome === 'awaiting_transfer' && order.transfer) {
     const cancel = async () => {
-      if (!window.confirm('تلغي الطلب؟ تعود القطع للمتاجر ولا يُؤخذ منك شيء.')) return;
+      const sure = await ask({
+        title: 'تلغي الطلب؟',
+        body: 'تعود القطع للمتاجر ولا يُؤخذ منك شيء.',
+        confirmLabel: 'ألغِ الطلب',
+        danger: true,
+      });
+      if (!sure) return;
       setCanceling(true);
       setActionError(null);
       try {

@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { api, session } from './api';
+import { displayCurrency } from './currency';
 
 /**
  * المفضّلة في المتصفّح — ST-23 والقلب في صفحة المنتج وبطاقته.
@@ -140,7 +141,7 @@ export async function setSaved(productId: string, saved: boolean): Promise<void>
   }
 }
 
-export const getWishlist = (): Promise<WishlistView> => api<WishlistView>('/me/wishlist');
+export const getWishlist = (): Promise<WishlistView> => api<WishlistView>(`/me/wishlist?currency=${displayCurrency()}`);
 
 // ------------------------------------------------------------ الإشعار العابر
 

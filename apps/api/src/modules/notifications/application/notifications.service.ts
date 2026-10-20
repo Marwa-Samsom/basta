@@ -172,6 +172,45 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     return this.enqueue({ code: input.code, userId: v.ownerUserId, vars: { store_name: v.nameAr, ...input.vars } }, db);
   }
 
+  /**
+   * لمديري المنصة الذين يحملون الصلاحية وحدهم — لا كل مدير: نزاع لا يحسمه إلا من يحمل
+   * disputes.resolve، وسحب لا يقرّه إلا من يحمل payouts.approve. المالك كغيره بصلاحياته
+   * المحفوظة، كما يفحصها الحارس. والمعلَّق أو المحذوف لا يصله شيء.
+   */
+  async enqueueAdmins(
+    input: { code: string; permission: string; vars: Record<string, string> },
+    db: Db = this.prisma,
+  ): Promise<number> {
+    const admins = await db.user.findMany({
+      where: {
+        status: 'active',
+        deletedAt: null,
+        roles: { some: { role: 'admin' } },
+        permissions: { some: { permission: input.permission } },
+      },
+      select: { id: true },
+    });
+    let queued = 0;
+    for (const a of admins) queued += await this.enqueue({ code: input.code, userId: a.id, vars: input.vars }, db);
+    return queued;
+  }
+
+  /**
+   * تنبيه الإدارة مرة لكل حالة — للمهام الدورية التي ترى الحالة في كل دورة. المفتاح يصف
+   * الحالة نفسها، و `skipDuplicates` على مفتاح فريد يجعل دورتين متزامنتين ترسلان مرة.
+   * يعيد هل أُرسل الآن.
+   */
+  async alertAdminsOnce(
+    key: string,
+    input: { code: string; permission: string; vars: Record<string, string> },
+    db: Db = this.prisma,
+  ): Promise<boolean> {
+    const { count } = await db.adminAlert.createMany({ data: [{ key }], skipDuplicates: true });
+    if (count === 0) return false;
+    await this.enqueueAdmins(input, db);
+    return true;
+  }
+
   // ------------------------------------------------------------- الإرسال
 
   async dispatch(limit = 50): Promise<{ sent: number; failed: number; skipped: number }> {

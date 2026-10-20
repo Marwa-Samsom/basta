@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { api, session, type Tokens } from '@/lib/api';
+import { syncAccountCurrency } from '@/lib/currency';
 import { Icon } from '@/components/icons';
 import { TextInput } from '@/components/ui';
 import { internalPath, withNext } from '@/lib/safe-path';
@@ -48,6 +49,7 @@ function RegisterForm() {
         body: { email: form.email, password: form.password },
       });
       session.write(login.tokens);
+      await syncAccountCurrency();
       router.push(withNext('/verify', next ?? '/account'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'تعذّر إنشاء الحساب.');

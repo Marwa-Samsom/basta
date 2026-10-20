@@ -3,6 +3,7 @@
 import { Fragment, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { useMe } from '@/components/admin-context';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { EmptyState, TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -42,6 +43,7 @@ export default function AdminUsersPage() {
   const { data, error, forbidden, reload } = useAdminData<Admin[]>('/admin/users');
   const { data: perms } = useAdminData<Perm[]>('/admin/permissions');
   const act = useAction();
+  const ask = useConfirm();
   const [email, setEmail] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
   const [editing, setEditing] = useState<Record<string, string[]>>({});
@@ -222,8 +224,14 @@ export default function AdminUsersPage() {
                             type="button"
                             className="btn btn--danger btn--sm"
                             disabled={act.busy}
-                            onClick={() => {
-                              if (!window.confirm(`سحب الإدارة من ${u.email}؟`)) return;
+                            onClick={async () => {
+                              const sure = await ask({
+                                title: `تسحب الإدارة من ${u.email}؟`,
+                                body: 'تسقط صلاحياته الإدارية كلها ويُسجَّل خروجه من كل أجهزته. حسابه نفسه يبقى.',
+                                confirmLabel: 'اسحب الإدارة',
+                                danger: true,
+                              });
+                              if (!sure) return;
                               void act.run(async () => {
                                 await api(`/admin/users/${u.id}/revoke`, { method: 'POST' });
                                 reload();

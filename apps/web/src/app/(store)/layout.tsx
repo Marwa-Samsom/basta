@@ -1,14 +1,17 @@
 import Link from 'next/link';
 import '@/styles/screens/storefront-discovery.css';
 import '@/styles/screens/storefront-purchase.css';
+import { CurrencyPicker } from '@/components/currency-picker';
 import { Icon } from '@/components/icons';
 import { NotificationBell } from '@/components/notification-bell';
 import { SearchBox } from '@/components/search-box';
-import { CartButton, CategoryStrip } from '@/components/store-chrome';
-import { getCategories } from '@/lib/storefront';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { CartButton, ShopStrip } from '@/components/store-chrome';
+import { requestCurrency } from '@/lib/currency-server';
+import { getCurrencies, getShops } from '@/lib/storefront';
 
-/** الأقسام الظاهرة في شريط الرأس — البقية في «كل الأقسام» */
-const TOP_CATEGORIES = 6;
+/** المتاجر الظاهرة في شريط الرأس — البقية في «كل المتاجر» */
+const TOP_SHOPS = 6;
 
 const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -22,7 +25,7 @@ const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
   {
     title: 'التسوّق',
     links: [
-      { href: '/categories', label: 'كل الأقسام' },
+      { href: '/shops', label: 'كل المتاجر' },
       { href: '/pages/returns', label: 'سياسة الإرجاع' },
       { href: '/account/orders', label: 'طلباتي' },
     ],
@@ -41,15 +44,23 @@ const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
  *
  * مكوّن خادم: الرأس والتذييل جزء من مصدر HTML لا من سكربت. صندوق البحث
  * وحده عميل لأنه يقترح أثناء الكتابة — ومع ذلك هو نموذج GET حقيقي، فيعمل
- * بلا JavaScript ويذهب إلى صفحة النتائج. والأقسام إن تعذّر جلبها يبقى
+ * بلا JavaScript ويذهب إلى صفحة النتائج. والمتاجر إن تعذّر جلبها يبقى
  * الرأس بلا رقائقها: سقوط شريط لا يُسقط الصفحة.
  */
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
-  const categories = await getCategories().catch(() => []);
-  const top = categories.filter((c) => c.depth === 0).slice(0, TOP_CATEGORIES);
+  const [top, money, chosen] = await Promise.all([
+    getShops()
+      .then((r) => r.items.slice(0, TOP_SHOPS))
+      .catch(() => []),
+    getCurrencies(),
+    requestCurrency(),
+  ]);
+  // ما يعرضه الخادم بالضبط: المختارة إن كانت متاحة، وإلا افتراضية الإدارة.
+  // data-currency منه تقرأ السلة والمفضّلة — فلا تختلف عملة صفحة عن سلّتها
+  const currency = chosen && money.currencies.some((c) => c.code === chosen) ? chosen : money.defaultCurrency;
 
   return (
-    <div className="store" data-density="comfortable">
+    <div className="store" data-density="comfortable" data-currency={currency}>
       <header className="store__head">
         <div className="store__bar">
           <Link href="/" className="store__brand">
@@ -57,6 +68,8 @@ export default async function StoreLayout({ children }: { children: React.ReactN
           </Link>
           <SearchBox />
           <div className="store__tools">
+            <CurrencyPicker current={currency} options={money.currencies} />
+            <ThemeToggle />
             <NotificationBell />
             <Link href="/account" className="icon-btn" aria-label="حسابي وطلباتي">
               <Icon name="user" size={19} />
@@ -64,12 +77,12 @@ export default async function StoreLayout({ children }: { children: React.ReactN
             <CartButton />
           </div>
         </div>
-        <nav className="store__cats" aria-label="الأقسام">
-          <Link href="/categories" className="store__all">
-            <Icon name="boxes" size={15} />
-            كل الأقسام
+        <nav className="store__cats" aria-label="المتاجر">
+          <Link href="/shops" className="store__all">
+            <Icon name="store" size={15} />
+            كل المتاجر
           </Link>
-          <CategoryStrip categories={top} />
+          <ShopStrip shops={top} />
           <Link href="/sell" className="btn btn--soft btn--sm store__sell">
             بِع على بسطة
           </Link>

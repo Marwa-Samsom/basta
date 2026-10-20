@@ -49,6 +49,8 @@ model User {
   passwordHash    String?
   fullName        String
   locale          String     @default("ar")
+  /// عملة العرض والدفع التي اختارها — تتبعه بين أجهزته. null: افتراضية الإدارة
+  preferredCurrency String?  @db.Char(3)
   status          UserStatus @default(active)
   /// مالك المنصة — واحد على الأكثر، يُعيَّن من سكربت المدير الأول، ولا يغيّره مدير آخر
   isPlatformOwner Boolean    @default(false)
@@ -273,8 +275,7 @@ model Vendor {
   country                    String    @db.Char(2)
 
   /// individual | company — يحدّد الوثائق المتوقَّعة في المراجعة
-  businessType   String?
-  mainCategoryId String? @db.Uuid
+  businessType String?
 
   /// لحظة إرسال الطلب للمراجعة. تُمسح عند الرفض فيعود الطلب مسوّدة قابلة للإصلاح.
   submittedAt DateTime? @db.Timestamptz
@@ -292,7 +293,7 @@ model Vendor {
   updatedAt  DateTime  @updatedAt @db.Timestamptz
 
   owner           User                @relation(fields: [ownerUserId], references: [id])
-  mainCategory    Category?           @relation(fields: [mainCategoryId], references: [id], onDelete: Restrict)
+  categories      VendorCategory[]
   documents       VendorDocument[]
   bankAccounts    VendorBankAccount[]
   products        Product[]
@@ -359,31 +360,30 @@ model VendorBankAccount {
 // 4 · الكتالوج
 // ============================================================================
 
-model Category {
-  id       String  @id @default(uuid()) @db.Uuid
-  parentId String? @db.Uuid
-  /// مسار مادّي "/3/17/42/" — يجعل "كل منتجات الفرع" استعلاماً واحداً بـ LIKE
-  path     String  @unique
-  depth    Int     @default(0)
-  slug     String  @unique
-  nameAr   String
-  nameEn   String?
-  iconKey  String?
-  sort     Int     @default(0)
-  isActive Boolean @default(true)
+/// فئات المتجر — يديرها البائع وحده بلا تدخّل الإدارة (قرار صاحب المشروع 14 أكتوبر 2026،
+/// ألغى شجرة الفئات العامة). قائمة مسطّحة لكل متجر، والمنتج في فئة واحدة منها أو بلا فئة.
+/// كل متجر جديد يبدأ بالفئات الثماني المقترحة — المشغِّل vendors_seed_categories
+/// في مهاجرة 20261018120000_vendor_category_templates، ويعدّلها البائع بعدها.
+model VendorCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  vendorId  String   @db.Uuid
+  nameAr    String
+  sort      Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
 
-  parent          Category?           @relation("CategoryTree", fields: [parentId], references: [id])
-  children        Category[]          @relation("CategoryTree")
-  products        Product[]
-  attributes      CategoryAttribute[]
-  commissionRules CommissionRule[]
-  mainForVendors  Vendor[]
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  products Product[]
 
-  @@index([parentId])
-  // فهرس text_pattern_ops في المهاجرة يخدم LIKE على البادئة
-  @@map("categories")
+  /// هدف المفتاح الأجنبي المركّب من المنتج — فئة متجر لا تحمل منتج متجر آخر
+  @@unique([id, vendorId])
+  // فريد في المهاجرة على (vendorId, lower(btrim(nameAr))): لا اسمان متطابقان في المتجر
+  @@index([vendorId, sort])
+  @@map("vendor_categories")
 }
 
+/// مكتبة سمات عامة (اللون، المقاس…) تديرها الإدارة ويستعملها أي منتج.
+/// كانت تُربط بالفئات العامة فيرثها فرعها — سقط الربط بسقوط الفئات.
 model Attribute {
   id            String  @id @default(uuid()) @db.Uuid
   code          String  @unique
@@ -396,7 +396,6 @@ model Attribute {
   sort          Int     @default(0)
 
   values         AttributeValue[]
-  categories     CategoryAttribute[]
   variantOptions VariantOptionValue[]
   productValues  ProductAttributeValue[]
 
@@ -420,19 +419,6 @@ model AttributeValue {
   @@map("attribute_values")
 }
 
-model CategoryAttribute {
-  categoryId  String  @db.Uuid
-  attributeId String  @db.Uuid
-  isRequired  Boolean @default(false)
-  sort        Int     @default(0)
-
-  category  Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  attribute Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
-
-  @@id([categoryId, attributeId])
-  @@map("category_attributes")
-}
-
 model Brand {
   id      String  @id @default(uuid()) @db.Uuid
   slug    String  @unique
@@ -445,9 +431,10 @@ model Brand {
   @@map("brands")
 }
 
+/// لا مراجعة قبل النشر (قرار صاحب المشروع 15 أكتوبر 2026): البائع ينشر فيصير active.
+/// rejected = أوقفته الإدارة بسبب يراه البائع، فيعدّله وينشره من جديد.
 enum ProductStatus {
   draft
-  pending_review
   active
   rejected
   archived
@@ -458,7 +445,8 @@ enum ProductStatus {
 model Product {
   id            String        @id @default(uuid()) @db.Uuid
   vendorId      String        @db.Uuid
-  categoryId    String        @db.Uuid
+  /// فئة من فئات متجره أو لا شيء — المفتاح المركّب مع vendorId يمنع فئة متجر آخر
+  vendorCategoryId String?    @db.Uuid
   brandId       String?       @db.Uuid
   slug          String        @unique
   nameAr        String
@@ -466,9 +454,8 @@ model Product {
   descriptionAr String?
   descriptionEn String?
   status        ProductStatus @default(draft)
+  /// سبب إيقاف الإدارة — يُمسح حين يعيد البائع النشر
   rejectReason  String?
-  /// يزيد مع كل تعديل محتوى — الاعتماد يشترط النسخة التي راجعها المدير
-  contentRevision Int         @default(0)
   hasVariants   Boolean       @default(false)
   ratingAvg     Decimal       @default(0) @db.Decimal(3, 2)
   ratingCount   Int           @default(0)
@@ -479,7 +466,8 @@ model Product {
   updatedAt     DateTime      @updatedAt @db.Timestamptz
 
   vendor           Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  category         Category                @relation(fields: [categoryId], references: [id])
+  /// حذف الفئة يُفرغ منتجاتها في معاملته قبل الحذف — Restrict يمنع غير ذلك
+  vendorCategory   VendorCategory?         @relation(fields: [vendorCategoryId, vendorId], references: [id, vendorId], onDelete: Restrict)
   brand            Brand?                  @relation(fields: [brandId], references: [id])
   variants         ProductVariant[]
   images           ProductImage[]
@@ -492,7 +480,7 @@ model Product {
 
   /// هدف المفتاح الأجنبي المركّب من المتغيّر — يضمن أن متغيّر المنتج لا يحمل بائعاً غير بائعه
   @@unique([id, vendorId])
-  @@index([categoryId, status, publishedAt(sort: Desc)])
+  @@index([vendorCategoryId])
   @@index([vendorId, status])
   @@map("products")
 }
@@ -1186,10 +1174,12 @@ model Refund {
 
 /// لا تُحذف قاعدة أبداً — تُنهى صلاحيتها بـ effectiveTo فقط،
 /// ليبقى تفسير أي عمولة تاريخية ممكناً.
+///
+/// نسبة على كل منتج يُباع: للمتجر إن خُصّصت، وإلا العامة (قرار صاحب المشروع
+/// 14 أكتوبر 2026). قواعد category القديمة أُنهيت ولا تُنشأ — قيد في المهاجرة.
 model CommissionRule {
   id               String    @id @default(uuid()) @db.Uuid
-  scope            String // global | category | vendor
-  categoryId       String?   @db.Uuid
+  scope            String // global | vendor — و category تاريخية منتهية
   vendorId         String?   @db.Uuid
   rateBps          Int
   minFeeMinorUnits BigInt?
@@ -1199,12 +1189,10 @@ model CommissionRule {
   createdBy        String?   @db.Uuid
   createdAt        DateTime  @default(now()) @db.Timestamptz
 
-  category Category? @relation(fields: [categoryId], references: [id])
-  vendor   Vendor?   @relation(fields: [vendorId], references: [id])
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
 
   @@index([scope, effectiveFrom])
   @@index([vendorId])
-  @@index([categoryId])
   @@map("commission_rules")
 }
 
@@ -1374,6 +1362,7 @@ model ReturnRequest {
   reasonCode  String
   description String?
   mediaKeys   String[]
+  /// فهرس فريد جزئي في المهاجرة: طلب «requested» واحد لكل فرعي — يُكتب في معاملة انتقاله
   status      String    @default("requested")
   requestedAt DateTime  @default(now()) @db.Timestamptz
   resolvedBy  String?   @db.Uuid
@@ -1451,6 +1440,15 @@ model NotificationTemplate {
 
   @@id([code, channel, locale])
   @@map("notification_templates")
+}
+
+/// تنبيه إدارة أُرسل مرة — مفتاحه الحالة نفسها («return_stalled:<id>»، «audit_drift:<منظر>:<يوم>»).
+/// المهمة الدورية تراه في كل دورة، والمفتاح الفريد يجعل إرساله مرة واحدة ولو تزامنت دورتان
+model AdminAlert {
+  key       String   @id
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@map("admin_alerts")
 }
 
 model Notification {

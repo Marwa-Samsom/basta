@@ -20,7 +20,8 @@ type Stringified<T> = {
 };
 
 export type SnapshotLine = Stringified<PricedLine>;
-export type SnapshotSubOrder = Stringified<Omit<PricedSubOrder, 'lines'>> & { lines: SnapshotLine[] };
+/** fxFactor للعرض وحده (سعر القطعة في السلة) — الملزِم في اللقطة fxRateSnapshot */
+export type SnapshotSubOrder = Stringified<Omit<PricedSubOrder, 'lines' | 'fxFactor'>> & { lines: SnapshotLine[] };
 export interface Snapshot {
   readonly version: 1;
   readonly currency: string;
@@ -59,7 +60,6 @@ export function toSnapshot(cart: PricedCart): Snapshot {
         variantId: l.variantId,
         productId: l.productId,
         vendorId: l.vendorId,
-        categoryId: l.categoryId,
         nameAr: l.nameAr,
         variantLabel: l.variantLabel,
         sku: l.sku,

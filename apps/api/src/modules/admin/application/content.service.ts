@@ -23,7 +23,7 @@ export function isInternalPath(raw: string): boolean {
   }
 }
 
-export const BANNER_PLACEMENTS = ['home_hero', 'home_middle', 'category_top'] as const;
+export const BANNER_PLACEMENTS = ['home_hero', 'home_middle'] as const;
 const FEATURED_KEY = 'home_featured_product_ids';
 
 export interface CouponInput {

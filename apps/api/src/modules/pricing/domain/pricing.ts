@@ -13,6 +13,7 @@
  */
 
 import { InvalidInputError } from '../../../common/errors/domain-error';
+import { samePlace } from '../../../common/places';
 
 // -------------------------------------------------------------------- الأنواع
 
@@ -20,7 +21,6 @@ export interface PricedLineInput {
   readonly variantId: string;
   readonly productId: string;
   readonly vendorId: string;
-  readonly categoryId: string;
   readonly nameAr: string;
   readonly variantLabel: string | null;
   readonly sku: string;
@@ -98,6 +98,8 @@ export interface PricedSubOrder {
   readonly vendor: Breakdown;
   /** بعملة الدفع — حصّته من فاتورة المشتري */
   readonly charge: Breakdown;
+  /** معامل الصرف الذي حُوّلت به بنوده (عملة البائع ← عملة الدفع) — لعرض سعر القطعة بالمعامل نفسه */
+  readonly fxFactor: number;
   readonly commissionMinor: bigint;
   readonly vendorNetMinor: bigint;
   /** وحدات عملة البائع الصغرى لكل وحدة صغرى من عملة الدفع */
@@ -136,7 +138,7 @@ export function fxFactor(
   return (to / from) * scale * (1 + fx.spreadBps / 10_000);
 }
 
-const convertMinor = (amount: bigint, factor: number): bigint =>
+export const convertMinor = (amount: bigint, factor: number): bigint =>
   factor === 1 ? amount : BigInt(Math.round(Number(amount) * factor));
 
 // -------------------------------------------------------------- الخصم
@@ -339,6 +341,7 @@ export function priceCart(input: {
       },
       commissionMinor: commission,
       vendorNetMinor: vendorNet,
+      fxFactor: factor,
       fxRateSnapshot: (1 / factor).toFixed(10),
       shipping: quote && quote.available ? { minDays: quote.minDays, maxDays: quote.maxDays } : { minDays: 0, maxDays: 0 },
     });
@@ -392,11 +395,11 @@ export function quoteShipping(
   address: { country: string; region: string | null; city: string | null },
   context: { itemsMinor: bigint; weightGrams: number; vendorNameAr: string },
 ): ShippingQuote {
-  const norm = (v: string | null): string => (v ?? '').trim();
+  // «عمّان» تطابق «عمان» و«الزرقا» تطابق «الزرقاء» — common/places
   const score = (r: ZoneInput['regions'][number]): number => {
     if (r.country.toUpperCase() !== address.country.toUpperCase()) return -1;
-    if (r.city && norm(r.city) !== norm(address.city)) return -1;
-    if (r.region && norm(r.region) !== norm(address.region)) return -1;
+    if (r.city && !samePlace(r.city, address.city)) return -1;
+    if (r.region && !samePlace(r.region, address.region)) return -1;
     return r.city ? 3 : r.region ? 2 : 1;
   };
 

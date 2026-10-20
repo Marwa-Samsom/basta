@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import '@/styles/screens/admin-operations.css';
 import '@/styles/screens/admin-catalog-system.css';
 import { LogoutButton } from '@/components/logout-button';
+import { NotificationBell } from '@/components/notification-bell';
 import { DashIdent, DashShell, type DashNavGroup } from '@/components/dash-shell';
 import type { IconName } from '@/components/icons';
 import { Alert, Spinner } from '@/components/ui';
@@ -16,7 +17,8 @@ import { MeContext, can } from '@/components/admin-context';
 const NAV: { href: string; label: string; icon: IconName; perm?: string; group: string; exact?: boolean }[] = [
   { href: '/admin', label: 'لوحة المؤشرات', icon: 'chart', group: 'التشغيل', exact: true },
   { href: '/admin/vendors', label: 'المتاجر', icon: 'store', perm: 'vendors.review', group: 'التشغيل' },
-  { href: '/admin/products', label: 'مراجعة المنتجات', icon: 'package', perm: 'catalog.manage', group: 'التشغيل' },
+  // لا مراجعة قبل النشر (15 أكتوبر 2026) — القائمة لمتابعة المنشور وإيقاف المخالف
+  { href: '/admin/products', label: 'المنتجات', icon: 'package', perm: 'catalog.manage', group: 'التشغيل' },
   { href: '/admin/orders', label: 'الطلبات', icon: 'truck', perm: 'orders.manage', group: 'التشغيل' },
   { href: '/admin/transfers', label: 'تحويلات المشترين', icon: 'cash', perm: 'payouts.approve', group: 'التشغيل' },
   { href: '/admin/payouts', label: 'طلبات التحويل', icon: 'wallet', perm: 'payouts.approve', group: 'التشغيل' },
@@ -24,13 +26,14 @@ const NAV: { href: string; label: string; icon: IconName; perm?: string; group: 
   { href: '/admin/returns', label: 'المرتجعات', icon: 'return', perm: 'orders.manage', group: 'التشغيل' },
   { href: '/admin/customers', label: 'العملاء', icon: 'users', perm: 'customers.manage', group: 'التشغيل' },
   { href: '/admin/reviews', label: 'التقييمات', icon: 'star', perm: 'content.manage', group: 'التشغيل' },
-  { href: '/admin/categories', label: 'التصنيفات والخصائص', icon: 'package', perm: 'catalog.manage', group: 'الكتالوج والمحتوى' },
+  // الفئات لكل متجر يديرها البائع (14 أكتوبر 2026) — للإدارة مكتبة الخصائص وحدها
+  { href: '/admin/attributes', label: 'الخصائص', icon: 'list', perm: 'catalog.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/coupons', label: 'الكوبونات', icon: 'star', perm: 'coupons.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/campaigns', label: 'الحملات', icon: 'chart', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/storefront', label: 'الواجهة واللافتات', icon: 'image', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/pages', label: 'صفحات المحتوى', icon: 'file', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/notifications', label: 'قوالب الإشعارات', icon: 'msg', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
-  { href: '/admin/commissions', label: 'قواعد العمولة', icon: 'scale', perm: 'commissions.edit', group: 'المال' },
+  { href: '/admin/commissions', label: 'العمولة', icon: 'scale', perm: 'commissions.edit', group: 'المال' },
   { href: '/admin/currencies', label: 'العملات والصرف', icon: 'wallet', perm: 'settings.edit', group: 'المال' },
   { href: '/admin/reports', label: 'التقارير', icon: 'chart', perm: 'reports.view', group: 'المال' },
   { href: '/admin/users', label: 'مستخدمو الإدارة', icon: 'users', perm: 'users.manage', group: 'النظام' },
@@ -95,7 +98,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <MeContext.Provider value={me}>
       <DashShell
-        tone="inverse"
         ident={
           <DashIdent
             href="/admin"
@@ -109,6 +111,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           />
         }
         groups={groups}
+        exitHref="/account"
+        // الجرس نفسه الذي في لوحة البائع: يصل المدير ما يخصّ صلاحياته — نزاع مصعَّد، طلب سحب
+        tools={<NotificationBell />}
         sideFoot={
           <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login?next=/admin">
             خروج

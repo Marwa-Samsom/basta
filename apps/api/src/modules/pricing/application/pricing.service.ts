@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { minorUnitDigits } from '../../../common/money/money';
+import { samePlace } from '../../../common/places';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
+import { DisplayCurrencyService } from './display-currency.service';
 import {
   priceCart,
   quoteShipping,
@@ -47,6 +49,7 @@ export class PricingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly display: DisplayCurrencyService,
   ) {}
 
   async quote(input: QuoteInput): Promise<Quote> {
@@ -69,7 +72,6 @@ export class PricingService {
           select: {
             id: true,
             nameAr: true,
-            categoryId: true,
             vendorId: true,
             // كل الصور (عشر على الأكثر) لا الأولى: صورة اللون المختار تسبق الرئيسية في السلة والطلب
             images: { orderBy: { sort: 'asc' }, select: { fileKey: true, variantId: true, optionValueId: true } },
@@ -90,7 +92,8 @@ export class PricingService {
         where: { id: { in: vendorIds } },
         select: { id: true, nameAr: true, settlementCurrency: true },
       }),
-      this.usdRates(input.now ?? new Date()),
+      // المصدر نفسه الذي يُعرض منه السعر في المتجر — ما يُرى هو ما يُخصم
+      this.display.usdRates(input.now ?? new Date()),
       this.settings(['fx_spread_bps', 'default_commission_bps']),
       this.inventory.levels([...merged.keys()]),
       this.commissionRules(vendorIds, input.now ?? new Date()),
@@ -113,7 +116,6 @@ export class PricingService {
       variantId: v.id,
       productId: v.product.id,
       vendorId: v.vendorId,
-      categoryId: v.product.categoryId,
       nameAr: v.product.nameAr,
       variantLabel: v.optionValues.map((o) => o.attributeValue.valueAr).join(' / ') || null,
       sku: v.sku,
@@ -121,7 +123,7 @@ export class PricingService {
       unitPriceMinor: v.priceMinorUnits,
       qty: merged.get(v.id) ?? 0,
       weightGrams: v.weightGrams,
-      commissionBps: commissions(v.vendorId, v.product.categoryId) ?? defaultBps,
+      commissionBps: commissions(v.vendorId) ?? defaultBps,
     }));
 
     const shipping = new Map<string, ShippingQuote>();
@@ -170,58 +172,30 @@ export class PricingService {
 
   // ------------------------------------------------------------- المصادر
 
-  /** السعر النافذ لكل عملة مقابل الدولار — الأحدث قبل اللحظة لا الأحدث مطلقاً */
-  private async usdRates(at: Date): Promise<Record<string, number>> {
-    const rows = await this.prisma.exchangeRate.findMany({
-      where: { baseCode: 'USD', effectiveAt: { lte: at } },
-      orderBy: { effectiveAt: 'desc' },
-      select: { quoteCode: true, rate: true },
-    });
-    // الصفوف مرتّبة بالأحدث أولاً: أول سعر لكل عملة هو النافذ
-    const out: Record<string, number> = { USD: 1 };
-    for (const r of rows) {
-      if (r.quoteCode !== 'USD' && out[r.quoteCode] === undefined) out[r.quoteCode] = Number(r.rate);
-    }
-    return out;
-  }
-
   private async settings(keys: readonly string[]): Promise<Map<string, unknown>> {
     const rows = await this.prisma.setting.findMany({ where: { key: { in: [...keys] } } });
     return new Map(rows.map((r) => [r.key, r.valueJson as unknown]));
   }
 
   /**
-   * أدقّ قاعدة عمولة نافذة: البائع قبل الفئة قبل العامة (Q-01). تُلقط على
-   * السطر الآن وتُقرأ اللقطة في كل احتساب لاحق — ADR-004.
+   * نسبة العمولة على كل منتج يُباع: نسبة المتجر إن خُصّصت، وإلا العامة — بغضّ
+   * النظر عن فئته أو سعره (قرار صاحب المشروع 14 أكتوبر 2026، ألغى مستوى الفئة).
+   * تُلقط على السطر الآن وتُقرأ اللقطة في كل احتساب لاحق — ADR-004.
    */
-  private async commissionRules(
-    vendorIds: readonly string[],
-    at: Date,
-  ): Promise<(vendorId: string, categoryId: string) => number | null> {
+  private async commissionRules(vendorIds: readonly string[], at: Date): Promise<(vendorId: string) => number | null> {
     const rules = await this.prisma.commissionRule.findMany({
       where: {
+        scope: { in: ['vendor', 'global'] },
         effectiveFrom: { lte: at },
         OR: [{ effectiveTo: null }, { effectiveTo: { gt: at } }],
         AND: [{ OR: [{ vendorId: { in: [...vendorIds] } }, { vendorId: null }] }],
       },
       orderBy: { effectiveFrom: 'desc' },
     });
-    const categoryPaths = new Map(
-      (
-        await this.prisma.category.findMany({ select: { id: true, path: true } })
-      ).map((c) => [c.id, c.path]),
-    );
-    const idByPathSegment = (path: string): string[] => path.split('/').filter(Boolean);
 
-    return (vendorId, categoryId) => {
+    return (vendorId) => {
       const vendorRule = rules.find((r) => r.scope === 'vendor' && r.vendorId === vendorId);
       if (vendorRule) return vendorRule.rateBps;
-      // الفئة وأسلافها: أقرب سلف له قاعدة يفوز
-      const ancestry = idByPathSegment(categoryPaths.get(categoryId) ?? '').reverse();
-      for (const id of [categoryId, ...ancestry]) {
-        const rule = rules.find((r) => r.scope === 'category' && r.categoryId === id);
-        if (rule) return rule.rateBps;
-      }
       return rules.find((r) => r.scope === 'global')?.rateBps ?? null;
     };
   }
@@ -263,7 +237,7 @@ export class PricingService {
       },
       orderBy: { effectiveFrom: 'desc' },
     });
-    const regional = rows.find((r) => r.region && r.region === address.region);
+    const regional = rows.find((r) => r.region && samePlace(r.region, address.region));
     const national = rows.find((r) => !r.region);
     const rate = regional ?? national;
     return rate ? { rateBps: rate.rateBps, inclusive: rate.isPriceInclusive } : { rateBps: 0, inclusive: true };

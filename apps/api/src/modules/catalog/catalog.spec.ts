@@ -7,12 +7,6 @@ import { DuplicateError, InvalidInputError, NotFoundError } from '../../common/e
 import { ScopedRepository, type ScopedDelegate } from '../../common/prisma/scoped-repository';
 import { vendorScopeOf } from '../../common/security/actor';
 import {
-  ancestorPaths,
-  buildTree,
-  placementUnder,
-  planMove,
-} from './domain/category-tree';
-import {
   ImportFileRejectedError,
   normalizeDigits,
   parseRow,
@@ -22,11 +16,7 @@ import {
   type ParsedRow,
 } from './domain/import-plan';
 import { productSlug } from './domain/slug';
-import {
-  assertVariantMatrix,
-  missingRequiredAttributes,
-  optionsKeyOf,
-} from './domain/variant-matrix';
+import { assertVariantMatrix, optionsKeyOf } from './domain/variant-matrix';
 
 const COLOR = 'c0000000-0000-4000-8000-000000000001';
 const SIZE = 'c0000000-0000-4000-8000-000000000002';
@@ -104,61 +94,6 @@ describe('مصفوفة المتغيّرات — SRS V-02', () => {
     expect(() => assertVariantMatrix([])).toThrow(InvalidInputError);
   });
 
-  it('السمات الإلزامية غير المملوءة تُسمّى بأسمائها', () => {
-    expect(
-      missingRequiredAttributes(
-        [
-          { attributeId: 'a', nameAr: 'الخامة' },
-          { attributeId: 'b', nameAr: 'المقاس' },
-        ],
-        new Set(['b']),
-      ),
-    ).toEqual(['الخامة']);
-  });
-});
-
-// ============================================================================
-describe('شجرة الفئات', () => {
-  it('المسار يُبنى من الأب والعمق يتبعه، والمستوى الخامس يُرفض', () => {
-    const root = placementUnder(null, 'r');
-    const l1 = placementUnder(root, 'a');
-    const l2 = placementUnder(l1, 'b');
-    const l3 = placementUnder(l2, 'c');
-    expect(l3).toEqual({ path: '/r/a/b/c/', depth: 3 });
-    expect(() => placementUnder(l3, 'd')).toThrow(InvalidInputError);
-  });
-
-  it('بادئات المسار من الجذر حتى الفئة — مصدر السمات الموروثة', () => {
-    expect(ancestorPaths('/1/abc/def/')).toEqual(['/1/', '/1/abc/', '/1/abc/def/']);
-  });
-
-  it('نقل فئة تحت أحد فروعها يُرفض — كان سيصنع حلقة', () => {
-    expect(() =>
-      planMove({ id: 'a', path: '/r/a/', depth: 1 }, { path: '/r/a/b/', depth: 2 }, 2),
-    ).toThrow(InvalidInputError);
-  });
-
-  it('النقل الذي يدفع أعمق الفروع خارج الحد يُرفض', () => {
-    expect(() => planMove({ id: 'a', path: '/r/a/', depth: 1 }, { path: '/x/y/', depth: 1 }, 3)).toThrow(
-      InvalidInputError,
-    );
-    expect(planMove({ id: 'a', path: '/r/a/', depth: 1 }, null, 2)).toEqual({
-      oldPrefix: '/r/a/',
-      newPrefix: '/a/',
-      depthShift: -1,
-    });
-  });
-
-  it('الشجرة تُرتَّب بالحقل sort والأيتام لا تُرفع إلى الجذر', () => {
-    const tree = buildTree([
-      { id: 'r', parentId: null, sort: 0 },
-      { id: 'b', parentId: 'r', sort: 2 },
-      { id: 'a', parentId: 'r', sort: 1 },
-      { id: 'orphan', parentId: 'inactive-parent', sort: 0 },
-    ]);
-    expect(tree.map((n) => n.id)).toEqual(['r']);
-    expect(tree[0]?.children.map((n) => n.id)).toEqual(['a', 'b']);
-  });
 });
 
 // ============================================================================
@@ -169,7 +104,7 @@ describe('الاستيراد — تحليل الملف', () => {
     HEADERS.map(
       (h) =>
         overrides[h] ??
-        ({ رمز_المنتج: 'P1', SKU: 'P1-M', الاسم_عربي: 'قميص', الفئة: 'fashion', السعر: '79.00', الكمية: '5' } as Record<string, string>)[h] ??
+        ({ رمز_المنتج: 'P1', SKU: 'P1-M', الاسم_عربي: 'قميص', الفئة: 'قمصان', السعر: '79.00', الكمية: '5' } as Record<string, string>)[h] ??
         '',
     );
 
@@ -218,20 +153,22 @@ describe('الاستيراد — تحليل الملف', () => {
   it('السعر قبل الخصم الأدنى من السعر يُرفض', () => {
     expect(parseRow(row({ السعر_قبل_الخصم: '50.00' }), columns, 2, 'SAR').ok).toBe(false);
   });
+
+  it('الفئة إلزامية (18 أكتوبر 2026) — فراغها يرفض سطره، وما فوق 80 حرفاً يُرفض، والملف بلا عمودها يُرفض', () => {
+    const none = parseRow(row({ الفئة: '' }), columns, 2, 'SAR');
+    expect(none.ok).toBe(false);
+    if (!none.ok) expect(none.rejected.reasons.map((r) => r.column)).toContain('الفئة');
+    expect(parseRow(row({ الفئة: 'ف'.repeat(81) }), columns, 2, 'SAR').ok).toBe(false);
+    expect(() => resolveHeaders(['رمز_المنتج', 'SKU', 'الاسم_عربي', 'السعر', 'الكمية'])).toThrow(/الفئة/);
+  });
 });
 
 // ============================================================================
 describe('الاستيراد — خطة الكتابة', () => {
-  const FASHION = 'f0000000-0000-4000-8000-000000000001';
-  const GROCERY = 'f0000000-0000-4000-8000-000000000002';
   const color = { id: COLOR, nameAr: 'اللون', values: new Map([['أحمر', RED], ['أزرق', BLUE]]), valueLabels: ['أحمر', 'أزرق'] };
   const size = { id: SIZE, nameAr: 'المقاس', values: new Map([['m', M], ['l', L]]), valueLabels: ['M', 'L'] };
 
   const lookups: ImportLookups = {
-    categories: new Map([
-      ['fashion', { id: FASHION, nameAr: 'ملابس', axisIds: new Set([COLOR, SIZE]) }],
-      ['grocery', { id: GROCERY, nameAr: 'بقالة', axisIds: new Set<string>() }],
-    ]),
     axes: new Map([
       ['اللون', color],
       ['color', color],
@@ -248,7 +185,7 @@ describe('الاستيراد — خطة الكتابة', () => {
     nameEn: null,
     descriptionAr: null,
     descriptionEn: null,
-    category: 'fashion',
+    category: 'قمصان',
     priceMinorUnits: 7900n,
     compareAtPriceMinorUnits: null,
     stock: 3,
@@ -281,20 +218,39 @@ describe('الاستيراد — خطة الكتابة', () => {
     expect(plan.rejected[0]?.reasons[0]?.message).toContain('السطر 3');
   });
 
-  it('فئة مجهولة، وسمة لا تخصّ الفئة، وقيمة غير معرّفة — كلٌّ يرفض سطره وحده', () => {
+  it('سمة مجهولة وقيمة غير معرّفة ترفضان سطرهما وحده، والفئة الجديدة لا ترفض شيئاً', () => {
     const plan = planImport(
       [
-        parsed(2, { productRef: 'A', category: 'toys' }),
-        parsed(3, { productRef: 'B', category: 'grocery' }),
+        parsed(2, { productRef: 'A', options: [{ name: 'الخامة', value: 'قطن' }] }),
+        parsed(3, { productRef: 'B', category: 'ألعاب' }),
         parsed(4, { productRef: 'C', options: [{ name: 'اللون', value: 'بنفسجي' }] }),
-        parsed(5, { productRef: 'D' }),
+        parsed(5, { productRef: 'D', category: null }),
       ],
       [],
       lookups,
     );
-    expect(plan.rejected.map((r) => r.line)).toEqual([2, 3, 4]);
-    expect(plan.rejected[2]?.reasons[0]?.message).toContain('أحمر، أزرق');
-    expect(plan.products.map((p) => p.productRef)).toEqual(['D']);
+    expect(plan.rejected.map((r) => r.line)).toEqual([2, 4]);
+    expect(plan.rejected[1]?.reasons[0]?.message).toContain('أحمر، أزرق');
+    // الفئة تُطابَق أو تُنشأ عند الكتابة في متجر البائع — الخطة تحمل اسمها كما كُتب
+    expect(plan.products.map((p) => [p.productRef, p.categoryName])).toEqual([
+      ['B', 'ألعاب'],
+      ['D', null],
+    ]);
+  });
+
+  it('أسطر رمز المنتج الواحد بفئتين يُرفض الثاني، و«قمصان» و«قمصان » فئة واحدة', () => {
+    const plan = planImport(
+      [
+        parsed(2),
+        parsed(3, { category: 'قمصان ', options: [{ name: 'المقاس', value: 'L' }] }),
+        parsed(4, { sku: 'P1-X', category: 'بناطيل', options: [{ name: 'اللون', value: 'أحمر' }] }),
+      ],
+      [],
+      lookups,
+    );
+    expect(plan.products[0]?.variants.map((v) => v.line)).toEqual([2, 3]);
+    expect(plan.rejected.map((r) => r.line)).toEqual([4]);
+    expect(plan.rejected[0]?.reasons.map((r) => r.column)).toContain('الفئة');
   });
 
   it('سطر يخالف أول أسطر رمز منتجه في الاسم أو السمات أو يكرر تركيبته يُرفض', () => {

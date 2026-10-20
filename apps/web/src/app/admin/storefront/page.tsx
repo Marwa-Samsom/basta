@@ -21,12 +21,13 @@ interface Banner {
   isActive: boolean;
 }
 
-const PLACEMENTS: Record<string, string> = { home_hero: 'أعلى الرئيسية', home_middle: 'وسط الرئيسية', category_top: 'أعلى صفحة التصنيف' };
+const PLACEMENTS: Record<string, string> = { home_hero: 'أعلى الرئيسية', home_middle: 'وسط الرئيسية' };
+/** لافتات «أعلى صفحة التصنيف» القديمة — بلا صفحة تظهر فيها منذ صارت الفئات لكل متجر، فأُطفئت */
+const RETIRED: Record<string, string> = { category_top: 'أعلى صفحة التصنيف (أُلغي الموضع)' };
 
 const FILTERS = [
   { key: 'all', label: 'الكل', test: () => true },
   { key: 'home', label: 'الرئيسية', test: (b: Banner) => b.placement.startsWith('home_') },
-  { key: 'category', label: 'أعلى التصنيف', test: (b: Banner) => b.placement === 'category_top' },
 ];
 
 /**
@@ -39,7 +40,7 @@ export default function AdminStorefrontPage() {
   const featured = useAdminData<string[]>('/admin/storefront/featured');
   const products = useAdminData<{ items: { id: string; nameAr: string; vendor: { nameAr: string } }[] }>('/admin/products?status=active&pageSize=100');
   const act = useAction();
-  const [draft, setDraft] = useState({ placement: 'home_hero', titleAr: '', linkUrl: '/categories', imageKey: '', imageUrl: '', startsAt: '', endsAt: '' });
+  const [draft, setDraft] = useState({ placement: 'home_hero', titleAr: '', linkUrl: '/shops', imageKey: '', imageUrl: '', startsAt: '', endsAt: '' });
   const [showNew, setShowNew] = useState(false);
   const [filter, setFilter] = useState('all');
   const [q, setQ] = useState('');
@@ -210,7 +211,7 @@ export default function AdminStorefrontPage() {
                     </span>
                   </td>
                   <td className="ac2-muted-cell" data-label="الموضع">
-                    {PLACEMENTS[b.placement] ?? b.placement}
+                    {PLACEMENTS[b.placement] ?? RETIRED[b.placement] ?? b.placement}
                   </td>
                   <td className="num" data-label="الترتيب">
                     {b.sort}

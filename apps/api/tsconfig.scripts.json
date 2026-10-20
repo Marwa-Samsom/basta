@@ -9,6 +9,6 @@
     "experimentalDecorators": true,
     "types": ["node"]
   },
-  "include": ["prisma/**/*"],
+  "include": ["prisma/**/*", "test/**/*"],
   "exclude": ["node_modules"]
 }

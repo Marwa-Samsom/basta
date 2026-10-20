@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsIn,
   IsInt,
   IsNumber,
@@ -16,85 +17,32 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { ATTRIBUTE_INPUT_TYPES, type AttributeInputType } from '../../application/category.service';
+import { ATTRIBUTE_INPUT_TYPES, type AttributeInputType } from '../../application/attribute.service';
 
 const MAX_STOCK = 1_000_000;
 
-// ============================================================================ الفئات والسمات
+// ============================================================================ فئات المتجر
 
-export class CreateCategoryDto {
-  @ApiPropertyOptional({ description: 'غائب = فئة جذرية' })
-  @IsOptional()
-  @IsUUID('4', { message: 'معرّف الفئة الأب غير صالح.' })
-  parentId?: string;
-
-  @ApiProperty({ example: 'men-clothing' })
-  @Matches(/^[a-z0-9]+(-[a-z0-9]+)*$/, { message: 'المعرّف النصّي حروف لاتينية صغيرة وأرقام بشرطات.' })
-  @Length(2, 80)
-  slug!: string;
-
+export class VendorCategoryDto {
   @ApiProperty({ example: 'ملابس رجالية' })
-  @IsString()
-  @Length(2, 120, { message: 'الاسم العربي من حرفين إلى 120 حرفاً.' })
+  @IsString({ message: 'اكتب اسم الفئة.' })
+  @Length(1, 80, { message: 'اسم الفئة من حرف إلى 80 حرفاً.' })
   nameAr!: string;
-
-  @ApiPropertyOptional({ example: "Men's clothing" })
-  @IsOptional()
-  @IsString()
-  @Length(2, 120)
-  nameEn?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  iconKey?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  sort?: number;
 }
 
-export class UpdateCategoryDto {
-  @IsOptional()
-  @Matches(/^[a-z0-9]+(-[a-z0-9]+)*$/, { message: 'المعرّف النصّي حروف لاتينية صغيرة وأرقام بشرطات.' })
-  @Length(2, 80)
-  slug?: string;
-
-  @IsOptional()
-  @IsString()
-  @Length(2, 120)
-  nameAr?: string;
-
-  @IsOptional()
-  @IsString()
-  @Length(2, 120)
-  nameEn?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  iconKey?: string;
-
-  @IsOptional()
-  @IsInt()
-  sort?: number;
-
-  @ApiPropertyOptional({ description: 'false يُخفي الفئة وفرعها من الشجرة العامة' })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+export class ReorderVendorCategoriesDto {
+  /** كل فئات المتجر بترتيبها الجديد — الأولى أولاً */
+  @ApiProperty({ type: [String] })
+  @IsArray({ message: 'أرسل معرّفات الفئات بترتيبها.' })
+  @ArrayMaxSize(200)
+  @IsUUID('4', { each: true, message: 'معرّف فئة غير صالح.' })
+  ids!: string[];
 }
 
-export class MoveCategoryDto {
-  @ApiPropertyOptional({ description: 'null أو غائب = نقل إلى الجذر', nullable: true })
-  @IsOptional()
-  @IsUUID('4', { message: 'معرّف الفئة الأب غير صالح.' })
-  parentId?: string | null;
-}
+// ============================================================================ السمات
 
 export class AttributeValueCreateDto {
   @ApiProperty({ example: 'أحمر' })
@@ -159,16 +107,6 @@ export class CreateAttributeDto {
   @ValidateNested({ each: true })
   @Type(() => AttributeValueCreateDto)
   values?: AttributeValueCreateDto[];
-}
-
-export class LinkAttributeDto {
-  @ApiProperty({ description: 'إلزامية تمنع نشر منتج لم يملأها' })
-  @IsBoolean()
-  isRequired!: boolean;
-
-  @IsOptional()
-  @IsInt()
-  sort?: number;
 }
 
 // ============================================================================ المنتجات
@@ -268,9 +206,11 @@ export class AttributeValueDto {
 }
 
 export class CreateProductDto {
-  @ApiProperty()
+  /** إلزامية منذ 18 أكتوبر 2026 — لا يُضاف منتج بلا فئة (والمتجر يبدأ بثماني فئات) */
+  @ApiProperty({ description: 'فئة من فئات متجرك' })
+  @IsDefined({ message: 'اختر فئة للمنتج — أو أضف فئة جديدة لمتجرك.' })
   @IsUUID('4', { message: 'معرّف الفئة غير صالح.' })
-  categoryId!: string;
+  vendorCategoryId!: string;
 
   @IsOptional()
   @IsUUID('4')
@@ -315,9 +255,11 @@ export class CreateProductDto {
 }
 
 export class UpdateProductDto {
-  @IsOptional()
-  @IsUUID('4', { message: 'معرّف الفئة غير صالح.' })
-  categoryId?: string;
+  /** غائبة = لا تتغيّر؛ ولا تُرسل null — المنتج لا يخرج من كل فئة */
+  @ApiPropertyOptional({ description: 'فئة من فئات متجرك — غائبة لا تغيّرها' })
+  @ValidateIf((_, v: unknown) => v !== undefined)
+  @IsUUID('4', { message: 'اختر فئة للمنتج — لا يبقى منتج بلا فئة.' })
+  vendorCategoryId?: string;
 
   @IsOptional()
   @IsUUID('4')
@@ -397,13 +339,18 @@ export class AdjustStockDto {
 
 export class ListProductsQueryDto {
   @IsOptional()
-  @IsIn(['draft', 'pending_review', 'active', 'rejected', 'archived'])
-  status?: 'draft' | 'pending_review' | 'active' | 'rejected' | 'archived';
+  @IsIn(['draft', 'active', 'rejected', 'archived'])
+  status?: 'draft' | 'active' | 'rejected' | 'archived';
 
   @IsOptional()
   @IsString()
   @MaxLength(100)
   search?: string;
+
+  /** فئة من فئات المتجر، أو none لما بلا فئة — للبائع وحده */
+  @IsOptional()
+  @Matches(/^(none|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i, { message: 'الفئة معرّف أو none.' })
+  category?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -442,18 +389,9 @@ export class ReorderImagesDto {
   imageIds!: string[];
 }
 
-export class ApproveProductDto {
-  /** نسخة المحتوى التي فتحها المراجِع (contentRevision في تفاصيل المنتج) */
-  @ApiProperty({ example: 3 })
-  @Type(() => Number)
-  @IsInt({ message: 'أرسل نسخة المحتوى التي راجعتها.' })
-  @Min(0)
-  contentRevision!: number;
-}
-
 export class RejectProductDto {
   @ApiProperty({ example: 'الصور لا تطابق المنتج الموصوف.' })
   @IsString()
-  @Length(5, 500, { message: 'سبب الرفض من 5 أحرف إلى 500 — البائع يصلح بناءً عليه.' })
+  @Length(5, 500, { message: 'سبب الإيقاف من 5 أحرف إلى 500 — البائع يصلح بناءً عليه.' })
   reason!: string;
 }

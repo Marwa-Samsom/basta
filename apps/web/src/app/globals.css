@@ -602,6 +602,48 @@ textarea.field__control {
   cursor: pointer;
 }
 
+/* ------------------------------------------------------------ نافذة التأكيد */
+/* components/confirm.tsx — بدل window.confirm. الزرّ الأحمر المعبّأ هنا وحده (DESIGN-BRIEF) */
+
+.confirm-dialog {
+  inline-size: min(440px, calc(100% - 2 * var(--space-6)));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+  color: var(--text-body);
+}
+.confirm-dialog::backdrop { background: color-mix(in srgb, var(--surface-inverse) 55%, transparent); }
+.confirm-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 18px var(--space-5) var(--space-2);
+}
+.confirm-dialog__title { font-size: var(--text-md); font-weight: var(--weight-bold); line-height: var(--leading-normal); color: var(--text-strong); }
+.confirm-dialog__body {
+  padding: 0 var(--space-5) var(--space-4);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  color: var(--text-muted);
+}
+.confirm-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px var(--space-5);
+  border-block-start: 1px solid var(--border-subtle);
+}
+.confirm-dialog .btn--danger { --btn-bg: var(--danger); --btn-fg: var(--text-on-brand); }
+.confirm-dialog .btn--danger:hover:not(:disabled) { --btn-bg: var(--danger-text); --btn-border: var(--danger-text); }
+
+@media (max-width: 480px) {
+  .confirm-dialog__foot { flex-direction: column-reverse; }
+  .confirm-dialog__foot .btn { inline-size: 100%; }
+}
+
 /* ----------------------------------------------------------------- مساعدات */
 
 .muted { color: var(--text-muted); }
@@ -669,7 +711,7 @@ textarea.field__control {
   position: sticky;
   inset-block-start: 0;
   block-size: 100dvh;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--surface-card);
   border-inline-end: 1px solid var(--border-default);
   padding-block: var(--space-3);
@@ -677,6 +719,10 @@ textarea.field__control {
   flex-direction: column;
   gap: var(--space-1);
 }
+
+/* الأقسام وحدها تتمرّر: «خروج» في الذيل ظاهر دائماً مهما طالت القائمة —
+   قائمة الإدارة تتجاوز العشرين بنداً فكان الزرّ يختفي تحت حافة الشاشة */
+.dash__side > .dash__nav { flex: 1; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 .dash__ident {
   display: flex;
@@ -752,7 +798,7 @@ textarea.field__control {
 }
 .dash__link[data-active='true'] .dash__count { background: var(--brand); color: var(--text-on-brand); }
 
-.dash__side-foot { margin-block-start: auto; padding: var(--space-3) var(--space-2) 0; border-block-start: 1px solid var(--border-subtle); }
+.dash__side-foot { flex: none; padding: var(--space-3) var(--space-2) 0; border-block-start: 1px solid var(--border-subtle); }
 
 .dash__col { display: flex; flex-direction: column; min-width: 0; }
 
@@ -812,27 +858,6 @@ textarea.field__control {
   font-weight: var(--weight-black);
   font-size: var(--text-md);
 }
-
-/* الإدارة — الشريط بسطح معكوس، والقسم المفتوح بتعبئة العلامة */
-.dash[data-tone='inverse'] .dash__side {
-  --inv-line: color-mix(in srgb, var(--text-on-inverse) 12%, transparent);
-  --inv-soft: color-mix(in srgb, var(--text-on-inverse) 62%, transparent);
-  background: var(--surface-inverse);
-  border-inline-end-color: var(--surface-inverse);
-  color: var(--text-on-inverse);
-}
-.dash[data-tone='inverse'] .dash__ident,
-.dash[data-tone='inverse'] .dash__side-foot { border-color: var(--inv-line); }
-.dash[data-tone='inverse'] .dash__ident-name { color: var(--text-on-inverse); }
-.dash[data-tone='inverse'] .dash__ident-sub,
-.dash[data-tone='inverse'] .dash__group { color: var(--inv-soft); }
-.dash[data-tone='inverse'] .dash__link { color: color-mix(in srgb, var(--text-on-inverse) 82%, transparent); }
-.dash[data-tone='inverse'] .dash__link:hover { background: color-mix(in srgb, var(--text-on-inverse) 8%, transparent); color: var(--text-on-inverse); }
-.dash[data-tone='inverse'] .dash__link[data-active='true'] { background: var(--brand); color: var(--text-on-brand); font-weight: var(--weight-bold); }
-.dash[data-tone='inverse'] .dash__count { background: var(--danger); color: var(--text-on-brand); }
-.dash[data-tone='inverse'] .dash__link[data-active='true'] .dash__count { background: color-mix(in srgb, var(--text-on-brand) 22%, transparent); }
-.dash[data-tone='inverse'] .dash__side-foot .btn { --btn-fg: var(--text-on-inverse); }
-.dash[data-tone='inverse'] .dash__side-foot .btn:hover:not(:disabled) { --btn-bg: color-mix(in srgb, var(--text-on-inverse) 8%, transparent); }
 
 @media (max-width: 860px) {
   .dash { grid-template-columns: minmax(0, 1fr); }
@@ -1121,6 +1146,34 @@ a.stat:hover { box-shadow: var(--shadow-md); }
 .store__brand:hover { color: var(--brand-hover); }
 
 .store__tools { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+
+/* عملة العرض — الرمز ظاهر، والقائمة الأصلية شفّافة فوقه تفتح بأسماء العملات كاملة */
+.cur-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  block-size: var(--ctrl-h);
+  padding-inline: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.cur-pick:hover { background: var(--surface-sunken); color: var(--text-strong); }
+.cur-pick:focus-within { outline: 2px solid var(--brand); outline-offset: 1px; }
+.cur-pick[data-busy] { opacity: 0.6; }
+.cur-pick__code { font-weight: var(--weight-semi); letter-spacing: 0.02em; }
+.cur-pick__select {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font: inherit;
+}
 
 .store__cats {
   max-width: var(--width-storefront);

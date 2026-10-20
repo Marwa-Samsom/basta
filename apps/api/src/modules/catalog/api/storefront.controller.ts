@@ -3,25 +3,33 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { Public } from '../../../common/security/decorators';
-import { SearchService } from '../../search/public';
-import { CategoryService } from '../application/category.service';
+import { DisplayCurrencyService } from '../../pricing/public';
 import { StorefrontService } from '../application/storefront.service';
 
-export class StorefrontQueryDto {
+/** رمز العملة كما يرسله المتجر — المجهول يسقط إلى افتراضية الإدارة لا إلى خطأ */
+const CURRENCY = /^[A-Za-z]{3}$/;
+
+export class CurrencyQueryDto {
+  /** عملة العرض — قرار 18 أكتوبر 2026. بلاها: ما تحدّده الإدارة */
+  @IsOptional()
+  @Matches(CURRENCY, { message: 'رمز العملة ثلاثة أحرف.' })
+  currency?: string;
+}
+
+export class StorefrontQueryDto extends CurrencyQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(120)
   q?: string;
 
-  /** رابط الفئة (slug) — يشمل كل الفروع تحته */
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  category?: string;
-
   @IsOptional()
   @IsUUID()
   vendorId?: string;
+
+  /** فئة من فئات المتجر — مع vendorId */
+  @IsOptional()
+  @IsUUID('4', { message: 'الفئة غير صالحة.' })
+  storeCategory?: string;
 
   @IsOptional()
   @IsUUID()
@@ -34,6 +42,7 @@ export class StorefrontQueryDto {
   @Matches(/^[0-9a-f-]{36}(,[0-9a-f-]{36})*,?$/i, { message: 'قيم التصفية معرّفات مفصولة بفاصلة.' })
   attrs?: string;
 
+  /** بالوحدة الصغرى لعملة العرض */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -68,6 +77,32 @@ export class StorefrontQueryDto {
   pageSize?: number;
 }
 
+export class ShopQueryDto extends CurrencyQueryDto {
+  /** فئة من فئات المتجر — أزرار التصفية في صفحته */
+  @IsOptional()
+  @IsUUID('4', { message: 'الفئة غير صالحة.' })
+  category?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+}
+
+export class ShopsQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+}
+
 /**
  * المتجر — مسارات عامة بلا مصادقة (المرحلة 07).
  *
@@ -79,22 +114,17 @@ export class StorefrontQueryDto {
 export class StorefrontController {
   constructor(
     private readonly storefront: StorefrontService,
-    private readonly categories: CategoryService,
-    private readonly search: SearchService,
+    private readonly display: DisplayCurrencyService,
   ) {}
 
   @Public()
   @Get('storefront/products')
   @ApiOperation({ summary: 'تصفّح وبحث بأوجه تصفية — ST-03 و ST-04' })
   async list(@Query() query: StorefrontQueryDto) {
-    // فئة مجهولة تُترجم إلى مسار لا يطابق شيئاً: نتيجة فارغة لا 400
-    const categoryPath = query.category
-      ? ((await this.storefront.categoryPathOf(query.category)) ?? '/__none__/')
-      : undefined;
     return this.storefront.list({
       ...(query.q ? { q: query.q } : {}),
-      ...(categoryPath ? { categoryPath } : {}),
       ...(query.vendorId ? { vendorId: query.vendorId } : {}),
+      ...(query.storeCategory ? { storeCategoryId: query.storeCategory } : {}),
       ...(query.brandId ? { brandId: query.brandId } : {}),
       ...(query.attrs ? { attributeValueIds: query.attrs.split(',').filter(Boolean) } : {}),
       ...(query.minPrice !== undefined ? { minPriceMinor: query.minPrice } : {}),
@@ -103,7 +133,15 @@ export class StorefrontController {
       ...(query.sort ? { sort: query.sort } : {}),
       ...(query.page ? { page: query.page } : {}),
       ...(query.pageSize ? { pageSize: query.pageSize } : {}),
+      ...(query.currency ? { displayCurrency: query.currency } : {}),
     });
+  }
+
+  @Public()
+  @Get('storefront/currencies')
+  @ApiOperation({ summary: 'العملات التي يختار منها المشتري، وعملة الزائر الجديد' })
+  currencies() {
+    return this.display.options();
   }
 
   @Public()
@@ -116,15 +154,22 @@ export class StorefrontController {
   @Public()
   @Get('storefront/products/:slug')
   @ApiOperation({ summary: 'صفحة المنتج — ST-07' })
-  detail(@Param('slug') slug: string) {
-    return this.storefront.bySlug(slug);
+  detail(@Param('slug') slug: string, @Query() query: CurrencyQueryDto) {
+    return this.storefront.bySlug(slug, query.currency);
+  }
+
+  @Public()
+  @Get('storefront/shops')
+  @ApiOperation({ summary: 'دليل المتاجر المعتمدة التي لها منتج معروض' })
+  shops(@Query() query: ShopsQueryDto) {
+    return this.storefront.shops({ q: query.q, page: query.page });
   }
 
   @Public()
   @Get('storefront/shops/:slug')
-  @ApiOperation({ summary: 'صفحة البائع — ST-11، والمعلَّق يُعرض بحالته لا 404' })
-  shop(@Param('slug') slug: string) {
-    return this.storefront.shopBySlug(slug);
+  @ApiOperation({ summary: 'صفحة البائع بفئاته — ST-11، والمعلَّق يُعرض بحالته لا 404' })
+  shop(@Param('slug') slug: string, @Query() query: ShopQueryDto) {
+    return this.storefront.shopBySlug(slug, { category: query.category, page: query.page, currency: query.currency });
   }
 
   @Public()
@@ -137,14 +182,7 @@ export class StorefrontController {
   @Public()
   @Get('storefront/featured')
   @ApiOperation({ summary: 'المنتجات المميّزة في الرئيسية بترتيب الإدارة — AD-19' })
-  featured() {
-    return this.storefront.featured();
-  }
-
-  @Public()
-  @Get('storefront/categories')
-  @ApiOperation({ summary: 'شجرة الفئات — ST-02' })
-  tree() {
-    return this.categories.tree();
+  featured(@Query() query: CurrencyQueryDto) {
+    return this.storefront.featured(query.currency);
   }
 }

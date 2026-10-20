@@ -46,7 +46,7 @@ export interface Facets {
   brands: FacetBucket[];
   vendors: FacetBucket[];
   attributes: { attributeId: string; nameAr: string; values: FacetBucket[] }[];
-  priceRange: { minMinor: string; maxMinor: string } | null;
+  priceRange: { minMinor: string; maxMinor: string; currency: string } | null;
 }
 
 export interface ListResult {
@@ -65,8 +65,12 @@ export interface ProductPage {
   nameAr: string;
   nameEn: string | null;
   descriptionAr: string | null;
+  /** عملة الأسعار المعروضة — عملة المشتري، أو عملة المتجر إن تعذّر الصرف */
   currency: string;
-  category: { id: string; slug: string; nameAr: string };
+  /** العملة التي سعّر بها المتجر */
+  storeCurrency: string;
+  /** فئة المنتج في متجره — null إن لم يضعه البائع في فئة */
+  storeCategory: { id: string; nameAr: string } | null;
   brand: { id: string; nameAr: string } | null;
   vendor: {
     id: string;
@@ -91,6 +95,8 @@ export interface ProductPage {
     id: string;
     sku: string;
     price: Price;
+    /** سعر المتجر بعملته حين تختلف عن عملة العرض */
+    originalPrice: Price | null;
     compareAtPrice: Price | null;
     available: number;
     options: {
@@ -121,17 +127,24 @@ export interface ShopPage {
     since: string;
     isSuspended: boolean;
   };
+  /** فئات المتجر التي فيها معروض — أزرار التصفية بترتيب البائع */
+  categories: { id: string; nameAr: string; count: number }[];
   products: ProductCard[];
+  page: number;
+  pageSize: number;
   total: number;
 }
 
-export interface Category {
+/** بطاقة متجر في دليل المتاجر */
+export interface ShopCard {
   id: string;
-  parentId: string | null;
   slug: string;
   nameAr: string;
-  depth: number;
-  children?: Category[];
+  descriptionAr: string | null;
+  ratingAvg: number;
+  ratingCount: number;
+  productCount: number;
+  categories: string[];
 }
 
 /**
@@ -139,8 +152,10 @@ export interface Category {
  * دقيقةً، فلا يضرب كل زائر قاعدة البيانات. والسعر والمخزون أحدث من دقيقة
  * في السلة والدفع لا هنا — صفحة المنتج تعرض، لا تحجز.
  */
-async function get<T>(path: string, revalidate = 60): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { next: { revalidate } });
+async function get<T>(path: string, revalidate = 60, currency?: string): Promise<T> {
+  // عملة العرض في العنوان: التخزين مفتاحه العنوان، فلكل عملة نسختها
+  const url = currency ? `${path}${path.includes('?') ? '&' : '?'}currency=${currency}` : path;
+  const res = await fetch(`${API_BASE}${url}`, { next: { revalidate } });
   if (res.status === 404) notFound();
   if (!res.ok) throw new Error(`تعذّر تحميل ${path}: ${res.status}`);
   return (await res.json()) as T;
@@ -161,13 +176,46 @@ export function decodeParam(value: string): string {
 
 const slugPath = (slug: string): string => encodeURIComponent(decodeParam(slug));
 
-export const getProduct = (slug: string): Promise<ProductPage> =>
-  get(`/storefront/products/${slugPath(slug)}`);
+export const getProduct = (slug: string, currency?: string): Promise<ProductPage> =>
+  get(`/storefront/products/${slugPath(slug)}`, 60, currency);
 
-export const getShop = (slug: string): Promise<ShopPage> =>
-  get(`/storefront/shops/${slugPath(slug)}`);
+export function getShop(
+  slug: string,
+  opts: { category?: string | undefined; page?: number | undefined; currency?: string | undefined } = {},
+): Promise<ShopPage> {
+  const query = new URLSearchParams();
+  if (opts.category) query.set('category', opts.category);
+  if (opts.page && opts.page > 1) query.set('page', String(opts.page));
+  const qs = query.toString();
+  return get(`/storefront/shops/${slugPath(slug)}${qs ? `?${qs}` : ''}`, 60, opts.currency);
+}
 
-export const getCategories = (): Promise<Category[]> => get('/storefront/categories', 300);
+export interface CurrencyOption {
+  code: string;
+  nameAr: string;
+  symbol: string;
+}
+
+/** العملات التي يختار منها المشتري وعملة الزائر الجديد — الخطأ لا يُسقط الرأس */
+export const getCurrencies = (): Promise<{ defaultCurrency: string; currencies: CurrencyOption[] }> =>
+  get<{ defaultCurrency: string; currencies: CurrencyOption[] }>('/storefront/currencies', 300).catch(() => ({
+    defaultCurrency: 'JOD',
+    currencies: [],
+  }));
+
+/** دليل المتاجر — حلّ محلّ «كل الأقسام» حين صارت الفئات لكل متجر (14 أكتوبر 2026) */
+export function getShops(opts: { q?: string | undefined; page?: number | undefined } = {}): Promise<{
+  items: ShopCard[];
+  page: number;
+  pageSize: number;
+  total: number;
+}> {
+  const query = new URLSearchParams();
+  if (opts.q?.trim()) query.set('q', opts.q.trim());
+  if (opts.page && opts.page > 1) query.set('page', String(opts.page));
+  const qs = query.toString();
+  return get(`/storefront/shops${qs ? `?${qs}` : ''}`, opts.q ? 0 : 120);
+}
 
 export interface Banner {
   id: string;
@@ -187,7 +235,8 @@ export interface ContentPage {
 export const getBanners = (placement: string): Promise<Banner[]> =>
   get<Banner[]>(`/storefront/banners?placement=${placement}`, 60).catch(() => []);
 
-export const getFeatured = (): Promise<ProductCard[]> => get<ProductCard[]>('/storefront/featured', 60).catch(() => []);
+export const getFeatured = (currency?: string): Promise<ProductCard[]> =>
+  get<ProductCard[]>('/storefront/featured', 60, currency).catch(() => []);
 
 /** حملة جارية في الرئيسية (AD-17) — بطاقاتها بمخطّط المميّز نفسه */
 export interface Campaign {
@@ -200,28 +249,17 @@ export interface Campaign {
 }
 
 /** الخطأ يعني «لا حملات» لا صفحة ساقطة — والبناء لا يحتاج خادماً حيّاً */
-export const getCampaigns = (): Promise<Campaign[]> => get<Campaign[]>('/storefront/campaigns', 60).catch(() => []);
+export const getCampaigns = (currency?: string): Promise<Campaign[]> =>
+  get<Campaign[]>('/storefront/campaigns', 60, currency).catch(() => []);
 
 export const getPage = (slug: string): Promise<ContentPage> => get(`/pages/${slugPath(slug)}`, 300);
 
-export function listProducts(params: Record<string, string | undefined>): Promise<ListResult> {
+export function listProducts(params: Record<string, string | undefined>, currency?: string): Promise<ListResult> {
   const query = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) if (v) query.set(k, v);
+  // العملة من الكوكي لا من العنوان: رابط بحث منسوخ يفتح بعملة من يفتحه
+  for (const [k, v] of Object.entries(params)) if (v && k !== 'currency') query.set(k, v);
   // البحث لا يُخزَّن: كل كلمة استعلام جديد، والتخزين يملأ الذاكرة بلا فائدة
-  return get(`/storefront/products?${query.toString()}`, params['q'] ? 0 : 60);
-}
-
-/** شجرة إلى قائمة مسطّحة — للعثور على فئة بالرابط */
-export function flatten(tree: Category[]): Category[] {
-  const out: Category[] = [];
-  const walk = (nodes: Category[]): void => {
-    for (const n of nodes) {
-      out.push(n);
-      if (n.children?.length) walk(n.children);
-    }
-  };
-  walk(tree);
-  return out;
+  return get(`/storefront/products?${query.toString()}`, params['q'] ? 0 : 60, currency);
 }
 
 export const num = (value: number): string =>

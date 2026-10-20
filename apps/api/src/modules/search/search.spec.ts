@@ -9,8 +9,15 @@ import {
 } from './domain/search-query';
 
 describe('مرشّحات البحث', () => {
-  it('الفئة تُرشَّح بالعضوية في مصفوفة الأسلاف لا ببادئة نصّية', () => {
-    expect(buildFilter({ categoryPath: '/3/17/' })).toEqual(['categoryAncestors = "/3/17/"']);
+  it('فئة المتجر تُرشَّح داخل متجرها — المتجر والفئة شرطان معاً', () => {
+    expect(buildFilter({ vendorId: 'v', storeCategoryId: 'c' })).toEqual(['vendorId = "v"', 'storeCategoryId = "c"']);
+  });
+
+  it('بعملة العرض: عملتها بسعرها الخام، وغيرها بدولار الفهرس — 10 دنانير ليست أرخص من 20 ريالاً', () => {
+    expect(buildFilter({ displayCurrency: 'JOD', minPriceMinor: 10_000, minPriceUsd: 13.8, maxPriceMinor: 20_000, maxPriceUsd: 27.6 })).toEqual([
+      '(currency = "JOD" AND priceMinor >= 10000) OR (currency != "JOD" AND priceUsd >= 13.8)',
+      '(currency = "JOD" AND priceMinor <= 20000) OR (currency != "JOD" AND priceUsd <= 27.6)',
+    ]);
   });
 
   it('السعر مدىً، والمخزون شرطاً', () => {
@@ -42,9 +49,9 @@ describe('الترتيب والصفحات', () => {
     expect(buildSort(undefined)).toEqual([]);
   });
 
-  it('السعر والأحدث يُرسلان صراحةً', () => {
-    expect(buildSort('price_asc')).toEqual(['priceMinor:asc']);
-    expect(buildSort('price_desc')).toEqual(['priceMinor:desc']);
+  it('السعر بدولار الفهرس لا بالوحدة الخام بين العملات، والأحدث صراحةً', () => {
+    expect(buildSort('price_asc')).toEqual(['priceUsd:asc']);
+    expect(buildSort('price_desc')).toEqual(['priceUsd:desc']);
     expect(buildSort('newest')).toEqual(['createdAt:desc']);
   });
 
@@ -59,15 +66,18 @@ describe('إعدادات الفهرس', () => {
   it('كل حقل يُرشَّح به مُعلَن — وإلا رفض المحرّك المرشّح وقت التنفيذ', () => {
     const used = [
       ...buildFilter({
-        categoryPath: '/1/',
         vendorId: 'v',
+        storeCategoryId: 'c',
         brandId: 'b',
         attributeValueIds: ['a'],
         minPriceMinor: 1,
         inStockOnly: true,
       }),
-    ].map((f) => String(f).split(' ')[0]);
+      ...buildFilter({ displayCurrency: 'JOD', maxPriceMinor: 1, maxPriceUsd: 1 }),
+    ].flatMap((f) => [...String(f).matchAll(/([a-zA-Z]+) (?:>=|<=|!=|=|>|<) /g)].map((m) => m[1]!));
 
+    // كل «حقل عامل» في المرشّح، ولو داخل تعبير مركّب بـ AND و OR
+    expect(used).toContain('priceUsd');
     for (const field of used) {
       expect(INDEX_SETTINGS.filterableAttributes).toContain(field);
     }

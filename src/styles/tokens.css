@@ -317,6 +317,9 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html { color-scheme: light dark; }
+/* الاختيار الصريح (زرّ الوضع) يحكم أدوات المتصفّح أيضاً: الأشرطة والحقول */
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
 
 body {
   margin: 0;

@@ -4,11 +4,14 @@ import '@/styles/screens/vendor-extra.css';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, EmptyState, Field, PageHead, TextInput } from '@/components/ui';
 import { digitsOnly } from '@/lib/digits';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { minorUnitDigits } from '@/lib/money';
 import { money } from '@/lib/orders';
 import { COUNTRIES } from '@/lib/vendor';
+import { samePlace } from '@/lib/places';
+import { RegionSelect } from '@/components/region-select';
 
 type Method = 'flat' | 'by_weight' | 'free_over';
 
@@ -51,6 +54,29 @@ const METHODS: { key: Method; label: string }[] = [
 const countryName = (code: string): string => COUNTRIES.find((c) => c.code === code)?.nameAr ?? code;
 const describe = (r: Region): string => [r.city, r.region, countryName(r.country)].filter(Boolean).join('، ');
 const keyOf = (r: Region): string => `${r.country}|${r.region ?? ''}|${r.city ?? ''}`;
+
+/** صفّ الإضافة في محرّر التغطية — `touched` حين اختار البائع بلداً أو كتب شيئاً */
+interface CoverRow {
+  country: string;
+  region: string;
+  city: string;
+  touched: boolean;
+}
+
+/**
+ * ما كتبه البائع في صفّ الإضافة ولم يضغط «أضف إلى التغطية» يدخل مع الحفظ — كان
+ * الحفظ يُرفض بـ«أضف بلداً» والبلد مختار أمامه. صفّ لم يلمسه لا يُضاف: البلد
+ * الافتراضي في القائمة ليس نيّة تغطية.
+ */
+function pendingRow(row: CoverRow, regions: Region[]): Region | null {
+  if (!row.touched) return null;
+  const region = row.region.trim() || null;
+  const city = row.city.trim() || null;
+  // البلد وحده نيّة حين لا تغطية غيره؛ مع تغطية قائمة هو ما بقي في القائمة بعد إضافة سابقة
+  if (!region && !city && regions.length > 0) return null;
+  const next = { country: row.country, region, city };
+  return regions.some((r) => keyOf(r) === keyOf(next)) ? null : next;
+}
 
 /** «12.5» ← 1250 بخانات العملة، والصفر مقبول (شحن مجاني). بلا عدد عشري في الطريق (ADR-001) */
 function toMinor(input: string, currency: string): string | null {
@@ -211,29 +237,35 @@ function RateFields({ draft, onChange, currency }: { draft: RateDraft; onChange:
 function RateCard({
   rate,
   currency,
+  revision,
   onSave,
   onToggle,
   onCancel,
 }: {
   rate: Rate | null;
   currency: string;
-  onSave: (body: Record<string, unknown>) => Promise<boolean>;
-  onToggle?: (active: boolean) => Promise<boolean>;
+  /** بصمة المنطقة — خطأ وقع على بصمة قديمة لم يعد صحيحاً (أُضيفت تسعيرة أخرى مثلاً) فيُخفى */
+  revision: string;
+  /** يعيد رسالة الخطأ لتظهر في البطاقة، أو null عند النجاح */
+  onSave: (body: Record<string, unknown>) => Promise<string | null>;
+  onToggle?: (active: boolean) => Promise<string | null>;
   onCancel?: () => void;
 }) {
   const [draft, setDraft] = useState<RateDraft>(() => (rate ? draftOf(rate, currency) : emptyDraft()));
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ text: string; at: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const fail = (text: string | null) => setFailure(text ? { text, at: revision } : null);
+  const error = failure && failure.at === revision ? failure.text : null;
 
   const save = async () => {
     const out = bodyOf(draft, currency);
     if ('error' in out) {
-      setError(out.error);
+      fail(out.error);
       return;
     }
-    setError(null);
+    fail(null);
     setBusy(true);
-    await onSave(out.body);
+    fail(await onSave(out.body));
     setBusy(false);
   };
 
@@ -261,8 +293,9 @@ function RateCard({
               aria-label="تسعيرة مفعّلة"
               disabled={busy}
               onClick={async () => {
+                fail(null);
                 setBusy(true);
-                await onToggle(!rate.isActive);
+                fail(await onToggle(!rate.isActive));
                 setBusy(false);
               }}
             />
@@ -281,16 +314,24 @@ function RateCard({
 
 // ---------------------------------------------------------------- المنطقة
 
-function CoverageEditor({ regions, onChange }: { regions: Region[]; onChange: (r: Region[]) => void }) {
-  const [country, setCountry] = useState(regions[0]?.country ?? 'SA');
-  const [region, setRegion] = useState('');
-  const [city, setCity] = useState('');
+function CoverageEditor({
+  regions,
+  onChange,
+  row,
+  onRow,
+}: {
+  regions: Region[];
+  onChange: (r: Region[]) => void;
+  row: CoverRow;
+  onRow: (r: CoverRow) => void;
+}) {
+  const { country, region, city } = row;
+  const set = (patch: Partial<CoverRow>) => onRow({ ...row, ...patch, touched: true });
 
   const add = () => {
     const next: Region = { country, region: region.trim() || null, city: city.trim() || null };
     if (!regions.some((r) => keyOf(r) === keyOf(next))) onChange([...regions, next]);
-    setRegion('');
-    setCity('');
+    onRow({ ...row, region: '', city: '', touched: false });
   };
 
   return (
@@ -319,7 +360,7 @@ function CoverageEditor({ regions, onChange }: { regions: Region[]; onChange: (r
       <div className="vx-cover-add">
         <Field label="البلد">
           {(p) => (
-            <select className="field__control" {...p} value={country} onChange={(e) => setCountry(e.target.value)}>
+            <select className="field__control" {...p} value={country} onChange={(e) => set({ country: e.target.value, region: '' })}>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.nameAr}
@@ -328,8 +369,8 @@ function CoverageEditor({ regions, onChange }: { regions: Region[]; onChange: (r
             </select>
           )}
         </Field>
-        <TextInput label="المحافظة / المنطقة" optional value={region} onChange={(e) => setRegion(e.target.value)} />
-        <TextInput label="المدينة" optional value={city} onChange={(e) => setCity(e.target.value)} />
+        <RegionSelect country={country} value={region} onChange={(v) => set({ region: v })} emptyLabel="كل البلد" optional />
+        <TextInput label="المدينة" optional value={city} onChange={(e) => set({ city: e.target.value })} />
         <button type="button" className="btn btn--secondary" onClick={add}>
           <Icon name="plus" size={15} />
           أضف إلى التغطية
@@ -337,8 +378,8 @@ function CoverageEditor({ regions, onChange }: { regions: Region[]; onChange: (r
       </div>
       <p className="vx-hint">
         <Icon name="info" size={13} />
-        الدول ثم المناطق ثم المدن — والأدقّ يفوز: سعر المدينة قبل سعر محافظتها قبل سعر البلد. اكتب المحافظة والمدينة كما يكتبها
-        المشتري في عنوانه، فالمطابقة حرفية. اترك المدينة فارغة لتغطية المحافظة كلها، والاثنتين لتغطية البلد كله.
+        الدول ثم المناطق ثم المدن — والأدقّ يفوز: سعر المدينة قبل سعر محافظتها قبل سعر البلد. المحافظة من القائمة نفسها التي يختار منها
+        المشتري عنوانه، والمدينة تُطابَق بلا تشكيل ولا همزة. اترك المدينة فارغة لتغطية المحافظة كلها، و«كل البلد» لتغطيته كله.
       </p>
     </div>
   );
@@ -357,11 +398,15 @@ function ZoneEditor({
   onDeleted: (id: string) => void;
   onError: (msg: string | null) => void;
 }) {
+  const ask = useConfirm();
   const [name, setName] = useState(zone?.nameAr ?? '');
   const [regions, setRegions] = useState<Region[]>(zone?.regions.map((r) => ({ country: r.country, region: r.region, city: r.city })) ?? []);
   const [draft, setDraft] = useState<RateDraft>(emptyDraft);
+  const [cover, setCover] = useState<CoverRow>({ country: zone?.regions[0]?.country ?? 'SA', region: '', city: '', touched: false });
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
+  // أي تغيّر في المنطقة — من هذه البطاقات أو من مفتاحها في القائمة — يُسقط أخطاء التسعيرات القديمة
+  const revision = useMemo(() => JSON.stringify(zone), [zone]);
 
   const run = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
     setBusy(true);
@@ -379,29 +424,53 @@ function ZoneEditor({
 
   const save = async () => {
     if (name.trim().length < 2) return onError('اكتب اسماً للمنطقة — حرفان على الأقل.');
-    if (regions.length === 0) return onError('أضف بلداً أو مدينة واحدة على الأقل إلى التغطية.');
+    const pending = pendingRow(cover, regions);
+    const all = pending ? [...regions, pending] : regions;
+    if (all.length === 0) return onError('اختر بلداً للتغطية ثم اضغط «أضف إلى التغطية».');
+    if (pending) {
+      setRegions(all);
+      setCover({ ...cover, region: '', city: '', touched: false });
+    }
     if (!zone) {
       const out = bodyOf(draft, currency);
       if ('error' in out) return onError(out.error);
-      const z = await run(() => api<Zone>('/vendor/shipping/zones', { method: 'POST', body: { nameAr: name, regions, rates: [out.body] } }));
+      const z = await run(() => api<Zone>('/vendor/shipping/zones', { method: 'POST', body: { nameAr: name, regions: all, rates: [out.body] } }));
       if (z) onSaved(z, `أُضيفت منطقة «${z.nameAr}» — ${z.regions.length} في تغطيتها.`);
       return;
     }
-    const z = await run(() => api<Zone>(`/vendor/shipping/zones/${zone.id}`, { method: 'PATCH', body: { nameAr: name, regions } }));
+    const z = await run(() => api<Zone>(`/vendor/shipping/zones/${zone.id}`, { method: 'PATCH', body: { nameAr: name, regions: all } }));
     if (z) onSaved(z, `حُفظت «${z.nameAr}» — ${z.regions.length} في تغطيتها.`);
   };
 
   const remove = async () => {
     if (!zone) return;
-    if (!window.confirm(`احذف «${zone.nameAr}»؟ المشترون في تغطيتها لن يستطيعوا الشراء منك إلا إن غطّتهم منطقة أخرى. الطلبات القائمة لا تتأثّر.`)) return;
+    const sure = await ask({
+      title: `تحذف «${zone.nameAr}»؟`,
+      body: 'المشترون في تغطيتها لن يستطيعوا الشراء منك إلا إن غطّتهم منطقة أخرى. الطلبات القائمة لا تتأثّر.',
+      confirmLabel: 'احذف المنطقة',
+      danger: true,
+    });
+    if (!sure) return;
     const ok = await run(() => api(`/vendor/shipping/zones/${zone.id}`, { method: 'DELETE' }));
     if (ok !== null) onDeleted(zone.id);
   };
 
-  const saveRate = async (path: string, method: 'POST' | 'PATCH', body: Record<string, unknown>, notice: string): Promise<boolean> => {
-    const z = await run(() => api<Zone>(path, { method, body }));
-    if (z) onSaved(z, notice);
-    return z !== null;
+  /**
+   * خطأ التسعيرة يعود إلى بطاقتها ولا يُرفع أعلى الصفحة: إيقاف آخر تسعيرة مفعّلة
+   * يُرفض، والرسالة هناك بعيدة عن المفتاح فبدا كأنه لا يستجيب.
+   */
+  const saveRate = async (path: string, method: 'POST' | 'PATCH', body: Record<string, unknown>, notice: string): Promise<string | null> => {
+    setBusy(true);
+    try {
+      const z = await api<Zone>(path, { method, body });
+      onError(null);
+      onSaved(z, notice);
+      return null;
+    } catch (e) {
+      return (e as Error).message;
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -414,7 +483,7 @@ function ZoneEditor({
           <span className="vx-card__sub">{zone ? 'تحرير المنطقة' : 'تُحفظ مفعّلة بتسعيرتها الأولى'}</span>
         </div>
         <TextInput label="اسم المنطقة" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="الرياض الكبرى" />
-        <CoverageEditor regions={regions} onChange={setRegions} />
+        <CoverageEditor regions={regions} onChange={setRegions} row={cover} onRow={setCover} />
 
         {!zone ? (
           <div className="vx-divider vx-editor">
@@ -458,6 +527,7 @@ function ZoneEditor({
                 key={`${r.id}:${r.method}:${r.priceMinorUnits}:${r.isActive}`}
                 rate={r}
                 currency={currency}
+                revision={revision}
                 onSave={(body) => saveRate(`/vendor/shipping/rates/${r.id}`, 'PATCH', body, 'حُفظت التسعيرة.')}
                 onToggle={(active) =>
                   saveRate(`/vendor/shipping/rates/${r.id}`, 'PATCH', { isActive: active }, active ? 'فُعّلت التسعيرة.' : 'أُوقفت التسعيرة.')
@@ -468,10 +538,11 @@ function ZoneEditor({
               <RateCard
                 rate={null}
                 currency={currency}
+                revision={revision}
                 onSave={async (body) => {
-                  const ok = await saveRate(`/vendor/shipping/zones/${zone.id}/rates`, 'POST', body, 'أُضيفت التسعيرة.');
-                  if (ok) setAdding(false);
-                  return ok;
+                  const failed = await saveRate(`/vendor/shipping/zones/${zone.id}/rates`, 'POST', body, 'أُضيفت التسعيرة.');
+                  if (!failed) setAdding(false);
+                  return failed;
                 }}
                 onCancel={() => setAdding(false)}
               />
@@ -495,11 +566,11 @@ type PreviewResult =
  * الحكم الملزم عند الدفع للخادم؛ هذه تُري البائع ما سيراه المشتري.
  */
 function previewQuote(zones: Zone[], addr: Region, itemsMinor: bigint, grams: number): PreviewResult {
-  const norm = (v: string | null) => (v ?? '').trim();
+  // بقاعدة الخادم نفسها — «عمّان» و«عمان» مكان واحد (lib/places)
   const score = (r: Region): number => {
     if (r.country.toUpperCase() !== addr.country.toUpperCase()) return -1;
-    if (r.city && norm(r.city) !== norm(addr.city)) return -1;
-    if (r.region && norm(r.region) !== norm(addr.region)) return -1;
+    if (r.city && !samePlace(r.city, addr.city)) return -1;
+    if (r.region && !samePlace(r.region, addr.region)) return -1;
     return r.city ? 3 : r.region ? 2 : 1;
   };
   let best: { zone: Zone; score: number } | null = null;
@@ -562,7 +633,7 @@ function Preview({ zones, currency }: { zones: Zone[]; currency: string }) {
       <div className="vx-preview__inputs">
         <Field label="البلد">
           {(p) => (
-            <select className="field__control" {...p} value={addr.country} onChange={(e) => setAddr({ ...addr, country: e.target.value })}>
+            <select className="field__control" {...p} value={addr.country} onChange={(e) => setAddr({ ...addr, country: e.target.value, region: '' })}>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.nameAr}
@@ -571,7 +642,7 @@ function Preview({ zones, currency }: { zones: Zone[]; currency: string }) {
             </select>
           )}
         </Field>
-        <TextInput label="المحافظة" value={addr.region ?? ''} onChange={(e) => setAddr({ ...addr, region: e.target.value })} />
+        <RegionSelect label="المحافظة" country={addr.country} value={addr.region ?? ''} onChange={(v) => setAddr({ ...addr, region: v })} emptyLabel="—" optional />
         <TextInput label="المدينة" value={addr.city ?? ''} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
         <AmountField label="قيمة السلّة" value={basket} onChange={setBasket} currency={currency} />
         <TextInput label="الوزن (كغ)" className="field__control vx-days" inputMode="decimal" dir="ltr" value={weight} onChange={(e) => setWeight(e.target.value)} />

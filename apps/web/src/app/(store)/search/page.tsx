@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { Icon } from '@/components/icons';
 import { Crumbs, Listing, hasFilters } from '@/components/listing';
 import { EmptyState } from '@/components/ui';
-import { getCategories, listProducts } from '@/lib/storefront';
+import { requestCurrency } from '@/lib/currency-server';
+import { getShops, listProducts } from '@/lib/storefront';
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
@@ -16,7 +17,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 /**
  * ST-04 نتائج البحث، و ST-05 بلا نتائج.
  *
- * «بلا نتائج» ليست طريقاً مسدوداً: تقترح الفئات وتقول ما يمكن تجربته،
+ * «بلا نتائج» ليست طريقاً مسدوداً: تقترح المتاجر وتقول ما يمكن تجربته،
  * لأن المشتري الذي يُترك أمام صفحة فارغة يغادر.
  */
 export default async function SearchPage({ searchParams }: Props) {
@@ -31,7 +32,10 @@ export default async function SearchPage({ searchParams }: Props) {
     );
   }
 
-  const [result, categories] = await Promise.all([listProducts(query), getCategories()]);
+  const [result, shops] = await Promise.all([
+    listProducts(query, await requestCurrency()),
+    getShops().then((r) => r.items.slice(0, 6)).catch(() => []),
+  ]);
   const filtered = hasFilters(query);
 
   // ST-05 — لا شيء يطابق الكلمة أصلاً (لا التصفية): صفحة تقترح بدل شبكة فارغة
@@ -47,18 +51,22 @@ export default async function SearchPage({ searchParams }: Props) {
           </ul>
         </section>
 
-        {categories.length > 0 ? (
-          <section className="sd-section" aria-labelledby="sd-nr-cats">
+        {shops.length > 0 ? (
+          <section className="sd-section" aria-labelledby="sd-nr-shops">
             <div className="sd-section__head">
-              <h2 id="sd-nr-cats" className="sd-section__title">
-                تصفّح الأقسام
+              <h2 id="sd-nr-shops" className="sd-section__title">
+                تصفّح المتاجر
               </h2>
+              <Link href="/shops" className="sd-section__link">
+                كل المتاجر
+                <Icon name="chev-end" size={14} mirror />
+              </Link>
             </div>
             <div className="sd-tiles">
-              {categories.map((c) => (
-                <Link key={c.id} href={`/c/${c.slug}`} className="sd-tile">
+              {shops.map((c) => (
+                <Link key={c.id} href={`/s/${encodeURIComponent(c.slug)}`} className="sd-tile">
                   <span className="sd-tile__icon" aria-hidden>
-                    <Icon name="boxes" size={19} />
+                    <Icon name="store" size={19} />
                   </span>
                   <span className="sd-tile__label">{c.nameAr}</span>
                 </Link>

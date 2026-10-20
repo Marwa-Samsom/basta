@@ -6,7 +6,6 @@ import { ScopedRepository } from '../../../common/prisma/scoped-repository';
 import type { Actor, VendorScope } from '../../../common/security/actor';
 import { InventoryService } from '../../inventory/public';
 import { VendorDirectory } from '../../vendors/public';
-import { ancestorPaths } from '../domain/category-tree';
 import {
   IMPORT_COLUMNS,
   ImportFileRejectedError,
@@ -22,7 +21,8 @@ import {
 } from '../domain/import-plan';
 import { productSlug } from '../domain/slug';
 import { readImportFile } from '../infrastructure/import-file-reader';
-import { isUniqueViolation } from './category.service';
+import { isUniqueViolation } from './attribute.service';
+import { VendorCategoryService } from './vendor-category.service';
 
 export interface ImportReport {
   readonly importId: string;
@@ -53,6 +53,7 @@ export class ProductImportService {
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
     private readonly vendors: VendorDirectory,
+    private readonly categories: VendorCategoryService,
   ) {}
 
   /** قالب CSV عربي بسطرين مثالين لمنتج بمتغيّرين. BOM ليفتحه Excel بالعربية صحيحة. */
@@ -99,15 +100,7 @@ export class ProductImportService {
 
   private async lookups(scope: VendorScope, rows: readonly ParsedRow[]): Promise<ImportLookups> {
     const skus = [...new Set(rows.map((r) => r.sku))];
-    const [categories, axisLinks, axes, existing] = await Promise.all([
-      this.prisma.category.findMany({
-        where: { isActive: true },
-        select: { id: true, slug: true, nameAr: true, nameEn: true, path: true },
-      }),
-      this.prisma.categoryAttribute.findMany({
-        where: { attribute: { isVariantAxis: true } },
-        select: { attributeId: true, category: { select: { path: true } } },
-      }),
+    const [axes, existing] = await Promise.all([
       this.prisma.attribute.findMany({
         where: { isVariantAxis: true },
         include: { values: { orderBy: { sort: 'asc' } } },
@@ -123,28 +116,6 @@ export class ProductImportService {
           }) as Promise<{ id: string; sku: string; productId: string }[]>)
         : Promise.resolve([]),
     ]);
-
-    const axesByPath = new Map<string, Set<string>>();
-    for (const link of axisLinks) {
-      const set = axesByPath.get(link.category.path) ?? new Set<string>();
-      set.add(link.attributeId);
-      axesByPath.set(link.category.path, set);
-    }
-
-    const categoryMap = new Map<string, { id: string; nameAr: string; axisIds: Set<string> }>();
-    const entries = categories.map((c) => {
-      const axisIds = new Set<string>();
-      for (const path of ancestorPaths(c.path)) {
-        for (const id of axesByPath.get(path) ?? []) axisIds.add(id);
-      }
-      return { category: c, entry: { id: c.id, nameAr: c.nameAr, axisIds } };
-    });
-    // الأسماء أولاً ثم المعرّفات النصّية: المعرّف فريد، فيغلب إن تشابه مع اسم فئة أخرى
-    for (const { category, entry } of entries) {
-      categoryMap.set(lookupKey(category.nameAr), entry);
-      if (category.nameEn) categoryMap.set(lookupKey(category.nameEn), entry);
-    }
-    for (const { category, entry } of entries) categoryMap.set(lookupKey(category.slug), entry);
 
     const axisMap = new Map<string, AxisLookup>();
     for (const a of axes) {
@@ -165,7 +136,6 @@ export class ProductImportService {
     }
 
     return {
-      categories: categoryMap,
       axes: axisMap,
       existingSkus: new Map(existing.map((v) => [v.sku, { variantId: v.id, productId: v.productId }])),
     };
@@ -219,11 +189,17 @@ export class ProductImportService {
       await this.prisma.$transaction(
         async (tx) => {
           if (products.length > 0) {
+            // فئات المتجر بالاسم — الغائبة تُنشأ هنا فتسقط مع المعاملة إن سقطت
+            const categoryIds = await this.categories.idsByName(
+              tx,
+              scope,
+              products.flatMap(({ product }) => (product.categoryName ? [product.categoryName] : [])),
+            );
             await tx.product.createMany({
               data: products.map(({ id, product }) => ({
                 id,
                 vendorId: scope.vendorId,
-                categoryId: product.categoryId,
+                vendorCategoryId: product.categoryName ? (categoryIds.get(lookupKey(product.categoryName)) ?? null) : null,
                 slug: productSlug(product.nameEn, randomBytes(4).toString('hex')),
                 nameAr: product.nameAr,
                 nameEn: product.nameEn,

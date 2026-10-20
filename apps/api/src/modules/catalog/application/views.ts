@@ -4,6 +4,7 @@
  * أسوأ من الخطأ الصاخب (ADR-001).
  */
 import { format, money } from '../../../common/money/money';
+import type { DisplayFx } from '../../pricing/public';
 
 export interface PriceView {
   readonly minorUnits: string;
@@ -17,6 +18,17 @@ export const priceView = (minorUnits: bigint, currency: string): PriceView => ({
   currency,
   formatted: format(money(minorUnits, currency)),
 });
+
+/**
+ * سعر للمشتري بعملة العرض، ومعه سعر المتجر الأصلي حين يختلفان. بلا سعر صرف
+ * نافذ يُعرض بعملته كما هو — سعر صحيح بعملة أخرى خيرٌ من صفحة ساقطة.
+ */
+export function displayedPrice(fx: DisplayFx, minor: bigint, currency: string): { price: PriceView; original: PriceView | null } {
+  const converted = currency === fx.currency ? null : fx.convert(minor, currency);
+  return converted === null
+    ? { price: priceView(minor, currency), original: null }
+    : { price: priceView(converted, fx.currency), original: priceView(minor, currency) };
+}
 
 export interface StockSummaryView {
   readonly onHand: number;
@@ -79,13 +91,12 @@ export interface ProductDetailView {
   readonly slug: string;
   readonly status: string;
   readonly rejectReason: string | null;
-  /** نسخة المحتوى — يرسلها المراجِع مع الاعتماد، فلا يُعتمد غير ما قرأه */
-  readonly contentRevision: number;
   readonly nameAr: string;
   readonly nameEn: string | null;
   readonly descriptionAr: string | null;
   readonly descriptionEn: string | null;
-  readonly category: { id: string; slug: string; nameAr: string; nameEn: string | null };
+  /** فئة من فئات المتجر — null إن لم يضعه البائع في فئة */
+  readonly vendorCategory: { id: string; nameAr: string } | null;
   readonly brandId: string | null;
   readonly hasVariants: boolean;
   readonly currency: string;
@@ -102,6 +113,7 @@ export interface ProductListItemView {
   readonly nameAr: string;
   readonly nameEn: string | null;
   readonly status: string;
+  readonly vendorCategory: { id: string; nameAr: string } | null;
   readonly variantCount: number;
   readonly priceFrom: PriceView | null;
   readonly priceTo: PriceView | null;
@@ -112,7 +124,7 @@ export interface ProductListItemView {
   readonly updatedAt: Date;
 }
 
-/** صف طابور مراجعة الإدارة — Q-15 */
+/** صف قائمة منتجات الإدارة */
 export interface AdminProductListItemView {
   readonly id: string;
   readonly nameAr: string;
@@ -120,7 +132,7 @@ export interface AdminProductListItemView {
   readonly status: string;
   readonly rejectReason: string | null;
   readonly vendor: { readonly id: string; readonly nameAr: string; readonly status: string };
-  readonly categoryNameAr: string;
+  readonly vendorCategoryNameAr: string | null;
   readonly variantCount: number;
   readonly priceFrom: PriceView | null;
   readonly thumbnail: string | null;

@@ -36,7 +36,10 @@ async function adminLogin(page: Page, email: string, totp: () => string, next: s
 async function setSetting(page: Page, label: string, value: string) {
   const row = page.locator('.ac2-setting').filter({ has: page.getByLabel(label, { exact: true }) });
   await row.getByLabel(label, { exact: true }).fill(value);
+  // القيمة المحفوظة نفسها لا تُحفظ ثانية (الزرّ معطّل) — قاعدة التطوير قد تحملها من تجربة يدوية
+  if (await row.getByRole('button', { name: 'حفظ' }).isDisabled()) return;
   await row.getByRole('button', { name: 'حفظ' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'احفظ الإعداد' }).click();
   await expect(page.getByText('حُفظ الإعداد.')).toBeVisible();
 }
 
@@ -47,11 +50,9 @@ test('التحويل اليدوي: يؤكّد المشتري فيرى كيف ي�
   const t = tag();
   const v = await makeVendor(t);
   const admin = await makeAdmin(t, ['payouts.approve', 'settings.edit']);
-  page.on('dialog', (d) => void d.accept());
 
   // 1 · المدير يضبط ما يراه المشتري
   const adminPage = await (await browser.newContext()).newPage();
-  adminPage.on('dialog', (d) => void d.accept());
   await adminLogin(adminPage, admin.email, admin.totp, '/admin/settings');
   await expect(adminPage.getByRole('heading', { name: 'الدفع بالتحويل' })).toBeVisible();
   await setSetting(adminPage, 'اسم المستفيد', 'شركة بسطة للتجارة');
@@ -66,7 +67,7 @@ test('التحويل اليدوي: يؤكّد المشتري فيرى كيف ي�
   await page.getByLabel('اسم المستلم').fill('مشترٍ E2E');
   await page.getByLabel('الهاتف').fill('+966500000000');
   await page.getByLabel('البلد').selectOption('SA');
-  await page.getByLabel('المحافظة / المنطقة').fill('الرياض');
+  await page.getByLabel('المحافظة / المنطقة').selectOption('الرياض');
   await page.getByLabel('المدينة').fill('الرياض');
   await page.getByLabel('الشارع ورقم البناء').fill('طريق الملك فهد 10');
   await page.getByRole('button', { name: 'احسب الشحن' }).click();
@@ -104,6 +105,7 @@ test('التحويل اليدوي: يؤكّد المشتري فيرى كيف ي�
   // 4 · المشتري يلغي بعد الدفع — الردّ ينتظر تحويل المدير، لا «رُدّ المبلغ»
   await page.goto(`/account/orders/${encodeURIComponent(number)}`);
   await page.getByRole('button', { name: 'إلغاء هذا المتجر' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'ألغِ هذا المتجر' }).click();
   await expect(page.getByText('نحوّله لحسابك', { exact: false })).toBeVisible();
 
   await adminPage.goto('/admin/transfers');
@@ -111,7 +113,18 @@ test('التحويل اليدوي: يؤكّد المشتري فيرى كيف ي�
   const refundRow = adminPage.getByRole('row', { name: new RegExp(`${number}-1`) });
   await expect(refundRow.getByText('من حساب: مشترٍ E2E', { exact: false })).toBeVisible();
   await refundRow.getByLabel(`مرجع تحويل الردّ ${number}-1`).fill(`OUT-${t}`);
+  // التسجيل يسأل أولاً بالطلب والمبلغ والمرجع — والتراجع لا يسجّل شيئاً ولا يُبلغ أحداً (J-07)
   await refundRow.getByRole('button', { name: 'حوّلته — سجّل' }).click();
+  const confirm = adminPage.getByRole('dialog');
+  await expect(confirm).toContainText(`${number}-1`);
+  await expect(confirm).toContainText(`OUT-${t}`);
+  await expect(confirm).toContainText(`مشترٍ ${t}`);
+  await confirm.getByRole('button', { name: 'تراجع' }).click();
+  await expect(confirm).toBeHidden();
+  expect((await prisma.refund.findFirstOrThrow({ where: { subOrder: { order: { orderNumber: number } } } })).status).toBe('awaiting_transfer');
+
+  await refundRow.getByRole('button', { name: 'حوّلته — سجّل' }).click();
+  await confirm.getByRole('button', { name: 'سجّل التحويل' }).click();
   await expect(adminPage.getByText('سُجّل الردّ وأُبلغ المشتري بمرجعه.')).toBeVisible();
 
   await page.reload();

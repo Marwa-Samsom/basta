@@ -8,12 +8,13 @@ import { digitsOnly } from '@/lib/digits';
 import { Alert, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { MAX_IMAGES, ProductImages } from '@/components/product-images';
+import { useOnboarding } from '@/lib/vendor';
 import {
   PRODUCT_STATUS,
   num,
-  type Category,
-  type EffectiveAttribute,
+  type Attribute,
   type ProductDetail,
+  type VendorCategory,
 } from '@/lib/catalog';
 
 interface VariantDraft {
@@ -39,10 +40,13 @@ const emptyVariant = (): VariantDraft => ({
 /** حدّ الوصف كما يفرضه الخادم (MaxLength في DTO المنتج) */
 const DESCRIPTION_MAX = 5000;
 
+/** قيمة الخيار الأخير في قائمة الفئات — يفتح حقل «فئة جديدة» ولا يُحفظ */
+const NEW_CATEGORY = '__new__';
+
 /** قائمة الخيارات تصير حبوباً ما دامت قصيرة؛ الطويلة تبقى قائمة منسدلة */
 const PILL_LIMIT = 12;
 
-const KIND: Record<EffectiveAttribute['inputType'], string> = {
+const KIND: Record<Attribute['inputType'], string> = {
   select: 'LIST',
   text: 'TEXT',
   number: 'NUMBER',
@@ -53,10 +57,12 @@ const KIND: Record<EffectiveAttribute['inputType'], string> = {
  * VD-08 — محرّر المنتج.
  *
  * ثلاث قواعد تحكم الشاشة:
- * 1. **تغيير الفئة يغيّر السمات**، فالسمات تُقرأ من الخادم لا تُخمَّن.
+ * 1. **السمات مكتبة عامة** يختار البائع منها محاور متغيّراته (حتى ثلاثة)، والفئة من
+ *    فئات متجره — يضيف الجديدة من القائمة نفسها بلا إدارة (14 أكتوبر 2026).
  * 2. **السعر والمخزون على المتغيّر** لا على المنتج (ADR-006) — حتى المنتج
  *    البسيط له متغيّر واحد، فالشكل واحد ولا فرعان في الكود.
- * 3. **«أرسل للمراجعة» يعرض الموانع مجتمعة** كما ترسلها الخدمة، ولا يخمّنها.
+ * 3. **«انشر» فوري بلا مراجعة** (15 أكتوبر 2026)، ويعرض الموانع مجتمعة كما ترسلها
+ *    الخدمة ولا يخمّنها. متجر قيد المراجعة ينشر فيظهر منتجه لحظة اعتماده.
  */
 export function ProductEditor({ productId }: { productId?: string }) {
   const router = useRouter();
@@ -67,16 +73,25 @@ export function ProductEditor({ productId }: { productId?: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [blockers, setBlockers] = useState<string[]>([]);
+  // حالة المتجر — المنشور قبل اعتماده يُقال له متى يظهر
+  const { data: store } = useOnboarding();
+  const storeInReview = store?.status === 'in_review';
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [attributes, setAttributes] = useState<EffectiveAttribute[]>([]);
+  const [categories, setCategories] = useState<VendorCategory[]>([]);
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
+  /** محاور المتغيّرات المختارة لهذا المنتج — بترتيب اختيارها */
+  const [axisIds, setAxisIds] = useState<string[]>([]);
+  /** null = الحقل مغلق؛ نصّ = البائع يكتب اسم فئة جديدة */
+  const [newCat, setNewCat] = useState<string | null>(null);
+  const [newCatError, setNewCatError] = useState<string | null>(null);
+  const [newCatBusy, setNewCatBusy] = useState(false);
   const [product, setProduct] = useState<ProductDetail | null>(null);
 
   const [form, setForm] = useState({
     nameAr: '',
     nameEn: '',
     descriptionAr: '',
-    categoryId: '',
+    vendorCategoryId: '',
   });
   const [attrValues, setAttrValues] = useState<Record<string, string>>({});
   const [variants, setVariants] = useState<VariantDraft[]>([emptyVariant()]);
@@ -87,29 +102,24 @@ export function ProductEditor({ productId }: { productId?: string }) {
     let alive = true;
     void (async () => {
       try {
-        const tree = await api<Category[]>('/categories', { auth: false });
-        const flat: Category[] = [];
-        const walk = (nodes: Category[]): void => {
-          for (const n of nodes) {
-            flat.push(n);
-            if (n.children?.length) walk(n.children);
-          }
-        };
-        walk(tree);
-
-        let detail: ProductDetail | null = null;
-        if (productId) detail = await api<ProductDetail>(`/vendor/products/${productId}`);
+        const [library, own, detail] = await Promise.all([
+          api<Attribute[]>('/attributes', { auth: false }),
+          api<VendorCategory[]>('/vendor/categories'),
+          productId ? api<ProductDetail>(`/vendor/products/${productId}`) : Promise.resolve(null),
+        ]);
         if (!alive) return;
 
-        setCategories(flat);
+        setAttributes(library);
+        setCategories(own);
         if (detail) {
           setProduct(detail);
           setForm({
             nameAr: detail.nameAr,
             nameEn: detail.nameEn ?? '',
             descriptionAr: detail.descriptionAr ?? '',
-            categoryId: detail.category.id,
+            vendorCategoryId: detail.vendorCategory?.id ?? '',
           });
+          setAxisIds(detail.variants[0]?.options.map((o) => o.attributeId) ?? []);
           setAttrValues(
             Object.fromEntries(
               detail.attributes.map((a) => [a.attributeId, a.valueId ?? a.valueAr ?? a.number ?? '']),
@@ -138,34 +148,15 @@ export function ProductEditor({ productId }: { productId?: string }) {
     };
   }, [productId]);
 
-  // سمات الفئة تُقرأ من الخادم عند كل تغيير فئة — الوراثة من الأصول تُحسب هناك
-  useEffect(() => {
-    if (!form.categoryId) return;
-    let alive = true;
-    void (async () => {
-      try {
-        const list = await api<EffectiveAttribute[]>(
-          `/categories/${form.categoryId}/attributes`,
-          { auth: false },
-        );
-        if (alive) setAttributes(list);
-      } catch {
-        if (alive) setAttributes([]);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [form.categoryId]);
-
   if (loading) {
     return <Spinner label="جارٍ فتح المحرّر…" />;
   }
 
-  const axes = attributes.filter((a) => a.isVariantAxis && a.values.length > 0);
+  const axisChoices = attributes.filter((a) => a.isVariantAxis && a.values.length > 0);
+  const axes = axisIds.flatMap((id) => axisChoices.filter((a) => a.attributeId === id));
   const plain = attributes.filter((a) => !a.isVariantAxis);
-  const categoryName = categories.find((c) => c.id === form.categoryId)?.nameAr ?? null;
-  const canPublish = product && product.status !== 'active' && product.status !== 'pending_review';
+  const categoryName = categories.find((c) => c.id === form.vendorCategoryId)?.nameAr ?? null;
+  const canPublish = product && product.status !== 'active';
 
   // ------------------------------------------------------------- الحفظ
 
@@ -184,7 +175,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
       nameAr: form.nameAr,
       ...(form.nameEn ? { nameEn: form.nameEn } : {}),
       ...(form.descriptionAr ? { descriptionAr: form.descriptionAr } : {}),
-      categoryId: form.categoryId,
+      ...(form.vendorCategoryId ? { vendorCategoryId: form.vendorCategoryId } : {}),
       attributes: attrs,
       variants: variants.map((v) => ({
         ...(v.id ? { id: v.id } : {}),
@@ -192,30 +183,78 @@ export function ProductEditor({ productId }: { productId?: string }) {
         price: v.price.trim(),
         stock: Number(v.stock || 0),
         ...(v.lowStockThreshold ? { lowStockThreshold: Number(v.lowStockThreshold) } : {}),
-        ...(Object.keys(v.options).length > 0
+        ...(axes.length > 0
           ? {
-              options: Object.entries(v.options).map(([attributeId, valueId]) => ({
-                attributeId,
-                valueId,
-              })),
+              options: axes.flatMap((a) => {
+                const valueId = v.options[a.attributeId];
+                return valueId ? [{ attributeId: a.attributeId, valueId }] : [];
+              }),
             }
           : {}),
       })),
     };
   }
 
+  /** محور يُضاف إلى المصفوفة أو يُرفع منها — والمرفوع تُمحى قيمه من كل الصفوف */
+  function toggleAxis(id: string): void {
+    if (axisIds.includes(id)) {
+      setAxisIds(axisIds.filter((a) => a !== id));
+      setVariants(
+        variants.map((v) => ({ ...v, options: Object.fromEntries(Object.entries(v.options).filter(([k]) => k !== id)) })),
+      );
+    } else if (axisIds.length < 3) {
+      setAxisIds([...axisIds, id]);
+    }
+  }
+
+  /** فئة جديدة في متجر البائع من مكانها — تُضاف إلى القائمة وتُختار */
+  async function addCategory(): Promise<void> {
+    const name = (newCat ?? '').trim();
+    if (!name) return;
+    setNewCatBusy(true);
+    setNewCatError(null);
+    try {
+      const created = await api<VendorCategory>('/vendor/categories', { method: 'POST', body: { nameAr: name } });
+      setCategories([...categories, created]);
+      setForm({ ...form, vendorCategoryId: created.id });
+      setNewCat(null);
+    } catch (err) {
+      setNewCatError(err instanceof Error ? err.message : 'تعذّرت إضافة الفئة.');
+    } finally {
+      setNewCatBusy(false);
+    }
+  }
+
+  /** ما يمنع الحفظ قبل إرساله — يُقال بالاسم بدل رفض الخادم العام، أو null */
+  function unsavable(): string | null {
+    // لا منتج بلا فئة (18 أكتوبر 2026) — والقديم بلا فئة يُصنَّف عند أوّل حفظ
+    if (!form.vendorCategoryId) return 'اختر فئة للمنتج من «الفئة في متجرك»، أو أضف فئة جديدة.';
+    // محور مختار بلا قيمة في صفّ
+    const unset = axes.find((a) => variants.some((v) => !v.options[a.attributeId]));
+    if (unset) return `اختر «${unset.nameAr}» لكل متغيّر، أو أزله من «ما يميّز متغيّراتك».`;
+    return null;
+  }
+
+  /** يكتب ما في النموذج: منتج جديد بلا معرّف، أو تعديل المنتج ذي المعرّف */
+  function write(id: string | null | undefined): Promise<ProductDetail> {
+    return id
+      ? api<ProductDetail>(`/vendor/products/${id}`, { method: 'PATCH', body: payload() })
+      : api<ProductDetail>('/vendor/products', { method: 'POST', body: payload() });
+  }
+
   async function save(): Promise<void> {
+    const problem = unsavable();
+    if (problem) {
+      setNotice(null);
+      setFailure(problem);
+      return;
+    }
     setBusy(true);
     setFailure(null);
     setNotice(null);
     setBlockers([]);
     try {
-      const saved = isNew
-        ? await api<ProductDetail>('/vendor/products', { method: 'POST', body: payload() })
-        : await api<ProductDetail>(`/vendor/products/${productId}`, {
-            method: 'PATCH',
-            body: payload(),
-          });
+      const saved = await write(isNew ? null : productId);
       setProduct(saved);
       setNotice('حُفظ المنتج.');
       if (isNew) router.replace(`/vendor/products/${saved.id}`);
@@ -227,8 +266,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
   }
 
   /**
-   * بعد عملية على الصور: المنتج يُقرأ من جديد — الصور وحالته (إضافة صورة لمنشور تعيده
-   * للمراجعة). الحقول لا تُمسّ: ما كتبه البائع ولم يحفظه يبقى كما هو.
+   * بعد عملية على الصور: المنتج يُقرأ من جديد بصوره. الحقول لا تُمسّ: ما كتبه البائع
+   * ولم يحفظه يبقى كما هو.
    */
   async function refreshProduct(): Promise<void> {
     if (!product) return;
@@ -239,21 +278,31 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
   async function publish(): Promise<void> {
     if (!product) return;
+    // يُنشر ما على الشاشة لا آخر حفظ: فئة اختيرت ولم تُحفظ كان النشر يُرفض بـ«اختر فئة»
+    // وهي ظاهرة في الحقل والملخّص (J-05، 19 أكتوبر 2026). فالنشر يحفظ أولاً
+    const problem = unsavable();
+    if (problem) {
+      setNotice(null);
+      setFailure(problem);
+      return;
+    }
     setBusy(true);
     setFailure(null);
+    setNotice(null);
     setBlockers([]);
     try {
+      setProduct(await write(product.id));
       const next = await api<ProductDetail>(`/vendor/products/${product.id}/publish`, {
         method: 'POST',
       });
       setProduct(next);
-      setNotice('أُرسل المنتج إلى مراجعة الإدارة.');
+      setNotice(storeInReview ? 'نُشر المنتج — يظهر للمشترين لحظة اعتماد متجرك.' : 'نُشر المنتج — يراه المشترون الآن.');
     } catch (err) {
       // الموانع تأتي من الخدمة مجتمعة — تُعرض كما هي لا تُختصر
       if (err instanceof ApiError && Array.isArray(err.details?.['reasons'])) {
         setBlockers(err.details['reasons'] as string[]);
       } else {
-        setFailure(err instanceof Error ? err.message : 'تعذّر إرسال المنتج.');
+        setFailure(err instanceof Error ? err.message : 'تعذّر نشر المنتج.');
       }
     } finally {
       setBusy(false);
@@ -289,7 +338,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
           </span>
         ) : null}
         <span className="page-head__actions">
-          {product?.status === 'active' ? (
+          {/* صفحة المنتج للمشتري: منتج متجر غير معتمد مخفي عنه فتُعطي 404 — «عاين» للمعتمد وحده */}
+          {product?.status === 'active' && store?.status === 'approved' ? (
             <Link className="btn btn--secondary" href={`/p/${product.slug}`}>
               <Icon name="eye" size={16} />
               عاين
@@ -301,7 +351,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
           {canPublish ? (
             <button className="btn btn--primary" type="button" disabled={busy} onClick={() => void publish()}>
               <Icon name="send" size={16} />
-              أرسل للمراجعة
+              انشر
             </button>
           ) : null}
         </span>
@@ -316,18 +366,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
             <Icon name="alert" size={17} />
           </span>
           <div className="vp-banner__text">
-            <p className="vp-banner__title">رُفض المنتج — سبب الإدارة</p>
+            <p className="vp-banner__title">أوقفت الإدارة هذا المنتج — السبب</p>
             <p>{product.rejectReason}</p>
+            <p>عدّله ثم اضغط «انشر» ليظهر للمشترين من جديد.</p>
           </div>
-        </div>
-      ) : null}
-
-      {product?.status === 'pending_review' ? (
-        <div className="vp-banner vp-banner--warning">
-          <Icon name="clock" size={18} className="vp-banner__glyph" />
-          <p>
-            <strong>قيد المراجعة</strong> — تراجع الإدارة منتجك قبل أن يظهر في المتجر.
-          </p>
         </div>
       ) : null}
 
@@ -335,8 +377,9 @@ export function ProductEditor({ productId }: { productId?: string }) {
         <div className="vp-banner vp-banner--info">
           <Icon name="info" size={16} className="vp-banner__glyph" />
           <p>
-            تعديل المحتوى (الاسم، الوصف، الفئة، السمات، الصور أو الصورة الرئيسية) يعيد المنتج إلى المراجعة. السعر
-            والمخزون لا يعيدانه.
+            {storeInReview
+              ? 'منشور — يظهر للمشترين لحظة اعتماد متجرك، وتعديلاتك محفوظة معه.'
+              : 'منشور ويراه المشترون — تعديلاتك تظهر لهم فور الحفظ.'}
           </p>
         </div>
       ) : null}
@@ -360,24 +403,82 @@ export function ProductEditor({ productId }: { productId?: string }) {
               />
             </div>
             <div className="vp-grid-2">
-              <Field label="الفئة *" hint="تغيير الفئة يغيّر السمات المطلوبة في القسم 4.">
+              <Field
+                label="الفئة في متجرك"
+                hint="إلزامية — تظهر للمشترين أزراراً في صفحة متجرك. أدرها كلها من «الفئات» في القائمة."
+              >
                 {(props) => (
                   <select
                     className="field__control"
                     {...props}
-                    value={form.categoryId}
-                    onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                    value={form.vendorCategoryId}
+                    onChange={(e) => {
+                      if (e.target.value === NEW_CATEGORY) {
+                        setNewCat('');
+                        setNewCatError(null);
+                      } else {
+                        setForm({ ...form, vendorCategoryId: e.target.value });
+                      }
+                    }}
                   >
-                    <option value="">اختر فئة…</option>
+                    <option value="" disabled>
+                      اختر فئة
+                    </option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {'— '.repeat(Math.max(c.depth - 1, 0))}
                         {c.nameAr}
                       </option>
                     ))}
+                    <option value={NEW_CATEGORY}>+ إضافة فئة جديدة…</option>
                   </select>
                 )}
               </Field>
+              {newCat !== null ? (
+                <div className="field">
+                  <label className="field__label" htmlFor="vp-new-category">
+                    اسم الفئة الجديدة
+                  </label>
+                  <div className="vp-newcat">
+                    <input
+                      id="vp-new-category"
+                      className="field__control"
+                      // يظهر الحقل بطلب البائع نفسه من القائمة — فالتركيز فيه متوقَّع لا مفاجئ
+                      autoFocus
+                      maxLength={80}
+                      placeholder="مثل: قمصان صيفية"
+                      value={newCat}
+                      aria-invalid={Boolean(newCatError)}
+                      aria-describedby={newCatError ? 'vp-new-category-error' : undefined}
+                      onChange={(e) => setNewCat(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void addCategory();
+                        } else if (e.key === 'Escape') {
+                          setNewCat(null);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--sm"
+                      disabled={newCatBusy || !newCat.trim()}
+                      onClick={() => void addCategory()}
+                    >
+                      <Icon name="plus" size={14} />
+                      أضف
+                    </button>
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => setNewCat(null)}>
+                      إلغاء
+                    </button>
+                  </div>
+                  {newCatError ? (
+                    <p className="field__error" id="vp-new-category-error" role="alert">
+                      {newCatError}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </Section>
 
@@ -423,13 +524,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
           {plain.length > 0 ? (
             <Section
               n={4}
-              title="سمات الفئة"
-              meta={
-                <span className="vp-sec__meta">
-                  {categoryName ? `من «${categoryName}» — ` : ''}الحقول بعلامة{' '}
-                  <span className="vp-req">*</span> إلزامية للنشر
-                </span>
-              }
+              title="المواصفات"
+              meta={<span className="vp-sec__meta">اختيارية — تظهر للمشتري في صفحة المنتج</span>}
             >
               <div className="vp-grid-2">
                 {plain.map((attr) => (
@@ -457,15 +553,26 @@ export function ProductEditor({ productId }: { productId?: string }) {
               السعر والمخزون على المتغيّر. المنتج البسيط متغيّر واحد بلا خيارات.
             </p>
 
-            {axes.length > 0 ? (
-              <div className="vp-axes">
-                <span className="vp-axes__label">المحاور المميّزة</span>
-                {axes.map((a) => (
-                  <span key={a.attributeId} className="vp-axis">
-                    {a.nameAr}
-                    <span className="num">{num(a.values.length)}</span>
-                  </span>
-                ))}
+            {axisChoices.length > 0 ? (
+              <div className="vp-axes" role="group" aria-label="محاور المتغيّرات">
+                <span className="vp-axes__label">ما يميّز متغيّراتك</span>
+                {axisChoices.map((a) => {
+                  const on = axisIds.includes(a.attributeId);
+                  return (
+                    <button
+                      key={a.attributeId}
+                      type="button"
+                      className="vp-axis"
+                      aria-pressed={on}
+                      disabled={!on && axisIds.length >= 3}
+                      onClick={() => toggleAxis(a.attributeId)}
+                    >
+                      <Icon name={on ? 'check' : 'plus'} size={12} />
+                      {a.nameAr}
+                      <span className="num">{num(a.values.length)}</span>
+                    </button>
+                  );
+                })}
               </div>
             ) : null}
 
@@ -588,12 +695,12 @@ export function ProductEditor({ productId }: { productId?: string }) {
           </Section>
         </div>
 
-        <aside className="vp-editor__side" aria-label="حالة الإرسال والملخّص">
+        <aside className="vp-editor__side" aria-label="حالة النشر والملخّص">
           {blockers.length > 0 ? (
             <section className="vp-blockers" role="alert">
               <header className="vp-blockers__head">
                 <Icon name="alert" size={17} />
-                <h2>لا يمكن الإرسال: {obstacles(blockers.length)}</h2>
+                <h2>لا يمكن النشر: {obstacles(blockers.length)}</h2>
               </header>
               <ul className="vp-blockers__list">
                 {blockers.map((message, i) => (
@@ -605,7 +712,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                   </li>
                 ))}
               </ul>
-              <p className="vp-blockers__hint">كل العوائق تُعرض معاً — أصلحها كلها ثم أعد الإرسال.</p>
+              <p className="vp-blockers__hint">كل العوائق تُعرض معاً — أصلحها كلها ثم انشر.</p>
             </section>
           ) : null}
 
@@ -620,7 +727,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
               ) : null}
               <div>
                 <dt>الفئة</dt>
-                <dd>{categoryName ?? '—'}</dd>
+                <dd>{categoryName ?? 'لم تُختر — مطلوبة'}</dd>
               </div>
               <div>
                 <dt>المتغيّرات</dt>
@@ -682,7 +789,7 @@ function Section({
 }
 
 /**
- * سمة فئة واحدة. القائمة القصيرة حبوب تُضغط، والنعم/لا مفتاح مقسّم —
+ * سمة واحدة من المواصفات. القائمة القصيرة حبوب تُضغط، والنعم/لا مفتاح مقسّم —
  * والضغط على المختار يلغيه، فتبقى السمة الاختيارية قابلة للتفريغ.
  */
 function AttrField({
@@ -690,18 +797,13 @@ function AttrField({
   value,
   onChange,
 }: {
-  attr: EffectiveAttribute;
+  attr: Attribute;
   value: string;
   onChange: (value: string) => void;
 }) {
   const id = useId();
   const labelId = `${id}-label`;
-  const label = (
-    <>
-      {attr.nameAr}
-      {attr.isRequired ? <span className="vp-req"> *</span> : null}
-    </>
-  );
+  const label = attr.nameAr;
   const pills = attr.inputType === 'select' && attr.values.length <= PILL_LIMIT;
   const grouped = pills || attr.inputType === 'boolean';
 

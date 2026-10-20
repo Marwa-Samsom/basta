@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor, VendorScope } from '../../../common/security/actor';
 import { AuditService, AuthService, TokenService, type TokenPair } from '../../identity/public';
+import { NotificationsService } from '../../notifications/public';
 import { VendorDocumentStorage } from '../infrastructure/document-storage';
 import {
   assertCurrencyChangeable,
@@ -51,7 +52,6 @@ export interface OnboardingView {
   readonly nameEn: string | null;
   readonly country: string;
   readonly businessType: string | null;
-  readonly mainCategoryId: string | null;
   readonly status: VendorLifecycle;
   readonly rejectionReason: string | null;
   readonly submittedAt: string | null;
@@ -95,6 +95,7 @@ export class VendorOnboardingService {
     private readonly audit: AuditService,
     private readonly auth: AuthService,
     private readonly tokens: TokenService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ----------------------------------------------------------- التسجيل
@@ -112,7 +113,6 @@ export class VendorOnboardingService {
       slug?: string | null;
       country: string;
       businessType?: string | null;
-      mainCategoryId?: string | null;
       /** اختيار صريح من البائع — بدونه تُقترح عملة بلده ويُطلب اختيارها قبل الإرسال */
       settlementCurrency?: string | null;
     },
@@ -154,7 +154,6 @@ export class VendorOnboardingService {
           nameEn: input.nameEn?.trim() || null,
           country,
           businessType: input.businessType ?? null,
-          mainCategoryId: input.mainCategoryId ?? null,
           settlementCurrency: chosen ?? defaultCurrencyFor(country),
           settlementCurrencyChosenAt: chosen ? new Date() : null,
           status: 'pending',
@@ -281,7 +280,6 @@ export class VendorOnboardingService {
       nameEn: vendor.nameEn,
       country: vendor.country,
       businessType: vendor.businessType,
-      mainCategoryId: vendor.mainCategoryId,
       status,
       rejectionReason: vendor.rejectionReason,
       submittedAt: vendor.submittedAt?.toISOString() ?? null,
@@ -313,7 +311,6 @@ export class VendorOnboardingService {
       slug?: string;
       country?: string;
       businessType?: string | null;
-      mainCategoryId?: string | null;
     },
   ): Promise<OnboardingView> {
     const vendor = await this.require(scope.vendorId);
@@ -340,7 +337,6 @@ export class VendorOnboardingService {
       }
       data['businessType'] = input.businessType ?? null;
     }
-    if (input.mainCategoryId !== undefined) data['mainCategoryId'] = input.mainCategoryId ?? null;
 
     if (Object.keys(data).length > 0) {
       await this.prisma.vendor.update({ where: { id: scope.vendorId }, data });
@@ -574,6 +570,16 @@ export class VendorOnboardingService {
       entityId: scope.vendorId,
       ip: meta.ip ?? null,
       userAgent: null,
+    });
+    // من يراجع المتاجر يعرف أن متجراً لا يبيع حتى يُعتمد — كان يعرف من قائمة اللوحة وحدها
+    await this.notifications.enqueueAdmins({
+      code: 'admin_vendor_submitted',
+      permission: 'vendors.review',
+      vars: {
+        store_name: vendor.nameAr,
+        kind: status === 'rejected' ? 'أعاد إرسال طلبه بعد الرفض' : 'أرسل طلب انضمامه',
+        link: `/admin/vendors/${scope.vendorId}`,
+      },
     });
 
     return this.view(scope.vendorId);

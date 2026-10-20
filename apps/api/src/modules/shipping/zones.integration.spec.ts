@@ -81,7 +81,6 @@ beforeAll(async () => {
   await app.getHttpAdapter().getInstance().ready();
   pricing = app.get(PricingService);
 
-  const home = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   for (const tag of ['a', 'b']) {
     const email = `ship${tag}.${SUFFIX}@basta.test`;
     const u = await prisma.user.create({
@@ -94,7 +93,7 @@ beforeAll(async () => {
       },
     });
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: home.id, slug: `ship-${tag}-${SUFFIX}`, nameAr: `منتج شحن ${tag}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `ship-${tag}-${SUFFIX}`, nameAr: `منتج شحن ${tag}`, status: 'active', publishedAt: new Date() },
     });
     // 2.4 كغ — «حسب الوزن» يقرّبها إلى 3
     const variant = await prisma.productVariant.create({
@@ -271,12 +270,16 @@ describe('VD-16 · الاتساق: لا تعادل ولا منطقة مفعّل�
     const zone = zones.find((z: { nameAr: string }) => z.nameAr === 'محافظة الرياض');
     const last = await call('PATCH', `/vendor/shipping/rates/${zone.rates[0].id}`, seats[0]!.token, { isActive: false });
     expect(last.statusCode, last.body).toBe(409);
+    // الرسالة تقول ما رُفض — لا تصف المنطقة كأنها صارت بلا تسعيرة
+    expect(last.json().message).toMatch(/^لا يمكن إيقاف هذه التسعيرة — هي الوحيدة المفعّلة في «محافظة الرياض»/);
     expect((await prisma.shippingRate.findUniqueOrThrow({ where: { id: zone.rates[0].id } })).isActive).toBe(true);
 
     expect((await call('PATCH', `/vendor/shipping/zones/${zone.id}`, seats[0]!.token, { isActive: false })).statusCode).toBe(200);
     expect((await call('PATCH', `/vendor/shipping/rates/${zone.rates[0].id}`, seats[0]!.token, { isActive: false })).statusCode).toBe(200);
     // وتفعيل منطقة بلا تسعيرة مفعّلة مرفوض
-    expect((await call('PATCH', `/vendor/shipping/zones/${zone.id}`, seats[0]!.token, { isActive: true })).statusCode).toBe(409);
+    const on = await call('PATCH', `/vendor/shipping/zones/${zone.id}`, seats[0]!.token, { isActive: true });
+    expect(on.statusCode, on.body).toBe(409);
+    expect(on.json().message).toMatch(/^فعّل تسعيرة واحدة على الأقل في «محافظة الرياض» قبل تفعيل المنطقة/);
   });
 });
 

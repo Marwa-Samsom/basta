@@ -19,7 +19,7 @@ async function fillAndPrice(page: Page) {
   await page.getByLabel('اسم المستلم').fill('مشترٍ E2E');
   await page.getByLabel('الهاتف').fill('+966500000000');
   await page.getByLabel('البلد').selectOption('SA');
-  await page.getByLabel('المحافظة / المنطقة').fill('الرياض');
+  await page.getByLabel('المحافظة / المنطقة').selectOption('الرياض');
   await page.getByLabel('المدينة').fill('الرياض');
   await page.getByLabel('الشارع ورقم البناء').fill('طريق الملك فهد 10');
   await page.getByRole('button', { name: 'احسب الشحن' }).click();
@@ -63,6 +63,38 @@ test('502 بعد أن دفع الخادم: «ادفع» ثانيةً بالمف�
   expect(await prisma.order.count({ where: { customerUserId: userId } })).toBe(1);
 });
 
+// CHK-105 (J-08، 20 أكتوبر 2026): بعد النجاح عاد «ادفع» فعّالاً أثناء الانتقال، فضغطة ثانية
+// أرسلت محاولة بمفتاح جديد على سلة فرغت وأظهرت «السلة فارغة.» تحت طلب دُفع للتوّ
+test('بعد نجاح الدفع يبقى الزرّ معطّلاً حتى تنتقل الصفحة — لا محاولة ثانية', async ({ page }) => {
+  const v = await makeVendor(tag());
+  const { userId } = await signInBuyer(page);
+  await addToCart(page, v.productSlug);
+  await fillAndPrice(page);
+
+  // صفحة الطلب بطيئة كأول فتحة في وضع التطوير: الانتقال يُمسك ثلاث ثوانٍ
+  await page.route(
+    (url) => url.pathname.startsWith('/orders/'),
+    async (route) => {
+      await new Promise((r) => setTimeout(r, 3_000));
+      await route.continue().catch(() => undefined);
+    },
+  );
+  let posts = 0;
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && new URL(r.url()).pathname === '/api/v1/checkout') posts++;
+  });
+  const paid = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/v1/checkout');
+  await payButton(page).click();
+  expect((await paid).status()).toBe(200);
+
+  // الطلب دُفع والصفحة لم تنتقل بعد: لا «ادفع» يُضغط
+  await expect(page.getByRole('button', { name: 'جارٍ الدفع…' })).toBeDisabled();
+  await expect(payButton(page)).toHaveCount(0);
+  await page.waitForURL(/\/orders\//);
+  expect(posts).toBe(1);
+  expect(await prisma.order.count({ where: { customerUserId: userId } })).toBe(1);
+});
+
 test('504 ثم إعادة تحميل الصفحة: المفتاح نفسه يبقى في الجلسة', async ({ page }) => {
   const v = await makeVendor(tag());
   const { userId } = await signInBuyer(page);
@@ -83,4 +115,31 @@ test('504 ثم إعادة تحميل الصفحة: المفتاح نفسه يب�
 
   // والشراء التالي محاولة جديدة: المفتاح انتهى بنتيجته
   expect(await page.evaluate(() => sessionStorage.getItem('basta.checkout.attempt'))).toBeNull();
+});
+
+// CHK-104 (J-08، 20 أكتوبر 2026): «أعد المحاولة» كانت تفتح صفحة دفع فارغة بعد بطاقة مرفوضة
+test('بطاقة مرفوضة ثم «أعد المحاولة»: الهاتف والعنوان كما كُتبا، والدفع الناجح يمحوهما', async ({ page }) => {
+  const v = await makeVendor(tag());
+  await signInBuyer(page);
+  await addToCart(page, v.productSlug);
+  await fillAndPrice(page);
+  await page.getByLabel('بطاقة يرفضها البنك').check();
+  await payButton(page).click();
+  await expect(page.getByRole('heading', { name: 'لم يكتمل الدفع' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'أعد المحاولة' }).click();
+  await page.waitForURL((u) => u.pathname === '/checkout');
+  await expect(page.getByLabel('اسم المستلم')).toHaveValue('مشترٍ E2E');
+  await expect(page.getByLabel('الهاتف')).toHaveValue('+966500000000');
+  await expect(page.getByLabel('البلد')).toHaveValue('SA');
+  await expect(page.getByLabel('المحافظة / المنطقة')).toHaveValue('الرياض');
+  await expect(page.getByLabel('المدينة')).toHaveValue('الرياض');
+  await expect(page.getByLabel('الشارع ورقم البناء')).toHaveValue('طريق الملك فهد 10');
+
+  await page.getByRole('button', { name: 'احسب الشحن' }).click();
+  await expect(page.locator('.sp-sum__total')).toBeVisible();
+  await page.getByLabel('بطاقة تنجح').check();
+  await payButton(page).click();
+  await page.waitForURL(/\/orders\//);
+  expect(await page.evaluate(() => window.sessionStorage.getItem('basta.checkoutDraft'))).toBeNull();
 });

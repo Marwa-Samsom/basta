@@ -427,7 +427,7 @@ a.vp-prod__name:hover { color: var(--brand-text); }
   letter-spacing: var(--tracking-label);
 }
 
-/* المحاور — شرائح ثابتة: المحور تحدّده الفئة لا البائع */
+/* المحاور — يختارها البائع من مكتبة السمات (حتى ثلاثة): المختار بلون العلامة */
 .vp-axes {
   display: flex;
   align-items: center;
@@ -451,6 +451,17 @@ a.vp-prod__name:hover { color: var(--brand-text); }
   font-weight: var(--weight-semi);
 }
 .vp-axis .num { font-size: var(--text-2xs); opacity: 0.75; }
+button.vp-axis { cursor: pointer; font-family: inherit; }
+.vp-axis[aria-pressed='false'] {
+  border-color: var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-body);
+}
+.vp-axis:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/* «فئة جديدة» داخل حقل الفئة — حقل وزرّان في سطر، ويلتفّ على الضيّق */
+.vp-newcat { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.vp-newcat .field__control { flex: 1 1 12rem; min-width: 0; }
 
 /* مصفوفة المتغيّرات — جدول بحقول مضغوطة */
 .vp-matrix-wrap { box-shadow: none; }
@@ -755,3 +766,32 @@ a.vp-prod__name:hover { color: var(--brand-text); }
   .vp-inv td.wrap { min-width: 0; }
   .vp-inv tr[data-out='true'] { border-color: var(--danger); }
 }
+
+/* ============================================================================
+   فئات المتجر — يرتّبها البائع ويسمّيها ويحذفها بلا إدارة (14 أكتوبر 2026)
+   ========================================================================= */
+.vc-lead { max-inline-size: 62ch; color: var(--text-muted); font-size: var(--text-sm); }
+.vc-add { display: grid; gap: var(--space-2); }
+.vc-list { list-style: none; margin: 0; padding: 0; }
+.vc-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  border-block-end: 1px solid var(--border-subtle);
+}
+.vc-row:last-child { border-block-end: 0; }
+.vc-order { display: inline-flex; flex-direction: column; gap: 2px; }
+.vc-up svg { transform: rotate(180deg); }
+.vc-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--space-3); flex: 1; min-width: 0; }
+.vc-name__text { font-weight: var(--weight-semi); color: var(--text-strong); overflow-wrap: anywhere; }
+.vc-count { font-size: var(--text-xs); color: var(--text-muted); }
+.vc-rename { flex: 1; min-width: 0; }
+.vc-actions { display: inline-flex; align-items: center; gap: var(--space-2); }
+@media (max-width: 480px) {
+  .vc-row { flex-wrap: wrap; padding-inline: var(--space-3); }
+  .vc-actions { margin-inline-start: auto; }
+}
+
+/* تصفية المنتجات بالفئة — بجانب البحث */
+.vp-catfilter { inline-size: auto; max-inline-size: 14rem; min-height: var(--control-sm); }

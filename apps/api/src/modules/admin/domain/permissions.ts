@@ -4,7 +4,8 @@
  */
 export const PERMISSIONS = [
   { code: 'vendors.review', labelAr: 'مراجعة البائعين', hint: 'اعتماد المتاجر ورفضها وتعليقها وقراءة وثائقها' },
-  { code: 'catalog.manage', labelAr: 'الكتالوج', hint: 'الفئات والسمات ومراجعة المنتجات قبل النشر' },
+  // لا فئات عامة (14 أكتوبر 2026) ولا مراجعة قبل النشر (15 أكتوبر 2026) — بقيت السمات والمنشور
+  { code: 'catalog.manage', labelAr: 'الكتالوج', hint: 'مكتبة السمات وقيمها، ومتابعة المنتجات المنشورة وإيقاف المخالف منها' },
   { code: 'orders.manage', labelAr: 'الطلبات', hint: 'البحث في الطلبات والتدخّل في المرتجعات المتعثّرة' },
   { code: 'orders.cancel', labelAr: 'إلغاء الطلبات', hint: 'إلغاء طلب قبل شحنه مع ردّ المبلغ للمشتري' },
   { code: 'disputes.resolve', labelAr: 'حسم النزاعات', hint: 'قرار نهائي في نزاع مصعَّد' },
@@ -50,11 +51,18 @@ export const SETTINGS_SPEC: Record<
   return_window_days: { labelAr: 'مهلة الإرجاع', kind: 'int', min: 0, max: 60, unit: 'يوم', financial: 'أقصر من فترة التعليق يعني تحرير مال قد يُطلب ردّه بعد صرفه.' },
   reservation_ttl_minutes: { labelAr: 'مهلة حجز المخزون', kind: 'int', min: 5, max: 60, unit: 'دقيقة' },
   vendor_accept_timeout_hours: { labelAr: 'مهلة قبول البائع', kind: 'int', min: 6, max: 168, unit: 'ساعة' },
-  default_commission_bps: { labelAr: 'العمولة العامة الافتراضية', kind: 'int', min: 0, max: 5000, unit: 'نقطة أساس', financial: 'تسري على الطلبات الجديدة فقط — كل طلب سابق على لقطته.' },
+  // العمولة العامة لا تُحرَّر هنا: مكانها الواحد «قواعد العمولة» (AD-10) — القاعدة العامة
+  // هناك تغلب هذا الإعداد، فتحريره كان لا يغيّر شيئاً. default_commission_bps احتياط إن غابت القاعدة
   cart_expiry_hours: { labelAr: 'انتهاء السلة', kind: 'int', min: 1, max: 720, unit: 'ساعة' },
   payment_reconcile_minutes: { labelAr: 'مهلة المصالحة', kind: 'int', min: 1, max: 60, unit: 'دقيقة' },
   fx_spread_bps: { labelAr: 'هامش الصرف', kind: 'int', min: 0, max: 1000, unit: 'نقطة أساس', financial: 'يغيّر السعر المعروض للمشتري بين العملات من الآن؛ المستحقات السابقة على لقطتها.' },
   base_currency: { labelAr: 'عملة المحاسبة', kind: 'currency', financial: 'تغيّر عملة التقارير الموحّدة فقط — لا تمسّ أي دفتر.' },
+  // 18 أكتوبر 2026: المشتري يختار عملته من رأس المتجر؛ هذه ما يراه قبل أن يختار
+  default_display_currency: {
+    labelAr: 'عملة العرض الافتراضية',
+    kind: 'currency',
+    hint: 'ما يرى به الزائر الجديد الأسعار ويدفع، حتى يختار عملته من رأس المتجر',
+  },
   coupon_default_funded_by: { labelAr: 'مموّل الكوبون الافتراضي', kind: 'enum', options: ['platform', 'vendor'] },
   // الدفع بتحويل يدوي — ما يراه المشتري بعد «أكّد الطلب». اسم المستفيد ووجهة واحدة
   // على الأقل (كليك أو IBAN) شرطٌ لقبول أي طلب

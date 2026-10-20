@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { convert, money, toDecimalString } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { csvCell } from '../../../common/csv';
+import { acceptanceDueSince } from '../domain/acceptance';
 
 export interface Range {
   from: Date;
@@ -197,20 +198,20 @@ export class ReportsService {
 
   async dashboard(r: Range, withMoney: boolean) {
     const deadlineHours = Number((await this.prisma.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } }))?.valueJson) || 48;
-    const [report, vendors, products, payouts, disputes, overdue, drift] = await Promise.all([
+    const [report, vendors, payouts, disputes, overdue, drift] = await Promise.all([
       withMoney ? this.financial(r) : Promise.resolve(null),
       this.prisma.vendor.count({ where: { status: 'in_review' } }),
-      this.prisma.product.count({ where: { status: 'pending_review', deletedAt: null } }),
       this.prisma.payoutRequest.count({ where: { status: { in: ['requested', 'approved'] } } }),
       this.prisma.dispute.count({ where: { status: { in: ['open', 'escalated'] } } }),
       this.prisma.subOrder.count({
-        where: { status: 'awaiting_vendor', placedAt: { lt: new Date(Date.now() - (deadlineHours - 12) * 3_600_000) } },
+        where: { status: 'awaiting_vendor', placedAt: { lt: acceptanceDueSince(deadlineHours, new Date()) } },
       }),
       this.drift(),
     ]);
     return {
       ...(report ?? { sales: null, ledger: null }),
-      queues: { vendors, products, payouts, disputes, overdueAcceptance: overdue },
+      // لا طابور منتجات: النشر بلا مراجعة منذ 15 أكتوبر 2026
+      queues: { vendors, payouts, disputes, overdueAcceptance: overdue },
       alerts: withMoney ? drift.filter((d) => d.rows > 0) : [],
     };
   }

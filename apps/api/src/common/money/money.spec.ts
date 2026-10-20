@@ -12,6 +12,7 @@ import {
   multiply,
   parse,
   proRata,
+  shareBetween,
   subtract,
   sum,
   toDecimalString,
@@ -143,6 +144,25 @@ describe('الاسترداد النسبي', () => {
 
   it('يرفض مقاماً صفرياً', () => {
     expect(() => proRata(money(100n, 'USD'), 1, 0)).toThrow(MoneyError);
+  });
+
+  it('النصيب التراكمي: كل قطعة لأسفل والأخيرة تكمل — المجموع المبلغ بالضبط بأي تقسيم', () => {
+    expect([0, 1, 2].map((k) => shareBetween(10_000n, k, k + 1, 3))).toEqual([3_333n, 3_333n, 3_334n]);
+    expect(shareBetween(10_000n, 0, 2, 3) + shareBetween(10_000n, 2, 3, 3)).toBe(10_000n);
+    expect(shareBetween(6_617n, 0, 1, 2) + shareBetween(6_617n, 1, 2, 2)).toBe(6_617n);
+    for (const qty of [1, 2, 3, 7, 13]) {
+      for (const amount of [1n, 99n, 10_000n, 123_457n]) {
+        let sum = 0n;
+        for (let k = 0; k < qty; k++) sum += shareBetween(amount, k, k + 1, qty);
+        expect(sum).toBe(amount);
+      }
+    }
+  });
+
+  it('لا نصيب خارج السطر', () => {
+    expect(() => shareBetween(100n, 2, 4, 3)).toThrow(MoneyError);
+    expect(() => shareBetween(100n, 2, 1, 3)).toThrow(MoneyError);
+    expect(() => shareBetween(100n, 0, 1, 0)).toThrow(MoneyError);
   });
 });
 

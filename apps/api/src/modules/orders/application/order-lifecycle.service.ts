@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Prisma, Role } from '@prisma/client';
 import {
@@ -11,7 +12,8 @@ import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type PaymentProvider } from '../../payments/public';
-import { planFullRefund, planPartialRefund } from '../domain/refunds';
+import { allocate } from '../../pricing/public';
+import { planFullRefund, planPartialRefund, toCharge } from '../domain/refunds';
 import {
   assertTransition,
   deriveParent,
@@ -38,6 +40,13 @@ export interface TransitionInput {
   readonly returnRequestId?: string | null;
   /** يُردّ كل ما بقي من الفرعي — حسم النزاع لصالح المشتري وحده يمرّره (refundForDispute) */
   readonly fullRefund?: boolean;
+  /** لطلب الإرجاع: صفّه يُكتب في معاملة الانتقال نفسها — الطلب الخاسر في سباق لا يترك صفّاً */
+  readonly returnRequest?: {
+    readonly id: string;
+    readonly items: readonly { orderItemId: string; qty: number }[];
+    readonly reasonCode: string;
+    readonly description: string | null;
+  };
 }
 
 /**
@@ -232,6 +241,20 @@ export class OrderLifecycleService {
     if (to === 'delivered' && from === 'shipped') {
       await tx.shipment.updateMany({ where: { subOrderId: sub.id }, data: { status: 'delivered', deliveredAt: now } });
     }
+    // بعد شرط الحالة أعلاه: طلبان متزامنان يكتب أحدهما صفّه، والآخر يُرفض قبل أن يكتب شيئاً
+    if (to === 'return_requested' && input.returnRequest) {
+      const r = input.returnRequest;
+      await tx.returnRequest.create({
+        data: {
+          id: r.id,
+          subOrderId: sub.id,
+          itemsJson: r.items as unknown as Prisma.InputJsonValue,
+          reasonCode: r.reasonCode,
+          description: r.description,
+          mediaKeys: [],
+        },
+      });
+    }
 
     // الإلغاء: القطع تعود كلها، والمبلغ كله يُردّ
     if (isCancellation(to)) {
@@ -346,24 +369,28 @@ export class OrderLifecycleService {
       where: { id: subOrderId },
       select: {
         orderId: true,
+        vendorId: true,
         fxRateSnapshot: true,
         chargeTotalMinorUnits: true,
+        order: { select: { pricingSnapshot: true } },
         refunds: { select: { amountMinorUnits: true } },
         items: {
           select: { id: true, lineTotalMinorUnits: true, qty: true, refundedQty: true, commissionMinorUnits: true },
         },
       },
     });
+    const totals = sub.items.map((i) => i.lineTotalMinorUnits);
+    const charged = allocate(itemsCharge(sub, totals), totals);
     const plan = planPartialRefund({
-      lines: sub.items.map((i) => ({
+      lines: sub.items.map((i, k) => ({
         orderItemId: i.id,
         lineTotalMinor: i.lineTotalMinorUnits,
+        chargeMinor: charged[k] ?? 0n,
         qty: i.qty,
         refundedQty: i.refundedQty,
         commissionMinor: i.commissionMinorUnits,
       })),
       returned: items,
-      fxRateSnapshot: sub.fxRateSnapshot.toString(),
       chargeTotalMinor: sub.chargeTotalMinorUnits ?? 0n,
       alreadyRefundedChargeMinor: sub.refunds.reduce((a, r) => a + r.amountMinorUnits, 0n),
     });
@@ -449,7 +476,27 @@ export class OrderLifecycleService {
       // لا يخرج المال آلياً (تحويل يدوي): ينتظر أن تحوّله الإدارة وتسجّل مرجعه.
       // لا إشعار ولا «مُسترَد» قبل ذلك، والمهمة لا تعيده — ليس متعثّراً بل ينتظر إنساناً
       if (result.status === 'manual') {
-        await this.prisma.refund.updateMany({ where: { id: refundId, status: 'processing' }, data: { status: AWAITING_TRANSFER } });
+        await this.prisma.$transaction(async (tx) => {
+          const { count } = await tx.refund.updateMany({ where: { id: refundId, status: 'processing' }, data: { status: AWAITING_TRANSFER } });
+          if (count === 0) return;
+          // ومن يحوّل الردود يعرف أن مشترياً ينتظر ماله — كان الردّ ينتظر في القائمة وحده
+          const o = await tx.subOrder.findUniqueOrThrow({
+            where: { id: refund.subOrderId },
+            select: { order: { select: { orderNumber: true, currency: true } } },
+          });
+          await this.notifications.enqueueAdmins(
+            {
+              code: 'admin_refund_awaiting_transfer',
+              permission: 'payouts.approve',
+              vars: {
+                order_number: o.order.orderNumber,
+                amount: formatMoney(money(refund.amountMinorUnits, o.order.currency)),
+                link: '/admin/transfers',
+              },
+            },
+            tx,
+          );
+        });
         return false;
       }
 
@@ -554,7 +601,17 @@ export class OrderLifecycleService {
       select: { id: true, orderId: true, vendorId: true, status: true },
     });
     const from = sub.status as SubOrderStatus;
-    if (isCancellation(from) || from === 'returned') {
+    // إرجاع جزئي: بقيت قطع عند المشتري فيعود الفرعي «تم التسليم»، لا «مُسترَد» نهائياً
+    const kept =
+      from === 'returned' &&
+      (await tx.orderItem.findMany({ where: { subOrderId: sub.id }, select: { qty: true, refundedQty: true } })).some(
+        (i) => i.refundedQty < i.qty,
+      );
+    if (kept) {
+      const reason = 'رُدّ نصيب المرتجع وبقيت قطع لم تُرجع';
+      assertTransition(from, 'delivered', 'system', { reason });
+      await this.apply(tx, sub, from, 'delivered', { kind: 'system', userId: null }, { reason });
+    } else if (isCancellation(from) || from === 'returned') {
       assertTransition(from, 'refunded', 'system');
       await this.apply(tx, sub, from, 'refunded', { kind: 'system', userId: null }, {});
     }
@@ -583,6 +640,13 @@ export class OrderLifecycleService {
     if (!sub || sub.order.customerUserId !== customerUserId) {
       throw new NotFoundError('الطلب غير موجود.', { subOrderId });
     }
+    // كان كل ما ليس «تم التسليم» يسمع «الإرجاع متاح بعد التسليم وحده» — والطلب مسلَّم وله إرجاع قائم
+    if (sub.status === 'return_requested') {
+      throw new ConflictError('لهذا المتجر طلب إرجاع قائم — انتظر ردّ المتجر عليه، ثم اطلب إرجاع غيره.', { status: sub.status });
+    }
+    if (sub.status === 'returned') {
+      throw new ConflictError('استلم المتجر مرتجعك ويُردّ مبلغه الآن — اطلب إرجاع غيره بعد أن يُردّ.', { status: sub.status });
+    }
     if (sub.status !== 'delivered' || !sub.deliveredAt) {
       throw new ConflictError('الإرجاع متاح بعد التسليم وحده.', { status: sub.status });
     }
@@ -599,20 +663,19 @@ export class OrderLifecycleService {
       }
     }
 
-    const ret = await this.prisma.returnRequest.create({
-      data: {
-        subOrderId,
-        itemsJson: input.items as unknown as Prisma.InputJsonValue,
-        reasonCode: input.reasonCode,
-        description: input.description?.trim() || null,
-        mediaKeys: [],
-      },
-      select: { id: true },
-    });
+    // كان الصفّ يُكتب قبل الانتقال وخارج معاملته: الطلب الخاسر في سباق يُرفض ويبقى صفّه
+    // «requested» يتيماً — مكرَّراً عند الإدارة، ومانعاً تحرير رصيد البائع (J-05)
+    const id = randomUUID();
     await this.transition(subOrderId, 'return_requested', { kind: 'customer', userId: customerUserId }, {
       reason: input.reasonCode,
+      returnRequest: {
+        id,
+        items: input.items,
+        reasonCode: input.reasonCode,
+        description: input.description?.trim() || null,
+      },
     });
-    return ret.id;
+    return id;
   }
 
   private async acceptedReturn(
@@ -643,6 +706,7 @@ export class OrderLifecycleService {
         vendorId: true,
         vendor: { select: { nameAr: true } },
         order: { select: { orderNumber: true, customerUserId: true, customer: { select: { fullName: true } } } },
+        shipment: { select: { carrierCode: true, trackingNumber: true } },
       },
     });
     const common = {
@@ -651,13 +715,41 @@ export class OrderLifecycleService {
       store_name: s.vendor.nameAr,
       link: `/account/orders/${s.order.orderNumber}`,
     };
-    if (to === 'shipped' || to === 'delivered' || to === 'delivery_failed') {
-      if (to === 'delivered' && from === 'return_requested') return;
+    // الرقم من صفّ الشحنة الذي كُتب للتوّ في المعاملة نفسها — إعادة الشحن بعد «تعذّر» تمرّ هنا أيضاً.
+    // مرجع التوصيل الذاتي يكتبه البائع لنفسه ولا يُتتبَّع في صفحة التتبّع، فلا يُسمّى «رقم تتبّع»
+    if (to === 'shipped' && s.shipment) {
+      const tracking_label = s.shipment.carrierCode === 'self' ? 'مرجع التوصيل' : 'رقم التتبّع';
+      await this.notifications.enqueue(
+        {
+          code: 'order_shipped',
+          userId: s.order.customerUserId,
+          vars: { ...common, tracking_label, tracking_number: s.shipment.trackingNumber },
+        },
+        tx,
+      );
+    } else if (to === 'shipped' || to === 'delivered' || to === 'delivery_failed') {
+      // العودة إلى «تم التسليم» بعد رفض إرجاع أو ردّ إرجاع جزئي ليست تسليماً: وصله ما يخصّه
+      if (to === 'delivered' && (from === 'return_requested' || from === 'returned')) return;
       await this.notifications.enqueue({ code: 'order_status_changed', userId: s.order.customerUserId, vars: { ...common, status: STATUS_LABELS[to] } }, tx);
     }
     if (isCancellation(to) && to !== 'canceled_by_customer') {
       await this.notifications.enqueue(
         { code: 'order_canceled', userId: s.order.customerUserId, vars: { ...common, reason: input.reason?.trim() || STATUS_LABELS[to] } },
+        tx,
+      );
+    }
+    // البائع يعرف بإلغاء لم يقم به هو، فلا يجهّز ما أُلغي — J-03 (18 أكتوبر 2026)
+    if (to === 'canceled_by_admin' || to === 'canceled_by_customer') {
+      await this.notifications.enqueueVendor(
+        {
+          code: 'vendor_order_canceled',
+          vendorId: s.vendorId,
+          vars: {
+            order_number: s.subOrderNumber,
+            reason: input.reason?.trim() || (to === 'canceled_by_customer' ? 'ألغاه المشتري' : 'ألغته الإدارة'),
+            link: `/vendor/orders/${subOrderId}`,
+          },
+        },
         tx,
       );
     }
@@ -686,6 +778,23 @@ export class OrderLifecycleService {
     const value = Number(row?.valueJson);
     return Number.isFinite(value) && value > 0 ? value : fallback;
   }
+}
+
+/**
+ * ما دفعه المشتري لقطع الفرعي بعملة الدفع (بعد الخصم وبالضريبة كما في أسطرها): مدفوع الفرعي
+ * في اللقطة ناقص شحنه. طلب بلا لقطة: مجموع الأسطر محوَّلاً بلقطة صرف الفرعي.
+ */
+function itemsCharge(
+  sub: { vendorId: string; fxRateSnapshot: Prisma.Decimal; order: { pricingSnapshot: Prisma.JsonValue } },
+  lineTotals: readonly bigint[],
+): bigint {
+  type Snap = { subOrders?: { vendorId?: string; charge?: { total?: string; shipping?: string } }[] };
+  const charge = (sub.order.pricingSnapshot as Snap | null)?.subOrders?.find((s) => s.vendorId === sub.vendorId)?.charge;
+  if (charge?.total !== undefined && charge.shipping !== undefined) return BigInt(charge.total) - BigInt(charge.shipping);
+  return toCharge(
+    lineTotals.reduce((a, b) => a + b, 0n),
+    sub.fxRateSnapshot.toString(),
+  );
 }
 
 /** الاسم الأول للتحية — `\s` لا `s`: كان يقصّ «Thomas» عند أول حرف s */

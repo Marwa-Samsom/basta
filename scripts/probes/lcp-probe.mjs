@@ -21,12 +21,10 @@ const BUDGET_MS = 2500;
 const demo = await fetch(`${API}/storefront/products/demo-linen-dress`).then((r) => (r.ok ? r.json() : null));
 const firstProduct = await fetch(`${API}/storefront/products?pageSize=1`).then((r) => r.json());
 const product = demo ?? firstProduct.items?.[0];
-const categories = await fetch(`${API}/storefront/categories`).then((r) => r.json());
 
 const pages = [
   ['الرئيسية', '/'],
-  ['الفئات', '/categories'],
-  ...(categories[0] ? [['فئة', `/c/${encodeURIComponent(categories[0].slug)}`]] : []),
+  ['المتاجر', '/shops'],
   ...(product ? [['منتج', `/p/${encodeURIComponent(product.slug)}`], ['متجر', `/s/${encodeURIComponent(product.vendor.slug)}`]] : []),
   ['نتائج بحث', `/search?q=${encodeURIComponent('قميص')}`],
 ];

@@ -42,11 +42,9 @@ async function publishProduct(
   priceMinor: bigint,
   stock: number,
 ): Promise<string> {
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'men-clothing' } });
   const product = await prisma.product.create({
     data: {
       vendorId: vendor,
-      categoryId: category.id,
       slug: `${nameAr.replace(/\s/g, '-')}-${SUFFIX}-${Math.random().toString(36).slice(2, 7)}`,
       nameAr,
       status: 'active',

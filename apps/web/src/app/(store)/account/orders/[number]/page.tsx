@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
 import { AskShop } from '@/components/ask-shop';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
@@ -22,6 +23,8 @@ import { imageUrl } from '@/lib/storefront';
 
 interface Item extends OrderItemView {
   imageKeySnapshot?: string | null;
+  /** السطر بعملة الدفع قبل الضريبة والخصم — جزء «قيمة المنتجات» في الملخّص */
+  chargeSubtotalMinorUnits: string;
 }
 
 interface Store extends Omit<SubOrderView, 'items'> {
@@ -88,6 +91,7 @@ const thumbOf = (key: string | null | undefined): string | null =>
 export default function MyOrderPage({ params }: { params: Promise<{ number: string }> }) {
   const { number } = use(params);
   const router = useRouter();
+  const ask = useConfirm();
   const [order, setOrder] = useState<OrderView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -138,9 +142,16 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
   const storeCount =
     order.stores.length === 1 ? 'متجر واحد' : order.stores.length === 2 ? 'متجران' : `${order.stores.length} متاجر`;
   const unsplit = order.stores.length === 0;
+  const refunded = refundTotals(order.stores);
 
   const cancelTransfer = async () => {
-    if (!window.confirm('تلغي الطلب؟ تعود القطع للمتاجر ولا يُؤخذ منك شيء.')) return;
+    const sure = await ask({
+      title: 'تلغي الطلب؟',
+      body: 'تعود القطع للمتاجر ولا يُؤخذ منك شيء.',
+      confirmLabel: 'ألغِ الطلب',
+      danger: true,
+    });
+    if (!sure) return;
     setError(null);
     try {
       await api(`/checkout/orders/${encodeURIComponent(order.number)}/cancel`, { method: 'POST' });
@@ -250,6 +261,26 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
                 <dt>الإجمالي</dt>
                 <dd className="money num">{money(order.grandTotalMinorUnits, order.currency)}</dd>
               </div>
+              {refunded.done > 0n || refunded.pending > 0n ? (
+                <>
+                  {refunded.done > 0n ? (
+                    <div>
+                      <dt>المُسترَد</dt>
+                      <dd className="num sp-sum__saving">− {money(refunded.done, order.currency)}</dd>
+                    </div>
+                  ) : null}
+                  {refunded.pending > 0n ? (
+                    <div>
+                      <dt>استرداد قيد التنفيذ</dt>
+                      <dd className="num">{money(refunded.pending, order.currency)}</dd>
+                    </div>
+                  ) : null}
+                  <div className="sp-sum__total">
+                    <dt>صافي ما دفعته</dt>
+                    <dd className="money num">{money(BigInt(order.grandTotalMinorUnits) - refunded.done, order.currency)}</dd>
+                  </div>
+                </>
+              ) : null}
             </dl>
           </div>
         </aside>
@@ -271,6 +302,7 @@ function StoreCard({
   onChange: (o: OrderView | null, msg: string) => void;
   onError: (m: string) => void;
 }) {
+  const ask = useConfirm();
   const [mode, setMode] = useState<'return' | 'dispute' | null>(null);
   const [busy, setBusy] = useState(false);
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -298,7 +330,13 @@ function StoreCard({
 
   const cancel = () =>
     run(async () => {
-      if (!window.confirm(`إلغاء ما طلبته من ${s.vendor.nameAr}؟ يُردّ مبلغه كاملاً، وباقي الطلب يكمل كما هو.`)) return;
+      const sure = await ask({
+        title: `تلغي ما طلبته من ${s.vendor.nameAr}؟`,
+        body: 'يُردّ مبلغه كاملاً إلى وسيلة دفعك، وباقي الطلب يكمل كما هو.',
+        confirmLabel: 'ألغِ هذا المتجر',
+        danger: true,
+      });
+      if (!sure) return;
       const o = await api<OrderView>(`/me/orders/${orderNumber}/stores/${s.id}/cancel`, { method: 'POST', body: {} });
       onChange(o, `أُلغي طلبك من ${s.vendor.nameAr} ويُردّ مبلغه إلى وسيلة دفعك.`);
     });
@@ -360,7 +398,9 @@ function StoreCard({
         ) : (
           <ol className="sp-track" aria-label="مسار الطلب">
             {TRACK.map((t, i) => {
-              const state = i < step ? 'done' : i === step ? 'current' : 'todo';
+              // آخر المسار إن بُلغ فقد تمّ — «تم التسليم» بساعة الانتظار يُقرأ «لم يُسلَّم بعد»
+              const last = i === TRACK.length - 1;
+              const state = i < step || (last && i === step) ? 'done' : i === step ? 'current' : 'todo';
               const at = i <= step ? reachedAt(t.key, i) : null;
               return (
                 <li
@@ -407,6 +447,11 @@ function StoreCard({
           {s.items.map((i) => {
             const src = thumbOf(i.imageKeySnapshot);
             const rating = i.review?.rating ?? null;
+            // المسترَدّ نوعان: قطع عادت بإرجاع، وقطع أُلغيت (رفض المتجر أو إلغاء) — «أُرجع» للأولى وحدها
+            const returned = Math.min(i.refundedQty, returnedQtyOf(s, i.id));
+            const refundNote = [returned ? `أُرجع ${returned}` : '', i.refundedQty > returned ? `أُلغي ${i.refundedQty - returned}` : '']
+              .filter(Boolean)
+              .join(' · ');
             return (
               <li key={i.id} className="sp-items__row">
                 <span className="sp-thumb sp-thumb--sm" aria-hidden>
@@ -419,16 +464,27 @@ function StoreCard({
                 </span>
                 <span className="sp-items__text">
                   <span className="sp-items__name">{i.productNameSnapshotAr}</span>
-                  {i.variantLabelSnapshot || i.refundedQty ? (
+                  {i.variantLabelSnapshot || refundNote ? (
                     <span className="sp-items__sub">
                       {i.variantLabelSnapshot}
-                      {i.variantLabelSnapshot && i.refundedQty ? ' · ' : ''}
-                      {i.refundedQty ? `أُرجع ${i.refundedQty}` : ''}
+                      {i.variantLabelSnapshot && refundNote ? ' · ' : ''}
+                      {refundNote}
                     </span>
                   ) : null}
                 </span>
                 <span className="sp-items__qty num">× {i.qty}</span>
-                <span className="sp-items__total money num">{money(i.lineTotalMinorUnits, currency)}</span>
+                {/*
+                 * بعملة الدفع وقبل الضريبة، كما في «قيمة المنتجات» — فأسطر الطلب تجمع الملخّص.
+                 * كان بعملة المتجر شاملاً الضريبة (23.00 ر.س) والملخّص بالدينار بلاها، فلا يُقارَنان.
+                 */}
+                <span className="sp-items__total">
+                  <span className="money num">{money(i.chargeSubtotalMinorUnits, currency)}</span>
+                  {s.currency !== currency ? (
+                    <span className="sp-items__store">
+                      <span className="num">{money(i.lineSubtotalMinorUnits, s.currency)}</span> بعملة المتجر
+                    </span>
+                  ) : null}
+                </span>
 
                 {s.reviewable && !i.review && i.refundedQty < i.qty ? (
                   <span className="sp-rate" role="group" aria-label="قيّم المنتج">
@@ -469,6 +525,11 @@ function StoreCard({
           <span>حصّة هذا المتجر من دفعتك</span>
           <span className="sp-kv__v money num">{money(s.chargeTotalMinorUnits, currency)}</span>
         </p>
+        {s.currency !== currency ? (
+          <p className="sp-transfer__hint">
+            المبالغ بعملة دفعتك بسعر الصرف لحظة الطلب، وسعر المتجر بعملته تحت قطعته؛ الضريبة والشحن في ملخّص الدفع.
+          </p>
+        ) : null}
 
         {s.refunds.length ? (
           <ul className="sp-refunds">
@@ -528,7 +589,8 @@ function StoreCard({
               اختر القطع وكمياتها. يُردّ نصيبها فور استلام البائع لها — لا يُردّ الشحن في الإرجاع الجزئي.
             </p>
             <div className="sp-panel__lines">
-              {s.items.map((i) => (
+              {/* بعد إرجاع جزئي يبقى الطلب «تم التسليم»: ما رُدّ كله لا يُعرض بقائمة «0» وحدها */}
+              {s.items.filter((i) => i.refundedQty < i.qty).map((i) => (
                 <label key={i.id} className="sp-panel__line">
                   <span>{i.productNameSnapshotAr}</span>
                   <select
@@ -602,6 +664,26 @@ function refundState(r: { status: string; transferReference?: string | null }) {
   }
   if (r.status === 'awaiting_transfer') return 'نحوّله لحسابك — نبلغك بمرجع التحويل حين يخرج';
   return 'قيد التنفيذ';
+}
+
+/** القطع التي عادت من هذا السطر بإرجاع لم يُرفض — ما زاد عليها من المسترَدّ أُلغي ولم يُرجَع */
+function returnedQtyOf(s: Store, orderItemId: string): number {
+  return s.returns
+    .filter((r) => r.status !== 'rejected')
+    .flatMap((r) => r.itemsJson)
+    .filter((l) => l.orderItemId === orderItemId)
+    .reduce((n, l) => n + l.qty, 0);
+}
+
+/** مجموع الاستردادات على الطلب كله بعملة الدفع: ما رُدّ فعلاً، وما زال في الطريق */
+function refundTotals(stores: Store[]): { done: bigint; pending: bigint } {
+  let done = 0n;
+  let pending = 0n;
+  for (const r of stores.flatMap((s) => s.refunds)) {
+    if (r.status === 'succeeded') done += BigInt(r.amountMinorUnits);
+    else if (r.status !== 'failed') pending += BigInt(r.amountMinorUnits);
+  }
+  return { done, pending };
 }
 
 function ReasonSelect({ options, value, onChange }: { options: Record<string, string>; value: string; onChange: (v: string) => void }) {

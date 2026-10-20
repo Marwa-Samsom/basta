@@ -7,6 +7,7 @@ import { Icon } from '@/components/icons';
 import { RecordView } from '@/components/recent';
 import { Crumbs } from '@/components/listing';
 import { ProductGrid } from '@/components/product-card';
+import { requestCurrency } from '@/lib/currency-server';
 import { getProduct, getShop, imageUrl, num } from '@/lib/storefront';
 import { ProductGallery, ProductSelection, VariantPicker, type GalleryImage } from '@/components/variant-picker';
 import { WishHeart } from '@/components/wish-heart';
@@ -19,7 +20,8 @@ const MORE_FROM_SHOP = 4;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProduct(slug);
+  // بعملة الصفحة نفسها: الطلب واحد يخدم البيانات الوصفية والصفحة
+  const product = await getProduct(slug, await requestCurrency());
   return {
     title: product.nameAr,
     description: product.descriptionAr?.slice(0, 160) ?? `${product.nameAr} من ${product.vendor.nameAr}`,
@@ -43,10 +45,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  */
 export default async function ProductPage({ params }: Params) {
   const { slug } = await params;
-  const product = await getProduct(slug);
+  const currency = await requestCurrency();
+  const product = await getProduct(slug, currency);
 
   // منتجات أخرى من المتجر نفسه — تحسين لا شرط: تعذّر جلبها لا يُسقط الصفحة
-  const shop = await getShop(product.vendor.slug).catch(() => null);
+  const shop = await getShop(product.vendor.slug, { currency }).catch(() => null);
   const more = (shop?.products ?? []).filter((p) => p.id !== product.id).slice(0, MORE_FROM_SHOP);
 
   const images: GalleryImage[] = product.images.map((img) => ({
@@ -66,6 +69,11 @@ export default async function ProductPage({ params }: Params) {
   // ST-24 و ST-10: ما يُحفظ في الجهاز — المعرّف والاسم والصورة، لا السعر
   const thumb = product.images[0]?.urls['thumb'] ?? null;
 
+  // مسار التنقّل: المتجر ← فئته في المتجر ← المنتج (الفئات لكل متجر — 14 أكتوبر 2026)
+  const shopPath = `/s/${encodeURIComponent(product.vendor.slug)}`;
+  const category = product.storeCategory;
+  const categoryPath = category ? `${shopPath}?category=${category.id}` : null;
+
   return (
     <article className="sd-pdp">
       <RecordView slug={product.slug} nameAr={product.nameAr} thumb={thumb} />
@@ -74,7 +82,8 @@ export default async function ProductPage({ params }: Params) {
           productJsonLd(product),
           breadcrumbJsonLd([
             { name: 'الرئيسية', path: '/' },
-            { name: product.category.nameAr, path: `/c/${product.category.slug}` },
+            { name: product.vendor.nameAr, path: shopPath },
+            ...(category && categoryPath ? [{ name: category.nameAr, path: categoryPath }] : []),
             { name: product.nameAr, path: `/p/${product.slug}` },
           ]),
         ]}
@@ -82,7 +91,8 @@ export default async function ProductPage({ params }: Params) {
       <Crumbs
         items={[
           { href: '/', label: 'الرئيسية' },
-          { href: `/c/${product.category.slug}`, label: product.category.nameAr },
+          { href: shopPath, label: product.vendor.nameAr },
+          ...(category && categoryPath ? [{ href: categoryPath, label: category.nameAr }] : []),
           { label: product.nameAr },
         ]}
       />
@@ -120,9 +130,9 @@ export default async function ProductPage({ params }: Params) {
           {product.isSoldOut ? (
             <div className="alert alert--warning" role="status">
               <p className="alert__title">نفد هذا المنتج</p>
-              <p>البائع لم يُعِد تزويده بعد. تصفّح منتجات مشابهة في الفئة نفسها.</p>
-              <Link className="btn btn--secondary btn--sm" href={`/c/${product.category.slug}`}>
-                منتجات مشابهة
+              <p>البائع لم يُعِد تزويده بعد. تصفّح منتجات مشابهة في المتجر نفسه.</p>
+              <Link className="btn btn--secondary btn--sm" href={categoryPath ?? shopPath}>
+                {category ? `المزيد من «${category.nameAr}»` : 'منتجات المتجر'}
               </Link>
             </div>
           ) : null}
@@ -132,16 +142,7 @@ export default async function ProductPage({ params }: Params) {
             actions={
               <>
                 <WishHeart productId={product.id} name={product.nameAr} variant="pdp" />
-                <CompareToggle
-                  item={{
-                    slug: product.slug,
-                    nameAr: product.nameAr,
-                    thumb,
-                    categoryId: product.category.id,
-                    categorySlug: product.category.slug,
-                    categoryNameAr: product.category.nameAr,
-                  }}
-                />
+                <CompareToggle item={{ slug: product.slug, nameAr: product.nameAr, thumb }} />
               </>
             }
           />

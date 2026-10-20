@@ -6,7 +6,14 @@ import { api } from '@/lib/api';
 import { Alert, EmptyState, PageHead, Spinner } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
-import { num, PRODUCT_STATUS, type Page, type ProductListItem, type ProductStatus } from '@/lib/catalog';
+import {
+  num,
+  PRODUCT_STATUS,
+  type Page,
+  type ProductListItem,
+  type ProductStatus,
+  type VendorCategory,
+} from '@/lib/catalog';
 
 type TabKey = ProductStatus | 'all';
 
@@ -19,9 +26,8 @@ const EDITED = new Intl.DateTimeFormat('ar-u-nu-latn', { dateStyle: 'medium' });
 const TABS: readonly { key: TabKey; label: string }[] = [
   { key: 'all', label: 'الكل' },
   { key: 'draft', label: 'مسوّدة' },
-  { key: 'pending_review', label: 'قيد المراجعة' },
   { key: 'active', label: 'منشور' },
-  { key: 'rejected', label: 'مرفوض' },
+  { key: 'rejected', label: 'موقوف' },
   { key: 'archived', label: 'مؤرشف' },
 ];
 
@@ -43,19 +49,26 @@ const initialTab = (): TabKey => {
   return TABS.find((t) => t.key === wanted)?.key ?? 'all';
 };
 
+/** الفئة من `?category=` — صفحة الفئات تفتح منتجات فئة بعينها، أو none لما بلا فئة */
+const initialCategory = (): string =>
+  typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('category') ?? '');
+
 export default function ProductsPage() {
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState(initialCategory);
+  const [categories, setCategories] = useState<VendorCategory[]>([]);
   const [page, setPage] = useState<Page<ProductListItem> | null>(null);
   const [counts, setCounts] = useState<Partial<Record<TabKey, number>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
-    async (status: TabKey, term: string): Promise<void> => {
+    async (status: TabKey, term: string, cat: string): Promise<void> => {
       const params = new URLSearchParams({ pageSize: '20' });
       if (status !== 'all') params.set('status', status);
       if (term.trim()) params.set('search', term.trim());
+      if (cat) params.set('category', cat);
       try {
         const next = await api<Page<ProductListItem>>(`/vendor/products?${params.toString()}`);
         setPage(next);
@@ -70,9 +83,20 @@ export default function ProductsPage() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => void load(tab, search), search ? 350 : 0);
+    const timer = setTimeout(() => void load(tab, search, category), search ? 350 : 0);
     return () => clearTimeout(timer);
-  }, [tab, search, load]);
+  }, [tab, search, category, load]);
+
+  // قائمة الفئات للتصفية — فشلها يُبقي القائمة بلا تصفية لا يمنعها
+  useEffect(() => {
+    let alive = true;
+    api<VendorCategory[]>('/vendor/categories')
+      .then((list) => alive && setCategories(list))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // عدّادات التبويبات — مرة عند الفتح؛ فشلها لا يمنع القائمة، فالتبويب يبقى بلا رقم
   useEffect(() => {
@@ -97,7 +121,7 @@ export default function ProductsPage() {
     };
   }, []);
 
-  const filtered = Boolean(search.trim()) || tab !== 'all';
+  const filtered = Boolean(search.trim()) || tab !== 'all' || Boolean(category);
   const storeEmpty = page !== null && page.items.length === 0 && !filtered;
   const total = counts.all;
 
@@ -171,6 +195,27 @@ export default function ProductsPage() {
                 </button>
               ))}
             </div>
+            {categories.length > 0 || category ? (
+              <select
+                // يُعاد تركيبه حين تصل الفئات: مُركَّباً قبلها تضيع قيمة ?category= لغياب خيارها
+                key={categories.length}
+                className="field__control vp-catfilter"
+                aria-label="تصفية بالفئة"
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setLoading(true);
+                }}
+              >
+                <option value="">كل الفئات</option>
+                <option value="none">بلا فئة</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nameAr}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <span className="input-icon vp-search">
               <Icon name="search" size={16} />
               <input
@@ -196,9 +241,16 @@ export default function ProductsPage() {
                 {search.trim() ? `لا نتائج تطابق «${search.trim()}»` : 'لا منتجات تطابق هذا الفلتر.'}
               </p>
               <p className="small muted">جرّب اسماً أو رمزاً أقصر، أو انتقل إلى تبويب آخر.</p>
-              {search ? (
-                <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
-                  امسح البحث
+              {search || category ? (
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  onClick={() => {
+                    setSearch('');
+                    setCategory('');
+                  }}
+                >
+                  امسح البحث والتصفية
                 </button>
               ) : null}
             </div>
@@ -228,6 +280,7 @@ export default function ProductsPage() {
                           <span className="vp-prod__text">
                             <span className="vp-prod__name">{p.nameAr}</span>
                             <span className="vp-prod__sub">
+                              {p.vendorCategory ? `${p.vendorCategory.nameAr} · ` : ''}
                               {p.variantCount > 1 ? (
                                 <>
                                   <span className="num">{num(p.variantCount)}</span> متغيّرات

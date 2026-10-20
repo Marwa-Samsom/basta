@@ -37,7 +37,6 @@ interface VendorSeat {
   vendorId: string;
   variantId: string;
   productId: string;
-  categoryId: string;
   currency: string;
   token: string;
 }
@@ -49,7 +48,7 @@ let admin = { userId: '', token: '' };
 const ADDRESS = { recipientName: 'مشترٍ', phone: '+966500000000', country: 'SA', region: 'الرياض', city: 'الرياض', street: 'طريق الملك فهد 1' };
 
 type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
-async function call(method: 'GET' | 'POST', url: string, token?: string, body?: unknown, headers: Record<string, string> = {}): Promise<Res> {
+async function call(method: 'GET' | 'POST' | 'DELETE', url: string, token?: string, body?: unknown, headers: Record<string, string> = {}): Promise<Res> {
   return app.inject({
     method,
     url: `/api/v1${url}`,
@@ -146,13 +145,6 @@ beforeAll(async () => {
   release = app.get(ReleaseScheduler);
   finance = app.get(FinanceService);
 
-  // فئة خاصة بالاختبار: تغيير عمولتها لا يمسّ اختبارات أخرى تعمل بالتوازي
-  const home = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
-  const categoryId = randomUUID();
-  const category = await prisma.category.create({
-    data: { id: categoryId, slug: `fin-${SUFFIX}`, nameAr: `فئة مال ${SUFFIX}`, parentId: home.id, path: `${home.path}${categoryId}/`, depth: home.depth + 1 },
-  });
-
   for (const [tag, currency, price] of [['sar', 'SAR', 23_300n], ['jod', 'JOD', 12_345n]] as const) {
     const email = `v${tag}.${SUFFIX}@basta.test`;
     const u = await prisma.user.create({
@@ -167,14 +159,14 @@ beforeAll(async () => {
       },
     });
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: category.id, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `SKU-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: price, optionsKey: '', isActive: true },
     });
     await prisma.inventory.create({ data: { variantId: variant.id, onHand: 100, reserved: 0 } });
     await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 100, reason: 'import' } });
-    vendors.push({ userId: u.id, vendorId: vendor.id, variantId: variant.id, productId: product.id, categoryId: category.id, currency, token: await login(email) });
+    vendors.push({ userId: u.id, vendorId: vendor.id, variantId: variant.id, productId: product.id, currency, token: await login(email) });
   }
 
   const b = await prisma.user.create({
@@ -264,7 +256,7 @@ describe('بوابة 10 · البند 2 — لقطة العمولة', () => {
     const before = sub(0);
     const before$ = await parties(before.id);
 
-    const set = await call('POST', '/admin/finance/commissions', admin.token, { scope: 'category', categoryId: vendors[0]!.categoryId, rateBps: 2500 });
+    const set = await call('POST', '/admin/finance/commissions', admin.token, { scope: 'vendor', vendorId: vendors[0]!.vendorId, rateBps: 2500 });
     expect(set.statusCode, set.body).toBe(201);
 
     // الطلب السابق: الفرعي والسطر والدفتر كما كانت
@@ -284,8 +276,36 @@ describe('بوابة 10 · البند 2 — لقطة العمولة', () => {
     expect(before.items[0]!.commissionBpsSnapshot).not.toBe(2500);
 
     // القاعدة القديمة أُنهيت ولم تُحذف
-    const rules = await prisma.commissionRule.findMany({ where: { categoryId: vendors[0]!.categoryId } });
+    const rules = await prisma.commissionRule.findMany({ where: { scope: 'vendor', vendorId: vendors[0]!.vendorId } });
     expect(rules.some((r) => r.rateBps === 2500 && r.effectiveTo === null)).toBe(true);
+    expect(await viewCount('audit_money_conservation')).toBe(0);
+  });
+
+  it('نسبة على كل منتج يُباع: المتجر المخصَّص بنسبته وغيره بالعامة، والإلغاء يعيده إلى العامة', async () => {
+    if (!dbUp) return;
+    const jod = vendors[1]!.vendorId;
+    const globalBps = (await prisma.commissionRule.findFirstOrThrow({ where: { scope: 'global', effectiveTo: null } })).rateBps;
+
+    // بلا نسبة خاصة: العامة، أيّاً كان المنتج
+    expect((await placeOrder([0, 1])).sub(1).items[0]!.commissionBpsSnapshot).toBe(globalBps);
+
+    const custom = await call('POST', '/admin/finance/commissions', admin.token, { scope: 'vendor', vendorId: jod, rateBps: 300 });
+    expect(custom.statusCode, custom.body).toBe(201);
+    expect((await placeOrder([0, 1])).sub(1).items[0]!.commissionBpsSnapshot).toBe(300);
+    const listed = (await call('GET', '/admin/finance/commissions', admin.token)).json() as { scope: string; vendorId: string | null; rateBps: number }[];
+    expect(listed.filter((r) => r.scope === 'vendor' && r.vendorId === jod).map((r) => r.rateBps)).toEqual([300]);
+
+    // الإلغاء يُنهي النسبة الخاصة ولا يحذفها، فيعود المتجر إلى العامة من الآن
+    const ended = await call('DELETE', `/admin/finance/commissions/vendor/${jod}`, admin.token);
+    expect(ended.statusCode, ended.body).toBe(200);
+    expect((await placeOrder([0, 1])).sub(1).items[0]!.commissionBpsSnapshot).toBe(globalBps);
+    expect((await call('DELETE', `/admin/finance/commissions/vendor/${jod}`, admin.token)).statusCode).toBe(404);
+    const history = await prisma.commissionRule.findMany({ where: { scope: 'vendor', vendorId: jod } });
+    expect(history.some((r) => r.rateBps === 300 && r.effectiveTo !== null)).toBe(true);
+
+    // مستوى الفئة أُلغي (14 أكتوبر 2026)
+    const byCategory = await call('POST', '/admin/finance/commissions', admin.token, { scope: 'category', rateBps: 500 });
+    expect(byCategory.statusCode).toBe(400);
     expect(await viewCount('audit_money_conservation')).toBe(0);
   });
 });
@@ -309,8 +329,14 @@ describe('بوابة 10 · البند 3 — الإرجاع بعد التحرير
 
     // البائع يسحب متاحه كله
     const w0 = await wallet(i);
+    const asked = new Date();
     const out = await call('POST', '/vendor/finance/payouts', vendors[i]!.token, { currency: 'JOD', amountMinorUnits: w0.balanceAvailableMinorUnits.toString() });
     expect(out.statusCode, out.body).toBe(201);
+    // ومن يقرّ السحوبات يعرف أن طلباً ينتظره (19 أكتوبر 2026)
+    const told = await prisma.notification.findFirst({
+      where: { userId: admin.userId, templateCode: 'admin_payout_requested', channel: 'in_app', createdAt: { gte: asked } },
+    });
+    expect(told?.payloadJson).toMatchObject({ link: '/admin/payouts' });
     expect((await wallet(i)).balanceAvailableMinorUnits).toBe(0n);
 
     // ثم يُرجع المشتري قطعة: الخصم من المتاح (مال هذا الطلب حُرِّر)، فيصير سالباً
@@ -494,14 +520,14 @@ describe('تحرير الأرصدة لا يتجوّع بالمسترَدّ كل�
       },
     });
     const product = await prisma.product.create({
-      data: { vendorId: v.id, categoryId: vendors[0]!.categoryId, slug: `p-${tag}-${SUFFIX}`, nameAr: 'منتج بشحن مجاني', status: 'active', publishedAt: new Date() },
+      data: { vendorId: v.id, slug: `p-${tag}-${SUFFIX}`, nameAr: 'منتج بشحن مجاني', status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: v.id, sku: `SKU-${tag}`.toUpperCase(), priceMinorUnits: 5_000n, optionsKey: '', isActive: true },
     });
     await prisma.inventory.create({ data: { variantId: variant.id, onHand: 20, reserved: 0 } });
     await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 20, reason: 'import' } });
-    vendors.push({ userId: u.id, vendorId: v.id, variantId: variant.id, productId: product.id, categoryId: vendors[0]!.categoryId, currency: 'JOD', token: await login(email) });
+    vendors.push({ userId: u.id, vendorId: v.id, variantId: variant.id, productId: product.id, currency: 'JOD', token: await login(email) });
     return vendors.length - 1;
   }
   const pendingNet = async (subId: string) =>

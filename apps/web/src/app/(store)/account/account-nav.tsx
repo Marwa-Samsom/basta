@@ -28,6 +28,15 @@ const NAV: readonly NavItem[] = [
   { href: '/account/disputes', label: 'النزاعات', icon: 'shield' },
 ];
 
+/**
+ * لوحتا العمل لمن له دورهما — كان المدير والتاجر يدخلان «حسابي» فلا يجدان طريقاً
+ * إلى لوحتيهما إلا بكتابة الرابط. الدور يُقرأ من الرمز للعرض وحده؛ اللوحة تفحصه بنفسها.
+ */
+const PANELS: readonly (NavItem & { roles: readonly string[] })[] = [
+  { href: '/admin', label: 'لوحة الإدارة', icon: 'shield', roles: ['admin'] },
+  { href: '/vendor', label: 'لوحة التاجر', icon: 'store', roles: ['vendor_owner', 'vendor_staff'] },
+];
+
 const subscribe = (cb: () => void) => {
   window.addEventListener('storage', cb);
   return () => window.removeEventListener('storage', cb);
@@ -41,6 +50,9 @@ const subscribe = (cb: () => void) => {
 export function AccountNav() {
   const pathname = usePathname();
   const signedIn = useSyncExternalStore(subscribe, () => !!session.read(), () => false);
+  // نصّ لا مصفوفة: لقطة useSyncExternalStore تُقارَن بالمساواة، والمصفوفة جديدة كل قراءة
+  const roles = useSyncExternalStore(subscribe, () => session.roles().join(','), () => '').split(',');
+  const panels = PANELS.filter((p) => p.roles.some((r) => roles.includes(r)));
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -88,6 +100,14 @@ export function AccountNav() {
             </li>
           );
         })}
+        {panels.map((item, i) => (
+          <li key={item.href} className={i === 0 ? 'aa-nav__group' : undefined}>
+            <Link href={item.href} className="aa-nav__link aa-nav__link--panel">
+              <Icon name={item.icon} size={17} />
+              <span className="aa-nav__label">{item.label}</span>
+            </Link>
+          </li>
+        ))}
         {signedIn ? (
           <li>
             <LogoutButton className="aa-nav__link aa-nav__link--out" next="/">

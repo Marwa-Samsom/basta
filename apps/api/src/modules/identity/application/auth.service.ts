@@ -10,6 +10,13 @@ import { generateRecoveryCodes, looksLikeRecoveryCode, normalizeRecoveryCode } f
 import { adminNeedsTotpSetup, generateTotpSecret, totpUri, verifyTotpStep } from '../domain/totp';
 import { TokenService, type AccessClaims, type TokenPair } from './token.service';
 import { normalizeEmail } from '../../../common/email';
+import { loadEnv } from '../../../common/config/env';
+
+/** رمز التطوير الثابت (DEV_FIXED_CODE) يُقبل بدل رمز التطبيق — لا أثر له خارج NODE_ENV=development */
+const isDevFixedCode = (submitted: string): boolean => {
+  const fixed = loadEnv().devFixedCode;
+  return fixed !== null && submitted.replace(/\s/g, '') === fixed;
+};
 
 export interface RequestMeta {
   /** قد تغيب فعلاً: عميل بلا ترويسة، أو طلب داخلي */
@@ -250,6 +257,7 @@ export class AuthService {
     meta: RequestMeta,
   ): Promise<void> {
     if (!submitted || !user.totpSecretEnc) throw new UnauthorizedException('رمز التحقق الثنائي مطلوب وصحيح.');
+    if (isDevFixedCode(submitted)) return;
     if (looksLikeRecoveryCode(submitted)) {
       if (!(await this.useRecoveryCode(user.id, submitted, meta))) {
         throw new UnauthorizedException('رمز الاستعادة غير صحيح أو استُعمل من قبل.');
@@ -362,7 +370,7 @@ export class AuthService {
     const pending = user.totpPendingSecretEnc;
     if (!pending) throw new ConflictException('لا تهيئة قيد الانتظار. ابدأ التهيئة أولاً.');
     // السرّ جديد فلا خطوة سابقة له — خطوة السرّ القديم لا تحجب رمز الجهاز الجديد
-    const step = verifyTotpStep(token, openTotpSecret(pending, userId));
+    const step = isDevFixedCode(token) ? Math.floor(Date.now() / 30_000) : verifyTotpStep(token, openTotpSecret(pending, userId));
     if (step === null) {
       throw new UnauthorizedException('الرمز غير صحيح. تأكد من وقت جهازك وأعد المحاولة.');
     }

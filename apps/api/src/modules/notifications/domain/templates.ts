@@ -23,7 +23,8 @@ export const CHANNEL_LABELS: Record<Channel, string> = {
 export interface EventDef {
   readonly code: string;
   readonly labelAr: string;
-  readonly audience: 'customer' | 'vendor';
+  /** admin: يصل من يحمل صلاحيته من المديرين وحدهم — enqueueAdmins */
+  readonly audience: 'customer' | 'vendor' | 'admin';
   readonly variables: readonly string[];
   readonly sample: Readonly<Record<string, string>>;
   /**
@@ -58,7 +59,15 @@ export const EVENTS: readonly EventDef[] = [
     labelAr: 'تغيّر حالة الطلب',
     audience: 'customer',
     variables: ['name', 'order_number', 'store_name', 'status', 'link'],
-    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', status: 'تم الشحن', link: '/account/orders/BST-260921-A1B2C3' },
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', status: 'تم التسليم', link: '/account/orders/BST-260921-A1B2C3' },
+  },
+  {
+    // كان الشحن «تغيّر حالة» بلا رقم، وصفحة التتبّع تقول إن الرقم في رسالة الشحن (BUY-086)
+    code: 'order_shipped',
+    labelAr: 'شحن الطلب للمشتري',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'store_name', 'tracking_label', 'tracking_number', 'link'],
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', tracking_label: 'رقم التتبّع', tracking_number: 'BX4821930576', link: '/account/orders/BST-260921-A1B2C3' },
   },
   {
     code: 'order_canceled',
@@ -113,6 +122,15 @@ export const EVENTS: readonly EventDef[] = [
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', amount: '42.000 د.أ', reference: 'CLQ-88123', link: '/account/orders/BST-260921-A1B2C3' },
   },
   {
+    // ما لم يلغِه البائع بنفسه: انقضاء مهلة القبول أو الإدارة أو المشتري — كان يعرفه
+    // من صفحة طلباته وحدها فقد يجهّز طلباً مُلغى (J-03، 18 أكتوبر 2026)
+    code: 'vendor_order_canceled',
+    labelAr: 'إلغاء طلب للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'reason', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يقبله البائع خلال 48 ساعة', link: '/vendor/orders' },
+  },
+  {
     code: 'return_requested',
     labelAr: 'طلب إرجاع للبائع',
     audience: 'vendor',
@@ -125,6 +143,128 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'customer',
     variables: ['name', 'order_number', 'link'],
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3-1', link: '/account/disputes' },
+  },
+  // النزاع بعد الرسالة: كان التاجر لا يعرف بنزاع عليه إلا إن فتح صفحته، ولا الطرفان
+  // بقرار الإدارة إلا من الصفحة نفسها (J-06، 19 أكتوبر 2026)
+  {
+    code: 'vendor_dispute_opened',
+    labelAr: 'نزاع جديد على طلب للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'reason', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يصلني الطلب', link: '/vendor/disputes' },
+  },
+  {
+    code: 'dispute_escalated',
+    labelAr: 'تصعيد نزاع للإدارة — للمشتري',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'link'],
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3-1', link: '/account/disputes' },
+  },
+  {
+    code: 'vendor_dispute_escalated',
+    labelAr: 'تصعيد نزاع للإدارة — للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', link: '/vendor/disputes' },
+  },
+  {
+    code: 'dispute_resolved',
+    labelAr: 'قرار النزاع — للمشتري',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'outcome', 'resolution', 'link'],
+    sample: {
+      name: 'سارة',
+      order_number: 'BST-260921-A1B2C3-1',
+      outcome: 'حُسم لصالحك، ويُردّ لك ما بقي من مبلغ هذا المتجر',
+      resolution: 'لم يقدّم المتجر ما يثبت التسليم.',
+      link: '/account/disputes',
+    },
+  },
+  {
+    code: 'vendor_dispute_resolved',
+    labelAr: 'قرار النزاع — للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'outcome', 'resolution', 'link'],
+    sample: {
+      store_name: 'متجر الورد',
+      order_number: 'BST-260921-A1B2C3-1',
+      outcome: 'حُسم لصالحكم، ويُحرَّر مال الطلب بموعده',
+      resolution: 'أثبت المتجر التسليم بتوقيع المستلم.',
+      link: '/vendor/disputes',
+    },
+  },
+  // للإدارة: ما يوقف مال أحد حتى يتحرّك مدير — لمن يحمل صلاحيته وحده (enqueueAdmins).
+  // كانت الإدارة تعرف من بطاقات لوحتها وحدها، فنزاع مصعَّد يجمّد مال متجر لا يراه أحد
+  // ما لم يفتح اللوحة (19 أكتوبر 2026)
+  {
+    code: 'admin_dispute_escalated',
+    labelAr: 'نزاع مصعَّد ينتظر الحسم',
+    audience: 'admin',
+    variables: ['store_name', 'order_number', 'reason', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يصلني الطلب', link: '/admin/disputes' },
+  },
+  {
+    code: 'admin_payout_requested',
+    labelAr: 'طلب سحب ينتظر الموافقة',
+    audience: 'admin',
+    variables: ['store_name', 'amount', 'link'],
+    sample: { store_name: 'متجر الورد', amount: '1,250.00 ر.س', link: '/admin/payouts' },
+  },
+  {
+    code: 'admin_vendor_submitted',
+    labelAr: 'متجر ينتظر المراجعة',
+    audience: 'admin',
+    variables: ['store_name', 'kind', 'link'],
+    sample: { store_name: 'متجر الورد', kind: 'أرسل طلب انضمامه', link: '/admin/vendors' },
+  },
+  {
+    code: 'admin_bank_account_added',
+    labelAr: 'حساب بنكي ينتظر التوثيق',
+    audience: 'admin',
+    variables: ['store_name', 'bank_name', 'iban_tail', 'link'],
+    sample: { store_name: 'متجر الورد', bank_name: 'البنك الأهلي', iban_tail: '7519', link: '/admin/vendors' },
+  },
+  {
+    code: 'admin_transfer_awaiting',
+    labelAr: 'تحويل مشترٍ ينتظر التأكيد',
+    audience: 'admin',
+    variables: ['order_number', 'amount', 'hours', 'link'],
+    sample: { order_number: 'BST-260921-A1B2C3', amount: '45.000 د.أ', hours: '48', link: '/admin/transfers' },
+  },
+  {
+    code: 'admin_refund_awaiting_transfer',
+    labelAr: 'ردّ ينتظر التحويل اليدوي',
+    audience: 'admin',
+    variables: ['order_number', 'amount', 'link'],
+    sample: { order_number: 'BST-260921-A1B2C3', amount: '23.000 د.أ', link: '/admin/transfers' },
+  },
+  {
+    code: 'admin_dispute_message',
+    labelAr: 'رسالة في نزاع مصعَّد',
+    audience: 'admin',
+    variables: ['order_number', 'sender', 'link'],
+    sample: { order_number: 'BST-260921-A1B2C3-1', sender: 'المشتري', link: '/admin/disputes' },
+  },
+  {
+    code: 'admin_return_stalled',
+    labelAr: 'مرتجع لم يستلمه المتجر',
+    audience: 'admin',
+    variables: ['order_number', 'store_name', 'days', 'link'],
+    sample: { order_number: 'BST-260921-A1B2C3-1', store_name: 'متجر الورد', days: '3', link: '/admin/returns' },
+  },
+  {
+    code: 'admin_acceptance_due',
+    labelAr: 'طلب قارب مهلة القبول',
+    audience: 'admin',
+    variables: ['order_number', 'store_name', 'hours', 'link'],
+    sample: { order_number: 'BST-260921-A1B2C3-1', store_name: 'متجر الورد', hours: '12', link: '/admin/orders?due=acceptance' },
+  },
+  {
+    code: 'admin_audit_drift',
+    labelAr: 'انحراف في فحوص المال',
+    audience: 'admin',
+    variables: ['check', 'rows', 'link'],
+    sample: { check: 'حفظ المال (بائع + منصة + مُسترد ≠ مقبوض)', rows: '2', link: '/admin' },
   },
   {
     code: 'payout_paid',
@@ -156,7 +296,7 @@ export const EVENTS: readonly EventDef[] = [
   },
   {
     code: 'product_rejected',
-    labelAr: 'رفض منتج',
+    labelAr: 'إيقاف منتج',
     audience: 'vendor',
     variables: ['store_name', 'product_name', 'reason', 'link'],
     sample: { store_name: 'متجر الورد', product_name: 'فستان كتان', reason: 'الصورة الأولى لا تُظهر المنتج', link: '/vendor/products' },
@@ -265,9 +405,14 @@ export const EVENTS: readonly EventDef[] = [
  */
 export const PREF_CATEGORIES = [
   { key: 'orders', labelAr: 'طلب جديد', noteAr: 'عند كل طلب فرعي جديد', codes: ['vendor_new_order'] },
-  { key: 'products', labelAr: 'قرار مراجعة منتج', noteAr: 'رفض منتج مع السبب', codes: ['product_rejected'] },
+  { key: 'products', labelAr: 'إيقاف منتج', noteAr: 'حين توقف الإدارة منتجاً منشوراً، مع السبب', codes: ['product_rejected'] },
   { key: 'stock', labelAr: 'مخزون منخفض', noteAr: 'عند بلوغ حدّ التنبيه', codes: ['low_stock'] },
-  { key: 'returns', labelAr: 'مرتجع أو نزاع', noteAr: 'طلب إرجاع جديد أو رسالة في نزاع', codes: ['return_requested', 'dispute_message'] },
+  {
+    key: 'returns',
+    labelAr: 'مرتجع أو نزاع',
+    noteAr: 'طلب إرجاع جديد، أو نزاع جديد أو رسالة أو تصعيد فيه — قرار النزاع يصل دائماً',
+    codes: ['return_requested', 'dispute_message', 'vendor_dispute_opened', 'dispute_escalated', 'vendor_dispute_escalated'],
+  },
   { key: 'payouts', labelAr: 'حالة التحويلات', noteAr: 'التحويل والرفض', codes: ['payout_paid', 'payout_rejected'] },
   { key: 'messages', labelAr: 'رسائل المشترين', noteAr: 'أول رسالة غير مقروءة في كل محادثة', codes: ['message_to_vendor'] },
 ] as const;
@@ -300,6 +445,12 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'طلبك {{order_number}}: {{status}}'),
   t('order_status_changed', 'push', '{{store_name}}: {{status}} — الطلب {{order_number}}'),
   t('order_status_changed', 'in_app', '{{store_name}}: {{status}} في الطلب {{order_number}}.'),
+
+  t('order_shipped', 'email',
+    'مرحباً {{name}}،\n\nشحن {{store_name}} ما طلبته في الطلب {{order_number}}.\n\n{{tracking_label}}: {{tracking_number}}\n\nالتفاصيل والتتبّع: {{link}}\n\nبسطة',
+    'شُحن طلبك {{order_number}}'),
+  t('order_shipped', 'push', '{{store_name}}: تم الشحن — {{tracking_label}} {{tracking_number}}'),
+  t('order_shipped', 'in_app', 'شحن {{store_name}} طلبك {{order_number}} — {{tracking_label}}: {{tracking_number}}.'),
 
   t('order_canceled', 'email',
     'مرحباً {{name}}،\n\nأُلغي ما طلبته من {{store_name}} في الطلب {{order_number}}. السبب: {{reason}}.\n\nيُردّ مبلغه كاملاً إلى وسيلة دفعك، وباقي الطلب يكمل كما هو.\n\n{{link}}\n\nبسطة',
@@ -337,6 +488,16 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'رسالة جديدة في نزاع الطلب {{order_number}}'),
   t('dispute_message', 'in_app', 'رسالة جديدة في نزاع الطلب {{order_number}}.'),
 
+  t('dispute_escalated', 'email',
+    'مرحباً {{name}}،\n\nصُعِّد النزاع على الطلب {{order_number}} إلى إدارة بسطة لتحسمه. يصلك قرارها وسببه هنا وبالبريد، وتستطيع حتى ذلك أن تضيف في النزاع ما يوضّح موقفك: {{link}}\n\nبسطة',
+    'صُعِّد نزاع الطلب {{order_number}} للإدارة'),
+  t('dispute_escalated', 'in_app', 'صُعِّد نزاع الطلب {{order_number}} للإدارة لتحسمه.'),
+
+  t('dispute_resolved', 'email',
+    'مرحباً {{name}}،\n\nحسمت إدارة بسطة النزاع على الطلب {{order_number}}: {{outcome}}.\n\nسبب القرار: {{resolution}}\n\nالتفاصيل: {{link}}\n\nبسطة',
+    'حُسم نزاع الطلب {{order_number}}'),
+  t('dispute_resolved', 'in_app', 'حُسم نزاع الطلب {{order_number}}: {{outcome}}.'),
+
   // ----------------------------------------------------------------- الهوية
   // الرمز لا يوضع في العنوان: سجلّ الإرسال في لوحة الإدارة يعرض العنوان
   t('email_verify_code', 'email',
@@ -370,10 +531,81 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
   t('vendor_new_order', 'whatsapp', 'بسطة: طلب جديد {{order_number}} بقيمة {{amount}} لمتجر {{store_name}}. اقبلوه خلال {{deadline_hours}} ساعة من لوحة البائع.'),
   t('vendor_new_order', 'in_app', 'طلب جديد {{order_number}} — {{amount}}. المهلة {{deadline_hours}} ساعة.'),
 
+  t('vendor_order_canceled', 'email',
+    'فريق {{store_name}}،\n\nأُلغي الطلب {{order_number}}. السبب: {{reason}}.\n\nرُدّ مبلغه للمشتري وعادت قطعه إلى مخزونكم، فلا تجهّزوه ولا تشحنوه.\n\n{{link}}\n\nبسطة',
+    'أُلغي الطلب {{order_number}}'),
+  t('vendor_order_canceled', 'in_app', 'أُلغي الطلب {{order_number}}: {{reason}}. لا تجهّزه.'),
+
   t('return_requested', 'email',
     'فريق {{store_name}}،\n\nطلب المشتري إرجاع قطع من الطلب {{order_number}}. السبب: {{reason}}.\n\nعند استلامكم القطع أكّدوا ذلك من اللوحة، فتعود للمخزون ويُردّ نصيبها للمشتري.\n\n{{link}}\n\nبسطة',
     'طلب إرجاع على {{order_number}}'),
   t('return_requested', 'in_app', 'طلب إرجاع على {{order_number}}: {{reason}}.'),
+
+  t('vendor_dispute_opened', 'email',
+    'فريق {{store_name}}،\n\nفتح المشتري نزاعاً على الطلب {{order_number}}. السبب: {{reason}}.\n\nمال هذا الطلب مجمَّد حتى يُحسم النزاع. اقرؤوا رسالته وردّوا عليه من هنا، فإن لم تتّفقا صعّده أحدكما للإدارة: {{link}}\n\nبسطة',
+    'نزاع على الطلب {{order_number}}'),
+  t('vendor_dispute_opened', 'in_app', 'نزاع على الطلب {{order_number}}: {{reason}}. ماله مجمَّد حتى يُحسم.'),
+
+  t('vendor_dispute_escalated', 'email',
+    'فريق {{store_name}}،\n\nصُعِّد النزاع على الطلب {{order_number}} إلى إدارة بسطة لتحسمه. يصلكم قرارها وسببه هنا وبالبريد، وتستطيعون حتى ذلك أن تضيفوا في النزاع ما يوضّح موقفكم: {{link}}\n\nبسطة',
+    'صُعِّد نزاع الطلب {{order_number}} للإدارة'),
+  t('vendor_dispute_escalated', 'in_app', 'صُعِّد نزاع الطلب {{order_number}} للإدارة لتحسمه.'),
+
+  t('vendor_dispute_resolved', 'email',
+    'فريق {{store_name}}،\n\nحسمت إدارة بسطة النزاع على الطلب {{order_number}}: {{outcome}}.\n\nسبب القرار: {{resolution}}\n\nالتفاصيل: {{link}}\n\nبسطة',
+    'حُسم نزاع الطلب {{order_number}}'),
+  t('vendor_dispute_resolved', 'in_app', 'حُسم نزاع الطلب {{order_number}}: {{outcome}}.'),
+
+  // ----------------------------------------------------------------- الإدارة
+  t('admin_dispute_escalated', 'email',
+    'صُعِّد نزاع على الطلب {{order_number}} من متجر {{store_name}} إلى الإدارة. سبب المشتري: {{reason}}.\n\nمال الطلب مجمَّد حتى يُحسم. اقرأ الخيط واحسم من هنا: {{link}}\n\nبسطة',
+    'نزاع مصعَّد على {{order_number}}'),
+  t('admin_dispute_escalated', 'in_app', 'نزاع مصعَّد على {{order_number}} ({{store_name}}): {{reason}}. ينتظر حسمك.'),
+
+  t('admin_payout_requested', 'email',
+    'طلب متجر {{store_name}} سحب {{amount}} إلى حسابه البنكي الموثَّق.\n\nوافق عليه أو ارفضه من هنا: {{link}}\n\nبسطة',
+    'طلب سحب {{amount}} من {{store_name}}'),
+  t('admin_payout_requested', 'in_app', 'طلب سحب {{amount}} من {{store_name}} ينتظر موافقتك.'),
+
+  t('admin_vendor_submitted', 'email',
+    'متجر {{store_name}} {{kind}}. وثائقه وحسابه البنكي جاهزة للمراجعة.\n\nلا يبيع قبل اعتماده. راجعه من هنا: {{link}}\n\nبسطة',
+    'متجر {{store_name}} ينتظر المراجعة'),
+  t('admin_vendor_submitted', 'in_app', 'متجر {{store_name}} {{kind}} — ينتظر مراجعتك.'),
+
+  t('admin_bank_account_added', 'email',
+    'أضاف متجر {{store_name}} حساباً بنكياً جديداً ({{bank_name}}، ينتهي بـ {{iban_tail}}).\n\nلا يُحوَّل إليه شيء قبل أن يوثّقه أحد الفريق. وثّقه من صفحة المتجر: {{link}}\n\nبسطة',
+    'حساب بنكي جديد لـ {{store_name}} ينتظر التوثيق'),
+  t('admin_bank_account_added', 'in_app', 'حساب بنكي جديد لـ {{store_name}} ({{bank_name}} …{{iban_tail}}) ينتظر توثيقك.'),
+
+  t('admin_transfer_awaiting', 'email',
+    'الطلب {{order_number}} بـ {{amount}} مدفوع بتحويل بنكي، وينتظر أن تؤكّد وصول المال إلى حساب المنصة.\n\nلا يصل المتاجر قبل التأكيد، ويُلغى آلياً إن لم يصل خلال {{hours}} ساعة. أكّده من هنا: {{link}}\n\nبسطة',
+    'تحويل الطلب {{order_number}} ينتظر التأكيد'),
+  t('admin_transfer_awaiting', 'in_app', 'الطلب {{order_number}} ({{amount}}) ينتظر تأكيد وصول التحويل — يُلغى بعد {{hours}} ساعة.'),
+
+  t('admin_refund_awaiting_transfer', 'email',
+    'ردّ {{amount}} للمشتري عن الطلب {{order_number}} لا يخرج آلياً لأنه دُفع بتحويل بنكي.\n\nحوّله إلى المشتري وسجّل مرجع التحويل من هنا: {{link}}\n\nبسطة',
+    'ردّ {{amount}} ينتظر تحويلك'),
+  t('admin_refund_awaiting_transfer', 'in_app', 'ردّ {{amount}} عن الطلب {{order_number}} ينتظر أن تحوّله للمشتري.'),
+
+  t('admin_dispute_message', 'email',
+    'كتب {{sender}} رسالة جديدة في النزاع المصعَّد على الطلب {{order_number}}.\n\nاقرأها قبل أن تحسم: {{link}}\n\nبسطة',
+    'رسالة جديدة في نزاع {{order_number}}'),
+  t('admin_dispute_message', 'in_app', 'رسالة جديدة من {{sender}} في النزاع المصعَّد على {{order_number}}.'),
+
+  t('admin_return_stalled', 'email',
+    'مرتجع الطلب {{order_number}} من متجر {{store_name}} لم يُسجَّل استلامه منذ {{days}} أيام.\n\nالمشتري ينتظر استرداده، ومال الطلب لا يُحرَّر للمتجر ما دام الإرجاع قائماً. تابعه مع المتجر أو سجّل الاستلام بدلاً منه: {{link}}\n\nبسطة',
+    'مرتجع {{order_number}} عالق منذ {{days}} أيام'),
+  t('admin_return_stalled', 'in_app', 'مرتجع {{order_number}} ({{store_name}}) لم يُستلم منذ {{days}} أيام.'),
+
+  t('admin_acceptance_due', 'email',
+    'الطلب {{order_number}} لم يقبله متجر {{store_name}} بعد، ويُلغى آلياً ويُردّ مبلغه خلال {{hours}} ساعة.\n\nذكّر المتجر أو تصرّف من هنا: {{link}}\n\nبسطة',
+    'الطلب {{order_number}} قارب مهلة القبول'),
+  t('admin_acceptance_due', 'in_app', 'الطلب {{order_number}} ({{store_name}}) لم يُقبل — يُلغى آلياً خلال {{hours}} ساعة.'),
+
+  t('admin_audit_drift', 'email',
+    'وجد فحص المال الدوري انحرافاً: {{check}} — {{rows}} صف.\n\nهذا خلل في الدفتر أو المخزون لا يُترك. افحصه الآن من لوحة الإدارة: {{link}}\n\nبسطة',
+    'انحراف في فحوص المال: {{check}}'),
+  t('admin_audit_drift', 'in_app', 'انحراف في فحوص المال: {{check}} — {{rows}} صف. افحصه الآن.'),
 
   t('payout_paid', 'email',
     'فريق {{store_name}}،\n\nحوّلنا {{amount}} إلى حسابكم البنكي. مرجع التحويل: {{reference}}.\n\nكشف الحساب: {{link}}\n\nبسطة',
@@ -395,10 +627,12 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'طلب انضمامكم يحتاج تعديلاً'),
   t('vendor_rejected', 'in_app', 'طلب انضمامكم يحتاج تعديلاً: {{reason}}.'),
 
+  // لا مراجعة قبل النشر (15 أكتوبر 2026): الإدارة توقف المنشور المخالف. المهاجرة
+  // 20261015120000 تستبدل النصّ القديم في القاعدة إن لم تحرّره الإدارة
   t('product_rejected', 'email',
-    'فريق {{store_name}}،\n\nلم ننشر المنتج «{{product_name}}». السبب: {{reason}}.\n\nعدّلوه وأعيدوا إرساله للمراجعة: {{link}}\n\nبسطة',
-    'المنتج «{{product_name}}» يحتاج تعديلاً'),
-  t('product_rejected', 'in_app', 'لم يُنشر «{{product_name}}»: {{reason}}.'),
+    'فريق {{store_name}}،\n\nأوقفنا عرض المنتج «{{product_name}}» في المتجر. السبب: {{reason}}.\n\nعدّلوه ثم انشروه من جديد: {{link}}\n\nبسطة',
+    'أوقفنا عرض «{{product_name}}»'),
+  t('product_rejected', 'in_app', 'أُوقف عرض «{{product_name}}»: {{reason}}.'),
 
   t('low_stock', 'email',
     'فريق {{store_name}}،\n\nقارب مخزون هذه المنتجات على النفاد: {{items}}.\n\nزيدوا الكمية قبل أن تنفد فيتوقّف بيعها: {{link}}\n\nبسطة',

@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { TransferDetailsService } from '../../payments/public';
+import { allocate } from '../../pricing/public';
 import { AWAITING_TRANSFER } from './order-lifecycle.service';
 import {
   STATUS_LABELS,
@@ -25,6 +26,7 @@ const SUB_ORDER_DETAIL = {
       unitPriceMinorUnits: true,
       qty: true,
       refundedQty: true,
+      lineSubtotalMinorUnits: true,
       lineTotalMinorUnits: true,
       review: { select: { id: true, rating: true } },
     },
@@ -132,11 +134,11 @@ export class OrderQueryService {
 
   async vendorList(
     vendorId: string,
-    q: { status?: string; search?: string; page?: number },
+    q: { status?: readonly string[]; search?: string; page?: number },
   ): Promise<{ items: unknown[]; total: number; counts: Record<string, number> }> {
     const where: Prisma.SubOrderWhereInput = {
       vendorId,
-      ...(q.status ? { status: q.status as SubOrderStatus } : {}),
+      ...(q.status?.length ? { status: { in: q.status as SubOrderStatus[] } } : {}),
       ...(q.search ? { subOrderNumber: { contains: q.search.trim(), mode: 'insensitive' } } : {}),
     };
     const page = Math.max(1, q.page ?? 1);
@@ -161,6 +163,7 @@ export class OrderQueryService {
       this.prisma.subOrder.count({ where }),
       this.prisma.subOrder.groupBy({ by: ['status'], where: { vendorId }, _count: true }),
     ]);
+    const nets = await this.ledgerNets(vendorId, rows.map((r) => r.id));
     return {
       items: rows.map((r) => ({
         id: r.id,
@@ -169,7 +172,7 @@ export class OrderQueryService {
         statusLabel: STATUS_LABELS[r.status as SubOrderStatus],
         currency: r.settlementCurrency,
         totalMinorUnits: r.totalMinorUnits.toString(),
-        netMinorUnits: r.vendorNetMinorUnits.toString(),
+        netMinorUnits: (nets.get(r.id) ?? r.vendorNetMinorUnits).toString(),
         placedAt: r.placedAt,
         itemCount: r._count.items,
         buyer: recipientOf(r.order.shippingAddressSnapshot),
@@ -185,6 +188,7 @@ export class OrderQueryService {
       include: { ...SUB_ORDER_DETAIL, order: { select: { orderNumber: true, shippingAddressSnapshot: true, customerNote: true } } },
     });
     if (!sub) throw new NotFoundError('الطلب غير موجود.', { subOrderId });
+    const ledgerNet = (await this.ledgerNets(vendorId, [sub.id])).get(sub.id) ?? sub.vendorNetMinorUnits;
     return {
       ...present(sub, 'vendor'),
       orderNumber: sub.order.orderNumber,
@@ -198,6 +202,9 @@ export class OrderQueryService {
         commissionMinorUnits: sub.commissionMinorUnits.toString(),
         commissionRateBps: sub.commissionRateBpsSnapshot,
         netMinorUnits: sub.vendorNetMinorUnits.toString(),
+        /** ما رجع من نصيب البائع للمشتري (بعد عكس عمولته) — وصافيه بعده كما في دفتره */
+        refundedMinorUnits: (sub.vendorNetMinorUnits - ledgerNet).toString(),
+        netAfterRefundsMinorUnits: ledgerNet.toString(),
       },
     };
   }
@@ -298,15 +305,21 @@ export class OrderQueryService {
       // ما رآه المشتري قبل التقسيم: أسطر اللقطة، ليعرف ماذا حجز
       ...(order.subOrders.length === 0 ? { lines: snapshotLines(order.pricingSnapshot) } : {}),
       // تتبّع لكل بائع: شحنة ومسار وحالة مستقلة — ST-19
-      stores: order.subOrders.map((s) => ({
-        ...present(s, 'customer'),
-        chargeTotalMinorUnits: (s.chargeTotalMinorUnits ?? 0n).toString(),
-        returnable:
-          s.status === 'delivered' &&
-          !!s.deliveredAt &&
-          Date.now() - s.deliveredAt.getTime() <= returnWindowDays * 86_400_000,
-        reviewable: s.status === 'delivered' || s.status === 'completed',
-      })),
+      stores: order.subOrders.map((s) => {
+        const base = present(s, 'customer');
+        const charged = chargedLines(order.pricingSnapshot, s);
+        return {
+          ...base,
+          // سطر القطعة بعملة الدفع قبل الضريبة والخصم — كما في «قيمة المنتجات» في الملخّص
+          items: base.items.map((i, k) => ({ ...i, chargeSubtotalMinorUnits: (charged[k] ?? 0n).toString() })),
+          chargeTotalMinorUnits: (s.chargeTotalMinorUnits ?? 0n).toString(),
+          returnable:
+            s.status === 'delivered' &&
+            !!s.deliveredAt &&
+            Date.now() - s.deliveredAt.getTime() <= returnWindowDays * 86_400_000,
+          reviewable: s.status === 'delivered' || s.status === 'completed',
+        };
+      }),
     };
   }
 
@@ -328,6 +341,28 @@ export class OrderQueryService {
     };
   }
 
+  /**
+   * صافي البائع الفعلي لكل فرعي من دفتره لا من لقطة الطلب: الاسترداد يُقيَّد في
+   * الدفتر ولا يغيّر اللقطة، فكان «صافي أرباحك 92.000» يُعرض لطلب رُدّ كله (J-03،
+   * 18 أكتوبر 2026). قيود الفرعي كلها بمرجعه، وتحرير المعلّق قيدان متقابلان صافيهما صفر.
+   * فرعي بلا قيود بعد يغيب عن الخريطة فتُستعمل لقطته.
+   */
+  private async ledgerNets(vendorId: string, subOrderIds: readonly string[]): Promise<Map<string, bigint>> {
+    if (subOrderIds.length === 0) return new Map();
+    const rows = await this.prisma.ledgerEntry.groupBy({
+      by: ['refId', 'direction'],
+      where: { vendorId, refType: 'sub_order', refId: { in: [...subOrderIds] } },
+      _sum: { amountMinorUnits: true },
+    });
+    const out = new Map<string, bigint>();
+    for (const r of rows) {
+      if (!r.refId) continue;
+      const v = r._sum.amountMinorUnits ?? 0n;
+      out.set(r.refId, (out.get(r.refId) ?? 0n) + (r.direction === 'credit' ? v : -v));
+    }
+    return out;
+  }
+
   private async returnWindow(): Promise<number> {
     const row = await this.prisma.setting.findUnique({ where: { key: 'return_window_days' } });
     const v = Number(row?.valueJson);
@@ -335,13 +370,31 @@ export class OrderQueryService {
   }
 }
 
+/**
+ * «ألغته الإدارة» حالةٌ يصلها النظام أيضاً (انقضاء مهلة القبول) — الفاعل في سطر
+ * التاريخ يفرّق: بلا دور منفّذ فهو آلي، ويُسمّى كذلك لا باسم الإدارة (J-03).
+ */
+const SYSTEM_CANCEL = 'أُلغي آلياً';
+const labelOf = (to: string, actorRole: string | null): string =>
+  to === 'canceled_by_admin' && actorRole === null ? SYSTEM_CANCEL : STATUS_LABELS[to as SubOrderStatus];
+
+/** القطع التي عادت بطلب إرجاع لم يُرفض — ما سواها من المُسترَد أُلغي لا «أُرجع» */
+function returnedQty(s: SubOrderRow, orderItemId: string): number {
+  return s.returns
+    .filter((r) => r.status !== 'rejected')
+    .flatMap((r) => (Array.isArray(r.itemsJson) ? (r.itemsJson as { orderItemId?: string; qty?: number }[]) : []))
+    .filter((l) => l.orderItemId === orderItemId)
+    .reduce((n, l) => n + (Number(l.qty) || 0), 0);
+}
+
 function present(s: SubOrderRow, audience: TransitionActor) {
   const status = s.status as SubOrderStatus;
+  const canceledBySystem = s.statusHistory.some((h) => h.toStatus === 'canceled_by_admin' && h.actorRole === null);
   return {
     id: s.id,
     number: s.subOrderNumber,
     status,
-    statusLabel: STATUS_LABELS[status],
+    statusLabel: status === 'canceled_by_admin' && canceledBySystem ? SYSTEM_CANCEL : STATUS_LABELS[status],
     // الأزرار مشتقّة من الجدول نفسه الذي يرفض على الخادم — لا قائمتان تتباعدان
     actions: allowedFor(status, audience).filter((to) => !(audience === 'customer' && to === 'return_requested')),
     currency: s.settlementCurrency,
@@ -356,11 +409,14 @@ function present(s: SubOrderRow, audience: TransitionActor) {
     items: s.items.map((i) => ({
       ...i,
       unitPriceMinorUnits: i.unitPriceMinorUnits.toString(),
+      lineSubtotalMinorUnits: i.lineSubtotalMinorUnits.toString(),
       lineTotalMinorUnits: i.lineTotalMinorUnits.toString(),
+      // من المُسترَد: ما عاد بإرجاع — والباقي (refundedQty − returnedQty) أُلغي
+      returnedQty: Math.min(i.refundedQty, returnedQty(s, i.id)),
     })),
     history: s.statusHistory.map((h) => ({
       ...h,
-      toLabel: STATUS_LABELS[h.toStatus as SubOrderStatus],
+      toLabel: labelOf(h.toStatus, h.actorRole),
     })),
     shipment: s.shipment,
     returns: s.returns,
@@ -372,6 +428,26 @@ function present(s: SubOrderRow, audience: TransitionActor) {
     })),
     disputes: s.disputes,
   };
+}
+
+/**
+ * أسطر الفرعي بعملة الدفع: بنوده المحوَّلة في لقطة التسعير (charge.items) موزّعةً
+ * على أسطره بنسبة قيمتها — فمجموعها بنود المتجر في «قيمة المنتجات» بالضبط، كما في
+ * السلة. طلب بلا لقطة: يُحوَّل مجموعه بلقطة صرف الفرعي.
+ */
+function chargedLines(
+  snapshot: Prisma.JsonValue | null,
+  s: { vendorId: string; fxRateSnapshot: Prisma.Decimal; items: readonly { lineSubtotalMinorUnits: bigint }[] },
+): bigint[] {
+  const subtotals = s.items.map((i) => i.lineSubtotalMinorUnits);
+  const subs = (snapshot as { subOrders?: { vendorId?: string; charge?: { items?: string } }[] } | null)?.subOrders ?? [];
+  const fromSnapshot = subs.find((x) => x.vendorId === s.vendorId)?.charge?.items;
+  const rate = Number(s.fxRateSnapshot);
+  const items =
+    fromSnapshot !== undefined
+      ? BigInt(fromSnapshot)
+      : BigInt(Math.round(Number(subtotals.reduce((a, b) => a + b, 0n)) / (rate > 0 ? rate : 1)));
+  return allocate(items, subtotals);
 }
 
 /** أسطر الطلب من لقطة التسعير — لطلب لم يُقسَّم بعد (ينتظر التحويل أو أُلغي قبله) */

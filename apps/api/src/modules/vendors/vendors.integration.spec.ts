@@ -384,6 +384,13 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(resubmit.statusCode, resubmit.body).toBe(200);
     expect(resubmit.json().status).toBe('in_review');
     expect(resubmit.json().rejectionReason).toBeNull();
+    // ومن يراجع المتاجر يعرف أنه أعاد الإرسال (19 أكتوبر 2026)
+    const reviewer = await prisma.user.findUniqueOrThrow({ where: { email: `admin.${SUFFIX}@basta.test` } });
+    const told = await prisma.notification.findFirst({
+      where: { userId: reviewer.id, templateCode: 'admin_vendor_submitted', channel: 'in_app', payloadJson: { path: ['link'], equals: `/admin/vendors/${vendorId}` } },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(told?.payloadJson).toMatchObject({ kind: 'أعاد إرسال طلبه بعد الرفض' });
 
     const approve = await app.inject({
       method: 'POST',
@@ -445,16 +452,16 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
 
   it('VD-07: البائع المعتمَد ينشر أول منتج — الرحلة اكتملت', async () => {
     if (!dbUp) return;
-    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'men-clothing' } });
     // «الخامة» سمة إلزامية على فرع الأزياء — بلا ملئها يرفض النشر، وهذا مقصود
     const material = await prisma.attribute.findFirstOrThrow({ where: { code: 'material' } });
     const create = await app.inject({
       method: 'POST',
       ...api('/vendor/products', sellerToken),
       payload: {
+        // المتجر يبدأ بالفئات الثماني المقترحة، ولا منتج بلا فئة
+        vendorCategoryId: (await prisma.vendorCategory.findFirstOrThrow({ where: { vendorId }, orderBy: { sort: 'asc' } })).id,
         nameAr: 'قميص قطني',
         nameEn: 'Cotton shirt',
-        categoryId: category.id,
         attributes: [{ attributeId: material.id, text: 'قطن 100%' }],
         variants: [{ sku: `SH-${SUFFIX}`, price: '19.900', stock: 5 }],
       },
@@ -462,7 +469,7 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(create.statusCode, create.body).toBe(201);
     const productId = create.json().id;
 
-    // الصورة شرط الإرسال — يرفعها من المحرّر كما يرفعها المتصفّح
+    // الصورة شرط النشر — يرفعها من المحرّر كما يرفعها المتصفّح
     const png = await sharp({ create: { width: 600, height: 600, channels: 3, background: { r: 140, g: 30, b: 50 } } }).png().toBuffer();
     const photo = multipart('shirt.png', png, 'image/png');
     const uploaded = await app.inject({
@@ -478,8 +485,8 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
       ...api(`/vendor/products/${productId}/publish`, sellerToken),
     });
     expect(publish.statusCode, publish.body).toBe(200);
-    // Q-15: النشر يضع المنتج في مراجعة الإدارة لا في المتجر مباشرةً
-    expect(publish.json().status).toBe('pending_review');
+    // لا مراجعة (15 أكتوبر 2026): المتجر المعتمد ينشر فيظهر منتجه مباشرةً
+    expect(publish.json().status).toBe('active');
   });
 });
 
@@ -493,14 +500,13 @@ describe('بوابة 06 · البند الثاني — المعلَّق لا ي�
     });
     expect(suspend.statusCode, suspend.body).toBe(204);
 
-    const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'men-clothing' } });
     const material = await prisma.attribute.findFirstOrThrow({ where: { code: 'material' } });
     const create = await app.inject({
       method: 'POST',
       ...api('/vendor/products', sellerToken),
       payload: {
+        vendorCategoryId: (await prisma.vendorCategory.findFirstOrThrow({ where: { vendorId }, orderBy: { sort: 'asc' } })).id,
         nameAr: 'قميص آخر',
-        categoryId: category.id,
         attributes: [{ attributeId: material.id, text: 'كتّان' }],
         variants: [{ sku: `SH2-${SUFFIX}`, price: '22.000', stock: 3 }],
       },
@@ -516,7 +522,7 @@ describe('بوابة 06 · البند الثاني — المعلَّق لا ي�
      * السبب هو التعليق لا نقص في المنتج. بلا هذا التأكيد يمرّ الاختبار
      * على منتج ناقص السمات ويبدو أن التعليق يحرس وهو لم يُستدعَ أصلاً.
      */
-    expect(publish.json().details.reasons.join(' ')).toMatch(/المتجر لم يُعتمد/);
+    expect(publish.json().details.reasons.join(' ')).toMatch(/المتجر معلَّق/);
   });
 
   it('التعليق يمنع تعديل بيانات المتجر كذلك', async () => {

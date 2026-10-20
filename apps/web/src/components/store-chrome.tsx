@@ -39,14 +39,17 @@ export function CartButton() {
   );
 }
 
-/** رقائق الأقسام تحت الرأس — القسم المفتوح بلون العلامة الخفيف */
-export function CategoryStrip({ categories }: { categories: { slug: string; nameAr: string }[] }) {
+/**
+ * رقائق المتاجر تحت الرأس — المتجر المفتوح بلون العلامة الخفيف. كانت رقائق أقسام
+ * عامة، وسقطت الأقسام العامة حين صارت الفئات لكل متجر (14 أكتوبر 2026).
+ */
+export function ShopStrip({ shops }: { shops: { slug: string; nameAr: string }[] }) {
   const pathname = usePathname();
   return (
     <>
-      {categories.map((c) => {
-        const href = `/c/${c.slug}`;
-        const active = decodeURIComponent(pathname) === href;
+      {shops.map((c) => {
+        const href = `/s/${encodeURIComponent(c.slug)}`;
+        const active = decodeURIComponent(pathname) === `/s/${c.slug}`;
         return (
           <Link
             key={c.slug}

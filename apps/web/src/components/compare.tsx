@@ -1,14 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { EmptyState, PageHead, Spinner } from '@/components/ui';
 import {
   COMPARE_MAX,
   addToCompare,
   removeFromCompare,
-  restartCompare,
   priceLabel,
   stockOf,
   useCompare,
@@ -32,22 +31,11 @@ export function productCount(n: number): string {
 /**
  * «قارن» في صفحة المنتج — زرّ تبديل: مضغوط حين يكون المنتج في القائمة،
  * والضغط ثانيةً يزيله. اسمه ثابت («قارن») وحالته في aria-pressed.
- * منتج من قسم آخر يسأل قبل أن يستبدل القائمة: لا يُمسح اختيار المشتري بصمت.
  */
 export function CompareToggle({ item }: { item: CompareItem }) {
   const list = useCompare();
   const inList = list.some((x) => x.slug === item.slug);
   const [message, setMessage] = useState('');
-  const [asking, setAsking] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const current = list[0]?.categoryNameAr ?? '';
-
-  useEffect(() => {
-    const el = dialog.current;
-    if (!el) return;
-    if (asking && !el.open) el.showModal();
-    if (!asking && el.open) el.close();
-  }, [asking]);
 
   useEffect(() => {
     if (!message) return;
@@ -64,7 +52,6 @@ export function CompareToggle({ item }: { item: CompareItem }) {
     const result = addToCompare(item);
     if (result === 'added') setMessage('أُضيف إلى المقارنة');
     else if (result === 'full') setMessage(`الحد الأقصى ${COMPARE_MAX} منتجات للمقارنة. أزل منتجاً من الشريط أولاً.`);
-    else if (result === 'other-category') setAsking(true);
   }
 
   return (
@@ -83,34 +70,6 @@ export function CompareToggle({ item }: { item: CompareItem }) {
       <p className="sx-toast" role="status">
         {message}
       </p>
-
-      <dialog ref={dialog} className="sx-dialog" aria-labelledby="sx-cmp-ask" onClose={() => setAsking(false)}>
-        <div className="sx-dialog__body">
-          <h2 id="sx-cmp-ask" className="sx-dialog__title">
-            ابدأ مقارنة جديدة؟
-          </h2>
-          <p>
-            المقارنة لمنتجات القسم نفسه، وقائمتك الآن من قسم «{current}». نبدأ قائمة جديدة بهذا المنتج من قسم «
-            {item.categoryNameAr}»؟
-          </p>
-        </div>
-        <div className="sx-dialog__foot">
-          <button type="button" className="btn btn--secondary" onClick={() => setAsking(false)}>
-            إلغاء
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => {
-              restartCompare(item);
-              setAsking(false);
-              setMessage('بدأت مقارنة جديدة بهذا المنتج');
-            }}
-          >
-            ابدأ مقارنة جديدة
-          </button>
-        </div>
-      </dialog>
     </>
   );
 }
@@ -134,7 +93,7 @@ export function CompareBar() {
         <span className="sx-cmpbar__text">
           <span className="sx-cmpbar__title">المقارنة: {productCount(list.length)}</span>
           <span className="sx-cmpbar__note">
-            {list.length < 2 ? 'أضف منتجاً آخر من القسم نفسه لتقارن' : `حتى ${COMPARE_MAX} منتجات من القسم نفسه`}
+            {list.length < 2 ? 'أضف منتجاً آخر لتقارن' : `حتى ${COMPARE_MAX} منتجات`}
           </span>
         </span>
       </span>
@@ -317,12 +276,12 @@ export function CompareView() {
             icon="scale"
             title="لا منتجات للمقارنة"
             actions={
-              <Link className="btn btn--primary" href="/categories">
-                تصفّح الأقسام
+              <Link className="btn btn--primary" href="/shops">
+                تصفّح المتاجر
               </Link>
             }
           >
-            أضف حتى أربعة منتجات من القسم نفسه من زرّ المقارنة في صفحة المنتج.
+            أضف حتى أربعة منتجات من زرّ المقارنة في صفحة المنتج.
           </EmptyState>
         </div>
       </div>
@@ -332,7 +291,6 @@ export function CompareView() {
   const fetched = list.map((x) => pages[x.slug]);
   const failed = fetched.some((p) => p === 'error');
   const rows = buildRows(fetched);
-  const category = list[0]!;
 
   return (
     <div className="sx-page">
@@ -340,8 +298,7 @@ export function CompareView() {
         title="قارن المنتجات"
         meta={
           <>
-            <span className="num">{list.length}</span> من <span className="num">{COMPARE_MAX}</span> منتجات · من قسم{' '}
-            {category.categoryNameAr}
+            <span className="num">{list.length}</span> من <span className="num">{COMPARE_MAX}</span> منتجات
           </>
         }
         actions={
@@ -404,8 +361,8 @@ export function CompareView() {
       {list.length < COMPARE_MAX ? (
         <p className="sx-cmp__more">
           <Icon name="info" size={15} />
-          {list.length < 2 ? 'أضف منتجاً آخر من القسم نفسه لتقارن.' : 'يمكنك إضافة منتجات أخرى من القسم نفسه.'}{' '}
-          <Link href={`/c/${category.categorySlug}`}>تصفّح {category.categoryNameAr}</Link>
+          {list.length < 2 ? 'أضف منتجاً آخر لتقارن.' : 'يمكنك إضافة منتجات أخرى.'}{' '}
+          <Link href="/shops">تصفّح المتاجر</Link>
         </p>
       ) : null}
     </div>

@@ -16,9 +16,8 @@ const RANGE_COLUMNS: readonly (readonly [table: string, column: string])[] = [
   ['carts', 'createdAt'],
 ];
 
-/** طابورا اللوحة: فهرس جزئي بشرط الطابور نفسه */
+/** طابور اللوحة: فهرس جزئي بشرط الطابور نفسه (طابور المنتجات سقط مع مراجعتها — 15 أكتوبر 2026) */
 const QUEUES: readonly (readonly [index: string, predicate: RegExp])[] = [
-  ['products_review_queue_idx', /pending_review/],
   ['sub_orders_awaiting_vendor_idx', /awaiting_vendor/],
 ];
 

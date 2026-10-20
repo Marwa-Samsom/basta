@@ -11,15 +11,15 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { NobleCryptoPlugin, ScureBase32Plugin, generateSecret, generateSync } from 'otplib';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
+import { AdminAlertsScheduler, ReportsService } from '../admin/public';
 import { hashPassword } from '../identity/public';
 import { LedgerService } from '../finance/public';
 import { NotificationsService } from '../notifications/public';
 import { FakePaymentProvider } from '../payments/public';
 import { TrackingService } from '../shipping/public';
-import { toCharge } from './domain/refunds';
 import { OrderLifecycleService, OrderScheduler } from './public';
 import { REFUND_STALE_MS, stalledRefund } from './application/order-lifecycle.service';
 
@@ -162,7 +162,6 @@ beforeAll(async () => {
   tracking = app.get(TrackingService);
   lifecycle = app.get(OrderLifecycleService);
 
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
 
   // بائعان بعملتين: الريال (تحويل) والدينار (عملة الدفع نفسها)
   for (const [tag, currency, price] of [
@@ -189,7 +188,7 @@ beforeAll(async () => {
       },
     });
     const product = await prisma.product.create({
-      data: { vendorId: vendor.id, categoryId: category.id, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
+      data: { vendorId: vendor.id, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
     });
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `SKU-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: price, optionsKey: '', isActive: true },
@@ -276,6 +275,31 @@ describe('بوابة 09 · البند 1 — الانتقال غير المسمو
   });
 });
 
+describe('تفاصيل طلب المشتري — أسطر القطع بعملة الدفع (18 أكتوبر 2026)', () => {
+  it('أسطر القطع تجمع «قيمة المنتجات» بالضبط، ومع قطعة الريال سعرها بعملة المتجر', async () => {
+    if (!dbUp) return;
+    const { order } = await placeOrder([2, 1]);
+    const res = await call('GET', `/me/orders/${order.orderNumber}`, buyer.token);
+    expect(res.statusCode, res.body).toBe(200);
+    const view = res.json() as {
+      currency: string;
+      itemsSubtotalMinorUnits: string;
+      stores: { currency: string; items: { qty: number; lineSubtotalMinorUnits: string; chargeSubtotalMinorUnits: string }[] }[];
+    };
+    expect(view.currency).toBe('JOD');
+    const lines = view.stores.flatMap((s) => s.items);
+    // كان السطر بعملة المتجر شاملاً الضريبة والملخّص بعملة الدفع بلاها، فلا يُقارَنان
+    expect(String(lines.reduce((a, l) => a + BigInt(l.chargeSubtotalMinorUnits), 0n))).toBe(view.itemsSubtotalMinorUnits);
+
+    const sar = view.stores.find((s) => s.currency === 'SAR')!.items[0]!;
+    expect(sar.lineSubtotalMinorUnits).toBe('39800');
+    expect(sar.chargeSubtotalMinorUnits).not.toBe('39800');
+    const jod = view.stores.find((s) => s.currency === 'JOD')!.items[0]!;
+    expect(jod.chargeSubtotalMinorUnits).toBe(jod.lineSubtotalMinorUnits);
+    expect(jod.chargeSubtotalMinorUnits).toBe('12500');
+  });
+});
+
 describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => {
   it('قطعة من ثلاث: يُردّ نصيبها بسعر اللقطة، وتعود قطعة واحدة للمخزون', async () => {
     if (!dbUp) return;
@@ -303,8 +327,11 @@ describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => 
     });
     expect(movement?.delta).toBe(1);
 
-    // المبلغ: ثلث السطر بعملة البائع، محوَّلاً لعملة الدفع بسعر اللقطة لا سعر اليوم
-    const expected = toCharge(line.lineTotalMinorUnits / 3n, a.fxRateSnapshot.toString());
+    // المبلغ: ثلث ما دفعه المشتري لقطع المتجر بعملة الدفع — مدفوع الفرعي في اللقطة ناقص
+    // شحنه، لأسفل. لا تحويل نصيب البائع قطعةً قطعة: ذاك كان يقرّب لأقرب (J-05)
+    type Snap = { subOrders: { vendorId: string; charge: { total: string; shipping: string } }[] };
+    const paid = (order.pricingSnapshot as unknown as Snap).subOrders.find((x) => x.vendorId === vendors[0]!.vendorId)!.charge;
+    const expected = (BigInt(paid.total) - BigInt(paid.shipping)) / 3n;
     const refunds = await prisma.refund.findMany({ where: { subOrderId: a.id } });
     expect(refunds).toHaveLength(1);
     expect(refunds[0]!.amountMinorUnits).toBe(expected);
@@ -318,7 +345,75 @@ describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => 
     expect(item.refundedQty).toBe(1);
     const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } });
     expect(payment.status).toBe('partially_refunded');
+    // بقيت قطعتان عند المشتري: «تم التسليم» لا «مُسترَد» نهائياً (J-05، 19 أكتوبر 2026)
+    expect(await statusOf(a.id)).toBe('delivered');
+  });
+
+  it('بعد إرجاع جزئي: يُرجَع الباقي في مهلته، و«مُسترَد» حين لا يبقى شيء — بلا إشعار تسليم ثانٍ', async () => {
+    if (!dbUp) return;
+    const { a, order } = await placeOrder([2, 1]);
+    await deliver(0, a.id);
+    const line = a.items[0]!;
+    const returnOf = (qty: number) =>
+      call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+        items: [{ orderItemId: line.id, qty }],
+        reasonCode: 'size_issue',
+      });
+    const deliveredNotices = () =>
+      prisma.notification.count({
+        where: { userId: buyer.userId, templateCode: 'order_status_changed', payloadJson: { path: ['order_number'], equals: order.orderNumber } },
+      });
+
+    const first = await returnOf(1);
+    expect(first.statusCode, first.body).toBe(201);
+    const notices = await deliveredNotices();
+    expect((await vendorMove(0, a.id, 'returned')).statusCode).toBe(200);
+    expect(await statusOf(a.id)).toBe('delivered');
+    const back = await prisma.subOrderStatusHistory.findFirst({
+      where: { subOrderId: a.id, fromStatus: 'returned', toStatus: 'delivered' },
+    });
+    expect(back?.actorRole).toBeNull();
+    // ما وصله لم يتغيّر: لا «تم التسليم» ثانية في بريده
+    expect(await deliveredNotices()).toBe(notices);
+
+    // المتبقّي وحده يُرجَع — والزائد عليه يُرفض برقمه
+    const tooMany = await returnOf(2);
+    expect(tooMany.statusCode).toBe(400);
+    expect(tooMany.json().message).toBe('الكمية المتاحة للإرجاع 1.');
+    const second = await returnOf(1);
+    expect(second.statusCode, second.body).toBe(201);
+    expect((await vendorMove(0, a.id, 'returned')).statusCode).toBe(200);
+
+    // لا قطعة باقية: «مُسترَد»، واستردادان بمجموع السطر كله
     expect(await statusOf(a.id)).toBe('refunded');
+    const refunds = await prisma.refund.findMany({ where: { subOrderId: a.id } });
+    expect(refunds).toHaveLength(2);
+    expect(await prisma.orderItem.findUniqueOrThrow({ where: { id: line.id } })).toMatchObject({ refundedQty: 2 });
+  });
+
+  it('طلبا إرجاع متزامنان: واحد يُسجَّل بصفّ واحد، والآخر يُرفض بلا أثر', async () => {
+    if (!dbUp) return;
+    const { a, order } = await placeOrder([2, 1]);
+    await deliver(0, a.id);
+    const body = { items: [{ orderItemId: a.items[0]!.id, qty: 1 }], reasonCode: 'damaged' };
+    const url = `/me/orders/${order.orderNumber}/stores/${a.id}/return`;
+    const results = await Promise.all([call('POST', url, buyer.token, body), call('POST', url, buyer.token, body)]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    // كان الخاسر يترك صفّاً «requested» يتيماً: مكرَّراً عند الإدارة ومانعاً تحرير الرصيد
+    const rows = await prisma.returnRequest.findMany({ where: { subOrderId: a.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(results.find((r) => r.statusCode === 201)!.json().returnRequestId);
+
+    // وطلب ثالث والأول قائم يسمع السبب الحقيقي، لا «بعد التسليم وحده»
+    const third = await call('POST', url, buyer.token, body);
+    expect(third.statusCode).toBe(409);
+    expect(third.json().message).toMatch(/طلب إرجاع قائم/);
+    expect(await prisma.returnRequest.count({ where: { subOrderId: a.id } })).toBe(1);
+
+    // والقاعدة نفسها ترفض صفّاً قائماً ثانياً ولو كتبه غير هذا المسار
+    await expect(
+      prisma.returnRequest.create({ data: { subOrderId: a.id, itemsJson: body.items, reasonCode: 'damaged', mediaKeys: [] } }),
+    ).rejects.toThrow(/return_requests_one_open_idx|Unique constraint/);
   });
 
   it('لا إرجاع لأكثر مما اشتُري، ولا قبل التسليم', async () => {
@@ -356,6 +451,9 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     expect(await stock(vendors[1]!.variantId)).toBe(stockB + 2);
     const refunds = await prisma.refund.findMany({ where: { subOrderId: b.id } });
     expect(refunds.map((r) => r.amountMinorUnits)).toEqual([b.chargeTotalMinorUnits]);
+    // البائع يعرف أن المشتري ألغى، بالسبب الذي كتبه — فلا يجهّز طلباً مُلغى (J-03)
+    const told = await prisma.notification.findMany({ where: { userId: vendors[1]!.userId, templateCode: 'vendor_order_canceled' } });
+    expect(told.some((n) => JSON.stringify(n.payloadJson).includes(b.subOrderNumber) && JSON.stringify(n.payloadJson).includes('غيّرت رأيي'))).toBe(true);
 
     // أخوه: الحالة والتاريخ والمخزون والمبالغ كما كانت
     const aAfter = await prisma.subOrder.findUniqueOrThrow({ where: { id: a.id }, include: { statusHistory: true } });
@@ -415,6 +513,26 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     }
     expect(await statusOf(a.id)).toBe('refunded');
     expect(await statusOf(b.id)).toBe('accepted');
+
+    // J-03 (18 أكتوبر 2026): البائع يعرف بالإلغاء، ويراه «أُلغي آلياً» لا «ألغته الإدارة»،
+    // والقطعة «أُلغي» لا «أُرجع»، وصافيه من دفتره صفر لا لقطة الطلب
+    const told = await prisma.notification.findMany({ where: { userId: vendors[0]!.userId, templateCode: 'vendor_order_canceled' } });
+    expect(told.some((n) => JSON.stringify(n.payloadJson).includes(a.subOrderNumber) && n.channel === 'in_app')).toBe(true);
+
+    const seen = await call('GET', `/vendor/orders/${a.id}`, vendors[0]!.token);
+    expect(seen.statusCode, seen.body).toBe(200);
+    const v = seen.json() as {
+      history: { toStatus: string; toLabel: string }[];
+      items: { refundedQty: number; returnedQty: number }[];
+      financials: { netMinorUnits: string; refundedMinorUnits: string; netAfterRefundsMinorUnits: string };
+    };
+    expect(v.history.find((h) => h.toStatus === 'canceled_by_admin')?.toLabel).toBe('أُلغي آلياً');
+    expect(v.items[0]).toMatchObject({ refundedQty: 1, returnedQty: 0 });
+    expect(v.financials.netAfterRefundsMinorUnits).toBe('0');
+    expect(v.financials.refundedMinorUnits).toBe(v.financials.netMinorUnits);
+
+    const row = (await call('GET', `/vendor/orders?search=${a.subOrderNumber}`, vendors[0]!.token)).json().items[0];
+    expect(row.netMinorUnits).toBe('0');
   }, 120_000);
 });
 
@@ -476,6 +594,13 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect(res.body).not.toContain(ADDRESS.street);
     // حدث متأخر لا يعيد المسار للخلف
     expect(await tracking.record(trk, 'in_transit')).toBe(false);
+
+    // إشعار الشحن يحمل رقم الشركة نفسه الذي يُبحث به هنا (BUY-086) — مرة واحدة
+    const notices = await prisma.notification.findMany({
+      where: { userId: buyer.userId, templateCode: 'order_shipped', channel: 'in_app', payloadJson: { path: ['tracking_number'], equals: trk } },
+    });
+    expect(notices).toHaveLength(1);
+    expect(notices[0]!.payloadJson).toMatchObject({ tracking_label: 'رقم التتبّع', store_name: expect.any(String) });
   });
 
   it('رقم التتبّع لشحنته وحدها: لا يُنسخ لشركة الشحن، والتوصيل الذاتي لا يُظهر شحنة غيره', async () => {
@@ -522,15 +647,19 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect((await call('GET', `/vendor/disputes/${id}`, vendors[1]!.token)).statusCode).toBe(404);
     expect((await call('POST', `/me/disputes/${id}/escalate`, buyer.token)).statusCode).toBe(204);
 
-    const later = new Date(Date.now() + 15 * 86_400_000);
-    await scheduler.completeDelivered(later);
+    // تسليم الاختبار يُرجَّع إلى ما قبل مدة التعليق، والمهمة بالوقت الحقيقي. كانت تُستدعى
+    // «بعد 15 يوماً» فتُكمل كل طلب مُسلَّم في القاعدة — ومنها طلبات التجربة اليدوية الحيّة
+    // على قاعدة التطوير، فيُغلق إرجاعها قبل مهلته (J-02، 18 أكتوبر 2026)
+    await prisma.subOrder.updateMany({ where: { id: { in: [a.id, b.id] } }, data: { deliveredAt: new Date(Date.now() - 15 * 86_400_000) } });
+    const now = new Date();
+    await scheduler.completeDelivered(now);
     expect(await statusOf(a.id)).toBe('delivered');
     expect(await statusOf(b.id)).toBe('completed');
 
     const queue = await call('GET', '/admin/disputes', admin.token);
     expect(queue.json().map((d: { id: string }) => d.id)).toContain(id);
     expect((await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: 'أُرسل البديل وقبله المشتري' })).statusCode).toBe(204);
-    await scheduler.completeDelivered(later);
+    await scheduler.completeDelivered(now);
     expect(await statusOf(a.id)).toBe('completed');
   });
 
@@ -722,5 +851,213 @@ describe('حسم النزاع لصالح المشتري يردّ ماله — و
     const r = await call('POST', `/admin/orders/stores/${a.id}/transition`, admin.token, { to: 'refunded' });
     expect(r.statusCode).toBeGreaterThanOrEqual(400);
     expect(await statusOf(a.id)).toBe('delivered');
+  });
+});
+
+describe('إشعارات النزاع — التاجر بالفتح والتصعيد، والطرفان بالقرار (J-06، 19 أكتوبر 2026)', () => {
+  // داخل الموقع وحده يكفي للعدّ: كل حدث له نسخة in_app مهما أُطفئ بريده
+  const told = async (userId: string, since: Date) =>
+    prisma.notification.findMany({
+      where: { userId, channel: 'in_app', createdAt: { gte: since } },
+      select: { templateCode: true, payloadJson: true },
+    });
+  const codes = async (userId: string, since: Date) => (await told(userId, since)).map((n) => n.templateCode);
+  const payloadOf = async (userId: string, since: Date, code: string) =>
+    (await told(userId, since)).find((n) => n.templateCode === code)?.payloadJson;
+
+  it('المشتري يفتح ويصعّد: التاجر يعرف بكلٍّ — والحسم للمتجر يصل الطرفين بسببه، ولا يصل المتجر الآخر شيء', async () => {
+    if (!dbUp) return;
+    const { a, b } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    await deliver(1, b.id);
+    // مدير لا يحمل disputes.resolve: لا يصله نزاع لا يملك حسمه
+    const bystander = await user('admin-no-disputes', 'admin', ['orders.manage']);
+    const since = new Date();
+
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_received', message: 'لم يصلني شيء' });
+    expect(opened.statusCode, opened.body).toBe(201);
+    const id = opened.json().id as string;
+    // كان التاجر لا يعرف بنزاع جمّد ماله إلا إن فتح صفحته
+    expect(await payloadOf(vendors[0]!.userId, since, 'vendor_dispute_opened')).toMatchObject({
+      order_number: a.subOrderNumber,
+      reason: 'لم يصلني الطلب',
+      link: `/vendor/disputes/${id}`,
+    });
+
+    expect((await call('POST', `/me/disputes/${id}/escalate`, buyer.token)).statusCode).toBe(204);
+    expect(await codes(vendors[0]!.userId, since)).toContain('vendor_dispute_escalated');
+    // من صعّد لا يُبلَّغ بما فعله هو
+    expect(await codes(buyer.userId, since)).not.toContain('dispute_escalated');
+    // ومن يحسم من المديرين يعرف أن نزاعاً يجمّد مال متجر ينتظره — ومن لا يحسم لا
+    expect(await payloadOf(admin.userId, since, 'admin_dispute_escalated')).toMatchObject({
+      order_number: a.subOrderNumber,
+      reason: 'لم يصلني الطلب',
+      link: '/admin/disputes',
+    });
+    expect(await codes(bystander.id, since)).toEqual([]);
+    // وما يضيفه طرف بعد التصعيد يقرؤه من يحسم
+    expect((await call('POST', `/me/disputes/${id}/messages`, buyer.token, { body: 'صورة الطرد المفتوح مرفقة' })).statusCode).toBe(204);
+    expect(await payloadOf(admin.userId, since, 'admin_dispute_message')).toMatchObject({ order_number: a.subOrderNumber, sender: 'المشتري' });
+
+    const resolved = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: 'أثبت المتجر التسليم بتوقيع المستلم' });
+    expect(resolved.statusCode, resolved.body).toBe(204);
+    expect(await payloadOf(buyer.userId, since, 'dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالح المتجر',
+      resolution: 'أثبت المتجر التسليم بتوقيع المستلم',
+      link: `/account/disputes/${id}`,
+    });
+    expect(await payloadOf(vendors[0]!.userId, since, 'vendor_dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالحكم، ويُحرَّر مال الطلب بموعده',
+      resolution: 'أثبت المتجر التسليم بتوقيع المستلم',
+    });
+    // المتجر الآخر في الطلب نفسه: لا شيء من نزاع غيره
+    expect((await codes(vendors[1]!.userId, since)).filter((c) => c.includes('dispute'))).toEqual([]);
+  });
+
+  it('التاجر يصعّد: المشتري يُبلَّغ — والحسم للمشتري يقول لكلٍّ ما يعنيه لماله', async () => {
+    if (!dbUp) return;
+    const { a } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const since = new Date();
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'damaged', message: 'وصلت مكسورة' });
+    const id = opened.json().id as string;
+
+    expect((await call('POST', `/vendor/disputes/${id}/escalate`, vendors[0]!.token)).statusCode).toBe(204);
+    expect(await codes(buyer.userId, since)).toContain('dispute_escalated');
+    expect(await codes(vendors[0]!.userId, since)).not.toContain('vendor_dispute_escalated');
+
+    const resolved = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'customer', resolution: 'الكسر ظاهر في الصور' });
+    expect(resolved.statusCode, resolved.body).toBe(204);
+    expect(await payloadOf(buyer.userId, since, 'dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالحك، ويُردّ لك ما بقي من مبلغ هذا المتجر إلى وسيلة دفعك',
+    });
+    expect(await payloadOf(vendors[0]!.userId, since, 'vendor_dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالح المشتري، ورُدّ له ما بقي من مبلغ الطلب',
+      resolution: 'الكسر ظاهر في الصور',
+    });
+    // والردّ نفسه ما زال يصل كما كان
+    expect(await codes(buyer.userId, since)).toContain('refund_issued');
+  });
+});
+
+describe('تنبيهات الإدارة الدورية — مرة لكل حالة، لمن يحمل صلاحيتها (19 أكتوبر 2026)', () => {
+  const toAdmin = (code: string) =>
+    prisma.notification.findMany({ where: { userId: admin.userId, templateCode: code, channel: 'in_app' }, select: { payloadJson: true } });
+  const about = async (code: string, orderNumber: string) =>
+    (await toAdmin(code)).filter((n) => (n.payloadJson as Record<string, string>)['order_number'] === orderNumber);
+
+  it('مرتجع لم يُستلم بعد 3 أيام: يُنبَّه من يدير الطلبات مرة واحدة', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const { a, order } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const req = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+      items: [{ orderItemId: a.items[0]!.id, qty: 1 }],
+      reasonCode: 'damaged',
+    });
+    expect(req.statusCode, req.body).toBe(201);
+    // قبل العتبة: لا شيء
+    await alerts.stalledReturns(new Date());
+    expect(await about('admin_return_stalled', a.subOrderNumber)).toHaveLength(0);
+
+    await prisma.returnRequest.update({ where: { id: req.json().returnRequestId }, data: { requestedAt: new Date(Date.now() - 4 * 86_400_000) } });
+    await alerts.stalledReturns(new Date());
+    await alerts.stalledReturns(new Date());
+    const told = await about('admin_return_stalled', a.subOrderNumber);
+    expect(told).toHaveLength(1);
+    expect(told[0]!.payloadJson).toMatchObject({ days: '4', link: '/admin/returns' });
+  });
+
+  it('طلب لم يُقبل في آخر 12 ساعة قبل إلغائه الآلي: يُنبَّه مرة — وما فاتت مهلته لا', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const { a, b } = await placeOrder([1, 1]);
+    // المهلة 48 ساعة: a بقيت له 8، و b فاتت مهلته (تلغيه مهمة الطلبات، لا تنبيه)
+    await prisma.subOrder.update({ where: { id: a.id }, data: { placedAt: new Date(Date.now() - 40 * 3_600_000) } });
+    await prisma.subOrder.update({ where: { id: b.id }, data: { placedAt: new Date(Date.now() - 50 * 3_600_000) } });
+    await alerts.acceptanceDue(new Date());
+    await alerts.acceptanceDue(new Date());
+    const told = await about('admin_acceptance_due', a.subOrderNumber);
+    expect(told).toHaveLength(1);
+    expect(told[0]!.payloadJson).toMatchObject({ hours: '8', link: '/admin/orders?due=acceptance' });
+    expect(await about('admin_acceptance_due', b.subOrderNumber)).toHaveLength(0);
+  });
+
+  // كانت الدورة تقرأ أقدم 200 وحدها، والمنبَّه عنه يبقى بينها حتى يُحسم — فما بعدها لا يُنبَّه أبداً.
+  // ظهر على قاعدة التطوير وفيها 392 طلباً تقارب مهلتها (20 أكتوبر 2026). الدفعة هنا 1 بدل 200
+  it('أكثر من دفعة: المنبَّه عنه لا يحجب ما بعده — طلبات تقارب مهلتها ومرتجعات عالقة', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const { a, b, order } = await placeOrder([1, 1]);
+    for (const [i, s] of [a, b].entries()) await deliver(i, s.id);
+    const returns = [];
+    for (const s of [a, b]) {
+      const req = await call('POST', `/me/orders/${order.orderNumber}/stores/${s.id}/return`, buyer.token, {
+        items: [{ orderItemId: s.items[0]!.id, qty: 1 }],
+        reasonCode: 'damaged',
+      });
+      expect(req.statusCode, req.body).toBe(201);
+      returns.push(req.json().returnRequestId as string);
+    }
+    // a أقدم من b في الحالتين: الدورة القديمة تعيد a في كل دفعة
+    await prisma.returnRequest.update({ where: { id: returns[0]! }, data: { requestedAt: new Date(Date.now() - 5 * 86_400_000) } });
+    await prisma.returnRequest.update({ where: { id: returns[1]! }, data: { requestedAt: new Date(Date.now() - 4 * 86_400_000) } });
+    await alerts.stalledReturns(new Date(), 1);
+    await alerts.stalledReturns(new Date(), 1);
+    for (const s of [a, b]) expect(await about('admin_return_stalled', s.subOrderNumber), s.subOrderNumber).toHaveLength(1);
+
+    const { a: c, b: d } = await placeOrder([1, 1]);
+    await prisma.subOrder.update({ where: { id: c.id }, data: { placedAt: new Date(Date.now() - 41 * 3_600_000) } });
+    await prisma.subOrder.update({ where: { id: d.id }, data: { placedAt: new Date(Date.now() - 39 * 3_600_000) } });
+    await alerts.acceptanceDue(new Date(), 1);
+    await alerts.acceptanceDue(new Date(), 1);
+    for (const s of [c, d]) expect(await about('admin_acceptance_due', s.subOrderNumber), s.subOrderNumber).toHaveLength(1);
+  });
+
+  it('انحراف في التدقيق: يُنبَّه من يرى التقارير مرة في اليوم لكل منظر — لا من لا يراها', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const auditor = await user('admin-reports', 'admin', ['reports.view']);
+    const drift = vi.spyOn(app.get(ReportsService), 'drift').mockResolvedValue([
+      { view: 'audit_wallet_drift', rows: 2 },
+      { view: 'audit_inventory_drift', rows: 0 },
+    ]);
+    try {
+      // يوم لم يمرّ على قاعدة الاختبار قبل هذا التشغيل: مفتاح التنبيه بيومه
+      const day = new Date(Date.UTC(3000, 0, 1) + Math.floor(Math.random() * 100_000) * 86_400_000);
+      expect(await alerts.auditDrift(day)).toBe(1);
+      expect(await alerts.auditDrift(day)).toBe(0);
+    } finally {
+      drift.mockRestore();
+    }
+    const told = await prisma.notification.findMany({ where: { userId: auditor.id, templateCode: 'admin_audit_drift', channel: 'in_app' } });
+    expect(told).toHaveLength(1);
+    expect(told[0]!.payloadJson).toMatchObject({ check: 'رصيد محفظة لا يطابق دفترها', rows: '2' });
+    // مدير الطلبات لا يرى التقارير: لا يصله
+    expect(await toAdmin('admin_audit_drift')).toHaveLength(0);
+  });
+});
+
+describe('قائمة طلبات المتجر — تصفية بحالة أو أكثر', () => {
+  it('تبويب «ملغى أو مُسترَد» يجمع حالاته الأربع، وحالة مفردة لا تُظهر غيرها، والمجهولة تُرفض', async () => {
+    if (!dbUp) return;
+    const { a, b, order } = await placeOrder([1, 1]);
+    expect((await call('POST', `/me/orders/${order.orderNumber}/stores/${b.id}/cancel`, buyer.token, { reason: 'غيّرت رأيي' })).statusCode).toBe(200);
+    expect(await statusOf(b.id)).toBe('refunded');
+
+    const closed = ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'];
+    const grouped = await call('GET', `/vendor/orders?status=${closed.join(',')}`, vendors[1]!.token);
+    expect(grouped.statusCode, grouped.body).toBe(200);
+    const items = grouped.json().items as { id: string; status: string }[];
+    expect(items.map((i) => i.id)).toContain(b.id);
+    for (const i of items) expect(closed).toContain(i.status);
+
+    const waiting = (await call('GET', '/vendor/orders?status=awaiting_vendor', vendors[1]!.token)).json().items as { id: string; status: string }[];
+    expect(waiting.map((i) => i.id)).not.toContain(b.id);
+    for (const i of waiting) expect(i.status).toBe('awaiting_vendor');
+    // أخوه عند المتجر الآخر لا يظهر هنا أصلاً
+    expect(items.map((i) => i.id)).not.toContain(a.id);
+
+    expect((await call('GET', '/vendor/orders?status=completed,bogus', vendors[1]!.token)).statusCode).toBe(400);
   });
 });

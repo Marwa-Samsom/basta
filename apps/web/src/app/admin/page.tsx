@@ -13,17 +13,17 @@ interface Dashboard {
   ledger: { currency: string; commissionMinorUnits: string; platformNetMinorUnits: string; vendorDuesNetMinorUnits: string }[] | null;
   activeVendors?: number;
   conversion?: { carts: number; paidOrders: number; ratePct: number | null };
-  queues: { vendors: number; products: number; payouts: number; disputes: number; overdueAcceptance: number };
+  queues: { vendors: number; payouts: number; disputes: number; overdueAcceptance: number };
   alerts: { view: string; rows: number }[];
 }
 
 /** `hot`: الطابور الذي يتأخّر فيه أحد — يُلوَّن بالتحذير ما دام فيه شيء */
 const QUEUES: { key: keyof Dashboard['queues']; label: string; sub: string; href: string; icon: IconName; hot: boolean }[] = [
   { key: 'vendors', label: 'متاجر تنتظر الاعتماد', sub: 'الأقدم أولاً', href: '/admin/vendors', icon: 'store', hot: true },
-  { key: 'products', label: 'منتجات تنتظر المراجعة', sub: 'جديدة ومعدَّلة بعد النشر', href: '/admin/products', icon: 'package', hot: true },
   { key: 'payouts', label: 'طلبات تحويل', sub: 'بانتظار الموافقة أو التحويل', href: '/admin/payouts', icon: 'wallet', hot: false },
   { key: 'disputes', label: 'نزاعات مفتوحة', sub: 'مفتوحة ومصعَّدة — الرصيد مجمَّد', href: '/admin/disputes', icon: 'scale', hot: true },
-  { key: 'overdueAcceptance', label: 'طلبات فرعية قاربت مهلة القبول', sub: 'أقل من 12 ساعة على انقضاء المهلة', href: '/admin/orders?status=processing', icon: 'clock', hot: true },
+  // القائمة نفسها التي يعدّها: كانت تفتح كل «قيد التنفيذ» فيضيع الطلب بين المئات
+  { key: 'overdueAcceptance', label: 'طلبات فرعية قاربت مهلة القبول', sub: 'أقل من 12 ساعة على انقضاء المهلة', href: '/admin/orders?due=acceptance', icon: 'clock', hot: true },
 ];
 
 const VIEW_LABELS: Record<string, string> = {

@@ -236,8 +236,8 @@ export class FinanceService {
 
     return this.prisma.$transaction(async (tx) => {
       // الموقوف لا يسحب: الإيقاف يجمّد المال حتى يُحسم سببه (نزاع، احتيال، KYC)
-      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true } });
-      if (vendor?.status !== 'approved') {
+      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true, nameAr: true } });
+      if (!vendor || vendor.status !== 'approved') {
         throw new ConflictError('حساب المتجر موقوف، والسحب متوقّف معه. راسل الدعم.', { status: vendor?.status ?? null });
       }
       const wallet = await this.ledger.lockWallet(tx, vendorId, input.currency);
@@ -279,6 +279,19 @@ export class FinanceService {
       await tx.auditLog.create({
         data: { actorUserId: userId, actorRole: 'vendor_owner', action: 'payout.request', entityType: 'PayoutRequest', entityId: payout.id, afterJson: { amount: input.amountMinorUnits.toString(), currency: input.currency } },
       });
+      // من يقرّ السحوبات يعرف: مال المتجر خرج من رصيده المتاح وينتظر موافقة (19 أكتوبر 2026)
+      await this.notifications.enqueueAdmins(
+        {
+          code: 'admin_payout_requested',
+          permission: 'payouts.approve',
+          vars: {
+            store_name: vendor.nameAr,
+            amount: formatMoney(money(input.amountMinorUnits, input.currency)),
+            link: '/admin/payouts',
+          },
+        },
+        tx,
+      );
       return present(payout);
     });
   }
@@ -364,12 +377,13 @@ export class FinanceService {
 
   // --------------------------------------------------------------- العمولات
 
+  /** القواعد السارية: العامة وما خُصّص للمتاجر */
   async commissionRules() {
     const now = new Date();
     return this.prisma.commissionRule.findMany({
-      where: { OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
+      where: { scope: { in: ['global', 'vendor'] }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
       orderBy: [{ scope: 'asc' }, { effectiveFrom: 'desc' }],
-      include: { category: { select: { nameAr: true, slug: true } }, vendor: { select: { nameAr: true } } },
+      include: { vendor: { select: { nameAr: true } } },
     });
   }
 
@@ -379,17 +393,18 @@ export class FinanceService {
    */
   async setCommission(
     adminId: string,
-    input: { scope: 'global' | 'category' | 'vendor'; categoryId?: string | null; vendorId?: string | null; rateBps: number },
+    input: { scope: 'global' | 'vendor'; vendorId?: string | null; rateBps: number },
   ) {
     if (!Number.isInteger(input.rateBps) || input.rateBps < 0 || input.rateBps > 5000) {
       throw new InvalidInputError('النسبة بين 0 و 50%.');
     }
+    if (input.scope !== 'global' && input.scope !== 'vendor') {
+      throw new InvalidInputError('النطاق: نسبة عامة أو نسبة متجر.');
+    }
     const target = {
       scope: input.scope,
-      categoryId: input.scope === 'category' ? (input.categoryId ?? null) : null,
       vendorId: input.scope === 'vendor' ? (input.vendorId ?? null) : null,
     };
-    if (input.scope === 'category' && !target.categoryId) throw new InvalidInputError('اختر الفئة.');
     if (input.scope === 'vendor' && !target.vendorId) throw new InvalidInputError('اختر المتجر.');
     const now = new Date();
     return this.prisma.$transaction(async (tx) => {
@@ -404,6 +419,25 @@ export class FinanceService {
         data: { actorUserId: adminId, actorRole: 'admin', action: 'commission.set', entityType: 'CommissionRule', entityId: rule.id, afterJson: { ...target, rateBps: input.rateBps, ended: ended.count } },
       });
       return rule;
+    });
+  }
+
+  /**
+   * المتجر يعود إلى النسبة العامة من الآن: قاعدته تُنهى ولا تُحذف، فيتبع
+   * العامة إن تغيّرت لاحقاً — نسبة خاصة تساوي العامة لا تتبعها.
+   */
+  async endVendorCommission(adminId: string, vendorId: string): Promise<{ ended: number }> {
+    const now = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const ended = await tx.commissionRule.updateMany({
+        where: { scope: 'vendor', vendorId, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
+        data: { effectiveTo: now },
+      });
+      if (ended.count === 0) throw new NotFoundError('لا نسبة خاصة سارية لهذا المتجر.', { vendorId });
+      await tx.auditLog.create({
+        data: { actorUserId: adminId, actorRole: 'admin', action: 'commission.end', entityType: 'Vendor', entityId: vendorId, afterJson: { scope: 'vendor', vendorId, ended: ended.count } },
+      });
+      return { ended: ended.count };
     });
   }
 

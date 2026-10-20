@@ -125,7 +125,6 @@ beforeAll(async () => {
   admin = await makeAdmin('root', PERMISSION_CODES);
   limited = await makeAdmin('content', ['content.manage']);
 
-  const category = await prisma.category.findUniqueOrThrow({ where: { slug: 'home' } });
   const vEmail = `vendor.${SUFFIX}@basta.test`;
   const vu = await prisma.user.create({
     data: { email: vEmail, fullName: 'بائع الإدارة', passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'vendor_owner' } } },
@@ -138,7 +137,7 @@ beforeAll(async () => {
     },
   });
   const p = await prisma.product.create({
-    data: { vendorId: v.id, categoryId: category.id, slug: `p-${SUFFIX}`, nameAr: `منتج ${SUFFIX}`, status: 'active', publishedAt: new Date() },
+    data: { vendorId: v.id, slug: `p-${SUFFIX}`, nameAr: `منتج ${SUFFIX}`, status: 'active', publishedAt: new Date() },
   });
   const variant = await prisma.productVariant.create({
     data: { productId: p.id, vendorId: v.id, sku: `SKU-${SUFFIX}`.toUpperCase(), priceMinorUnits: 15_000n, optionsKey: '', isActive: true },
@@ -203,7 +202,9 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
         }
       }
     }
-  });
+    // إرسال تجريبي لكل قالب بالتتابع: صارت القوالب أكثر من 60 (النزاع والإدارة، 19 أكتوبر
+    // 2026) فتجاوزت المهلة الافتراضية (5 ث) تحت حمل التشغيل الكامل
+  }, 30_000);
 
   it('أحداث حقيقية: طلب مدفوع يصل المشتري والبائع، وشحنه يصل المشتري', async () => {
     if (!dbUp) return;
@@ -227,8 +228,10 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
     }
     expect((await call('POST', `/vendor/orders/${sub.id}/transition`, vendor.token, { to: 'shipped', tracking: 'SELF-1234' })).statusCode).toBe(200);
     await drain(buyer.userId);
-    const shipped = await prisma.notification.findMany({ where: { userId: buyer.userId, templateCode: 'order_status_changed' } });
-    expect(shipped.some((n) => n.channel === 'in_app' && n.body?.includes('تم الشحن'))).toBe(true);
+    // إشعار الشحن يحمل المرجع، والتوصيل الذاتي لا يسمّيه «رقم تتبّع» (BUY-086)
+    const shipped = await prisma.notification.findMany({ where: { userId: buyer.userId, templateCode: 'order_shipped' } });
+    expect(shipped.find((n) => n.channel === 'in_app')?.body).toContain('مرجع التوصيل: SELF-1234');
+    expect(shipped.find((n) => n.channel === 'email')?.body).toContain('مرجع التوصيل: SELF-1234');
     // المشتري بلا اشتراك متصفّح: القناة تُتخطّى بسببها، لا تفشل ولا تُسقط شيئاً
     expect(shipped.find((n) => n.channel === 'push')?.status).toBe('skipped');
 
@@ -523,7 +526,7 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
       expect(bad.statusCode, `${JSON.stringify(linkUrl)} ${bad.body}`).toBe(400);
     }
     expect(await prisma.banner.count({ where: { titleAr: `خبيث ${SUFFIX}` } })).toBe(0);
-    const banner = await call('POST', '/admin/banners', limited.token, { placement: 'home_hero', imageKey: img.json().imageKey, linkUrl: '/categories', titleAr: `تخفيضات ${SUFFIX}`, isActive: true });
+    const banner = await call('POST', '/admin/banners', limited.token, { placement: 'home_hero', imageKey: img.json().imageKey, linkUrl: '/shops', titleAr: `تخفيضات ${SUFFIX}`, isActive: true });
     expect(banner.statusCode, banner.body).toBe(201);
     const live = (await call('GET', '/storefront/banners?placement=home_hero')).json();
     const b = live.find((x: { titleAr: string }) => x.titleAr === `تخفيضات ${SUFFIX}`);
@@ -575,11 +578,49 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     await expect(prisma.auditLog.update({ where: { id: one.id }, data: { action: 'x' } })).rejects.toThrow();
   });
 
+  it('«قاربت مهلة القبول»: البطاقة تفتح ما تعدّه وحده، بالقاعدة نفسها (J-03)', async () => {
+    if (!dbUp) return;
+    const near = await placeOrder(1);
+    const fresh = await placeOrder(1);
+    const sub = near.subOrders[0]!;
+    const hours = Number((await prisma.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } }))?.valueJson) || 48;
+    // الاختبار يعمل على قاعدة التطوير نفسها: يرجّع طلبه هو وحده، ويعيده بعدها فلا يظهر
+    // في لوحة من يجرّب يدوياً ولا تلغيه مهمة الطلبات الحيّة
+    const placedAt = new Date(Date.now() - (hours - 8) * 3_600_000);
+    await prisma.subOrder.update({ where: { id: sub.id }, data: { placedAt } });
+    try {
+      const list = await call('GET', '/admin/orders?due=acceptance', admin.token);
+      expect(list.statusCode, list.body).toBe(200);
+      type Item = { orderNumber: string; subOrders: { id: string; acceptBy: string | null; acceptanceDue: boolean }[] };
+      const items = list.json().items as Item[];
+      expect(items.map((o) => o.orderNumber)).toContain(near.orderNumber);
+      expect(items.map((o) => o.orderNumber)).not.toContain(fresh.orderNumber);
+      const mine = items.find((o) => o.orderNumber === near.orderNumber)!.subOrders.find((s) => s.id === sub.id)!;
+      expect(mine.acceptanceDue).toBe(true);
+      expect(new Date(mine.acceptBy!).getTime()).toBe(placedAt.getTime() + hours * 3_600_000);
+
+      // البطاقة تعدّ الفرعيات نفسها التي تعرضها القائمة — لا رقم بلا قائمة. القائمة كلها لا صفحتها
+      // الأولى: على قاعدة التطوير قد يقارب المهلة مئات الطلبات من تشغيلات سابقة (20 أكتوبر 2026)
+      const all: Item[] = [...items];
+      for (let page = 2; all.length < (list.json().total as number); page++) {
+        const next = (await call('GET', `/admin/orders?due=acceptance&page=${page}`, admin.token)).json().items as Item[];
+        if (next.length === 0) break;
+        all.push(...next);
+      }
+      const queued = (await call('GET', '/admin/dashboard', admin.token)).json().queues.overdueAcceptance as number;
+      expect(queued).toBe(all.flatMap((o) => o.subOrders).filter((s) => s.acceptanceDue).length);
+
+      expect((await call('GET', '/admin/orders?due=late', admin.token)).statusCode).toBe(400);
+    } finally {
+      await prisma.subOrder.update({ where: { id: sub.id }, data: { placedAt: new Date() } });
+    }
+  });
+
   it('اللوحة: طوابير العمل وتنبيهات الانحراف في مكان واحد', async () => {
     if (!dbUp) return;
     const d = await call('GET', '/admin/dashboard', admin.token);
     expect(d.statusCode).toBe(200);
-    expect(d.json().queues).toMatchObject({ vendors: expect.any(Number), products: expect.any(Number), payouts: expect.any(Number), disputes: expect.any(Number) });
+    expect(d.json().queues).toMatchObject({ vendors: expect.any(Number), payouts: expect.any(Number), disputes: expect.any(Number) });
     expect(d.json().alerts).toEqual([]);
   });
 });

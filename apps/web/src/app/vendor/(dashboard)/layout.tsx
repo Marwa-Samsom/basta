@@ -22,6 +22,8 @@ const NAV: DashNavGroup[] = [
     items: [
       { href: '/vendor', label: 'الرئيسية', icon: 'chart', exact: true },
       { href: '/vendor/products', label: 'المنتجات', icon: 'package' },
+      // فئات المتجر تحت المنتجات — يديرها البائع وحده (14 أكتوبر 2026)
+      { href: '/vendor/categories', label: 'الفئات', icon: 'list' },
       { href: '/vendor/inventory', label: 'المخزون', icon: 'boxes' },
       { href: '/vendor/orders', label: 'الطلبات', icon: 'truck' },
       { href: '/vendor/messages', label: 'الرسائل', icon: 'msg' },
@@ -79,8 +81,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   /**
    * التأهيل لم يُرسَل أو رُفض: الطريق واحد، إلى صفحة الحالة. أمّا قيد
-   * المراجعة فيدخل — VD-03 يدعوه لتجهيز منتجاته مسوّداتٍ أثناء الانتظار،
-   * والنشر وحده ممنوع حتى الاعتماد (مانع في الخادم). منعُه من اللوحة كان
+   * المراجعة فيدخل — يضيف منتجاته وينشرها أثناء الانتظار، فتظهر للمشترين لحظة
+   * اعتماد متجره (قاعدة الرؤية في الخادم، 15 أكتوبر 2026). منعُه من اللوحة كان
    * يعيد رابط «هيّئ منتجاتك» إلى صفحة الحالة نفسها في حلقة.
    */
   if (data.status === 'pending' || data.status === 'rejected') {
@@ -107,6 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
       groups={NAV}
       tools={<NotificationBell />}
+      exitHref="/account"
       sideFoot={
         <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login">
           خروج
@@ -115,7 +118,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       banner={
         data.status === 'in_review' ? (
           <Alert tone="info" title="متجرك قيد المراجعة">
-            جهّز منتجاتك الآن — تُحفظ مسوّداتٍ، وتستطيع إرسالها للنشر فور اعتماد متجرك.{' '}
+            أضف منتجاتك وانشرها الآن — تظهر للمشترين تلقائياً لحظة اعتماد متجرك.{' '}
             <Link href="/vendor/onboarding/status">تابع حالة طلبك</Link>
           </Alert>
         ) : data.status === 'suspended' ? (

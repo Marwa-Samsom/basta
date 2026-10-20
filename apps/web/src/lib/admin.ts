@@ -92,9 +92,8 @@ export const VENDOR_STATUS: Record<string, string> = {
 
 export const PRODUCT_STATUS: Record<string, string> = {
   draft: 'مسوّدة',
-  pending_review: 'بانتظار المراجعة',
   active: 'منشور',
-  rejected: 'مرفوض',
+  rejected: 'موقوف',
   archived: 'مؤرشف',
 };
 
@@ -119,7 +118,6 @@ export const TONE: Record<string, string> = {
   banned: 'badge--rejected',
   failed: 'badge--rejected',
   suspended: 'badge--warning',
-  pending_review: 'badge--warning',
   requested: 'badge--warning',
   escalated: 'badge--warning',
   skipped: 'badge--pending',

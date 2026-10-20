@@ -3,13 +3,12 @@
  * عديمة الأثر عند التكرار: تشغيلها مرتين لا يضاعف شيئاً.
  *
  * **تُنشئ ما غاب ولا تكتب فوق ما وُجد.** كل ما هنا تحرّره الإدارة بعد الإطلاق —
- * الإعدادات والعملات وأسماء الفئات والسمات وإلزاميتها. كانت upsert تكتب القيمة
+ * الإعدادات والعملات والسمات وقيمها. كانت upsert تكتب القيمة
  * المؤسِّسة فوق الحيّة، فتشغيل البذور في الإنتاج (خطوة في قائمة الإطلاق) يعيد
  * العمولة وفترة التعليق والحدّ الأدنى للسحب إلى افتراضها بصمت. تغيير قيمة قائمة
  * مكانه اللوحة أو مهاجرة صريحة، لا البذور.
  */
 import { PrismaClient } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
 
 const prisma = new PrismaClient();
 
@@ -43,26 +42,12 @@ const SETTINGS = [
   ['payment_reconcile_minutes',   10],
   ['base_currency',               'USD'],    // ADR-013
   ['fx_spread_bps',               200],      // Q-13
+  ['default_display_currency',    'JOD'],    // عملة الزائر الجديد — 18 أكتوبر 2026
   ['coupon_default_funded_by',    'platform'], // Q-06
   ['transfer_window_hours',       48],       // الدفع بتحويل يدوي — UX-OPS-AUDIT البند 8
 ] as const;
 
-// Q-01: شبكة العمولات الفئوية فوق القاعدة العامة
-const CATEGORIES = [
-  { slug: 'electronics', nameAr: 'إلكترونيات وأجهزة', commissionBps:  600 },
-  { slug: 'fashion',     nameAr: 'ملابس وأحذية',      commissionBps: 1200 },
-  { slug: 'beauty',      nameAr: 'جمال وعناية',        commissionBps: 1200 },
-  { slug: 'home',        nameAr: 'منزل ومطبخ',         commissionBps: 1000 },
-  { slug: 'grocery',     nameAr: 'بقالة ومواد غذائية', commissionBps:  500 },
-  { slug: 'handmade',    nameAr: 'يدويّات وحرف',       commissionBps:  800 },
-];
-
-// المرحلة 05: سمات تكفي لمنتج حقيقي بمتغيّرات، وفروع تثبت أن الشجرة متعددة المستويات
-const SUBCATEGORIES = [
-  { parent: 'fashion', slug: 'men-clothing', nameAr: 'ملابس رجالية', nameEn: "Men's clothing" },
-  { parent: 'fashion', slug: 'women-clothing', nameAr: 'ملابس نسائية', nameEn: "Women's clothing" },
-  { parent: 'electronics', slug: 'phones', nameAr: 'هواتف ذكية', nameEn: 'Smartphones' },
-];
+// مكتبة سمات تكفي لمنتج حقيقي بمتغيّرات — متاحة لكل منتج بلا فئة
 
 /** [الاسم العربي، الإنجليزي، اللون] */
 type ValueSeed = readonly [valueAr: string, valueEn: string, hexColor?: string];
@@ -100,16 +85,6 @@ const ATTRIBUTES: readonly AttributeSeed[] = [
     code: 'warranty_months', nameAr: 'مدة الضمان', nameEn: 'Warranty', inputType: 'number', unit: 'شهر',
     isVariantAxis: false, sort: 5, values: [],
   },
-];
-
-// [فئة، سمة، إلزامية] — الفروع ترث سمات أصولها
-const CATEGORY_ATTRIBUTES: readonly (readonly [slug: string, code: string, isRequired: boolean])[] = [
-  ['fashion', 'color', false],
-  ['fashion', 'size', false],
-  ['fashion', 'material', true],
-  ['electronics', 'color', false],
-  ['electronics', 'storage', false],
-  ['electronics', 'warranty_months', false],
 ];
 
 /**
@@ -208,48 +183,14 @@ async function main() {
     }
   }
 
-  console.log('▸ الفئات وقواعد العمولة');
-  for (const [i, c] of CATEGORIES.entries()) {
-    const cat = await prisma.category.upsert({
-      where: { slug: c.slug },
-      update: {},
-      create: { slug: c.slug, nameAr: c.nameAr, path: `/${i + 1}/`, depth: 0, sort: i },
-    });
-    const rule = await prisma.commissionRule.findFirst({
-      where: { scope: 'category', categoryId: cat.id, effectiveTo: null },
-    });
-    if (!rule) {
-      await prisma.commissionRule.create({
-        data: {
-          scope: 'category',
-          categoryId: cat.id,
-          rateBps: c.commissionBps,
-          effectiveFrom: new Date('2026-01-01'),
-        },
-      });
-    }
-  }
-
+  // العمولة نسبة عامة على كل منتج يُباع، ونسبة خاصة لمتجر تُحدَّد من اللوحة (14 أكتوبر 2026)
+  console.log('▸ العمولة العامة');
   const globalRule = await prisma.commissionRule.findFirst({
     where: { scope: 'global', effectiveTo: null },
   });
   if (!globalRule) {
     await prisma.commissionRule.create({
       data: { scope: 'global', rateBps: 1000, effectiveFrom: new Date('2026-01-01') },
-    });
-  }
-
-  console.log('▸ الفئات الفرعية');
-  for (const [i, c] of SUBCATEGORIES.entries()) {
-    const parent = await prisma.category.findUniqueOrThrow({ where: { slug: c.parent } });
-    const existing = await prisma.category.findUnique({ where: { slug: c.slug } });
-    if (existing) continue;
-    const id = randomUUID();
-    await prisma.category.create({
-      data: {
-        id, parentId: parent.id, path: `${parent.path}${id}/`, depth: parent.depth + 1,
-        slug: c.slug, nameAr: c.nameAr, nameEn: c.nameEn, sort: i,
-      },
     });
   }
 
@@ -267,17 +208,6 @@ async function main() {
         data: { attributeId: attribute.id, valueAr, valueEn: valueEn ?? null, hexColor: hexColor ?? null, sort },
       });
     }
-  }
-
-  console.log('▸ ربط السمات بالفئات');
-  for (const [slug, code, isRequired] of CATEGORY_ATTRIBUTES) {
-    const category = await prisma.category.findUniqueOrThrow({ where: { slug } });
-    const attribute = await prisma.attribute.findUniqueOrThrow({ where: { code } });
-    await prisma.categoryAttribute.upsert({
-      where: { categoryId_attributeId: { categoryId: category.id, attributeId: attribute.id } },
-      update: {},
-      create: { categoryId: category.id, attributeId: attribute.id, isRequired },
-    });
   }
 
   console.log('▸ صفحات المحتوى');

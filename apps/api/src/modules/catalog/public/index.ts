@@ -3,7 +3,7 @@
  * الكتالوج يعتمد على المخزون لا العكس: المخزون لا يعرف المنتجات.
  */
 export { CatalogModule } from '../catalog.module';
-export { CategoryService, type CategoryView, type EffectiveAttribute } from '../application/category.service';
+export { AttributeService, type AttributeView } from '../application/attribute.service';
 export {
   ProductService,
   PublishBlockedError,
