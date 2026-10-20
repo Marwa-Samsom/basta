@@ -59,7 +59,15 @@ export const EVENTS: readonly EventDef[] = [
     labelAr: 'تغيّر حالة الطلب',
     audience: 'customer',
     variables: ['name', 'order_number', 'store_name', 'status', 'link'],
-    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', status: 'تم الشحن', link: '/account/orders/BST-260921-A1B2C3' },
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', status: 'تم التسليم', link: '/account/orders/BST-260921-A1B2C3' },
+  },
+  {
+    // كان الشحن «تغيّر حالة» بلا رقم، وصفحة التتبّع تقول إن الرقم في رسالة الشحن (BUY-086)
+    code: 'order_shipped',
+    labelAr: 'شحن الطلب للمشتري',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'store_name', 'tracking_label', 'tracking_number', 'link'],
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', tracking_label: 'رقم التتبّع', tracking_number: 'BX4821930576', link: '/account/orders/BST-260921-A1B2C3' },
   },
   {
     code: 'order_canceled',
@@ -437,6 +445,12 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'طلبك {{order_number}}: {{status}}'),
   t('order_status_changed', 'push', '{{store_name}}: {{status}} — الطلب {{order_number}}'),
   t('order_status_changed', 'in_app', '{{store_name}}: {{status}} في الطلب {{order_number}}.'),
+
+  t('order_shipped', 'email',
+    'مرحباً {{name}}،\n\nشحن {{store_name}} ما طلبته في الطلب {{order_number}}.\n\n{{tracking_label}}: {{tracking_number}}\n\nالتفاصيل والتتبّع: {{link}}\n\nبسطة',
+    'شُحن طلبك {{order_number}}'),
+  t('order_shipped', 'push', '{{store_name}}: تم الشحن — {{tracking_label}} {{tracking_number}}'),
+  t('order_shipped', 'in_app', 'شحن {{store_name}} طلبك {{order_number}} — {{tracking_label}}: {{tracking_number}}.'),
 
   t('order_canceled', 'email',
     'مرحباً {{name}}،\n\nأُلغي ما طلبته من {{store_name}} في الطلب {{order_number}}. السبب: {{reason}}.\n\nيُردّ مبلغه كاملاً إلى وسيلة دفعك، وباقي الطلب يكمل كما هو.\n\n{{link}}\n\nبسطة',

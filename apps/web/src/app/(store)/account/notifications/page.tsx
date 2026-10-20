@@ -33,6 +33,7 @@ type Tone = 'brand' | 'info' | 'success' | 'danger' | 'warning' | 'neutral';
 const KINDS: Record<string, { title: string; icon: IconName; tone: Tone }> = {
   order_placed: { title: 'تأكّد طلبك', icon: 'check-circle', tone: 'success' },
   order_status_changed: { title: 'تغيّرت حالة طلبك', icon: 'package', tone: 'brand' },
+  order_shipped: { title: 'شُحن طلبك', icon: 'truck', tone: 'brand' },
   order_canceled: { title: 'أُلغي جزء من طلبك', icon: 'alert', tone: 'danger' },
   refund_issued: { title: 'أُعيد إليك مبلغ', icon: 'wallet', tone: 'success' },
   refund_transferred: { title: 'حوّلنا لك مبلغاً', icon: 'wallet', tone: 'success' },
