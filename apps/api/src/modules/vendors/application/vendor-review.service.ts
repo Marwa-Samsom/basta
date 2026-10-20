@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import {
   ConflictError,
   InvalidInputError,
@@ -46,17 +47,35 @@ export class VendorReviewService {
     private readonly events: VendorEvents,
   ) {}
 
-  async queue(query: { status?: string; limit?: number; offset?: number } = {}): Promise<{
+  async queue(query: { status?: string; limit?: number; offset?: number; search?: string } = {}): Promise<{
     items: readonly ReviewQueueItem[];
     total: number;
   }> {
     const status = (query.status ?? 'in_review') as VendorLifecycle;
     const take = Math.min(Math.max(query.limit ?? 20, 1), 100);
     const skip = Math.max(query.offset ?? 0, 0);
+    /**
+     * بحث داخل الحالة: الاسم بالعربية أو الإنجليزية، أو الرابط، أو بريد صاحبه. كانت الصفحة
+     * تعرض أول مئة بالأقدم ولا شيء بعدها — متجر «غزة» بين 5221 معتمداً لا يُوصل إليه (J-11)
+     */
+    const t = query.search?.trim();
+    const where: Prisma.VendorWhereInput = {
+      status: status as never,
+      ...(t
+        ? {
+            OR: [
+              { nameAr: { contains: t, mode: 'insensitive' } },
+              { nameEn: { contains: t, mode: 'insensitive' } },
+              { slug: { contains: t, mode: 'insensitive' } },
+              { owner: { email: { contains: t, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
 
     const [rows, total] = await Promise.all([
       this.prisma.vendor.findMany({
-        where: { status: status as never },
+        where,
         orderBy: [{ submittedAt: 'asc' }, { createdAt: 'asc' }],
         take,
         skip,
@@ -71,7 +90,7 @@ export class VendorReviewService {
           documents: { select: { status: true } },
         },
       }),
-      this.prisma.vendor.count({ where: { status: status as never } }),
+      this.prisma.vendor.count({ where }),
     ]);
 
     const now = Date.now();

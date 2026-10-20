@@ -264,6 +264,10 @@
 .ao-search { inline-size: 250px; max-inline-size: 100%; }
 .ao-search > .field__control { inline-size: 100%; }
 
+/* «المزيد» تحت قائمة طويلة، ومعه كم عُرض من كم */
+.ao-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-3); padding-block: var(--space-4); }
+.ao-more__count { color: var(--text-muted); font-size: var(--text-sm); }
+
 /* ----------------------------------------------------------- الجداول */
 
 .ao-table td { vertical-align: middle; }
