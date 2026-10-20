@@ -1,10 +1,10 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, ReasonButton } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
-import { PARENT_STATUS, TONE, useAction, useAdminData } from '@/lib/admin';
+import { PARENT_STATUS, TONE, useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { money, when } from '@/lib/orders';
 
 interface Row {
@@ -30,17 +30,15 @@ interface Profile extends Omit<Row, 'orders'> {
 export default function AdminCustomersPage() {
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
-  const { data, error, forbidden, reload } = useAdminData<{ items: Row[]; total: number }>(`/admin/customers${search.trim() ? `?q=${encodeURIComponent(search.trim())}` : ''}`);
+  const list = useAdminList<Row>(`/admin/customers${search.trim() ? `?q=${encodeURIComponent(search.trim())}` : ''}`, (c) => c.id);
+  const { data, error, forbidden, reload } = list;
 
   return (
     <div className="ao-page">
       <AdminHeader title="العملاء" count={data ? `${data.total} عميل` : undefined} />
       <div className="toolbar">
         <div className="toolbar__end">
-          <span className="input-icon ao-search">
-            <Icon name="search" size={15} />
-            <input className="field__control" type="search" placeholder="الاسم أو البريد أو الهاتف" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="بحث" />
-          </span>
+          <SearchBox value={search} onChange={setSearch} placeholder="الاسم أو البريد أو الهاتف" label="بحث في العملاء" />
         </div>
       </div>
       {!data ? (
@@ -75,7 +73,7 @@ export default function AdminCustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((c) => {
+              {list.items.map((c) => {
                 const open = openId === c.id;
                 return (
                   <Fragment key={c.id}>
@@ -123,6 +121,7 @@ export default function AdminCustomersPage() {
           </table>
         </div>
       )}
+      <MoreButton list={list} />
     </div>
   );
 }

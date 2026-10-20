@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { like, pageArgs } from '../../../common/paging';
 import { UPLOADS_ROOT, UPLOADS_URL_PREFIX } from '../../catalog/public';
 
 /**
@@ -218,9 +219,22 @@ export class ContentService {
 
   // ------------------------------------------------------------- المميّز
 
-  async featured(): Promise<string[]> {
+  /**
+   * المميّز بترتيبه، ومع كل معرّف اسم المنتج ومتجره. كانت اللوحة تأخذ الأسماء من أول مئة
+   * منتج منشور، فالمميّز خارجها يظهر بأول معرّفه. `active: false` لمنتج لم يعد منشوراً —
+   * يُزال قبل أي حفظ، لأن الحفظ يقبل المنشور وحده.
+   */
+  async featured(): Promise<{ id: string; nameAr: string | null; vendor: string | null; active: boolean }[]> {
     const row = await this.prisma.setting.findUnique({ where: { key: FEATURED_KEY } });
-    return Array.isArray(row?.valueJson) ? (row.valueJson as string[]) : [];
+    const ids = Array.isArray(row?.valueJson) ? (row.valueJson as string[]) : [];
+    const found = await this.prisma.product.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, nameAr: true, status: true, deletedAt: true, vendor: { select: { nameAr: true } } },
+    });
+    return ids.map((id) => {
+      const p = found.find((x) => x.id === id);
+      return { id, nameAr: p?.nameAr ?? null, vendor: p?.vendor.nameAr ?? null, active: !!p && p.status === 'active' && !p.deletedAt };
+    });
   }
 
   async setFeatured(actorId: string, productIds: string[]) {
@@ -237,14 +251,23 @@ export class ContentService {
 
   // --------------------------------------------------------- مراجعات المنتجات
 
-  async reviews(status?: string) {
-    const rows = await this.prisma.review.findMany({
-      where: status ? { status } : {},
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      include: { product: { select: { nameAr: true, slug: true } }, user: { select: { fullName: true } } },
-    });
-    return rows;
+  /** AD-22 — بالحالة والبحث (المنتج، أو اسم المشتري أو بريده، أو نصّ المراجعة) وخمسين خمسين */
+  async reviews(q: { status?: string; search?: string; page: number }) {
+    const t = q.search;
+    const where: Prisma.ReviewWhereInput = {
+      ...(q.status ? { status: q.status } : {}),
+      ...(t ? { OR: [{ product: { nameAr: like(t) } }, { user: { OR: [{ fullName: like(t) }, { email: like(t) }] } }, { title: like(t) }, { body: like(t) }] } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        ...pageArgs(q.page),
+        include: { product: { select: { nameAr: true, slug: true } }, user: { select: { fullName: true } } },
+      }),
+      this.prisma.review.count({ where }),
+    ]);
+    return { items, total };
   }
 
   async moderateReview(actorId: string, id: string, status: 'published' | 'rejected', reason?: string | null) {

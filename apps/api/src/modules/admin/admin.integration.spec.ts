@@ -533,8 +533,12 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     expect(b.imageUrl).toMatch(/^\/uploads\/banners\/.+\/full\.webp$/);
     expect((await app.inject({ method: 'GET', url: b.imageUrl })).statusCode).toBe(200);
 
-    const before = (await call('GET', '/admin/storefront/featured', limited.token)).json() as string[];
+    const before = ((await call('GET', '/admin/storefront/featured', limited.token)).json() as { id: string; active: boolean }[]).filter((p) => p.active).map((p) => p.id);
     expect((await call('PUT', '/admin/storefront/featured', limited.token, { productIds: [vendor.productId] })).statusCode).toBe(204);
+    // المميّز يعود باسمه ومتجره — لا يُبحث عنه في أول مئة منتج
+    expect((await call('GET', '/admin/storefront/featured', limited.token)).json()).toEqual([
+      { id: vendor.productId, nameAr: expect.any(String), vendor: `متجر ${SUFFIX}`, active: true },
+    ]);
     const featured = (await call('GET', '/storefront/featured')).json();
     expect(featured.map((p: { id: string }) => p.id)).toContain(vendor.productId);
 
@@ -557,6 +561,11 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     expect((await call('POST', `/admin/reviews/${r.json().id}/moderate`, limited.token, { status: 'rejected', reason: 'ألفاظ مسيئة' })).statusCode).toBe(204);
     const visible = (await call('GET', `/products/${vendor.productId}/reviews`)).json();
     expect(JSON.stringify(visible)).not.toContain(`كلام مسيء ${SUFFIX}`);
+    // تُوجد بالبحث في نصّها داخل حالتها، ولا تظهر في المنشورة
+    const hidden = (await call('GET', `/admin/reviews?status=rejected&search=${encodeURIComponent(`مسيء ${SUFFIX}`)}`, limited.token)).json();
+    expect(hidden).toMatchObject({ total: 1 });
+    expect(hidden.items[0].id).toBe(r.json().id);
+    expect((await call('GET', `/admin/reviews?status=published&search=${encodeURIComponent(`مسيء ${SUFFIX}`)}`, limited.token)).json()).toMatchObject({ items: [], total: 0 });
   });
 
   it('الطلبات والمرتجعات والتدقيق: بحث من اللوحة، وكل إجراء إداري في السجل', async () => {
@@ -564,9 +573,13 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     const found = await call('GET', `/admin/orders?q=${encodeURIComponent(`متجر ${SUFFIX}`)}`, admin.token);
     expect(found.statusCode).toBe(200);
     expect(found.json().total).toBeGreaterThanOrEqual(1);
-    const ret = await call('GET', '/admin/returns', admin.token);
+    // المبالغ المعادة باسم المتجر، كلها له؛ وبحث بلا مطابق فارغ
+    const ret = await call('GET', `/admin/returns/refunds?search=${encodeURIComponent(`متجر ${SUFFIX}`)}`, admin.token);
     expect(ret.statusCode).toBe(200);
-    expect(ret.json().refunds.length).toBeGreaterThanOrEqual(1);
+    expect(ret.json().total).toBeGreaterThanOrEqual(1);
+    expect(ret.json().items.every((r: { subOrder: { vendor: { nameAr: string } } }) => r.subOrder.vendor.nameAr === `متجر ${SUFFIX}`)).toBe(true);
+    expect((await call('GET', '/admin/returns/refunds?search=لا-مطابق-هنا', admin.token)).json()).toMatchObject({ items: [], total: 0 });
+    expect((await call('GET', '/admin/returns?search=لا-مطابق-هنا', admin.token)).json()).toMatchObject({ items: [], total: 0 });
 
     const log = await call('GET', `/admin/audit?actor=root.${SUFFIX}`, admin.token);
     const actions = log.json().items.map((i: { action: string }) => i.action);

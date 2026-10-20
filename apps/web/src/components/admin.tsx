@@ -241,6 +241,51 @@ export function Tabs({
   );
 }
 
+/** خانة البحث في شريط الأدوات — بأيقونتها، وعرضها كامل السطر على الجوال */
+export function SearchBox({
+  value,
+  onChange,
+  placeholder,
+  label,
+  className = 'ao-search',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <span className={`input-icon ${className}`}>
+      <Icon name="search" size={15} />
+      <input className="field__control" type="search" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} />
+    </span>
+  );
+}
+
+/**
+ * «المزيد» تحت قائمة طويلة ومعه «<المعروض> من <الإجمالي>» — يختفي حين تكتمل. يأخذ ما يعيده
+ * `useAdminList` كما هو: `<MoreButton list={list} />`.
+ */
+export function MoreButton({ list }: { list: { items: unknown[]; total: number; hasMore: boolean; loadingMore: boolean; moreError: string | null; more: () => void } }) {
+  if (!list.hasMore && !list.moreError) return null;
+  return (
+    <div className="ao-more">
+      <span className="ao-more__count num">
+        {list.items.length} من {list.total}
+      </span>
+      {list.moreError ? (
+        <span className="ao-more__error" role="alert">
+          {list.moreError}
+        </span>
+      ) : null}
+      <button type="button" className="btn btn--secondary btn--sm" disabled={list.loadingMore} onClick={list.more}>
+        {list.loadingMore ? 'جارٍ التحميل…' : list.moreError ? 'أعد المحاولة' : 'المزيد'}
+      </button>
+    </div>
+  );
+}
+
 /**
  * حالة فارغة — مربّع أيقونة وعنوان وجملة تقول ما التالي. بلا `title` يصير
  * النصّ الممرَّر هو العنوان (الاستعمال القديم `<Empty>لا كوبونات.</Empty>`).

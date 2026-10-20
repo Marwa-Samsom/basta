@@ -390,8 +390,10 @@ describe('بوابة 10 · البند 4 — السحب المتزامن', () => 
   it('رفض السحب قيد معاكس يعيد المال — والتحويل بمرجع', async () => {
     if (!dbUp) return;
     const i = 0;
-    const list = await call('GET', '/admin/finance/payouts?status=requested', admin.token);
-    const mine = list.json().filter((p: { vendor: string }) => p.vendor === 'متجر sar');
+    // بالبحث باسم المتجر — القائمة خمسين خمسين، وطلبات متاجر الاختبار السابقة تملأ أولها
+    const list = await call('GET', `/admin/finance/payouts?status=requested&search=${encodeURIComponent('متجر sar')}`, admin.token);
+    expect(list.json().items.every((p: { vendor: string; status: string }) => p.vendor.includes('متجر sar') && p.status === 'requested')).toBe(true);
+    const mine = list.json().items.filter((p: { vendor: string }) => p.vendor === 'متجر sar');
     expect(mine.length).toBeGreaterThanOrEqual(1);
     const [first] = mine;
     expect(first.bank.ibanLast4).toBe('7519');

@@ -324,9 +324,11 @@ describe('التحويل اليدوي · الحجز والتأكيد', () => {
     openOrders.push(orderId);
 
     // الطابور يعرضه بمبلغه ومشتريه
-    const queue = await call('GET', '/admin/payments/transfers', { token: financeToken });
+    // بالبحث برقم الطلب — الطابور خمسين خمسين
+    const queue = await call('GET', `/admin/payments/transfers?search=${number}`, { token: financeToken });
     expect(queue.statusCode, queue.body).toBe(200);
-    const row = queue.json().waiting.find((w: { orderNumber: string }) => w.orderNumber === number);
+    expect(queue.json().total).toBe(1);
+    const row = queue.json().items.find((w: { orderNumber: string }) => w.orderNumber === number);
     expect(row).toMatchObject({ amountMinorUnits: total.minorUnits, currency: 'JOD', storeCount: 2, buyer: { phone: ADDRESS.phone } });
 
     // من لا يملك صلاحية المال لا يؤكّد
@@ -365,9 +367,12 @@ describe('التحويل اليدوي · الحجز والتأكيد', () => {
     expect((await notices(buyer.id, 'order_placed')).length).toBeGreaterThan(0);
 
     // وفي «آخر ما أُكّد» بمرجعه ومن أكّده
-    const after = await call('GET', '/admin/payments/transfers', { token: financeToken });
-    expect(after.json().waiting.some((w: { orderNumber: string }) => w.orderNumber === number)).toBe(false);
-    expect(after.json().confirmed.find((c: { orderNumber: string }) => c.orderNumber === number)).toMatchObject({
+    const after = await call('GET', `/admin/payments/transfers?search=${number}`, { token: financeToken });
+    expect(after.json()).toMatchObject({ items: [], total: 0 });
+    // والمؤكَّد يُوجد بمرجع التحويل كما في كشف البنك
+    const confirmed = await call('GET', '/admin/payments/transfers/confirmed?search=clq-88123', { token: financeToken });
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    expect(confirmed.json().items.find((c: { orderNumber: string }) => c.orderNumber === number)).toMatchObject({
       reference: 'CLQ-88123',
       confirmedBy: 'مدير finance',
     });
@@ -490,8 +495,9 @@ describe('التحويل اليدوي · الردّ', () => {
     expect(detail.json().stores[0].refunds[0]).toMatchObject({ status: 'awaiting_transfer', transferReference: null });
 
     // طابور الإدارة: المبلغ، والمشتري، ومن أين دفع — إليه يُردّ
-    const queue = await call('GET', '/admin/refunds/awaiting-transfer', { token: financeToken });
+    const queue = await call('GET', `/admin/refunds/awaiting-transfer?search=${number}`, { token: financeToken });
     expect(queue.statusCode, queue.body).toBe(200);
+    expect(queue.json().total).toBe(1);
     expect(queue.json().items.find((i: { id: string }) => i.id === refund.id)).toMatchObject({
       orderNumber: number,
       amountMinorUnits: total.minorUnits,

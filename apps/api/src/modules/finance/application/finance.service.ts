@@ -6,6 +6,7 @@ import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
 import { LedgerService } from './ledger.service';
 import { csvCell } from '../../../common/csv';
+import { like, pageArgs } from '../../../common/paging';
 
 export const ENTRY_LABELS: Record<string, string> = {
   sale_credit: 'مبيعات',
@@ -307,6 +308,28 @@ export class FinanceService {
       include: { vendor: { select: { nameAr: true } } },
     });
     return rows.map((r) => ({ ...present(r), vendor: r.vendor.nameAr }));
+  }
+
+  /**
+   * AD-13 للإدارة — بالحالة والبحث وخمسين خمسين. البحث باسم المتجر (بالعربية أو الإنجليزية)
+   * أو رابطه أو مرجع التحويل: طلب «غزة» بين مئات طلبات متاجر الاختبار لا يُرى إلا هكذا (J-11).
+   */
+  async adminPayouts(q: { status?: string; search?: string; page: number }) {
+    const t = q.search;
+    const where: Prisma.PayoutRequestWhereInput = {
+      ...(q.status ? { status: q.status as never } : {}),
+      ...(t ? { OR: [{ vendor: { OR: [{ nameAr: like(t) }, { nameEn: like(t) }, { slug: like(t) }] } }, { transferReference: like(t) }] } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.payoutRequest.findMany({
+        where,
+        orderBy: [{ requestedAt: 'desc' }, { id: 'asc' }],
+        ...pageArgs(q.page),
+        include: { vendor: { select: { nameAr: true } } },
+      }),
+      this.prisma.payoutRequest.count({ where }),
+    ]);
+    return { items: rows.map((r) => ({ ...present(r), vendor: r.vendor.nameAr })), total };
   }
 
   async approvePayout(adminId: string, id: string) {

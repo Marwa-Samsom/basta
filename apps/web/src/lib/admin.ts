@@ -49,6 +49,80 @@ export function useAdminData<T>(path: string | null): {
   return { data, error, forbidden, reload };
 }
 
+/**
+ * قائمة إدارية تكبر مع الوقت — الصفحة الأولى بـ `useAdminData`، و`more()` يُلحق التالية
+ * (`page=N`، أو `offset=<المعروض>` لما يُقرأ بالإزاحة). الصفحات الملحقة مربوطة بمسار الأولى:
+ * بحث أو حالة أخرى = مسار آخر، فتبدأ القائمة من أولها بلا تأثير جانبي يمسحها. و`reload()`
+ * بعد إجراء يعيدها إلى الأولى بأرقامها الجديدة. الصفّ المكرّر (قائمة تحرّكت بين صفحتين)
+ * يُسقط بمفتاحه.
+ *
+ * كانت القوائم تقف عند أول مئة أو مئتين بلا ما بعدها (J-11، 20 أكتوبر 2026).
+ */
+export function useAdminList<T>(
+  path: string | null,
+  key: (row: T) => string,
+  paging: 'page' | 'offset' = 'page',
+): {
+  data: { items: T[]; total: number } | null;
+  items: T[];
+  total: number;
+  error: string | null;
+  forbidden: boolean;
+  reload: () => void;
+  more: () => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  moreError: string | null;
+} {
+  const first = useAdminData<{ items: T[]; total: number }>(path);
+  const [extra, setExtra] = useState<{ path: string | null; pages: T[][] }>({ path: null, pages: [] });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<{ path: string | null; message: string } | null>(null);
+  const pages = extra.path === path ? extra.pages : [];
+
+  const items: T[] = [];
+  const seen = new Set<string>();
+  for (const row of [...(first.data?.items ?? []), ...pages.flat()]) {
+    const k = key(row);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    items.push(row);
+  }
+  const total = first.data?.total ?? 0;
+
+  const more = () => {
+    if (!path || !first.data || loadingMore) return;
+    const sep = path.includes('?') ? '&' : '?';
+    const at = paging === 'offset' ? `offset=${first.data.items.length + pages.reduce((n, p) => n + p.length, 0)}` : `page=${pages.length + 2}`;
+    setLoadingMore(true);
+    setMoreError(null);
+    void api<{ items: T[] }>(`${path}${sep}${at}`)
+      .then((next) => setExtra((e) => ({ path, pages: [...(e.path === path ? e.pages : []), next.items] })))
+      .catch((e: Error) => setMoreError({ path, message: e.message }))
+      .finally(() => setLoadingMore(false));
+  };
+
+  const reload = () => {
+    setExtra({ path: null, pages: [] });
+    setMoreError(null);
+    first.reload();
+  };
+
+  return {
+    data: first.data,
+    items,
+    total,
+    error: first.error,
+    forbidden: first.forbidden,
+    reload,
+    more,
+    // صفحة ملحقة فارغة نهاية القائمة حتى لو نقص المعروض عن الإجمالي بمكرّر أُسقط
+    hasMore: !!first.data && items.length < total && pages.at(-1)?.length !== 0,
+    loadingMore,
+    moreError: moreError?.path === path ? moreError.message : null,
+  };
+}
+
 /** إجراء بحالة انشغال ورسالة — كل زرّ إداري يمرّ به */
 export function useAction(): {
   busy: boolean;

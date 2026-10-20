@@ -9,6 +9,7 @@ import {
   Inject,
   Param,
   Post,
+  Query,
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -25,6 +26,7 @@ import {
 } from 'class-validator';
 import type { FastifyRequest } from 'fastify';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
+import { pageOf, termOf } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor } from '../../../common/security/actor';
 import { CurrentActor, MaybeActor, OptionalAuth, Public, RequirePermission, Roles } from '../../../common/security/decorators';
@@ -266,8 +268,16 @@ export class AdminTransfersController {
 
   @Get()
   @RequirePermission('payouts.approve')
-  list() {
-    return this.queue.list();
+  list(@Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.queue.waiting({ ...(term ? { search: term } : {}), page: pageOf(page) });
+  }
+
+  @Get('confirmed')
+  @RequirePermission('payouts.approve')
+  confirmed(@Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.queue.confirmed({ ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 
   @Post(':orderNumber/confirm')

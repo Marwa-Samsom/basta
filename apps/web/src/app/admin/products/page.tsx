@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AdminHeader, Empty, Loading, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Loading, MoreButton, SearchBox, Tabs } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { media, PRODUCT_STATUS, TONE, useAdminData } from '@/lib/admin';
+import { media, PRODUCT_STATUS, TONE, useAdminList } from '@/lib/admin';
 import { money, when } from '@/lib/orders';
 
 interface Item {
@@ -29,7 +29,8 @@ export default function AdminProductsPage() {
   const [status, setStatus] = useState('active');
   const [search, setSearch] = useState('');
   const q = new URLSearchParams({ status, pageSize: '100', ...(search.trim() ? { search: search.trim() } : {}) });
-  const { data, error, forbidden, reload } = useAdminData<{ items: Item[]; total: number }>(`/admin/products?${q}`);
+  const list = useAdminList<Item>(`/admin/products?${q}`, (p) => p.id);
+  const { data, error, forbidden, reload } = list;
 
   return (
     <div className="ao-page">
@@ -37,10 +38,7 @@ export default function AdminProductsPage() {
       <div className="toolbar">
         <Tabs value={status} onChange={setStatus} label="حالة المنتج" options={['active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: PRODUCT_STATUS[k]! }))} />
         <div className="toolbar__end">
-          <span className="input-icon ao-search">
-            <Icon name="search" size={15} />
-            <input className="field__control" type="search" placeholder="اسم المنتج أو المتجر" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="بحث" />
-          </span>
+          <SearchBox value={search} onChange={setSearch} placeholder="اسم المنتج أو المتجر" label="بحث في المنتجات" />
         </div>
       </div>
       {!data ? (
@@ -55,7 +53,7 @@ export default function AdminProductsPage() {
         )
       ) : (
         <ul className="ao-plist" aria-label="المنتجات">
-          {data.items.map((p) => {
+          {list.items.map((p) => {
             const thumb = media(p.thumbnail);
             return (
               <li key={p.id}>
@@ -89,6 +87,7 @@ export default function AdminProductsPage() {
           })}
         </ul>
       )}
+      <MoreButton list={list} />
     </div>
   );
 }

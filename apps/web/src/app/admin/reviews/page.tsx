@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, ReasonButton, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, Tabs } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
-import { useAction, useAdminData } from '@/lib/admin';
+import { useAction, useAdminList } from '@/lib/admin';
 import { when } from '@/lib/orders';
 
 interface Review {
@@ -21,11 +21,15 @@ interface Review {
 
 /**
  * AD-22 — مراجعات المنتجات. كلها موثّقة بشراء فعلي وتُنشر فوراً؛ الإدارة
- * تُخفي المسيء بسبب مكتوب وتعيده إن أخطأت.
+ * تُخفي المسيء بسبب مكتوب وتعيده إن أخطأت. البحث باسم المنتج أو المشتري أو نصّ المراجعة،
+ * و«المزيد» لما بعد الخمسين.
  */
 export default function AdminReviewsPage() {
   const [status, setStatus] = useState('published');
-  const { data, error, forbidden, reload } = useAdminData<Review[]>(`/admin/reviews?status=${status}`);
+  const [search, setSearch] = useState('');
+  const query = new URLSearchParams({ status, ...(search.trim() ? { search: search.trim() } : {}) });
+  const list = useAdminList<Review>(`/admin/reviews?${query}`, (r) => r.id);
+  const { data, error, forbidden, reload } = list;
   const act = useAction();
 
   const moderate = (id: string, next: 'published' | 'rejected', reason?: string) =>
@@ -36,15 +40,34 @@ export default function AdminReviewsPage() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="تقييمات المنتجات" count={data ? `${data.length} تقييم` : undefined} hint="كل مراجعة موثّقة بشراء فعلي." />
+      <AdminHeader title="تقييمات المنتجات" count={data ? `${data.total} تقييم` : undefined} hint="كل مراجعة موثّقة بشراء فعلي." />
       <Feedback error={act.error} notice={act.notice} />
-      <Tabs value={status} onChange={setStatus} label="حالة التقييم" options={[{ key: 'published', label: 'منشورة' }, { key: 'rejected', label: 'مخفية' }]} />
+      <div className="toolbar">
+        <Tabs value={status} onChange={setStatus} label="حالة التقييم" options={[{ key: 'published', label: 'منشورة' }, { key: 'rejected', label: 'مخفية' }]} />
+        <div className="toolbar__end">
+          <SearchBox value={search} onChange={setSearch} placeholder="المنتج أو المشتري أو نصّ المراجعة" label="بحث في التقييمات" />
+        </div>
+      </div>
       {!data ? (
         <Loading error={error} forbidden={forbidden} onRetry={reload} />
-      ) : data.length === 0 ? (
-        <Empty icon="star" title={status === 'published' ? 'لا تقييمات منشورة' : 'لا تقييمات مخفية'}>
-          {status === 'published' ? 'تظهر التقييمات هنا فور نشرها من المشترين.' : 'لم تُخفِ الإدارة أي تقييم.'}
-        </Empty>
+      ) : data.items.length === 0 ? (
+        search.trim() ? (
+          <Empty
+            icon="search"
+            title="لا تقييمات بهذا البحث"
+            actions={
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
+                أزل التصفية
+              </button>
+            }
+          >
+            جرّب كلمة أخرى أو الحالة الأخرى.
+          </Empty>
+        ) : (
+          <Empty icon="star" title={status === 'published' ? 'لا تقييمات منشورة' : 'لا تقييمات مخفية'}>
+            {status === 'published' ? 'تظهر التقييمات هنا فور نشرها من المشترين.' : 'لم تُخفِ الإدارة أي تقييم.'}
+          </Empty>
+        )
       ) : (
         <div className="table-wrap">
           <table className="table ao-table">
@@ -60,7 +83,7 @@ export default function AdminReviewsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((r) => (
+              {list.items.map((r) => (
                 <tr key={r.id}>
                   <td>
                     <span className="ao-stars" role="img" aria-label={`${r.rating} من 5`}>
@@ -106,6 +129,7 @@ export default function AdminReviewsPage() {
           </table>
         </div>
       )}
+      <MoreButton list={list} />
     </div>
   );
 }

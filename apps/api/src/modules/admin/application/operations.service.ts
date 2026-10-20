@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ConflictError, ForbiddenError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { like, pageArgs } from '../../../common/paging';
 import { StorefrontService } from '../../catalog/public';
 import { NotificationsService } from '../../notifications/public';
 import { DisplayCurrencyService } from '../../pricing/public';
@@ -416,25 +417,45 @@ export class OperationsService {
     };
   }
 
-  async returns(status?: string) {
-    const [requests, refunds] = await Promise.all([
+  /**
+   * AD-15 طلبات الإرجاع — بالحالة والبحث وخمسين خمسين. البحث برقم الطلب أو طلب المتجر، أو اسم
+   * المتجر، أو اسم المشتري أو بريده.
+   */
+  async returns(q: { status?: string; search?: string; page: number }) {
+    const t = q.search;
+    const where: Prisma.ReturnRequestWhereInput = { ...(q.status ? { status: q.status } : {}), ...(t ? { subOrder: subOrderMatching(t) } : {}) };
+    const [items, total] = await Promise.all([
       this.prisma.returnRequest.findMany({
-        where: status ? { status } : {},
-        orderBy: { requestedAt: 'desc' },
-        take: 100,
+        where,
+        orderBy: [{ requestedAt: 'desc' }, { id: 'asc' }],
+        ...pageArgs(q.page),
         include: { subOrder: { select: { id: true, subOrderNumber: true, status: true, vendor: { select: { nameAr: true } } } } },
       }),
+      this.prisma.returnRequest.count({ where }),
+    ]);
+    return { items, total };
+  }
+
+  /** AD-15 المبالغ المعادة — بالبحث نفسه أو بمرجع البوابة، وخمسين خمسين */
+  async refunds(q: { search?: string; page: number }) {
+    const t = q.search;
+    const where: Prisma.RefundWhereInput = t ? { OR: [{ subOrder: subOrderMatching(t) }, { providerRefundId: like(t) }] } : {};
+    const [rows, total] = await Promise.all([
       this.prisma.refund.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 100,
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        ...pageArgs(q.page),
         include: { subOrder: { select: { subOrderNumber: true, settlementCurrency: true, vendorId: true, vendor: { select: { nameAr: true } }, order: { select: { currency: true } } } } },
       }),
+      this.prisma.refund.count({ where }),
     ]);
-    // رصيد البائع السالب بجانب استرداده — AD-15
-    const negatives = await this.prisma.wallet.findMany({ where: { balanceAvailableMinorUnits: { lt: 0 } }, select: { vendorId: true, currency: true, balanceAvailableMinorUnits: true } });
+    // رصيد البائع السالب بجانب استرداده — لمتاجر هذه الصفحة وحدها
+    const negatives = await this.prisma.wallet.findMany({
+      where: { vendorId: { in: [...new Set(rows.map((r) => r.subOrder.vendorId))] }, balanceAvailableMinorUnits: { lt: 0 } },
+      select: { vendorId: true, currency: true, balanceAvailableMinorUnits: true },
+    });
     return {
-      requests,
-      refunds: refunds.map((r) => ({
+      items: rows.map((r) => ({
         ...r,
         amountMinorUnits: r.amountMinorUnits.toString(),
         vendorAmountMinorUnits: r.vendorAmountMinorUnits?.toString() ?? null,
@@ -442,6 +463,18 @@ export class OperationsService {
         vendorNegative:
           negatives.find((n) => n.vendorId === r.subOrder.vendorId && n.currency === r.subOrder.settlementCurrency)?.balanceAvailableMinorUnits.toString() ?? null,
       })),
+      total,
     };
   }
+}
+
+/** طلب متجر برقمه أو رقم طلبه، أو باسم متجره، أو باسم المشتري أو بريده */
+function subOrderMatching(t: string): Prisma.SubOrderWhereInput {
+  return {
+    OR: [
+      { subOrderNumber: like(t) },
+      { vendor: { nameAr: like(t) } },
+      { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ email: like(t) }, { fullName: like(t) }] } }] } },
+    ],
+  };
 }

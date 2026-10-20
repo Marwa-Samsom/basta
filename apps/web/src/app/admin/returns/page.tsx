@@ -1,34 +1,33 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
-import { TONE, useAction, useAdminData } from '@/lib/admin';
+import { TONE, useAction, useAdminList } from '@/lib/admin';
 import { labelOf, money, REFUND_STATUS, RETURN_REASONS, when } from '@/lib/orders';
 
-interface Data {
-  requests: {
-    id: string;
-    reasonCode: string;
-    description: string | null;
-    status: string;
-    requestedAt: string;
-    itemsJson: { orderItemId: string; qty: number }[];
-    subOrder: { id: string; subOrderNumber: string; status: string; vendor: { nameAr: string } };
-  }[];
-  refunds: {
-    id: string;
-    amountMinorUnits: string;
-    vendorAmountMinorUnits: string | null;
-    currency: string;
-    reason: string;
-    status: string;
-    providerRefundId: string | null;
-    createdAt: string;
-    vendorNegative: string | null;
-    subOrder: { subOrderNumber: string; settlementCurrency: string; vendor: { nameAr: string } };
-  }[];
+interface ReturnRow {
+  id: string;
+  reasonCode: string;
+  description: string | null;
+  status: string;
+  requestedAt: string;
+  itemsJson: { orderItemId: string; qty: number }[];
+  subOrder: { id: string; subOrderNumber: string; status: string; vendor: { nameAr: string } };
+}
+
+interface RefundRow {
+  id: string;
+  amountMinorUnits: string;
+  vendorAmountMinorUnits: string | null;
+  currency: string;
+  reason: string;
+  status: string;
+  providerRefundId: string | null;
+  createdAt: string;
+  vendorNegative: string | null;
+  subOrder: { subOrderNumber: string; settlementCurrency: string; vendor: { nameAr: string } };
 }
 
 const RETURN_STATUS: Record<string, string> = { requested: 'بانتظار البائع', received: 'استُلم', rejected: 'رُفض' };
@@ -41,34 +40,59 @@ const STALL_MS = 3 * 24 * 3_600_000;
  * AD-15 — المرتجعات والاستردادات. الإدارة تتدخّل حين يتعثّر متجر: تستلم
  * المرتجع بدلاً منه (الانتقال نفسه بفاعل admin)، والاسترداد يظهر بمرجع
  * البوابة، والرصيد السالب للبائع إن نتج بجانبه.
+ *
+ * بحث واحد للقائمتين (رقم الطلب أو المتجر أو المشتري)، ولكلٍّ «المزيد» — كانتا تقفان عند
+ * أحدث مئة بلا بحث.
  */
 export default function AdminReturnsPage() {
-  const { data, error, forbidden, reload } = useAdminData<Data>('/admin/returns');
+  const [search, setSearch] = useState('');
+  const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
+  const requests = useAdminList<ReturnRow>(`/admin/returns${query}`, (r) => r.id);
+  const refunds = useAdminList<RefundRow>(`/admin/returns/refunds${query}`, (r) => r.id);
   const act = useAction();
   // لحظة فتح الصفحة — يُقاس بها عمر الطلب، ولا تتغيّر بين رسم ورسم
   const [now] = useState(() => Date.now());
-  if (!data) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
+  if (!requests.data || !refunds.data) {
+    const failed = requests.error ? requests : refunds;
+    return <Loading error={failed.error} forbidden={failed.forbidden} onRetry={failed.reload} />;
+  }
+  const searching = Boolean(search.trim());
+  const clear = (
+    <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
+      أزل التصفية
+    </button>
+  );
 
   const receive = (subOrderId: string, returnRequestId: string) =>
     act.run(async () => {
       await api(`/admin/orders/stores/${subOrderId}/transition`, { method: 'POST', body: { to: 'returned', returnRequestId } });
-      reload();
+      requests.reload();
+      refunds.reload();
     }, 'سُجّل الاستلام: عادت القطع للمخزون ويُردّ نصيبها للمشتري.');
 
   return (
     <div className="ao-page">
       <AdminHeader title="المرتجعات والمبالغ المعادة" />
       <Feedback error={act.error} notice={act.notice} />
+      <div className="toolbar">
+        <div className="toolbar__end">
+          <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو المتجر أو المشتري" label="بحث في المرتجعات والمبالغ المعادة" />
+        </div>
+      </div>
 
       <section className="card card--flush">
         <header className="card__head">
           <h2>طلبات الإرجاع</h2>
-          <span className="ao-card-count num">{data.requests.length}</span>
+          <span className="ao-card-count num">{requests.total}</span>
         </header>
-        {data.requests.length === 0 ? (
-          <Empty icon="return" title="لا طلبات إرجاع">
-            تظهر هنا طلبات الإرجاع حين يفتحها المشترون.
-          </Empty>
+        {requests.items.length === 0 ? (
+          searching ? (
+            <Empty icon="search" title="لا طلبات إرجاع بهذا البحث" actions={clear} />
+          ) : (
+            <Empty icon="return" title="لا طلبات إرجاع">
+              تظهر هنا طلبات الإرجاع حين يفتحها المشترون.
+            </Empty>
+          )
         ) : (
           <div className="table-wrap" tabIndex={0} role="region" aria-label="طلبات الإرجاع">
             <table className="table ao-table">
@@ -86,7 +110,7 @@ export default function AdminReturnsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.requests.map((r) => {
+                {requests.items.map((r) => {
                   const stalled = r.status === 'requested' && now - new Date(r.requestedAt).getTime() >= STALL_MS;
                   return (
                     <tr key={r.id}>
@@ -126,17 +150,22 @@ export default function AdminReturnsPage() {
             </table>
           </div>
         )}
+        <MoreButton list={requests} />
       </section>
 
       <section className="card card--flush">
         <header className="card__head">
           <h2>المبالغ المعادة</h2>
-          <span className="ao-card-count num">{data.refunds.length}</span>
+          <span className="ao-card-count num">{refunds.total}</span>
         </header>
-        {data.refunds.length === 0 ? (
-          <Empty icon="wallet" title="لا استردادات">
-            تظهر هنا المبالغ المعادة للمشترين بمرجع البوابة أو التحويل.
-          </Empty>
+        {refunds.items.length === 0 ? (
+          searching ? (
+            <Empty icon="search" title="لا استردادات بهذا البحث" actions={clear} />
+          ) : (
+            <Empty icon="wallet" title="لا استردادات">
+              تظهر هنا المبالغ المعادة للمشترين بمرجع البوابة أو التحويل.
+            </Empty>
+          )
         ) : (
           <div className="table-wrap" tabIndex={0} role="region" aria-label="الاستردادات">
             <table className="table ao-table">
@@ -151,7 +180,7 @@ export default function AdminReturnsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.refunds.map((r) => (
+                {refunds.items.map((r) => (
                   <tr key={r.id} data-late={Boolean(r.vendorNegative)}>
                     <td>
                       <span className="ao-stack">
@@ -190,6 +219,7 @@ export default function AdminReturnsPage() {
             </table>
           </div>
         )}
+        <MoreButton list={refunds} />
       </section>
     </div>
   );

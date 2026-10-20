@@ -267,6 +267,7 @@
 /* «المزيد» تحت قائمة طويلة، ومعه كم عُرض من كم */
 .ao-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-3); padding-block: var(--space-4); }
 .ao-more__count { color: var(--text-muted); font-size: var(--text-sm); }
+.ao-more__error { color: var(--danger-text); font-size: var(--text-sm); }
 
 /* ----------------------------------------------------------- الجداول */
 

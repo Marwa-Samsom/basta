@@ -15,6 +15,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, MaxLength, Min } from 'class-validator';
 import { ForbiddenActorError, vendorScopeOf, type Actor } from '../../../common/security/actor';
 import { CurrentActor, Public, RequirePermission, Roles } from '../../../common/security/decorators';
+import { pageOf, termOf } from '../../../common/paging';
 import { DisputesService, type Party } from '../application/disputes.service';
 import { ReviewsService } from '../application/reviews.service';
 
@@ -157,8 +158,9 @@ export class AdminDisputesController {
   constructor(private readonly disputes: DisputesService) {}
 
   @Get()
-  list(@CurrentActor() a: Actor, @Query('status') status?: string) {
-    return this.disputes.list({ kind: 'admin', userId: a.userId }, status ?? 'escalated');
+  list(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.disputes.adminList({ status: status ?? 'escalated', ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 
   @Get(':id')

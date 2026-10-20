@@ -35,6 +35,7 @@ import {
 import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
 import { loadEnv } from '../../../common/config/env';
 import { InvalidInputError } from '../../../common/errors/domain-error';
+import { pageOf, termOf } from '../../../common/paging';
 import { OrderLifecycleService } from '../application/order-lifecycle.service';
 import { OrderQueryService } from '../application/order-query.service';
 import type { SubOrderStatus } from '../domain/state-machine';
@@ -272,8 +273,9 @@ export class AdminRefundsController {
 
   @Get('awaiting-transfer')
   @RequirePermission('payouts.approve')
-  awaiting() {
-    return this.query.awaitingRefunds();
+  awaiting(@Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.query.awaitingRefunds({ ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 
   @Post(':id/transfer')

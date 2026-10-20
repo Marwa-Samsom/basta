@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, ReasonButton, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, Tabs } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
-import { TONE, useAction, useAdminData } from '@/lib/admin';
+import { TONE, useAction, useAdminList } from '@/lib/admin';
 import { money, when } from '@/lib/orders';
 
 interface Payout {
@@ -34,16 +34,22 @@ const EMPTY: Record<string, string> = {
  * AD-13 — السحوبات. المبلغ خُصم من متاح البائع لحظة الطلب؛ الموافقة ثم
  * تسجيل التحويل بمرجعه، والرفض قيد معاكس يعيده فوراً. رقم الحساب كاملاً
  * لا يظهر في القائمة — آخر أربعة أرقام تكفي للتعرّف، والكامل في ملف البائع.
+ *
+ * بحث و«المزيد» (20 أكتوبر 2026): كانت تعرض أحدث مئتين بلا بحث، فطلب «غزة» بين مئات طلبات
+ * متاجر الاختبار لا يُوجد (J-11). البحث باسم المتجر أو رابطه أو مرجع التحويل.
  */
 export default function AdminPayoutsPage() {
   const [status, setStatus] = useState('requested');
-  const { data, error, forbidden, reload } = useAdminData<Payout[]>(`/admin/finance/payouts?status=${status}`);
+  const [search, setSearch] = useState('');
+  const query = new URLSearchParams({ status, ...(search.trim() ? { search: search.trim() } : {}) });
+  const list = useAdminList<Payout>(`/admin/finance/payouts?${query}`, (p) => p.id);
+  const { data, error, forbidden, reload } = list;
   const act = useAction();
   const [refs, setRefs] = useState<Record<string, string>>({});
 
   return (
     <div className="ao-page">
-      <AdminHeader title="طلبات التحويل" count={data ? `${data.length} طلب` : undefined} hint="تحتاج صلاحية payouts.approve — هذه الصفحة تحرّك مالاً.">
+      <AdminHeader title="طلبات التحويل" count={data ? `${data.total} طلب` : undefined} hint="تحتاج صلاحية payouts.approve — هذه الصفحة تحرّك مالاً.">
         <button
           type="button"
           className="btn btn--secondary btn--sm"
@@ -60,13 +66,32 @@ export default function AdminPayoutsPage() {
         </button>
       </AdminHeader>
       <Feedback error={act.error} notice={act.notice} />
-      <Tabs value={status} onChange={setStatus} label="حالة الطلب" options={Object.entries(STATUS).map(([key, label]) => ({ key, label }))} />
+      <div className="toolbar">
+        <Tabs value={status} onChange={setStatus} label="حالة الطلب" options={Object.entries(STATUS).map(([key, label]) => ({ key, label }))} />
+        <div className="toolbar__end">
+          <SearchBox value={search} onChange={setSearch} placeholder="اسم المتجر أو رابطه أو مرجع التحويل" label="بحث في طلبات التحويل" />
+        </div>
+      </div>
       {!data ? (
         <Loading error={error} forbidden={forbidden} onRetry={reload} />
-      ) : data.length === 0 ? (
-        <Empty icon="wallet" title="لا طلبات تحويل هنا">
-          {EMPTY[status]}
-        </Empty>
+      ) : data.items.length === 0 ? (
+        search.trim() ? (
+          <Empty
+            icon="search"
+            title="لا طلبات بهذا البحث"
+            actions={
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
+                أزل التصفية
+              </button>
+            }
+          >
+            جرّب اسماً آخر أو حالة أخرى من الرقائق أعلاه.
+          </Empty>
+        ) : (
+          <Empty icon="wallet" title="لا طلبات تحويل هنا">
+            {EMPTY[status]}
+          </Empty>
+        )
       ) : (
         <div className="table-wrap">
           <table className="table ao-table">
@@ -83,7 +108,7 @@ export default function AdminPayoutsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((p) => (
+              {list.items.map((p) => (
                 <tr key={p.id}>
                   <td>
                     <span className="ao-shop">
@@ -183,6 +208,7 @@ export default function AdminPayoutsPage() {
           </table>
         </div>
       )}
+      <MoreButton list={list} />
     </div>
   );
 }

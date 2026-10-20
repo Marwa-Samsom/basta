@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox, Tabs } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { TextArea } from '@/components/ui';
 import { api } from '@/lib/api';
-import { useAction, useAdminData } from '@/lib/admin';
+import { useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { DISPUTE_REASONS, DISPUTE_STATUS, ROLE_LABEL, labelOf, when } from '@/lib/orders';
 
 interface Row {
@@ -32,43 +32,66 @@ const SIDE: Record<string, string> = { customer: 'start', vendor_owner: 'end', v
 /**
  * AD-14 — النزاعات. المصعَّد أولاً، ومال الطلب مجمَّد حتى الحسم (ADR-007).
  * الحسم للمشتري يكتمل بإجراء الطلب نفسه (إلغاء أو استلام مرتجع من صفحة
- * الطلبات) — القرار هنا يوثّق الحكم ويفكّ التجميد.
+ * الطلبات) — القرار هنا يوثّق الحكم ويفكّ التجميد. البحث برقم الطلب أو المتجر أو المشتري،
+ * و«المزيد» لما بعد الخمسين.
  */
 export default function AdminDisputesPage() {
   const [status, setStatus] = useState('escalated');
   const [openId, setOpenId] = useState<string | null>(null);
-  const { data, error, forbidden, reload } = useAdminData<Row[]>(`/admin/disputes?status=${status}`);
+  const [search, setSearch] = useState('');
+  const query = new URLSearchParams({ status, ...(search.trim() ? { search: search.trim() } : {}) });
+  const list = useAdminList<Row>(`/admin/disputes?${query}`, (d) => d.id);
+  const { data, error, forbidden, reload } = list;
   const live = status === 'open' || status === 'escalated';
   // النزاع المختار، وإلا أوّل القائمة: الحاجة أن يُقرأ لا أن يُبحث عنه
-  const activeId = data?.find((d) => d.id === openId)?.id ?? data?.[0]?.id ?? null;
+  const activeId = list.items.find((d) => d.id === openId)?.id ?? list.items[0]?.id ?? null;
 
   return (
     <div className="ao-page">
-      <AdminHeader title="النزاعات" count={data ? `${data.length} نزاع` : undefined} hint="الرصيد مجمَّد ما دام النزاع مفتوحاً." />
-      <Tabs
-        value={status}
-        onChange={(s) => {
-          setStatus(s);
-          setOpenId(null);
-        }}
-        label="حالة النزاع"
-        options={['escalated', 'open', 'resolved_customer', 'resolved_vendor', 'withdrawn'].map((k) => ({ key: k, label: DISPUTE_STATUS[k]! }))}
-      />
+      <AdminHeader title="النزاعات" count={data ? `${data.total} نزاع` : undefined} hint="الرصيد مجمَّد ما دام النزاع مفتوحاً." />
+      <div className="toolbar">
+        <Tabs
+          value={status}
+          onChange={(s) => {
+            setStatus(s);
+            setOpenId(null);
+          }}
+          label="حالة النزاع"
+          options={['escalated', 'open', 'resolved_customer', 'resolved_vendor', 'withdrawn'].map((k) => ({ key: k, label: DISPUTE_STATUS[k]! }))}
+        />
+        <div className="toolbar__end">
+          <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو المتجر أو المشتري" label="بحث في النزاعات" />
+        </div>
+      </div>
       {!data ? (
         <Loading error={error} forbidden={forbidden} onRetry={reload} />
-      ) : data.length === 0 ? (
-        <Empty icon={live ? 'check-circle' : 'scale'} tone={live ? 'success' : undefined} title="لا نزاعات هنا">
-          {live ? 'لا نزاع ينتظر قراراً الآن.' : 'جرّب حالة أخرى من الرقائق أعلاه.'}
-        </Empty>
+      ) : data.items.length === 0 ? (
+        search.trim() ? (
+          <Empty
+            icon="search"
+            title="لا نزاعات بهذا البحث"
+            actions={
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
+                أزل التصفية
+              </button>
+            }
+          >
+            جرّب رقماً آخر أو حالة أخرى من الرقائق أعلاه.
+          </Empty>
+        ) : (
+          <Empty icon={live ? 'check-circle' : 'scale'} tone={live ? 'success' : undefined} title="لا نزاعات هنا">
+            {live ? 'لا نزاع ينتظر قراراً الآن.' : 'جرّب حالة أخرى من الرقائق أعلاه.'}
+          </Empty>
+        )
       ) : (
         <div className="ao-split">
           <nav className="ao-dlist" aria-label="قائمة النزاعات">
             <div className="ao-dlist__head">
               <h2 className="ao-card-title">{DISPUTE_STATUS[status] ?? status}</h2>
-              <span className="ao-dlist__count num">{data.length}</span>
+              <span className="ao-dlist__count num">{data.total}</span>
             </div>
             <ul>
-              {data.map((d) => (
+              {list.items.map((d) => (
                 <li key={d.id}>
                   <button type="button" className="ao-ditem" aria-current={d.id === activeId ? 'true' : undefined} onClick={() => setOpenId(d.id)}>
                     <span className="ao-ditem__no num">{d.subOrder.subOrderNumber}</span>
@@ -85,6 +108,7 @@ export default function AdminDisputesPage() {
                 </li>
               ))}
             </ul>
+            <MoreButton list={list} />
           </nav>
           {activeId ? <DisputeDetail key={activeId} id={activeId} onChange={reload} /> : null}
         </div>
