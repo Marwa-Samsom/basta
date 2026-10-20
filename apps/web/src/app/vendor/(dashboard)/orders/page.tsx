@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { Alert, EmptyState, PageHead } from '@/components/ui';
+import { useState } from 'react';
+import { Alert, EmptyState, MoreButton, PageHead } from '@/components/ui';
 import { Icon } from '@/components/icons';
-import { api } from '@/lib/api';
+import { useAdminList } from '@/lib/admin';
 import { labelOf, money, toneOf, when } from '@/lib/orders';
 
 interface Row {
@@ -19,11 +19,6 @@ interface Row {
   buyer: string | null;
 }
 
-interface ListView {
-  items: Row[];
-  total: number;
-  counts: Record<string, number>;
-}
 
 /**
  * التبويبات بترتيب العمل اليومي: ما ينتظرك أولاً، ثم ما انتهى. كل حالة لها
@@ -43,25 +38,18 @@ const TABS: { statuses: string[]; label: string }[] = [
  *
  * البائع يرى فرعيّه وحده: رقمه وحالته وصافيه بعملته. «بانتظار القبول» أعلى
  * التبويبات بعدّاده لأن مهلة القبول 48 ساعة ثم يُلغى الطلب آلياً.
+ *
+ * عشرون في الصفحة و«المزيد» لما بعدها (20 أكتوبر 2026) — كانت القائمة أول عشرين بلا غيرها.
+ * والبحث برقم الطلب أو اسم المستلم أو منتج فيه.
  */
 export default function VendorOrdersPage() {
   const [tab, setTab] = useState('');
   const [search, setSearch] = useState('');
-  const [data, setData] = useState<ListView | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    const q = new URLSearchParams();
-    if (tab) q.set('status', tab);
-    if (search.trim()) q.set('search', search.trim());
-    api<ListView>(`/vendor/orders?${q}`)
-      .then((d) => alive && (setData(d), setError(null)))
-      .catch((e: Error) => alive && setError(e.message));
-    return () => {
-      alive = false;
-    };
-  }, [tab, search]);
+  const q = new URLSearchParams();
+  if (tab) q.set('status', tab);
+  if (search.trim()) q.set('search', search.trim());
+  const list = useAdminList<Row, { counts: Record<string, number> }>(`/vendor/orders?${q}`, (r) => r.id);
+  const { data, error } = list;
 
   const waiting = data?.counts['awaiting_vendor'] ?? 0;
   const all = data ? Object.values(data.counts).reduce((a, n) => a + n, 0) : 0;
@@ -84,10 +72,10 @@ export default function VendorOrdersPage() {
             <input
               className="field__control"
               type="search"
-              placeholder="ابحث برقم الطلب"
+              placeholder="رقم الطلب أو المستلم أو المنتج"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              aria-label="ابحث برقم الطلب"
+              aria-label="ابحث في الطلبات"
             />
           </span>
         }
@@ -152,7 +140,7 @@ export default function VendorOrdersPage() {
               }
             >
               {filtered
-                ? 'جرّب مرحلة أخرى من الأعلى، أو ابحث برقم طلب آخر.'
+                ? 'جرّب مرحلة أخرى من الأعلى، أو ابحث برقم أو اسم آخر.'
                 : 'تصلك الطلبات هنا فور شراء أحدهم من متجرك، والجديد منها أولاً مع مهلة القبول.'}
             </EmptyState>
           ) : (
@@ -170,7 +158,7 @@ export default function VendorOrdersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((r) => (
+                  {list.items.map((r) => (
                     <tr key={r.id} data-status={r.status}>
                       <td data-label="الطلب الفرعي">
                         <Link href={`/vendor/orders/${r.id}`} className="num vm-order-link">
@@ -202,6 +190,7 @@ export default function VendorOrdersPage() {
             </div>
           )
         ) : null}
+        <MoreButton list={list} />
       </section>
     </div>
   );

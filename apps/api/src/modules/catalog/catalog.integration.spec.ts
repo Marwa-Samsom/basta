@@ -403,6 +403,60 @@ describe('ADR-010 · عزل البائعين عبر الواجهة', () => {
 });
 
 // ============================================================================
+describe('VD-11 · المخزون من الخادم — بحث وتصفية وصفحات (20 أكتوبر 2026)', () => {
+  dbIt('متغيّراً متغيّراً بالبحث، و«المنخفض» و«النافد» من الخادم، والمنخفض أولاً، ولا يرى متجرٌ مخزون غيره', async () => {
+    const A = as('a');
+    const ok = await simpleProduct('a', `INV-OK-${SUFFIX}`);
+    await simpleProduct('a', `INV-LOW-${SUFFIX}`);
+    const out = await simpleProduct('a', `INV-OUT-${SUFFIX}`);
+    const stock = (p: { id: string; variants: VariantJson[] }, setTo: number) =>
+      A.patch(`/vendor/products/${p.id}/variants/${p.variants[0]!.id}/stock`, { setTo, reason: 'manual_adjust' });
+    expect((await stock(ok, 50)).statusCode).toBe(200);
+    expect((await stock(out, 0)).statusCode).toBe(200);
+    // low يبقى على 2 — دون حدّ التنبيه (5)
+
+    const inv = async (q: string) => {
+      const res = await A.get(`/vendor/inventory?${q}`);
+      expect(res.statusCode, res.body).toBe(200);
+      return res.json() as { items: { sku: string; onHand: number; available: number; isLow: boolean; variant: string; productNameAr: string }[]; total: number; counts: Record<string, number> };
+    };
+    const term = (s: string) => `search=${encodeURIComponent(s)}`;
+    const skus = (r: { items: { sku: string }[] }) => r.items.map((i) => i.sku).filter((s) => s.endsWith(SUFFIX));
+
+    // بحث SKU بلا حساسية للأحرف، والمنخفض أولاً
+    const mine = await inv(term('inv-'));
+    expect(skus(mine)).toEqual(expect.arrayContaining([`INV-OK-${SUFFIX}`, `INV-LOW-${SUFFIX}`, `INV-OUT-${SUFFIX}`]));
+    const order = skus(mine);
+    expect(order.indexOf(`INV-OK-${SUFFIX}`)).toBeGreaterThan(order.indexOf(`INV-LOW-${SUFFIX}`));
+    const one = await inv(term(`inv-ok-${SUFFIX}`));
+    expect(one.total).toBe(1);
+    expect(one.items[0]).toMatchObject({ onHand: 50, available: 50, isLow: false, productNameAr: 'منتج بسيط' });
+
+    // التصفية من الخادم: النافد وحده نافد، والمنخفض يجمع ما بلغ الحدّ
+    expect(skus(await inv(`filter=out&${term('inv-')}`))).toEqual([`INV-OUT-${SUFFIX}`]);
+    expect(skus(await inv(`filter=low&${term('inv-')}`)).sort()).toEqual([`INV-LOW-${SUFFIX}`, `INV-OUT-${SUFFIX}`].sort());
+    expect((await A.get('/vendor/inventory?filter=bogus')).statusCode).toBe(400);
+
+    // العدّادات للمتجر كله لا للبحث
+    const counts = (await inv(term(`inv-ok-${SUFFIX}`))).counts;
+    expect(counts.all).toBeGreaterThanOrEqual(3);
+    expect(counts.out).toBeGreaterThanOrEqual(1);
+    expect(counts.low).toBeGreaterThanOrEqual(2);
+    expect(counts.attention).toBeGreaterThanOrEqual(counts.out!);
+
+    // الصفحة الثانية لا تكرّر الأولى
+    const p1 = await inv('');
+    const p2 = await inv('page=2');
+    expect(p2.items.some((i) => p1.items.some((j) => j.sku === i.sku))).toBe(false);
+    expect(p1.items.length + p2.items.length).toBeLessThanOrEqual(p1.total);
+
+    // عزل البائعين: متجر آخر لا يرى هذه المتغيّرات ولا تدخل عدّاداته
+    const other = (await as('b').get(`/vendor/inventory?${term(`inv-ok-${SUFFIX}`)}`)).json();
+    expect(other).toMatchObject({ items: [], total: 0 });
+  });
+});
+
+// ============================================================================
 describe('النشر', () => {
   dbIt('يُمنع بكل أسبابه معاً: متجر لم يُرسل طلبه ولا صورة', async () => {
     const P = as('pending');

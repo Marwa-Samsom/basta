@@ -98,4 +98,5 @@
 }
 
 /* قائمة النزاعات */
+.sp-dlist__search { display: flex; inline-size: 280px; max-inline-size: 100%; margin-block-end: var(--space-3); }
 .sp-dlist td .sp-dlist__vendor { font-size: var(--text-xs); color: var(--text-muted); }

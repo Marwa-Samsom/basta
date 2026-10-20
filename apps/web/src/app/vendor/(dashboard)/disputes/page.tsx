@@ -21,7 +21,7 @@ export default function VendorDisputesPage() {
         </Link>
       </div>
       <div className="vm-disputes">
-        <DisputeList base="/vendor/disputes" link={(id) => `/vendor/disputes/${id}`} />
+        <DisputeList base="/vendor/disputes" link={(id) => `/vendor/disputes/${id}`} searchable />
       </div>
     </div>
   );

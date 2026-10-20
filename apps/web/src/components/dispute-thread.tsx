@@ -185,7 +185,9 @@ export function DisputeThread({ id, base, me, back }: { id: string; base: string
 }
 
 /** قائمة النزاعات — لكلا الجمهورين */
-export function DisputeList({ base, link }: { base: string; link: (id: string) => string }) {
+export function DisputeList({ base, link, searchable = false }: { base: string; link: (id: string) => string; searchable?: boolean }) {
+  // للبائع: تصفية النزاعات المحمّلة برقم الطلب أو السبب
+  const [filter, setFilter] = useState('');
   const [rows, setRows] = useState<
     { id: string; reasonCode: string; status: string; createdAt: string; subOrder: { subOrderNumber: string; vendor: { nameAr: string } }; _count: { messages: number } }[] | null
   >(null);
@@ -206,7 +208,17 @@ export function DisputeList({ base, link }: { base: string; link: (id: string) =
       </EmptyState>
     );
   }
+  const term = filter.trim();
+  const shown = term ? rows.filter((r) => r.subOrder.subOrderNumber.toLowerCase().includes(term.toLowerCase()) || (DISPUTE_REASONS[r.reasonCode] ?? '').includes(term)) : rows;
   return (
+    <>
+      {searchable ? (
+        <span className="input-icon sp-dlist__search">
+          <Icon name="search" size={15} />
+          <input className="field__control" type="search" placeholder="رقم الطلب أو السبب" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="صفِّ النزاعات" />
+        </span>
+      ) : null}
+      {shown.length === 0 ? <p className="small muted">لا نزاع يطابق «{term}».</p> : null}
     <div className="table-wrap sp-dlist">
       <table className="table">
         <thead>
@@ -219,7 +231,7 @@ export function DisputeList({ base, link }: { base: string; link: (id: string) =
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {shown.map((r) => (
             <tr key={r.id}>
               <td data-label="الطلب">
                 <span className="stack stack--tight">
@@ -244,5 +256,6 @@ export function DisputeList({ base, link }: { base: string; link: (id: string) =
         </tbody>
       </table>
     </div>
+    </>
   );
 }

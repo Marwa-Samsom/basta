@@ -17,6 +17,8 @@ import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagg
 import type { MultipartFile } from '@fastify/multipart';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { InvalidInputError } from '../../../common/errors/domain-error';
+import { pageOf, termOf } from '../../../common/paging';
+import { assertOneOf } from '../../../common/validation';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
 import type { Actor } from '../../../common/security/actor';
@@ -315,6 +317,17 @@ export class VendorCatalogController {
     @Param('imageId', uuidParam) imageId: string,
   ): Promise<void> {
     await this.images.remove(scopeOf(actor), id, imageId);
+  }
+
+  @Get('inventory')
+  @ApiOperation({ summary: 'المخزون متغيّراً متغيّراً — بحث وتصفية وخمسون في الصفحة، المنخفض أولاً' })
+  inventory(@CurrentActor() actor: Actor, @Query('search') search?: string, @Query('filter') filter?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.products.inventoryRows(scopeOf(actor), {
+      ...(term ? { search: term } : {}),
+      ...(filter ? { filter: assertOneOf(filter, ['low', 'out'] as const, 'التصفية') } : {}),
+      page: pageOf(page),
+    });
   }
 
   @Get('inventory/low-stock')

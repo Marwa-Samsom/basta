@@ -56,14 +56,15 @@ export function useAdminData<T>(path: string | null): {
  * بعد إجراء يعيدها إلى الأولى بأرقامها الجديدة. الصفّ المكرّر (قائمة تحرّكت بين صفحتين)
  * يُسقط بمفتاحه.
  *
- * كانت القوائم تقف عند أول مئة أو مئتين بلا ما بعدها (J-11، 20 أكتوبر 2026).
+ * كانت القوائم تقف عند أول مئة أو مئتين بلا ما بعدها (J-11، 20 أكتوبر 2026). ولوحة البائع
+ * تستعمله كذلك، و`Extra` ما يعود مع الصفحة الأولى غير القائمة (عدّادات الحالات مثلاً).
  */
-export function useAdminList<T>(
+export function useAdminList<T, Extra extends object = object>(
   path: string | null,
   key: (row: T) => string,
   paging: 'page' | 'offset' = 'page',
 ): {
-  data: { items: T[]; total: number } | null;
+  data: ({ items: T[]; total: number } & Extra) | null;
   items: T[];
   total: number;
   error: string | null;
@@ -74,7 +75,7 @@ export function useAdminList<T>(
   loadingMore: boolean;
   moreError: string | null;
 } {
-  const first = useAdminData<{ items: T[]; total: number }>(path);
+  const first = useAdminData<{ items: T[]; total: number } & Extra>(path);
   const [extra, setExtra] = useState<{ path: string | null; pages: T[][] }>({ path: null, pages: [] });
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState<{ path: string | null; message: string } | null>(null);

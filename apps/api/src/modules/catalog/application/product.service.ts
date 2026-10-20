@@ -9,6 +9,7 @@ import {
   NotFoundError,
 } from '../../../common/errors/domain-error';
 import { MoneyError, parse as parseMoney } from '../../../common/money/money';
+import { like, pageArgs } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ScopedRepository } from '../../../common/prisma/scoped-repository';
 import { vendorScopeOf, type Actor, type VendorScope } from '../../../common/security/actor';
@@ -275,6 +276,79 @@ export class ProductService {
           updatedAt: r.updatedAt,
         };
       }),
+    };
+  }
+
+  /**
+   * VD-11 — المخزون متغيّراً متغيّراً، خمسين خمسين ببحث (اسم المنتج أو SKU) وتصفية. كانت
+   * الصفحة تقرأ أول مئة منتج ثم تطلب كل منتج وحده لتعرف متغيّراته — ما بعد المئة لا يُرى،
+   * والفتح مئة طلب. «المنخفض» بالعلامة نفسها التي يُنبَّه بها البائع (lowStockSince)،
+   * و«النافد» ما لا متاح منه (الموجود لا يزيد على المحجوز). المنخفض أولاً.
+   */
+  async inventoryRows(scope: VendorScope, q: { search?: string; filter?: 'low' | 'out'; page: number }) {
+    const t = q.search;
+    const live: Prisma.ProductVariantWhereInput = { archivedAt: null, product: { deletedAt: null } };
+    const low: Prisma.ProductVariantWhereInput = { inventory: { is: { lowStockSince: { not: null } } } };
+    const out: Prisma.ProductVariantWhereInput = { inventory: { is: { onHand: { lte: this.prisma.inventory.fields.reserved } } } };
+    const where: Prisma.ProductVariantWhereInput = {
+      ...live,
+      ...(t ? { OR: [{ sku: like(t) }, { product: { OR: [{ nameAr: like(t) }, { nameEn: like(t) }] } }] } : {}),
+      ...(q.filter === 'low' ? low : q.filter === 'out' ? out : {}),
+    };
+    const orderBy: Prisma.ProductVariantOrderByWithRelationInput[] = [
+      { inventory: { lowStockSince: { sort: 'asc', nulls: 'last' } } },
+      { product: { nameAr: 'asc' } },
+      { sku: 'asc' },
+      { id: 'asc' },
+    ];
+    const repo = this.variantsRepo(scope);
+    // عدّادات الرقائق للمتجر كله، لا لنتيجة البحث — كما كانت
+    const [rows, total, all, lowCount, outCount, attention] = await Promise.all([
+      repo.findMany({
+        where,
+        orderBy,
+        ...pageArgs(q.page),
+        select: {
+          id: true,
+          sku: true,
+          product: { select: { id: true, nameAr: true, images: { take: 1, orderBy: { sort: 'asc' }, select: { fileKey: true } } } },
+          optionValues: { orderBy: { attributeId: 'asc' }, select: { attributeValue: { select: { valueAr: true } } } },
+        },
+      }) as unknown as Promise<
+        {
+          id: string;
+          sku: string;
+          product: { id: string; nameAr: string; images: { fileKey: string }[] };
+          optionValues: { attributeValue: { valueAr: string } }[];
+        }[]
+      >,
+      repo.count(where),
+      repo.count(live),
+      repo.count({ ...live, ...low }),
+      repo.count({ ...live, ...out }),
+      repo.count({ ...live, OR: [low, out] }),
+    ]);
+    const levels = new Map((await this.inventory.levels(rows.map((r) => r.id))).map((l) => [l.variantId, l]));
+    return {
+      items: rows.map((r) => {
+        const s = levels.get(r.id);
+        const image = r.product.images[0];
+        return {
+          productId: r.product.id,
+          productNameAr: r.product.nameAr,
+          thumbnail: image ? this.storage.urls(image.fileKey)['thumb.webp'] : null,
+          variantId: r.id,
+          variant: r.optionValues.map((o) => o.attributeValue.valueAr).join(' · '),
+          sku: r.sku,
+          onHand: s?.onHand ?? 0,
+          reserved: s?.reserved ?? 0,
+          available: s?.available ?? 0,
+          lowStockThreshold: s?.lowStockThreshold ?? 0,
+          isLow: s?.isLow ?? false,
+        };
+      }),
+      total,
+      counts: { all, low: lowCount, out: outCount, attention },
     };
   }
 

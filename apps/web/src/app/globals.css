@@ -1014,6 +1014,11 @@ a.stat:hover { box-shadow: var(--shadow-md); }
 .stat__note { color: var(--text-muted); font-size: var(--text-xs); }
 
 /* حالة فارغة — تقول ما التالي لا «لا يوجد» فقط */
+/* «المزيد» تحت قائمة طويلة، ومعه كم عُرض من كم — الإدارة والبائع */
+.list-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-3); padding-block: var(--space-4); }
+.list-more__count { color: var(--text-muted); font-size: var(--text-sm); }
+.list-more__error { color: var(--danger-text); font-size: var(--text-sm); }
+
 .empty {
   display: grid;
   justify-items: center;

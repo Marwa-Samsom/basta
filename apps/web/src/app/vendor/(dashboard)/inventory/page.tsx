@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { digitsOnly } from '@/lib/digits';
-import { Alert, EmptyState, Field, PageHead, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Alert, EmptyState, Field, MoreButton, PageHead, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
-import { num, type LowStockRow, type Page, type ProductListItem } from '@/lib/catalog';
+import { useAdminList } from '@/lib/admin';
+import { num } from '@/lib/catalog';
 
 interface Row {
   productId: string;
@@ -21,17 +22,19 @@ interface Row {
   reserved: number;
   available: number;
   lowStockThreshold: number;
+  /** علامة المخزون نفسها التي يُنبَّه بها البائع — الموجود بلغ حدّ التنبيه */
+  isLow: boolean;
 }
 
 type Filter = 'all' | 'low' | 'out';
 
-const isLow = (r: Row): boolean => r.lowStockThreshold > 0 && r.available <= r.lowStockThreshold;
 const isOut = (r: Row): boolean => r.available <= 0;
 
-const FILTERS: readonly { key: Filter; label: string; test: (r: Row) => boolean }[] = [
-  { key: 'all', label: 'الكل', test: () => true },
-  { key: 'low', label: 'المنخفض فقط', test: isLow },
-  { key: 'out', label: 'النافد', test: isOut },
+/** التصفية في الخادم — «المنخفض» بعلامة التنبيه، و«النافد» ما لا متاح منه */
+const FILTERS: readonly { key: Filter; label: string }[] = [
+  { key: 'all', label: 'الكل' },
+  { key: 'low', label: 'المنخفض فقط' },
+  { key: 'out', label: 'النافد' },
 ];
 
 const REASONS = [
@@ -48,108 +51,31 @@ const REASONS = [
  * وتعديل الكمية إلى ما دون المحجوز مرفوض — والتحذير يظهر قبل الحفظ لا بعده.
  */
 export default function InventoryPage() {
-  const [rows, setRows] = useState<Row[] | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Row | null>(null);
 
-  /** يجمع صفوف المخزون أو يعيد رسالة الخطأ — بلا ضبط حالة، فيصلح للتأثير وللتحديث معاً. */
-  const collect = useCallback(async (): Promise<Row[] | string> => {
-    try {
-      // المخزون يُقرأ من المنتجات نفسها: لا مسار منفصل يعيد ما تعيده القائمة
-      const [page, low] = await Promise.all([
-        api<Page<ProductListItem>>('/vendor/products?pageSize=100'),
-        api<LowStockRow[]>('/vendor/inventory/low-stock'),
-      ]);
-
-      const details = await Promise.all(
-        page.items.map((p) =>
-          api<{ id: string; nameAr: string; variants: unknown[] }>(`/vendor/products/${p.id}`)
-            .then((d) => ({ detail: d, thumbnail: p.thumbnail }))
-            .catch(() => null),
-        ),
-      );
-
-      const flat: Row[] = [];
-      for (const entry of details) {
-        if (!entry) continue;
-        const { detail, thumbnail } = entry;
-        for (const v of detail.variants as {
-          id: string;
-          sku: string;
-          options?: { valueAr: string }[];
-          stock: { onHand: number; reserved: number; available: number; lowStockThreshold: number };
-        }[]) {
-          flat.push({
-            productId: detail.id,
-            productNameAr: detail.nameAr,
-            thumbnail,
-            variantId: v.id,
-            variant: (v.options ?? []).map((o) => o.valueAr).join(' · '),
-            sku: v.sku,
-            onHand: v.stock.onHand,
-            reserved: v.stock.reserved,
-            available: v.stock.available,
-            lowStockThreshold: v.stock.lowStockThreshold,
-          });
-        }
-      }
-      // ترتيب المنخفض أولاً: ما يحتاج تدخّلاً يُرى بلا بحث
-      const lowIds = new Set(low.map((l) => l.variantId));
-      flat.sort((a, b) => Number(lowIds.has(b.variantId)) - Number(lowIds.has(a.variantId)));
-      return flat;
-    } catch (err) {
-      return err instanceof Error ? err.message : 'تعذّر تحميل المخزون.';
-    }
-  }, []);
-
-  const refresh = useCallback(async (): Promise<void> => {
-    const next = await collect();
-    if (typeof next === 'string') setError(next);
-    else {
-      setRows(next);
-      setError(null);
-    }
-  }, [collect]);
-
-  // أول تحميل داخل التأثير نفسه: لا ضبط حالة قبل انتهاء الطلب
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      const next = await collect();
-      if (!alive) return;
-      if (typeof next === 'string') setError(next);
-      else setRows(next);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [collect]);
-
-  const all = rows ?? [];
-  const active = FILTERS.find((f) => f.key === filter);
-  const term = search.trim().toLowerCase();
-  const visible = all.filter((r) => {
-    if (active && !active.test(r)) return false;
-    if (!term) return true;
-    return r.sku.toLowerCase().includes(term) || r.productNameAr.includes(term);
-  });
-  const attention = all.filter((r) => isLow(r) || isOut(r)).length;
+  // المخزون من الخادم متغيّراً متغيّراً، خمسين خمسين — البحث والتصفية هناك لا هنا، فما بعد
+  // الصفحة الأولى يُوجد. كانت الصفحة أول مئة منتج ثم طلباً لكل منتج (20 أكتوبر 2026).
+  const query = new URLSearchParams({ ...(filter !== 'all' ? { filter } : {}), ...(search.trim() ? { search: search.trim() } : {}) });
+  const list = useAdminList<Row, { counts: Record<Filter | 'attention', number> }>(`/vendor/inventory?${query}`, (r) => r.variantId);
+  const { data, error } = list;
+  const counts = data?.counts;
+  const term = search.trim();
 
   return (
     <div className="vp-page">
       <PageHead
         title="المخزون"
         count={
-          rows
-            ? rows.length === 0
+          counts
+            ? counts.all === 0
               ? 'لا متغيّرات بعد'
-              : `${num(rows.length)} متغيّراً · ${num(attention)} يحتاج انتباهاً`
+              : `${num(counts.all)} متغيّراً · ${num(counts.attention)} يحتاج انتباهاً`
             : undefined
         }
         actions={
-          rows && rows.length > 0 ? (
+          counts && counts.all > 0 ? (
             <span className="input-icon vp-search">
               <Icon name="search" size={16} />
               <input
@@ -166,9 +92,9 @@ export default function InventoryPage() {
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {!rows && !error ? <Spinner label="جارٍ تحميل المخزون…" /> : null}
+      {!data && !error ? <Spinner label="جارٍ تحميل المخزون…" /> : null}
 
-      {rows && rows.length === 0 ? (
+      {counts && counts.all === 0 ? (
         <EmptyState
           icon="boxes"
           title="لا مخزون بعد"
@@ -183,7 +109,7 @@ export default function InventoryPage() {
         </EmptyState>
       ) : null}
 
-      {rows && rows.length > 0 ? (
+      {data && counts && counts.all > 0 ? (
         <section className="card card--flush">
           <div className="card__head vp-toolbar">
             <div className="tabs vp-filter" role="group" aria-label="تصفية المخزون">
@@ -196,7 +122,7 @@ export default function InventoryPage() {
                   onClick={() => setFilter(f.key)}
                 >
                   {f.label}
-                  <span className="tabs__count">{num(all.filter(f.test).length)}</span>
+                  <span className="tabs__count">{num(counts[f.key])}</span>
                 </button>
               ))}
             </div>
@@ -206,14 +132,14 @@ export default function InventoryPage() {
             </span>
           </div>
 
-          {visible.length === 0 ? (
+          {list.items.length === 0 ? (
             <div className="vp-nomatch">
               <span className="empty__icon vp-nomatch__icon" aria-hidden>
                 <Icon name="boxes" size={24} />
               </span>
               <p className="vp-nomatch__title">
                 {term
-                  ? `لا نتائج تطابق «${search.trim()}»`
+                  ? `لا نتائج تطابق «${term}»`
                   : filter === 'low'
                     ? 'لا متغيّر تحت حدّ التنبيه — مخزونك بخير.'
                     : 'لا متغيّر نافد — مخزونك بخير.'}
@@ -248,9 +174,9 @@ export default function InventoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((r) => {
+                  {list.items.map((r) => {
                     const out = isOut(r);
-                    const low = !out && isLow(r);
+                    const low = !out && r.isLow;
                     return (
                       <tr key={r.variantId} data-out={out || undefined}>
                         <td className="wrap">
@@ -303,6 +229,7 @@ export default function InventoryPage() {
               </table>
             </div>
           )}
+          <MoreButton list={list} />
         </section>
       ) : null}
 
@@ -312,7 +239,7 @@ export default function InventoryPage() {
           onClose={() => setEditing(null)}
           onDone={() => {
             setEditing(null);
-            void refresh();
+            list.reload();
           }}
         />
       ) : null}

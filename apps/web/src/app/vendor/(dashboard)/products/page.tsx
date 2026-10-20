@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
-import { Alert, EmptyState, PageHead, Spinner } from '@/components/ui';
+import { Alert, EmptyState, MoreButton, PageHead, Spinner } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
 import {
@@ -62,6 +62,12 @@ export default function ProductsPage() {
   const [counts, setCounts] = useState<Partial<Record<TabKey, number>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // «المزيد»: الصفحات التالية تُلحق بالأولى، ومفتاح القائمة يمنع إلحاق صفحة بحث سابق بغيره
+  const [extra, setExtra] = useState<ProductListItem[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  const [exhausted, setExhausted] = useState(false);
+  const listKey = useRef('');
 
   const load = useCallback(
     async (status: TabKey, term: string, cat: string): Promise<void> => {
@@ -71,7 +77,11 @@ export default function ProductsPage() {
       if (cat) params.set('category', cat);
       try {
         const next = await api<Page<ProductListItem>>(`/vendor/products?${params.toString()}`);
+        listKey.current = params.toString();
         setPage(next);
+        setExtra([]);
+        setMoreError(null);
+        setExhausted(false);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'تعذّر تحميل المنتجات.');
@@ -120,6 +130,28 @@ export default function ProductsPage() {
       alive = false;
     };
   }, []);
+
+  // الأولى وما أُلحق بها، بلا صفّ مكرّر إن تحرّكت القائمة بين صفحتين
+  const items = page ? [...page.items, ...extra].filter((p, i, all) => all.findIndex((x) => x.id === p.id) === i) : [];
+
+  const loadMore = async (): Promise<void> => {
+    if (!page) return;
+    const key = listKey.current;
+    const params = new URLSearchParams(key);
+    params.set('page', String(Math.floor((page.items.length + extra.length) / page.pageSize) + 1));
+    setLoadingMore(true);
+    setMoreError(null);
+    try {
+      const next = await api<Page<ProductListItem>>(`/vendor/products?${params.toString()}`);
+      if (listKey.current !== key) return;
+      setExtra((e) => [...e, ...next.items]);
+      if (next.items.length === 0) setExhausted(true);
+    } catch (err) {
+      if (listKey.current === key) setMoreError(err instanceof Error ? err.message : 'تعذّر تحميل المزيد.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const filtered = Boolean(search.trim()) || tab !== 'all' || Boolean(category);
   const storeEmpty = page !== null && page.items.length === 0 && !filtered;
@@ -272,7 +304,7 @@ export default function ProductsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {page.items.map((p) => (
+                  {items.map((p) => (
                     <tr key={p.id}>
                       <td className="wrap">
                         <Link className="vp-prod" href={`/vendor/products/${p.id}`}>
@@ -338,18 +370,17 @@ export default function ProductsPage() {
           ) : null}
 
           {page && page.items.length > 0 ? (
-            <div className="card__foot vp-foot">
-              <span className="small muted">
-                <span className="num">{num(page.items.length)}</span> من{' '}
-                <span className="num">{num(page.total)}</span> منتجاً
-              </span>
-              {page.total > page.pageSize ? (
+            (items.length < page.total && !exhausted) || moreError ? (
+              <MoreButton
+                list={{ items, total: page.total, hasMore: items.length < page.total && !exhausted, loadingMore, moreError, more: () => void loadMore() }}
+              />
+            ) : (
+              <div className="card__foot vp-foot">
                 <span className="small muted">
-                  تُعرض أول <span className="num">{num(page.pageSize)}</span> نتيجة — الصفحات الكاملة
-                  في المرحلة القادمة، اعرض بالبحث حتى ذلك الحين.
+                  <span className="num">{num(items.length)}</span> من <span className="num">{num(page.total)}</span> منتجاً
                 </span>
-              ) : null}
-            </div>
+              </div>
+            )
           ) : null}
         </section>
       )}
