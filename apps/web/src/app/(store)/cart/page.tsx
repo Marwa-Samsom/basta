@@ -251,13 +251,16 @@ export default function CartPage() {
 
 function CartRow({ line: l, busy, onQty }: { line: CartLine; busy: boolean; onQty: (qty: number) => void }) {
   const src = thumbOf(l.imageKey);
+  const gone = l.unavailable === true;
   const soldOut = l.available === 0;
   const short = l.available < l.qty;
-  const stock = soldOut
-    ? { cls: 'sp-stock--out', text: 'نفدت الكمية' }
-    : l.available <= 3
-      ? { cls: 'sp-stock--low', text: `بقي ${l.available} فقط` }
-      : { cls: '', text: 'متوفّر' };
+  const stock = gone
+    ? { cls: 'sp-stock--out', text: 'غير متاح' }
+    : soldOut
+      ? { cls: 'sp-stock--out', text: 'نفدت الكمية' }
+      : l.available <= 3
+        ? { cls: 'sp-stock--low', text: `بقي ${l.available} فقط` }
+        : { cls: '', text: 'متوفّر' };
 
   return (
     <div className={`sp-line ${short ? 'sp-line--problem' : ''}`}>
@@ -282,7 +285,11 @@ function CartRow({ line: l, busy, onQty }: { line: CartLine; busy: boolean; onQt
         {short ? (
           <span className="sp-flag sp-flag--danger" role="alert">
             <Icon name="alert" size={13} />
-            {soldOut ? 'نفدت هذه القطعة بعد إضافتها — أزلها لتكمل الشراء' : `المتاح ${l.available} فقط — أنقص الكمية لتكمل الشراء`}
+            {gone
+              ? 'لم تعد هذه القطعة تُباع — أزلها لتكمل الشراء'
+              : soldOut
+                ? 'نفدت هذه القطعة بعد إضافتها — أزلها لتكمل الشراء'
+                : `المتاح ${l.available} فقط — أنقص الكمية لتكمل الشراء`}
           </span>
         ) : null}
 
@@ -292,7 +299,7 @@ function CartRow({ line: l, busy, onQty }: { line: CartLine; busy: boolean; onQt
               type="button"
               className="sp-qty__btn"
               aria-label="أنقص"
-              disabled={busy || l.qty <= 1}
+              disabled={busy || gone || l.qty <= 1}
               onClick={() => onQty(l.qty - 1)}
             >
               <Icon name="minus" size={14} />
@@ -324,17 +331,24 @@ function CartRow({ line: l, busy, onQty }: { line: CartLine; busy: boolean; onQt
         </div>
       </div>
 
-      <div className="sp-line__price">
-        <span className="sp-line__total money num">{l.lineTotal.formatted}</span>
-        <span className="sp-line__unit num">
-          {l.unitPrice.formatted} × {l.qty}
-        </span>
-        {l.originalLineTotal ? (
-          <span className="sp-line__store">
-            <span className="num">{l.originalLineTotal.formatted}</span> بعملة المتجر
+      {gone ? (
+        // لا سعر يُعرض لما لا يُباع — ولا يدخل الإجمالي
+        <div className="sp-line__price">
+          <span className="sp-line__total">—</span>
+        </div>
+      ) : (
+        <div className="sp-line__price">
+          <span className="sp-line__total money num">{l.lineTotal.formatted}</span>
+          <span className="sp-line__unit num">
+            {l.unitPrice.formatted} × {l.qty}
           </span>
-        ) : null}
-      </div>
+          {l.originalLineTotal ? (
+            <span className="sp-line__store">
+              <span className="num">{l.originalLineTotal.formatted}</span> بعملة المتجر
+            </span>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
