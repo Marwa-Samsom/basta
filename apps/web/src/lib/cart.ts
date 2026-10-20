@@ -37,6 +37,8 @@ export interface CartLine {
   originalUnitPrice: Money | null;
   originalLineTotal: Money | null;
   priceChanged: boolean;
+  /** لم يعد يُباع (أُوقف أو أُرشف أو عُلّق متجره) — يُزال، ولا يدخل الإجمالي */
+  unavailable?: boolean;
 }
 
 export interface CartView {
@@ -104,7 +106,9 @@ export const cartApi = {
             }).catch(() => cart),
       )
       .catch((err) => {
-        if (err instanceof ApiError && err.status === 404) {
+        // السلة نفسها غابت أو انتهت — لا 404 عن قطعة فيها: ذاك كان يمحو الرمز فتضيع قطع
+        // المتاجر الأخرى معها (CHK-021). الخادم صار يعرضها سطراً «لم يعد متاحاً»
+        if (err instanceof ApiError && err.status === 404 && !err.details?.['variantIds']) {
           window.localStorage.removeItem(TOKEN_KEY);
           return null;
         }

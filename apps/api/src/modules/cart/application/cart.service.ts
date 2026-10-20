@@ -23,6 +23,8 @@ export interface CartLineView {
   readonly originalLineTotal: { minorUnits: string; currency: string; formatted: string } | null;
   /** السعر تغيّر منذ أُضيف — يُقال للمشتري قبل الدفع لا بعده */
   readonly priceChanged: boolean;
+  /** لم يعد يُباع (أُوقف أو أُرشف أو عُلّق متجره): يُعرض ليُزال، ولا يدخل الإجمالي */
+  readonly unavailable?: true;
 }
 
 export interface CartView {
@@ -215,27 +217,49 @@ export class CartService {
       };
     }
 
-    let quote: Quote;
-    try {
-      quote = await this.quoteFor(cart.id, cart.currency, address, cart.couponCode, cart.userId);
-    } catch (err) {
-      // كوبون انتهى منذ أُضيف: يسقط ويُقال السبب، ولا تتعطّل السلة كلها
-      if (cart.couponCode && err instanceof InvalidInputError) {
-        await this.prisma.cart.update({ where: { id: cart.id }, data: { couponCode: null } });
-        return this.view(token, address);
+    /**
+     * قطعة لم تعد تُباع (أوقفتها الإدارة، أو أرشفها البائع، أو عُلّق متجره) كانت تُسقط التسعير
+     * كله بـ 404، فيقرؤه المتصفّح سلة انتهت ويمحو رمزها — وتضيع معها قطع المتاجر الأخرى
+     * (CHK-021 — حدث في J-10، 20 أكتوبر 2026). الآن تُسعَّر السلة بلا الغائبة، وتُعرض هي
+     * سطراً «لم يعد متاحاً» يُزال، ومانعاً يوقف الدفع حتى يُزال.
+     */
+    let gone: string[] = [];
+    let quote: Quote | null = null;
+    for (;;) {
+      const rest = items.filter((i) => !gone.includes(i.variantId));
+      if (rest.length === 0) break;
+      try {
+        quote = await this.pricing.quote({
+          items: rest.map((i) => ({ variantId: i.variantId, qty: i.qty })),
+          currency: cart.currency,
+          address,
+          couponCode: cart.couponCode,
+          userId: cart.userId,
+        });
+        break;
+      } catch (err) {
+        // كوبون انتهى منذ أُضيف: يسقط ويُقال السبب، ولا تتعطّل السلة كلها
+        if (cart.couponCode && err instanceof InvalidInputError) {
+          await this.prisma.cart.update({ where: { id: cart.id }, data: { couponCode: null } });
+          return this.view(token, address);
+        }
+        const missing = err instanceof NotFoundError ? err.details?.['variantIds'] : undefined;
+        if (!Array.isArray(missing) || missing.length === 0) throw err;
+        gone = [...gone, ...(missing as string[])];
       }
-      throw err;
     }
 
     const atAdd = new Map(items.map((i) => [i.variantId, i.priceMinorUnitsAtAdd]));
-    const blockers = [...quote.blockers];
+    const blockers = [...(quote?.blockers ?? [])];
+    const zero = view(0n, cart.currency);
 
     /**
      * كل مبلغ بعملة السلة (18 أكتوبر 2026). سطر المتجر حصّة من بنوده المحوَّلة
      * بنسبة قيمته (allocate)، فمجموع الأسطر = مجموع المتجر = ما يدخل الإجمالي بالضبط؛
      * وسعر القطعة بمعامل المتجر نفسه، كما في صفحة المنتج.
      */
-    const groups = quote.subOrders.map((s) => {
+    const priced = quote;
+    const groups: CartView['groups'][number][] = (priced?.subOrders ?? []).map((s) => {
       const converted = s.currency !== cart.currency;
       const lineTotals = allocate(s.charge.items, s.lines.map((l) => l.lineSubtotal));
       return {
@@ -243,7 +267,7 @@ export class CartService {
         vendorNameAr: s.vendorNameAr,
         storeCurrency: s.currency,
         lines: s.lines.map((l, i) => {
-          const available = quote.availability.get(l.variantId) ?? 0;
+          const available = priced!.availability.get(l.variantId) ?? 0;
           if (available < l.qty) {
             blockers.push(
               available === 0
@@ -267,9 +291,51 @@ export class CartService {
           };
         }),
         subtotal: view(s.charge.items, cart.currency),
-        shipping: quote.shippingKnown ? view(s.charge.shipping, cart.currency) : null,
+        shipping: priced!.shippingKnown ? view(s.charge.shipping, cart.currency) : null,
       };
     });
+
+    // ما لم يعد يُباع: في مجموعة متجره (أو مجموعة له وحده)، بلا سعر يدخل الإجمالي
+    if (gone.length > 0) {
+      const rows = await this.prisma.productVariant.findMany({
+        where: { id: { in: gone } },
+        select: {
+          id: true,
+          productId: true,
+          product: {
+            select: {
+              nameAr: true,
+              images: { orderBy: { sort: 'asc' }, take: 1, select: { fileKey: true } },
+              vendor: { select: { id: true, nameAr: true, settlementCurrency: true } },
+            },
+          },
+          optionValues: { select: { attributeValue: { select: { valueAr: true } } } },
+        },
+      });
+      for (const r of rows) {
+        const item = items.find((i) => i.variantId === r.id)!;
+        blockers.push(`${r.product.nameAr} لم يعد متاحاً للبيع. احذفه من سلّتك.`);
+        const line: CartLineView = {
+          variantId: r.id,
+          productId: r.productId,
+          nameAr: r.product.nameAr,
+          variantLabel: r.optionValues.map((o) => o.attributeValue.valueAr).join(' / ') || null,
+          imageKey: r.product.images[0]?.fileKey ?? null,
+          qty: item.qty,
+          available: 0,
+          unitPrice: zero,
+          lineTotal: zero,
+          originalUnitPrice: null,
+          originalLineTotal: null,
+          priceChanged: false,
+          unavailable: true,
+        };
+        const vendor = r.product.vendor;
+        const at = groups.findIndex((g) => g.vendorId === vendor.id);
+        if (at >= 0) groups[at] = { ...groups[at]!, lines: [...groups[at]!.lines, line] };
+        else groups.push({ vendorId: vendor.id, vendorNameAr: vendor.nameAr, storeCurrency: vendor.settlementCurrency, lines: [line], subtotal: zero, shipping: null });
+      }
+    }
 
     const totalView = (minor: bigint) => ({ minorUnits: minor.toString(), formatted: format(money(minor, cart.currency)) });
 
@@ -279,15 +345,15 @@ export class CartService {
       itemCount: items.reduce((a, i) => a + i.qty, 0),
       groups,
       totals: {
-        items: totalView(quote.totals.items),
-        discount: totalView(quote.totals.discount),
-        shipping: totalView(quote.totals.shipping),
-        tax: totalView(quote.totals.tax),
-        total: totalView(quote.totals.total),
+        items: totalView(priced?.totals.items ?? 0n),
+        discount: totalView(priced?.totals.discount ?? 0n),
+        shipping: totalView(priced?.totals.shipping ?? 0n),
+        tax: totalView(priced?.totals.tax ?? 0n),
+        total: totalView(priced?.totals.total ?? 0n),
       },
-      shippingKnown: quote.shippingKnown,
-      taxInclusive: quote.taxInclusive,
-      couponCode: quote.coupon?.code ?? null,
+      shippingKnown: priced?.shippingKnown ?? false,
+      taxInclusive: priced?.taxInclusive ?? true,
+      couponCode: priced?.coupon?.code ?? cart.couponCode,
       blockers,
     };
   }

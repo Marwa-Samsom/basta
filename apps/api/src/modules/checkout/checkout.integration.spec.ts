@@ -46,7 +46,7 @@ const ADDRESS = {
 type Inject = Awaited<ReturnType<NestFastifyApplication['inject']>>;
 
 async function call(
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
   url: string,
   opts: { body?: unknown; headers?: Record<string, string> } = {},
 ): Promise<Inject> {
@@ -835,5 +835,58 @@ describe('الإجمالي الذي رآه المشتري هو ما يُخصم �
     const otherCurrency = await place(cart, ADDRESS, { expectedTotal: jo.totals.total.minorUnits, expectedCurrency: 'SAR' });
     expect(otherCurrency.statusCode).toBe(409);
     expect(otherCurrency.json().details.reason).toBe('TOTAL_CHANGED');
+  });
+});
+
+describe('قطعة لم تعد تُباع لا تُسقط السلة — تُعرض لتُزال، والباقي يُسعَّر (CHK-021)', () => {
+  const linesOf = (cart: { groups: { lines: { variantId: string }[] }[] }) => cart.groups.flatMap((g) => g.lines);
+  const productOf = async (variantId: string) => (await prisma.productVariant.findUniqueOrThrow({ where: { id: variantId } })).productId;
+
+  it('منتج أوقفته الإدارة: السلة 200 بسطره «لم يعد متاحاً» ومانعه، والإجمالي بالباقي؛ الإزالة تفكّ المانع', async () => {
+    if (!dbUp) return;
+    const token = await cartWith([
+      { variantId: variantIds[0]!, qty: 1 },
+      { variantId: variantIds[1]!, qty: 1 },
+    ]);
+    const headers = { 'x-cart-token': token };
+    const before = (await call('GET', '/cart', { headers })).json();
+    const productId = await productOf(variantIds[0]!);
+    await prisma.product.update({ where: { id: productId }, data: { status: 'rejected' } });
+    try {
+      // كان 404 «منتج في سلّتك لم يعد متاحاً…» فيمحو المتصفّح رمز السلة وتضيع القطعة الأخرى معها
+      const res = await call('GET', '/cart', { headers });
+      expect(res.statusCode, res.body).toBe(200);
+      const cart = res.json();
+      expect(linesOf(cart).find((l) => l.variantId === variantIds[0])).toMatchObject({ unavailable: true, available: 0, qty: 1 });
+      expect(linesOf(cart).find((l) => l.variantId === variantIds[1])).toMatchObject({ qty: 1 });
+      expect(cart.blockers.some((b: string) => b.includes('لم يعد متاحاً للبيع'))).toBe(true);
+      expect(cart.itemCount).toBe(2);
+      // الإجمالي بالقطعة الأخرى وحدها
+      expect(BigInt(cart.totals.items.minorUnits)).toBeGreaterThan(0n);
+      expect(BigInt(cart.totals.items.minorUnits)).toBeLessThan(BigInt(before.totals.items.minorUnits));
+
+      const removed = await call('PATCH', `/cart/items/${variantIds[0]}`, { body: { qty: 0 }, headers });
+      expect(removed.statusCode, removed.body).toBe(200);
+      expect(removed.json().blockers).toEqual([]);
+      expect(linesOf(removed.json()).map((l) => l.variantId)).toEqual([variantIds[1]]);
+    } finally {
+      await prisma.product.update({ where: { id: productId }, data: { status: 'active' } });
+    }
+  });
+
+  it('سلة كل قطعها لم تعد تُباع: 200 بإجمالي صفر وسطورها ومانعها — لا 404', async () => {
+    if (!dbUp) return;
+    const token = await cartWith([{ variantId: variantIds[0]!, qty: 2 }]);
+    const productId = await productOf(variantIds[0]!);
+    await prisma.product.update({ where: { id: productId }, data: { status: 'rejected' } });
+    try {
+      const res = await call('GET', '/cart', { headers: { 'x-cart-token': token } });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(linesOf(res.json())).toMatchObject([{ variantId: variantIds[0], unavailable: true, qty: 2 }]);
+      expect(res.json().totals.total.minorUnits).toBe('0');
+      expect(res.json().blockers).toHaveLength(1);
+    } finally {
+      await prisma.product.update({ where: { id: productId }, data: { status: 'active' } });
+    }
   });
 });
