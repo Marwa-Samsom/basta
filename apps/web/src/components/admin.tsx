@@ -263,28 +263,8 @@ export function SearchBox({
   );
 }
 
-/**
- * «المزيد» تحت قائمة طويلة ومعه «<المعروض> من <الإجمالي>» — يختفي حين تكتمل. يأخذ ما يعيده
- * `useAdminList` كما هو: `<MoreButton list={list} />`.
- */
-export function MoreButton({ list }: { list: { items: unknown[]; total: number; hasMore: boolean; loadingMore: boolean; moreError: string | null; more: () => void } }) {
-  if (!list.hasMore && !list.moreError) return null;
-  return (
-    <div className="ao-more">
-      <span className="ao-more__count num">
-        {list.items.length} من {list.total}
-      </span>
-      {list.moreError ? (
-        <span className="ao-more__error" role="alert">
-          {list.moreError}
-        </span>
-      ) : null}
-      <button type="button" className="btn btn--secondary btn--sm" disabled={list.loadingMore} onClick={list.more}>
-        {list.loadingMore ? 'جارٍ التحميل…' : list.moreError ? 'أعد المحاولة' : 'المزيد'}
-      </button>
-    </div>
-  );
-}
+/** «المزيد» مشترك مع لوحة البائع — في مكتبة الواجهة */
+export { MoreButton } from './ui';
 
 /**
  * حالة فارغة — مربّع أيقونة وعنوان وجملة تقول ما التالي. بلا `title` يصير

@@ -20,6 +20,8 @@ interface Item {
 interface Inbox {
   unread: number;
   items: Item[];
+  /** معرّف آخر المعروض إن بقي أقدم منه — يُطلب به ما بعده */
+  nextCursor: string | null;
 }
 
 type Kind = 'order' | 'product' | 'stock' | 'payout' | 'dispute' | 'store';
@@ -58,7 +60,8 @@ const FILTERS: { key: Kind | 'all'; label: string }[] = [
  *
  * الصندوق نفسه الذي يقرؤه الجرس في الشريط العلوي (`/me/notifications`):
  * فتح الإشعار يعلّمه مقروءاً ثم يذهب إلى رابطه، و«تعليم الكل مقروءاً» طلب
- * واحد للخادم. الخادم يعيد آخر 30 إشعاراً.
+ * واحد للخادم. الخادم يعيد آخر 30 إشعاراً، و«الأقدم» يُلحق الثلاثين التالية بموضع آخرها
+ * (20 أكتوبر 2026 — كان ما قبل الثلاثين لا يُرى).
  */
 export default function VendorNotificationsPage() {
   const router = useRouter();
@@ -67,6 +70,7 @@ export default function VendorNotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -91,13 +95,27 @@ export default function VendorNotificationsPage() {
     }
   };
 
+  const older = async () => {
+    if (!inbox?.nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const next = await api<Inbox>(`/me/notifications?before=${encodeURIComponent(inbox.nextCursor)}`);
+      setInbox((cur) => (cur ? { unread: next.unread, items: [...cur.items, ...next.items.filter((n) => !cur.items.some((x) => x.id === n.id))], nextCursor: next.nextCursor } : cur));
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const open = async (n: Item) => {
     if (!n.readAt) {
       // التعليم أولاً: الانتقال بعده لا يُسقطه، وفشله لا يمنع الوصول إلى الرابط
       await api(`/me/notifications/${n.id}/read`, { method: 'POST' }).catch(() => undefined);
       setInbox((cur) =>
         cur
-          ? { unread: Math.max(0, cur.unread - 1), items: cur.items.map((x) => (x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x)) }
+          ? { ...cur, unread: Math.max(0, cur.unread - 1), items: cur.items.map((x) => (x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x)) }
           : cur,
       );
     }
@@ -185,6 +203,13 @@ export default function VendorNotificationsPage() {
             })}
           </ul>
         )}
+        {inbox.nextCursor ? (
+          <div className="list-more">
+            <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void older()}>
+              {loadingMore ? 'جارٍ التحميل…' : 'الأقدم'}
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   );

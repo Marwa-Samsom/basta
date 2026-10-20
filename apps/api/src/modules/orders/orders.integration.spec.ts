@@ -1067,4 +1067,26 @@ describe('قائمة طلبات المتجر — تصفية بحالة أو أك
 
     expect((await call('GET', '/vendor/orders?status=completed,bogus', vendors[1]!.token)).statusCode).toBe(400);
   });
+
+  it('البحث برقم الطلب أو اسم المستلم أو المنتج أو SKU، والصفحة الثانية لا تكرّر الأولى (20 أكتوبر 2026)', async () => {
+    if (!dbUp) return;
+    const { b } = await placeOrder([1, 1]);
+    const v = vendors[1]!;
+    const variant = await prisma.productVariant.findUniqueOrThrow({ where: { id: v.variantId }, select: { sku: true, product: { select: { nameAr: true } } } });
+    const search = async (term: string) => (await call('GET', `/vendor/orders?search=${encodeURIComponent(term)}`, v.token)).json() as { items: { id: string; buyer: string | null }[]; total: number };
+
+    for (const term of [b.subOrderNumber.toLowerCase(), ADDRESS.recipientName, variant.product.nameAr, variant.sku.toLowerCase()]) {
+      expect((await search(term)).items.map((i) => i.id), term).toContain(b.id);
+    }
+    const byName = await search(ADDRESS.recipientName);
+    for (const i of byName.items) expect(i.buyer ?? '').toContain(ADDRESS.recipientName);
+    expect(await search('لا-مطابق-هنا')).toMatchObject({ items: [], total: 0 });
+    // متجر آخر لا يجد طلب هذا المتجر ولو بحث باسم مستلمه
+    expect((await call('GET', `/vendor/orders?search=${encodeURIComponent(variant.sku)}`, vendors[0]!.token)).json().items.map((i: { id: string }) => i.id)).not.toContain(b.id);
+
+    const p1 = (await call('GET', '/vendor/orders', v.token)).json() as { items: { id: string }[]; total: number };
+    const p2 = (await call('GET', '/vendor/orders?page=2', v.token)).json() as { items: { id: string }[] };
+    expect(p2.items.some((i) => p1.items.some((j) => j.id === i.id))).toBe(false);
+    expect(p1.items.length + p2.items.length).toBeLessThanOrEqual(p1.total);
+  });
 });

@@ -196,6 +196,29 @@ export function Spinner({ label = 'جارٍ التحميل' }: { label?: string 
 }
 
 /**
+ * «المزيد» تحت قائمة طويلة ومعه «<المعروض> من <الإجمالي>» — يختفي حين تكتمل. يأخذ ما يعيده
+ * `useAdminList` كما هو: `<MoreButton list={list} />`. في لوحتي الإدارة والبائع.
+ */
+export function MoreButton({ list }: { list: { items: unknown[]; total: number; hasMore: boolean; loadingMore: boolean; moreError: string | null; more: () => void } }) {
+  if (!list.hasMore && !list.moreError) return null;
+  return (
+    <div className="list-more">
+      <span className="list-more__count num">
+        {list.items.length} من {list.total}
+      </span>
+      {list.moreError ? (
+        <span className="list-more__error" role="alert">
+          {list.moreError}
+        </span>
+      ) : null}
+      <button type="button" className="btn btn--secondary btn--sm" disabled={list.loadingMore} onClick={list.more}>
+        {list.loadingMore ? 'جارٍ التحميل…' : list.moreError ? 'أعد المحاولة' : 'المزيد'}
+      </button>
+    </div>
+  );
+}
+
+/**
  * رأس الصفحة — نمط كل شاشة في التصميم: العنوان، وعدّاد أو وصف قصير بجانبه،
  * والإجراءات في الطرف المقابل.
  */

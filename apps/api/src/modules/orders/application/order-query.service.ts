@@ -160,7 +160,17 @@ export class OrderQueryService {
     const where: Prisma.SubOrderWhereInput = {
       vendorId,
       ...(q.status?.length ? { status: { in: q.status as SubOrderStatus[] } } : {}),
-      ...(q.search ? { subOrderNumber: { contains: q.search.trim(), mode: 'insensitive' } } : {}),
+      // رقم الطلب، أو اسم المستلم كما في عنوانه، أو منتج فيه باسمه أو SKU — البائع يعرف
+      // طلبه بأحدها، ولا يرى بريد المشتري فلا يُبحث به
+      ...(q.search?.trim()
+        ? {
+            OR: [
+              { subOrderNumber: like(q.search.trim()) },
+              { order: { shippingAddressSnapshot: { path: ['recipientName'], string_contains: q.search.trim() } } },
+              { items: { some: { OR: [{ productNameSnapshotAr: like(q.search.trim()) }, { skuSnapshot: like(q.search.trim()) }] } } },
+            ],
+          }
+        : {}),
     };
     const page = Math.max(1, q.page ?? 1);
     const [rows, total, grouped] = await Promise.all([

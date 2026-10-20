@@ -124,6 +124,8 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
   const [unread, setUnread] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [wide, setWide] = useState(false);
+  // البائع يصفّي محادثاته باسم المشتري أو موضوعها أو آخر رسالة — حتى مئتي محادثة محمّلة
+  const [filter, setFilter] = useState('');
 
   useEffect(() => {
     const mq = window.matchMedia(WIDE);
@@ -151,7 +153,11 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
     };
   }, [audience, base, router]);
 
-  const activeId = selected ?? (wide ? (rows?.[0]?.id ?? null) : null);
+  const term = filter.trim();
+  const shown = (rows ?? []).filter(
+    (r) => !term || [r.customer?.fullName ?? '', r.context.label, r.lastPreview].some((x) => x.toLowerCase().includes(term.toLowerCase())),
+  );
+  const activeId = selected ?? (wide ? (shown[0]?.id ?? null) : null);
 
   /** الخيط أُرسل فيه أو فُتح — القائمة تتبعه بلا إعادة جلب */
   const rowsRef = useRef<Row[] | null>(null);
@@ -228,8 +234,24 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
         data-view={selected ? 'thread' : 'list'}
       >
         <nav className="ms-panel ms-list" aria-label="المحادثات">
+          {audience === 'vendor' ? (
+            <div className="ms-list__search">
+              <span className="input-icon">
+                <Icon name="search" size={15} />
+                <input
+                  className="field__control"
+                  type="search"
+                  placeholder="المشتري أو المنتج أو الطلب"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  aria-label="صفِّ المحادثات"
+                />
+              </span>
+            </div>
+          ) : null}
+          {shown.length === 0 ? <p className="ms-list__none">لا محادثة تطابق «{filter.trim()}».</p> : null}
           <ul className="ms-list__items">
-            {rows.map((r) => {
+            {shown.map((r) => {
               const active = r.id === activeId;
               const isUnread = r.unread && !active;
               return (
