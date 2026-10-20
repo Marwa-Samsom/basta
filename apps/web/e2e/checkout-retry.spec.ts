@@ -84,3 +84,30 @@ test('504 ثم إعادة تحميل الصفحة: المفتاح نفسه يب�
   // والشراء التالي محاولة جديدة: المفتاح انتهى بنتيجته
   expect(await page.evaluate(() => sessionStorage.getItem('basta.checkout.attempt'))).toBeNull();
 });
+
+// CHK-104 (J-08، 20 أكتوبر 2026): «أعد المحاولة» كانت تفتح صفحة دفع فارغة بعد بطاقة مرفوضة
+test('بطاقة مرفوضة ثم «أعد المحاولة»: الهاتف والعنوان كما كُتبا، والدفع الناجح يمحوهما', async ({ page }) => {
+  const v = await makeVendor(tag());
+  await signInBuyer(page);
+  await addToCart(page, v.productSlug);
+  await fillAndPrice(page);
+  await page.getByLabel('بطاقة يرفضها البنك').check();
+  await payButton(page).click();
+  await expect(page.getByRole('heading', { name: 'لم يكتمل الدفع' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'أعد المحاولة' }).click();
+  await page.waitForURL((u) => u.pathname === '/checkout');
+  await expect(page.getByLabel('اسم المستلم')).toHaveValue('مشترٍ E2E');
+  await expect(page.getByLabel('الهاتف')).toHaveValue('+966500000000');
+  await expect(page.getByLabel('البلد')).toHaveValue('SA');
+  await expect(page.getByLabel('المحافظة / المنطقة')).toHaveValue('الرياض');
+  await expect(page.getByLabel('المدينة')).toHaveValue('الرياض');
+  await expect(page.getByLabel('الشارع ورقم البناء')).toHaveValue('طريق الملك فهد 10');
+
+  await page.getByRole('button', { name: 'احسب الشحن' }).click();
+  await expect(page.locator('.sp-sum__total')).toBeVisible();
+  await page.getByLabel('بطاقة تنجح').check();
+  await payButton(page).click();
+  await page.waitForURL(/\/orders\//);
+  expect(await page.evaluate(() => window.sessionStorage.getItem('basta.checkoutDraft'))).toBeNull();
+});

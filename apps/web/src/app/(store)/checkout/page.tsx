@@ -55,6 +55,39 @@ function shipments(n: number): string {
 
 type StepState = 'done' | 'current' | 'todo';
 
+const BLANK_ADDRESS = { recipientName: '', phone: '', country: 'JO', region: '', city: '', street: '', building: '' };
+type AddressForm = typeof BLANK_ADDRESS;
+
+/**
+ * ما كتبه المشتري في تبويبه. البطاقة المرفوضة تنقله إلى «لم يكتمل الدفع»، و«أعد المحاولة»
+ * تفتح صفحة دفع جديدة — فكان يكتب الهاتف والعنوان من جديد والصفحة تقول «سلّتك كما هي»
+ * (J-08، 20 أكتوبر 2026). باسم الحساب: حساب آخر يدخل التبويب نفسه لا يرى عنوان غيره.
+ * يُمحى حين يُدفع الطلب أو يُحجز بانتظار التحويل، ويبقى للمرفوض والمعلّق.
+ */
+const DRAFT_KEY = 'basta.checkoutDraft';
+
+function readDraft(): AddressForm | null {
+  try {
+    const raw = JSON.parse(window.sessionStorage.getItem(DRAFT_KEY) ?? 'null') as { owner?: unknown; address?: unknown } | null;
+    if (!raw || raw.owner !== session.userId() || typeof raw.address !== 'object' || raw.address === null) return null;
+    const saved = raw.address as Record<string, unknown>;
+    const draft = { ...BLANK_ADDRESS };
+    for (const k of Object.keys(draft) as (keyof AddressForm)[]) if (typeof saved[k] === 'string') draft[k] = saved[k];
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(address: AddressForm | null): void {
+  try {
+    if (address) window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ owner: session.userId(), address }));
+    else window.sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // تخزين محجوب (تصفّح خاص صارم): الصفحة تعمل بلا مسوّدة
+  }
+}
+
 /**
  * عنوان محفوظ في حقول النموذج كما هي: الحي يسبق الشارع في حقل «الشارع ورقم
  * البناء»، والطابق يلحق المبنى. حدود حقول الدفع (200 و 80) لا تُتجاوز —
@@ -151,15 +184,9 @@ function CheckoutForm() {
   // البوابة فوقه لا تعرضه إلا لمن دخل
   const router = useRouter();
 
-  const [address, setAddress] = useState({
-    recipientName: '',
-    phone: '',
-    country: 'JO',
-    region: '',
-    city: '',
-    street: '',
-    building: '',
-  });
+  // الصفحة لا تُرسم في الخادم (البوابة فوقها تنتظر الجلسة)، فقراءة التبويب هنا آمنة
+  const [restored] = useState(readDraft);
+  const [address, setAddress] = useState<AddressForm>(() => restored ?? BLANK_ADDRESS);
   const [card, setCard] = useState<string>('tok_success');
   const [payment, setPayment] = useState<PaymentMethod | null>(null);
   const transfer = payment?.method === 'bank_transfer' ? payment : null;
@@ -222,9 +249,9 @@ function CheckoutForm() {
       .then(({ items }) => {
         if (!alive || items.length === 0) return;
         setSaved(items);
-        // الافتراضي يُملأ مسبقاً ما دامت الحقول فارغة — لا يُكتب فوق ما كتبه المشتري
+        // الافتراضي يُملأ مسبقاً ما دامت الحقول فارغة — لا يُكتب فوق ما كتبه المشتري، ولا فوق مسوّدته
         const def = items.find((i) => i.isDefault);
-        if (!def) return;
+        if (!def || restored) return;
         setAddress((cur) =>
           cur.recipientName || cur.region || cur.city || cur.street ? cur : { ...fieldsOf(def), phone: cur.phone || def.phone },
         );
@@ -234,7 +261,10 @@ function CheckoutForm() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [restored]);
+
+  // كل تعديل يُحفظ في التبويب — يعود بعد «أعد المحاولة» أو إعادة تحميل الصفحة
+  useEffect(() => writeDraft(address), [address]);
 
   async function calculate(): Promise<void> {
     setBusy(true);
@@ -273,6 +303,8 @@ function CheckoutForm() {
       // الخادم أجاب بطلب معروف — مدفوعاً أو مرفوضاً أو معلّقاً تحسمه المصالحة.
       // الشراء التالية (بطاقة أخرى، أو سلة جديدة) محاولة جديدة بمفتاح جديد
       endAttempt();
+      // دُفع أو حُجز بانتظار التحويل: انتهى هذا الشراء، والتالي يبدأ من العنوان المحفوظ لا من مسوّدته
+      if (result.outcome === 'paid' || result.outcome === 'awaiting_transfer') writeDraft(null);
       // الخادم فرّغ السلة (دُفع الطلب أو حُجز بانتظار التحويل) — الرأس يعيد قراءة عدّادها
       window.dispatchEvent(new Event(CART_EVENT));
       router.push(`/orders/${result.orderNumber}`);
