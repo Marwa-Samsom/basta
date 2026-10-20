@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AdminHeader, Empty, Loading, MoreButton, SearchBox, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Loading, MoreButton, SearchBox, SortButton, Tabs } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { media, PRODUCT_STATUS, TONE, useAdminList } from '@/lib/admin';
 import { money, when } from '@/lib/orders';
@@ -28,7 +29,9 @@ interface Item {
 export default function AdminProductsPage() {
   const [status, setStatus] = useState('active');
   const [search, setSearch] = useState('');
-  const q = new URLSearchParams({ status, pageSize: '100', ...(search.trim() ? { search: search.trim() } : {}) });
+  // بتاريخ آخر تعديل
+  const [sort, setSort] = useState<SortOrder>('newest');
+  const q = new URLSearchParams({ status, pageSize: '100', sort, ...(search.trim() ? { search: search.trim() } : {}) });
   const list = useAdminList<Item>(`/admin/products?${q}`, (p) => p.id);
   const { data, error, forbidden, reload } = list;
 
@@ -39,6 +42,7 @@ export default function AdminProductsPage() {
         <Tabs value={status} onChange={setStatus} label="حالة المنتج" options={['active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: PRODUCT_STATUS[k]! }))} />
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="اسم المنتج أو المتجر" label="بحث في المنتجات" />
+          <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
       {!data ? (

@@ -454,6 +454,19 @@ describe('VD-11 · المخزون من الخادم — بحث وتصفية وص
     const other = (await as('b').get(`/vendor/inventory?${term(`inv-ok-${SUFFIX}`)}`)).json();
     expect(other).toMatchObject({ items: [], total: 0 });
   });
+
+  dbIt('المنتجات بتاريخ آخر تعديل: الأحدث أولاً افتراضياً، و?sort=oldest يعكسه، وغيرهما 400', async () => {
+    const A = as('a');
+    await simpleProduct('a', `SORT-1-${SUFFIX}`);
+    await simpleProduct('a', `SORT-2-${SUFFIX}`);
+    const updated = async (q: string) => ((await A.get(`/vendor/products?pageSize=100${q}`)).json().items as { updatedAt: string }[]).map((p) => Date.parse(p.updatedAt));
+    const newest = await updated('');
+    const oldest = await updated('&sort=oldest');
+    expect(newest.length).toBeGreaterThan(1);
+    expect(newest).toEqual([...newest].sort((x, y) => y - x));
+    expect(oldest).toEqual([...oldest].sort((x, y) => x - y));
+    expect((await A.get('/vendor/products?sort=bogus')).statusCode).toBe(400);
+  });
 });
 
 // ============================================================================

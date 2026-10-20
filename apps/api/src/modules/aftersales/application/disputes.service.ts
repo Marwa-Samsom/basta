@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma, Role } from '@prisma/client';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { like, pageArgs } from '../../../common/paging';
+import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { NotificationsService } from '../../notifications/public';
 import { OrderLifecycleService } from '../../orders/public';
 
@@ -125,7 +125,7 @@ export class DisputesService {
    * AD-14 للإدارة — بالحالة والبحث وخمسين خمسين. البحث برقم الطلب أو طلب المتجر، أو اسم
    * المتجر، أو اسم المشتري أو بريده: من يتصل بالدعم يذكر واحداً منها.
    */
-  async adminList(q: { status: string; search?: string; page: number }) {
+  async adminList(q: { status: string; search?: string; page: number; sort?: SortOrder }) {
     const t = q.search;
     const where: Prisma.DisputeWhereInput = {
       status: q.status,
@@ -142,7 +142,7 @@ export class DisputesService {
         : {}),
     };
     const [items, total] = await Promise.all([
-      this.prisma.dispute.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...pageArgs(q.page), select: LIST_SELECT }),
+      this.prisma.dispute.findMany({ where, orderBy: [{ createdAt: dirOf(q.sort, 'newest') }, { id: 'asc' }], ...pageArgs(q.page), select: LIST_SELECT }),
       this.prisma.dispute.count({ where }),
     ]);
     return { items, total };

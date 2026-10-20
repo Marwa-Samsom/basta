@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, SortButton, Tabs } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { TONE, useAction, useAdminList } from '@/lib/admin';
@@ -41,7 +42,8 @@ const EMPTY: Record<string, string> = {
 export default function AdminPayoutsPage() {
   const [status, setStatus] = useState('requested');
   const [search, setSearch] = useState('');
-  const query = new URLSearchParams({ status, ...(search.trim() ? { search: search.trim() } : {}) });
+  const [sort, setSort] = useState<SortOrder>('newest');
+  const query = new URLSearchParams({ status, sort, ...(search.trim() ? { search: search.trim() } : {}) });
   const list = useAdminList<Payout>(`/admin/finance/payouts?${query}`, (p) => p.id);
   const { data, error, forbidden, reload } = list;
   const act = useAction();
@@ -70,6 +72,7 @@ export default function AdminPayoutsPage() {
         <Tabs value={status} onChange={setStatus} label="حالة الطلب" options={Object.entries(STATUS).map(([key, label]) => ({ key, label }))} />
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="اسم المتجر أو رابطه أو مرجع التحويل" label="بحث في طلبات التحويل" />
+          <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
       {!data ? (

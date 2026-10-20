@@ -26,7 +26,7 @@ import {
 } from 'class-validator';
 import type { FastifyRequest } from 'fastify';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
-import { pageOf, termOf } from '../../../common/paging';
+import { pageOf, sortOf, termOf } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor } from '../../../common/security/actor';
 import { CurrentActor, MaybeActor, OptionalAuth, Public, RequirePermission, Roles } from '../../../common/security/decorators';
@@ -268,16 +268,18 @@ export class AdminTransfersController {
 
   @Get()
   @RequirePermission('payouts.approve')
-  list(@Query('search') search?: string, @Query('page') page?: string) {
+  list(@Query('search') search?: string, @Query('page') page?: string, @Query('sort') sort?: string) {
     const term = termOf(search);
-    return this.queue.waiting({ ...(term ? { search: term } : {}), page: pageOf(page) });
+    const order = sortOf(sort);
+    return this.queue.waiting({ ...(term ? { search: term } : {}), page: pageOf(page), ...(order ? { sort: order } : {}) });
   }
 
   @Get('confirmed')
   @RequirePermission('payouts.approve')
-  confirmed(@Query('search') search?: string, @Query('page') page?: string) {
+  confirmed(@Query('search') search?: string, @Query('page') page?: string, @Query('sort') sort?: string) {
     const term = termOf(search);
-    return this.queue.confirmed({ ...(term ? { search: term } : {}), page: pageOf(page) });
+    const order = sortOf(sort);
+    return this.queue.confirmed({ ...(term ? { search: term } : {}), page: pageOf(page), ...(order ? { sort: order } : {}) });
   }
 
   @Post(':orderNumber/confirm')

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { like, pageArgs } from '../../../common/paging';
+import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { UPLOADS_ROOT, UPLOADS_URL_PREFIX } from '../../catalog/public';
 
 /**
@@ -252,7 +252,7 @@ export class ContentService {
   // --------------------------------------------------------- مراجعات المنتجات
 
   /** AD-22 — بالحالة والبحث (المنتج، أو اسم المشتري أو بريده، أو نصّ المراجعة) وخمسين خمسين */
-  async reviews(q: { status?: string; search?: string; page: number }) {
+  async reviews(q: { status?: string; search?: string; page: number; sort?: SortOrder }) {
     const t = q.search;
     const where: Prisma.ReviewWhereInput = {
       ...(q.status ? { status: q.status } : {}),
@@ -261,7 +261,7 @@ export class ContentService {
     const [items, total] = await Promise.all([
       this.prisma.review.findMany({
         where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        orderBy: [{ createdAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         ...pageArgs(q.page),
         include: { product: { select: { nameAr: true, slug: true } }, user: { select: { fullName: true } } },
       }),

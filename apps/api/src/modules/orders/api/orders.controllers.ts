@@ -35,7 +35,7 @@ import {
 import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
 import { loadEnv } from '../../../common/config/env';
 import { InvalidInputError } from '../../../common/errors/domain-error';
-import { pageOf, termOf } from '../../../common/paging';
+import { pageOf, SORT_ORDERS, sortOf, termOf, type SortOrder } from '../../../common/paging';
 import { OrderLifecycleService } from '../application/order-lifecycle.service';
 import { OrderQueryService } from '../application/order-query.service';
 import type { SubOrderStatus } from '../domain/state-machine';
@@ -97,6 +97,10 @@ export class VendorOrdersQueryDto {
   @IsInt()
   @Min(1)
   page?: number;
+
+  @IsOptional()
+  @IsIn(SORT_ORDERS, { message: 'الترتيب newest (الأحدث أولاً) أو oldest (الأقدم أولاً).' })
+  sort?: SortOrder;
 }
 
 export class ReasonDto {
@@ -151,6 +155,7 @@ export class VendorOrdersController {
       ...(q.status?.length ? { status: q.status } : {}),
       ...(q.search ? { search: q.search } : {}),
       ...(q.page ? { page: q.page } : {}),
+      ...(q.sort ? { sort: q.sort } : {}),
     });
   }
 
@@ -273,9 +278,10 @@ export class AdminRefundsController {
 
   @Get('awaiting-transfer')
   @RequirePermission('payouts.approve')
-  awaiting(@Query('search') search?: string, @Query('page') page?: string) {
+  awaiting(@Query('search') search?: string, @Query('page') page?: string, @Query('sort') sort?: string) {
     const term = termOf(search);
-    return this.query.awaitingRefunds({ ...(term ? { search: term } : {}), page: pageOf(page) });
+    const order = sortOf(sort);
+    return this.query.awaitingRefunds({ ...(term ? { search: term } : {}), page: pageOf(page), ...(order ? { sort: order } : {}) });
   }
 
   @Post(':id/transfer')

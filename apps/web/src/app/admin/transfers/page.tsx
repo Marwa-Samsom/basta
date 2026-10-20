@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox, SortButton, Tabs } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
@@ -86,10 +87,12 @@ export default function AdminTransfersPage() {
   const [tab, setTab] = useState('incoming');
   // بحث واحد بالرقم أو الاسم أو المرجع — يصفّي القوائم الثلاث، وكلٌّ خمسين خمسين
   const [search, setSearch] = useState('');
-  const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
-  const incoming = useAdminList<Waiting>(`/admin/payments/transfers${query}`, (w) => w.orderNumber);
-  const refunds = useAdminList<RefundRow>(`/admin/refunds/awaiting-transfer${query}`, (r) => r.id);
-  const confirmed = useAdminList<Confirmed>(tab === 'confirmed' ? `/admin/payments/transfers/confirmed${query}` : null, (c) => c.orderNumber);
+  // لكل تبويب ترتيبه: الطابوران بالأقدم أولاً (ما ينتظر أطول قبل غيره)، والمؤكَّد بالأحدث
+  const [sorts, setSorts] = useState<Record<string, SortOrder>>({ incoming: 'oldest', refunds: 'oldest', confirmed: 'newest' });
+  const query = (key: string) => `?${new URLSearchParams({ sort: sorts[key] ?? 'newest', ...(search.trim() ? { search: search.trim() } : {}) })}`;
+  const incoming = useAdminList<Waiting>(`/admin/payments/transfers${query('incoming')}`, (w) => w.orderNumber);
+  const refunds = useAdminList<RefundRow>(`/admin/refunds/awaiting-transfer${query('refunds')}`, (r) => r.id);
+  const confirmed = useAdminList<Confirmed>(tab === 'confirmed' ? `/admin/payments/transfers/confirmed${query('confirmed')}` : null, (c) => c.orderNumber);
   const searching = Boolean(search.trim());
   const clear = (
     <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
@@ -158,6 +161,7 @@ export default function AdminTransfersPage() {
         />
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو اسم المشتري أو المرجع" label="بحث في التحويلات" />
+          <SortButton value={sorts[tab] ?? 'newest'} onChange={(v) => setSorts((s) => ({ ...s, [tab]: v }))} />
         </div>
       </div>
 

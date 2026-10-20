@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox, SortButton } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { TONE, useAction, useAdminList } from '@/lib/admin';
@@ -46,7 +47,9 @@ const STALL_MS = 3 * 24 * 3_600_000;
  */
 export default function AdminReturnsPage() {
   const [search, setSearch] = useState('');
-  const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
+  // ترتيب واحد للقائمتين
+  const [sort, setSort] = useState<SortOrder>('newest');
+  const query = `?${new URLSearchParams({ sort, ...(search.trim() ? { search: search.trim() } : {}) })}`;
   const requests = useAdminList<ReturnRow>(`/admin/returns${query}`, (r) => r.id);
   const refunds = useAdminList<RefundRow>(`/admin/returns/refunds${query}`, (r) => r.id);
   const act = useAction();
@@ -77,6 +80,7 @@ export default function AdminReturnsPage() {
       <div className="toolbar">
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو المتجر أو المشتري" label="بحث في المرتجعات والمبالغ المعادة" />
+          <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
 

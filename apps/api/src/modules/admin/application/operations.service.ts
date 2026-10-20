@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ConflictError, ForbiddenError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { like, pageArgs } from '../../../common/paging';
+import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { StorefrontService } from '../../catalog/public';
 import { NotificationsService } from '../../notifications/public';
 import { DisplayCurrencyService } from '../../pricing/public';
@@ -156,7 +156,7 @@ export class OperationsService {
 
   // ---------------------------------------------------------- AD-21 العملاء
 
-  async customers(q: { search?: string; page?: number }) {
+  async customers(q: { search?: string; page?: number; sort?: SortOrder }) {
     const where: Prisma.UserWhereInput = {
       roles: { some: { role: 'customer' } },
       deletedAt: null,
@@ -167,7 +167,7 @@ export class OperationsService {
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         skip: (Math.max(1, q.page ?? 1) - 1) * PAGE,
         take: PAGE,
         select: { id: true, fullName: true, email: true, phone: true, status: true, createdAt: true, lastLoginAt: true, _count: { select: { orders: true } } },
@@ -245,7 +245,7 @@ export class OperationsService {
 
   // ------------------------------------------------------------ AD-24 التدقيق
 
-  async auditLog(q: { actor?: string; action?: string; entityType?: string; entityId?: string; from?: Date; to?: Date; page?: number }) {
+  async auditLog(q: { actor?: string; action?: string; entityType?: string; entityId?: string; from?: Date; to?: Date; page?: number; sort?: SortOrder }) {
     const where: Prisma.AuditLogWhereInput = {
       ...(q.action ? { action: { startsWith: q.action } } : {}),
       ...(q.entityType ? { entityType: q.entityType } : {}),
@@ -256,7 +256,7 @@ export class OperationsService {
     const [items, total] = await Promise.all([
       this.prisma.auditLog.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         skip: (Math.max(1, q.page ?? 1) - 1) * PAGE,
         take: PAGE,
         include: { actor: { select: { email: true, fullName: true } } },
@@ -370,7 +370,7 @@ export class OperationsService {
   // -------------------------------------------------- AD-12 و AD-15 الطلبات
 
   /** `due: 'acceptance'` — ما قاربت مهلة قبوله وحده، بقاعدة بطاقة اللوحة نفسها (domain/acceptance) */
-  async orders(q: { search?: string; status?: string; page?: number; due?: 'acceptance' }) {
+  async orders(q: { search?: string; status?: string; page?: number; due?: 'acceptance'; sort?: SortOrder }) {
     const t = q.search?.trim();
     const now = new Date();
     const deadlineHours = Number((await this.prisma.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } }))?.valueJson) || 48;
@@ -392,7 +392,7 @@ export class OperationsService {
     const [items, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
-        orderBy: { placedAt: 'desc' },
+        orderBy: [{ placedAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         skip: (Math.max(1, q.page ?? 1) - 1) * PAGE,
         take: PAGE,
         select: {
@@ -421,13 +421,13 @@ export class OperationsService {
    * AD-15 طلبات الإرجاع — بالحالة والبحث وخمسين خمسين. البحث برقم الطلب أو طلب المتجر، أو اسم
    * المتجر، أو اسم المشتري أو بريده.
    */
-  async returns(q: { status?: string; search?: string; page: number }) {
+  async returns(q: { status?: string; search?: string; page: number; sort?: SortOrder }) {
     const t = q.search;
     const where: Prisma.ReturnRequestWhereInput = { ...(q.status ? { status: q.status } : {}), ...(t ? { subOrder: subOrderMatching(t) } : {}) };
     const [items, total] = await Promise.all([
       this.prisma.returnRequest.findMany({
         where,
-        orderBy: [{ requestedAt: 'desc' }, { id: 'asc' }],
+        orderBy: [{ requestedAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         ...pageArgs(q.page),
         include: { subOrder: { select: { id: true, subOrderNumber: true, status: true, vendor: { select: { nameAr: true } } } } },
       }),
@@ -437,13 +437,13 @@ export class OperationsService {
   }
 
   /** AD-15 المبالغ المعادة — بالبحث نفسه أو بمرجع البوابة، وخمسين خمسين */
-  async refunds(q: { search?: string; page: number }) {
+  async refunds(q: { search?: string; page: number; sort?: SortOrder }) {
     const t = q.search;
     const where: Prisma.RefundWhereInput = t ? { OR: [{ subOrder: subOrderMatching(t) }, { providerRefundId: like(t) }] } : {};
     const [rows, total] = await Promise.all([
       this.prisma.refund.findMany({
         where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        orderBy: [{ createdAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         ...pageArgs(q.page),
         include: { subOrder: { select: { subOrderNumber: true, settlementCurrency: true, vendorId: true, vendor: { select: { nameAr: true } }, order: { select: { currency: true } } } } },
       }),

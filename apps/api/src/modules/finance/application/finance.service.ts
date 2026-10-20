@@ -6,7 +6,7 @@ import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
 import { LedgerService } from './ledger.service';
 import { csvCell } from '../../../common/csv';
-import { like, pageArgs } from '../../../common/paging';
+import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 
 export const ENTRY_LABELS: Record<string, string> = {
   sale_credit: 'مبيعات',
@@ -314,7 +314,7 @@ export class FinanceService {
    * AD-13 للإدارة — بالحالة والبحث وخمسين خمسين. البحث باسم المتجر (بالعربية أو الإنجليزية)
    * أو رابطه أو مرجع التحويل: طلب «غزة» بين مئات طلبات متاجر الاختبار لا يُرى إلا هكذا (J-11).
    */
-  async adminPayouts(q: { status?: string; search?: string; page: number }) {
+  async adminPayouts(q: { status?: string; search?: string; page: number; sort?: SortOrder }) {
     const t = q.search;
     const where: Prisma.PayoutRequestWhereInput = {
       ...(q.status ? { status: q.status as never } : {}),
@@ -323,7 +323,7 @@ export class FinanceService {
     const [rows, total] = await Promise.all([
       this.prisma.payoutRequest.findMany({
         where,
-        orderBy: [{ requestedAt: 'desc' }, { id: 'asc' }],
+        orderBy: [{ requestedAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         ...pageArgs(q.page),
         include: { vendor: { select: { nameAr: true } } },
       }),

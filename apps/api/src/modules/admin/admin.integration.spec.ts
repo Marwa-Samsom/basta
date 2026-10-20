@@ -583,6 +583,15 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
 
     const log = await call('GET', `/admin/audit?actor=root.${SUFFIX}`, admin.token);
     const actions = log.json().items.map((i: { action: string }) => i.action);
+    // الترتيب: الأحدث أولاً افتراضياً، و?sort=oldest يعكسه من أوله، وغيرهما 400
+    const times = (r: { json: () => { items: { createdAt: string }[] } }) => r.json().items.map((i) => Date.parse(i.createdAt));
+    const newest = times(log);
+    const oldest = times(await call('GET', `/admin/audit?actor=root.${SUFFIX}&sort=oldest`, admin.token));
+    expect(newest.length).toBeGreaterThan(1);
+    expect(newest).toEqual([...newest].sort((x, y) => y - x));
+    expect(oldest).toEqual([...oldest].sort((x, y) => x - y));
+    expect(oldest[0]).toBeLessThan(newest[0]!);
+    expect((await call('GET', '/admin/orders?sort=bogus', admin.token)).statusCode).toBe(400);
     for (const a of ['setting.update', 'tax.set', 'fx.add', 'customer.suspend', 'admin.grant', 'coupon.create', 'page.save']) {
       expect(actions, a).toContain(a);
     }

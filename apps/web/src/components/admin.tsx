@@ -264,7 +264,7 @@ export function SearchBox({
 }
 
 /** «المزيد» مشترك مع لوحة البائع — في مكتبة الواجهة */
-export { MoreButton } from './ui';
+export { MoreButton, SortButton } from './ui';
 
 /**
  * حالة فارغة — مربّع أيقونة وعنوان وجملة تقول ما التالي. بلا `title` يصير

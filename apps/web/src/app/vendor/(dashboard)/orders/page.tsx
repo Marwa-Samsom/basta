@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Alert, EmptyState, MoreButton, PageHead } from '@/components/ui';
+import { Alert, EmptyState, MoreButton, PageHead, SortButton, type SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { useAdminList } from '@/lib/admin';
 import { labelOf, money, toneOf, when } from '@/lib/orders';
@@ -45,7 +45,8 @@ const TABS: { statuses: string[]; label: string }[] = [
 export default function VendorOrdersPage() {
   const [tab, setTab] = useState('');
   const [search, setSearch] = useState('');
-  const q = new URLSearchParams();
+  const [sort, setSort] = useState<SortOrder>('newest');
+  const q = new URLSearchParams({ sort });
   if (tab) q.set('status', tab);
   if (search.trim()) q.set('search', search.trim());
   const list = useAdminList<Row, { counts: Record<string, number> }>(`/vendor/orders?${q}`, (r) => r.id);
@@ -67,17 +68,20 @@ export default function VendorOrdersPage() {
           ) : undefined
         }
         actions={
-          <span className="input-icon vm-search">
-            <Icon name="search" size={16} />
-            <input
-              className="field__control"
-              type="search"
-              placeholder="رقم الطلب أو المستلم أو المنتج"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="ابحث في الطلبات"
-            />
-          </span>
+          <>
+            <span className="input-icon vm-search">
+              <Icon name="search" size={16} />
+              <input
+                className="field__control"
+                type="search"
+                placeholder="رقم الطلب أو المستلم أو المنتج"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="ابحث في الطلبات"
+              />
+            </span>
+            <SortButton value={sort} onChange={setSort} />
+          </>
         }
       />
 
