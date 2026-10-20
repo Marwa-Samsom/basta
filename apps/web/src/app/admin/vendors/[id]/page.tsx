@@ -123,7 +123,7 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
               label="علّق المتجر"
               min={10}
               icon="lock"
-              hint="تختفي منتجاته فوراً. الطلبات القائمة تكتمل وتُصرف مستحقاتها."
+              hint="تختفي منتجاته فوراً. الطلبات القائمة تكتمل، ورصيده يُسحب بعد حجز احترازي من التعليق (90 يوماً — من الإعدادات)."
               disabled={act.busy}
               onSubmit={(r) => post('suspend', { reason: r }, 'عُلِّق المتجر.')}
             />

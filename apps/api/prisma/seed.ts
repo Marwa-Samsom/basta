@@ -34,6 +34,7 @@ const TAX_RATES = [
 
 const SETTINGS = [
   ['hold_period_days',            14],       // ADR-007
+  ['suspension_payout_hold_days', 90],       // القرار الملزم 13 — حجز احترازي للمعلَّق، 20 أكتوبر 2026
   ['return_window_days',          14],       // Q-08
   ['reservation_ttl_minutes',     15],       // ADR-006
   ['vendor_accept_timeout_hours', 48],       // Q-07

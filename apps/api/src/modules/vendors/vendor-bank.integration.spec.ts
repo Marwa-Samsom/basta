@@ -322,7 +322,7 @@ describe('المتجر المعتمد لا يمرّ من مسار التسجيل
     expect(profile.statusCode, profile.body).toBe(200);
   });
 
-  it('السحب: الافتراضي غير الموثَّق يُرفض، والمتجر الموقوف لا يسحب', async () => {
+  it('السحب: الافتراضي غير الموثَّق يُرفض، والمعلَّق يسحب بعد حجز احترازي 90 يوماً لا قبله', async () => {
     if (!dbUp) return;
     const v = await makeVendor('payout');
     const payout = () => call('POST', '/vendor/finance/payouts', v.token, { currency: 'SAR', amountMinorUnits: '100' });
@@ -334,10 +334,19 @@ describe('المتجر المعتمد لا يمرّ من مسار التسجيل
     expect(unverified.json().message).toMatch(/لم يوثّقه/);
 
     await prisma.vendorBankAccount.updateMany({ where: { vendorId: v.vendorId, isDefault: true }, data: { verifiedAt: new Date() } });
-    await prisma.vendor.update({ where: { id: v.vendorId }, data: { status: 'suspended' } });
+    // المعلَّق للتوّ: رصيده محجوز احترازياً 90 يوماً من تعليقه، والتاريخ في الرسالة (القرار 13، 20 أكتوبر 2026)
+    const suspendedAt = new Date();
+    await prisma.vendor.update({ where: { id: v.vendorId }, data: { status: 'suspended', suspendedAt } });
     const suspended = await payout();
     expect(suspended.statusCode, suspended.body).toBe(409);
-    expect(suspended.json().message).toMatch(/موقوف/);
+    expect(suspended.json().message).toMatch(/محجوز احترازياً حتى/);
+    expect(suspended.json().message).toContain(new Date(suspendedAt.getTime() + 90 * 86_400_000).toISOString().slice(0, 10));
+
+    // انقضى الحجز: يمرّ فحص التعليق إلى فحص الرصيد كمتجر عادي — لا مصادرة
+    await prisma.vendor.update({ where: { id: v.vendorId }, data: { suspendedAt: new Date(Date.now() - 91 * 86_400_000) } });
+    const afterHold = await payout();
+    expect(afterHold.statusCode, afterHold.body).toBe(409);
+    expect(afterHold.json().message).toMatch(/رصيدك المتاح/);
 
     expect(await prisma.payoutRequest.count({ where: { vendorId: v.vendorId } })).toBe(0);
   });

@@ -48,6 +48,15 @@ export const SETTINGS_SPEC: Record<
   }
 > = {
   hold_period_days: { labelAr: 'تعليق رصيد البائع', kind: 'int', min: 0, max: 60, unit: 'يوم', financial: 'يسري على الطلبات التي تُسلَّم بعد الحفظ؛ ما سُلّم قبله يبقى على موعده.' },
+  // القرار الملزم 13 كما حسمته صاحبة المشروع (20 أكتوبر 2026): المعلَّق يسحب بعد حجز احترازي
+  suspension_payout_hold_days: {
+    labelAr: 'حجز رصيد المتجر المعلَّق',
+    kind: 'int',
+    min: 0,
+    max: 365,
+    unit: 'يوم',
+    financial: 'المتجر المعلَّق يسحب رصيده بعد هذه المدة من تعليقه — حجز احترازي لا مصادرة. يسري على المعلَّقين الآن أيضاً.',
+  },
   return_window_days: { labelAr: 'مهلة الإرجاع', kind: 'int', min: 0, max: 60, unit: 'يوم', financial: 'أقصر من فترة التعليق يعني تحرير مال قد يُطلب ردّه بعد صرفه.' },
   reservation_ttl_minutes: { labelAr: 'مهلة حجز المخزون', kind: 'int', min: 5, max: 60, unit: 'دقيقة' },
   vendor_accept_timeout_hours: { labelAr: 'مهلة قبول البائع', kind: 'int', min: 6, max: 168, unit: 'ساعة' },
