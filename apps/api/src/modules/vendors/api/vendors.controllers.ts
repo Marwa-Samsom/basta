@@ -198,6 +198,7 @@ export class AdminVendorsController {
       ...(query.status ? { status: query.status } : {}),
       ...(query.limit ? { limit: Number(query.limit) } : {}),
       ...(query.offset ? { offset: Number(query.offset) } : {}),
+      ...(query.search?.trim() ? { search: query.search.trim() } : {}),
     });
   }
 

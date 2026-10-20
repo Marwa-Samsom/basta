@@ -345,6 +345,28 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(mine.documentsTotal).toBe(4);
   });
 
+  // كانت الصفحة أول مئة بالأقدم بلا بحث ولا ما بعدها — متجر بين آلاف لا يُوصل إليه (J-11، 20 أكتوبر 2026)
+  it('AD-04/06: البحث بالاسم أو الرابط أو بريد صاحبه داخل الحالة، والصفحة التالية بالإزاحة', async () => {
+    if (!dbUp) return;
+    const list = (q: string) => app.inject({ method: 'GET', ...api(`/admin/vendors?${q}`, adminToken) });
+    for (const term of [`Dar AlQutn ${SUFFIX}`, `dar-alqutn-${SUFFIX}`, `SELLER.${SUFFIX}@basta.test`]) {
+      const res = await list(`status=in_review&search=${encodeURIComponent(term)}`);
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().items.map((v: { id: string }) => v.id), term).toEqual([vendorId]);
+      expect(res.json().total, term).toBe(1);
+    }
+    // داخل الحالة المختارة: بانتظار المراجعة لا يظهر في «معتمد»
+    expect((await list(`status=approved&search=${encodeURIComponent(`dar-alqutn-${SUFFIX}`)}`)).json().total).toBe(0);
+
+    // الصفحة الثانية تكمل الأولى بلا تكرار، والإجمالي واحد للصفحتين
+    const first = (await list('status=in_review&limit=1')).json();
+    if (first.total > 1) {
+      const second = (await list('status=in_review&limit=1&offset=1')).json();
+      expect(second.total).toBe(first.total);
+      expect(second.items[0].id).not.toBe(first.items[0].id);
+    }
+  });
+
   it('AD-05: الرفض يعيد الطلب قابلاً للإصلاح بسبب يقرأه البائع', async () => {
     if (!dbUp) return;
     const empty = await app.inject({

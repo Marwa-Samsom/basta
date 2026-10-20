@@ -155,6 +155,12 @@ export class ReviewQueueQueryDto {
   @IsOptional()
   @Matches(/^\d{1,6}$/, { message: 'الإزاحة رقم صحيح.' })
   offset?: string;
+
+  @ApiPropertyOptional({ description: 'اسم المتجر بالعربية أو الإنجليزية، أو رابطه، أو بريد صاحبه' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
 }
 
 export class RejectVendorDto {
