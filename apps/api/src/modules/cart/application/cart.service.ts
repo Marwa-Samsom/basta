@@ -177,6 +177,22 @@ export class CartService {
     await this.prisma.cart.update({ where: { id: cartId }, data: { couponCode: null } });
   }
 
+  /**
+   * يطرح ما دُفع ثمنه من سلته — لنجاح وصل متأخراً، والسلة ربما تغيّرت بعد الطلب: ما أضافه المشتري
+   * بعده يبقى، وما دفعه لا يبقى ليدفعه مرة ثانية. الكوبون يُمحى إن فرغت كما يُمحى مع clear.
+   */
+  async removeBought(cartId: string, bought: readonly { variantId: string; qty: number }[]): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      for (const { variantId, qty } of bought) {
+        const { count } = await tx.cartItem.updateMany({ where: { cartId, variantId, qty: { gt: qty } }, data: { qty: { decrement: qty } } });
+        if (count === 0) await tx.cartItem.deleteMany({ where: { cartId, variantId } });
+      }
+      if ((await tx.cartItem.count({ where: { cartId } })) === 0) {
+        await tx.cart.update({ where: { id: cartId }, data: { couponCode: null } });
+      }
+    });
+  }
+
   async view(token: string, address: QuoteAddress | null = null): Promise<CartView> {
     const cart = await this.require(token);
     const items = await this.prisma.cartItem.findMany({

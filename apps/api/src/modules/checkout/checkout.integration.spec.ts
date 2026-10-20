@@ -92,6 +92,10 @@ async function pay(token: string, paymentToken: string, key = randomUUID()) {
   });
 }
 
+/** سطور السلة برمزها كما في القاعدة */
+const cartLines = (token: string) =>
+  prisma.cartItem.findMany({ where: { cart: { sessionToken: token } }, select: { variantId: true, qty: true } });
+
 /** حساب مشترٍ حقيقي عبر التسجيل والدخول — كما يمرّ به من يشتري */
 async function account(tag: string): Promise<{ token: string; userId: string }> {
   const email = `${tag}.${SUFFIX}@basta.test`;
@@ -359,6 +363,8 @@ describe('بوابة 08 · البند 4 — انقطاع الاتصال ينته
     expect(pending.status).toBe('pending_payment');
     // الحجز باقٍ أثناء الانتظار: لا تُباع القطعة لغيره وماله ربما خُصم
     expect(pending.reservationIds.length).toBe(1);
+    // لا نعرف بعد إن خُصم: السلة باقية كما هي
+    expect(await cartLines(token)).toHaveLength(1);
 
     // رقم الطلب وحده لا يفتحه ولا يطلق مصالحته — بلا دخول، أو بحساب آخر، أو بمفتاح
     // ضيف مخمَّن: 404 كأنه غير موجود، والطلب باقٍ معلّقاً
@@ -373,6 +379,27 @@ describe('بوابة 08 · البند 4 — انقطاع الاتصال ينته
     const status = await call('GET', `/checkout/orders/${pending.orderNumber}`, { headers: { authorization: `Bearer ${buyerToken}` } });
     expect(status.json().outcome).toBe('paid');
     expect(status.json().subOrderCount).toBe(1);
+    // دُفع: السلة لا تبقى بما دُفع ثمنه فيُدفع ثانية (CHK-069 — حدث في J-08)
+    expect(await cartLines(token)).toEqual([]);
+  });
+
+  it('نجاح متأخر يطرح من السلة ما دُفع وحده — ما أُضيف بعد الطلب يبقى (CHK-069)', async () => {
+    if (!dbUp) return;
+    const token = await cartWith([{ variantId: variantIds[0]!, qty: 2 }]);
+    const res = await pay(token, 'tok_timeout');
+    expect(res.json().outcome).toBe('pending');
+    // المشتري أضاف إلى السلة نفسها وهو ينتظر
+    expect((await call('POST', '/cart/items', { body: { variantId: variantIds[1]!, qty: 1 }, headers: { 'x-cart-token': token } })).statusCode).toBe(201);
+    expect((await call('POST', '/cart/items', { body: { variantId: variantIds[0]!, qty: 1 }, headers: { 'x-cart-token': token } })).statusCode).toBe(201);
+
+    await app.get(CheckoutService).reconcile(res.json().orderId as string);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: res.json().orderId as string } })).status).toBe('processing');
+    expect((await cartLines(token)).sort((a, b) => a.variantId.localeCompare(b.variantId))).toEqual(
+      [
+        { variantId: variantIds[0]!, qty: 1 },
+        { variantId: variantIds[1]!, qty: 1 },
+      ].sort((a, b) => a.variantId.localeCompare(b.variantId)),
+    );
   });
 
   it('رقم الطلب من مولّد معمّى بثمانية محارف، وإعادة «ادفع» بالمفتاح نفسه تعيد الطلب نفسه', async () => {
@@ -529,7 +556,8 @@ describe('دفع بعد انتهاء الحجز — إشعاران متزامن�
 
   /** طلب بانتظار التحقق، ثم انقضى حجزه — البوابة ستؤكّد الخصم بعد المهلة */
   async function expiredPending(variantId: string) {
-    const res = await pay(await cartWith([{ variantId, qty: 1 }]), 'tok_3ds');
+    const cart = await cartWith([{ variantId, qty: 1 }]);
+    const res = await pay(cart, 'tok_3ds');
     expect(res.json().outcome).toBe('requires_action');
     const orderId = res.json().orderId as string;
     const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
@@ -544,14 +572,16 @@ describe('دفع بعد انتهاء الحجز — إشعاران متزامن�
         payload: body,
       });
     };
-    return { orderId, payment: order.payment!, webhook };
+    return { orderId, payment: order.payment!, webhook, cart };
   }
 
   it('المخزون متاح: يُعاد الحجز ويُكمل الطلب — بلا ردّ', async () => {
     if (!dbUp) return;
     const variantId = await oneUnit();
-    const { orderId, payment, webhook } = await expiredPending(variantId);
+    const { orderId, payment, webhook, cart } = await expiredPending(variantId);
     expect((await webhook()).statusCode).toBe(200);
+    // الحجز أُعيد بسلة القديم: الإشعار يعرف ما يطرح منها
+    expect(await cartLines(cart)).toEqual([]);
     const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
     expect(order.status).toBe('processing');
     expect(order.payment!.status).toBe('captured');
