@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { AdminHeader, Empty, Feedback, Loading, Tabs } from '@/components/admin';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { useAction, useAdminData } from '@/lib/admin';
@@ -86,6 +87,7 @@ export default function AdminTransfersPage() {
   const incoming = useAdminData<{ waiting: Waiting[]; confirmed: Confirmed[] }>('/admin/payments/transfers');
   const refunds = useAdminData<{ items: RefundRow[] }>('/admin/refunds/awaiting-transfer');
   const act = useAction();
+  const ask = useConfirm();
   const [draft, setDraft] = useState<Record<string, { reference: string; amount: string; note: string }>>({});
   const [refundRefs, setRefundRefs] = useState<Record<string, string>>({});
 
@@ -96,6 +98,35 @@ export default function AdminTransfersPage() {
 
   const edit = (n: string, patch: Partial<{ reference: string; amount: string; note: string }>) =>
     setDraft((d) => ({ ...d, [n]: { reference: '', amount: '', note: '', ...d[n], ...patch } }));
+
+  /**
+   * التسجيل يُبلغ المشتري أن ماله خرج، ولا يُتراجع عنه — والطوابير تبدأ بالأقدم بلا بحث، فيُكتب
+   * المرجع في صفّ غير المقصود. سُجّل ردّ طلب تجريبي بمرجع ردّ آخر هكذا (J-07، 20 أكتوبر 2026):
+   * السؤال يعيد الطلب والمشتري والمبلغ قبل أن يُبلَّغ أحد.
+   */
+  const recordRefund = async (r: RefundRow) => {
+    const reference = (refundRefs[r.id] ?? '').trim();
+    const sure = await ask({
+      title: `حوّلت ${money(r.amountMinorUnits, r.currency)} إلى ${r.buyer.name ?? 'المشتري'}؟`,
+      body: (
+        <>
+          <p>
+            ردّ <bdi className="num">{r.subOrderNumber}</bdi> · {r.store} — بمرجع{' '}
+            <bdi className="num" dir="ltr">
+              {reference}
+            </bdi>
+          </p>
+          <p>يُبلَّغ المشتري الآن أن المبلغ خرج إليه، ولا يُلغى التسجيل بعده.</p>
+        </>
+      ),
+      confirmLabel: 'سجّل التحويل',
+    });
+    if (!sure) return;
+    void act.run(async () => {
+      await api(`/admin/refunds/${r.id}/transfer`, { method: 'POST', body: { reference } });
+      refunds.reload();
+    }, 'سُجّل الردّ وأُبلغ المشتري بمرجعه.');
+  };
 
   return (
     <div className="ao-page">
@@ -308,12 +339,7 @@ export default function AdminTransfersPage() {
                           type="button"
                           className="btn btn--primary btn--sm"
                           disabled={act.busy || (refundRefs[r.id]?.trim().length ?? 0) < 3}
-                          onClick={() =>
-                            void act.run(async () => {
-                              await api(`/admin/refunds/${r.id}/transfer`, { method: 'POST', body: { reference: refundRefs[r.id] } });
-                              refunds.reload();
-                            }, 'سُجّل الردّ وأُبلغ المشتري بمرجعه.')
-                          }
+                          onClick={() => void recordRefund(r)}
                         >
                           حوّلته — سجّل
                         </button>
