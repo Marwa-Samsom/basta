@@ -272,6 +272,23 @@ export class CheckoutService {
     return this.result(order.id);
   }
 
+  /**
+   * نجاح وصل متأخراً — المصالحة أو صفحة الطلب أو إشعار المزوّد — لا يعرف سلة «ادفع». كانت تبقى
+   * بقطعها، فيرى المشتري ما دفع ثمنه ما زال فيها ويدفع ثانية: اشترى القميص مرتين هكذا في J-08
+   * (CHK-069، 20 أكتوبر 2026). السلة من حجز الطلب (الحجز يحمل سلّته)، ويُطرح منها ما دُفع وحده.
+   */
+  private async removeBoughtFromCart(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { reservationIds: true } });
+    if (!order || order.reservationIds.length === 0) return;
+    const held = await this.prisma.stockReservation.findMany({
+      where: { id: { in: order.reservationIds } },
+      select: { cartId: true, variantId: true, qty: true },
+    });
+    const cartId = held.find((r) => r.cartId)?.cartId;
+    if (!cartId) return;
+    await this.carts.removeBought(cartId, held.map(({ variantId, qty }) => ({ variantId, qty })));
+  }
+
   /** تطبيق نتيجة الدفع — من الردّ المباشر، أو الإشعار، أو المصالحة. عديم الأثر عند التكرار. */
   async apply(orderId: string, outcome: ChargeOutcome, cartId?: string | null): Promise<void> {
     if (outcome.intentId) {
@@ -285,6 +302,7 @@ export class CheckoutService {
       case 'captured':
         if (await this.markPaid(orderId)) {
           if (cartId) await this.carts.clear(cartId).catch(() => undefined);
+          else await this.removeBoughtFromCart(orderId).catch(() => undefined);
           return;
         }
         // لم يُقسَّم: إمّا دُفع من قبل (إشعار مكرّر) وإمّا أُغلق قبل أن يصل المال
@@ -768,10 +786,15 @@ export class CheckoutService {
       return await this.prisma.$transaction(
         async (tx) => {
           if ((await lockOrder(tx)) !== 'pending_payment') return false;
-          const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { pricingSnapshot: true } });
+          const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { pricingSnapshot: true, reservationIds: true } });
           const lines = (order.pricingSnapshot as unknown as Snapshot).subOrders.flatMap((s) => s.lines);
+          // الحجز الجديد يحمل سلة القديم — منه يُعرف ما يُطرح من السلة بعد الدفع (removeBoughtFromCart)
+          const cart = await tx.stockReservation.findFirst({
+            where: { id: { in: order.reservationIds }, cartId: { not: null } },
+            select: { cartId: true },
+          });
           const fresh = await this.inventory.reserve(
-            { lines: lines.map((l) => ({ variantId: l.variantId, qty: l.qty, label: l.nameAr })), orderId },
+            { lines: lines.map((l) => ({ variantId: l.variantId, qty: l.qty, label: l.nameAr })), orderId, cartId: cart?.cartId ?? null },
             tx,
           );
           await tx.order.update({ where: { id: orderId }, data: { reservationIds: fresh.reservations.map((r) => r.id) } });
