@@ -599,9 +599,16 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
       expect(mine.acceptanceDue).toBe(true);
       expect(new Date(mine.acceptBy!).getTime()).toBe(placedAt.getTime() + hours * 3_600_000);
 
-      // البطاقة تعدّ الفرعيات نفسها التي تعرضها القائمة — لا رقم بلا قائمة
+      // البطاقة تعدّ الفرعيات نفسها التي تعرضها القائمة — لا رقم بلا قائمة. القائمة كلها لا صفحتها
+      // الأولى: على قاعدة التطوير قد يقارب المهلة مئات الطلبات من تشغيلات سابقة (20 أكتوبر 2026)
+      const all: Item[] = [...items];
+      for (let page = 2; all.length < (list.json().total as number); page++) {
+        const next = (await call('GET', `/admin/orders?due=acceptance&page=${page}`, admin.token)).json().items as Item[];
+        if (next.length === 0) break;
+        all.push(...next);
+      }
       const queued = (await call('GET', '/admin/dashboard', admin.token)).json().queues.overdueAcceptance as number;
-      expect(queued).toBe(items.flatMap((o) => o.subOrders).filter((s) => s.acceptanceDue).length);
+      expect(queued).toBe(all.flatMap((o) => o.subOrders).filter((s) => s.acceptanceDue).length);
 
       expect((await call('GET', '/admin/orders?due=late', admin.token)).statusCode).toBe(400);
     } finally {
