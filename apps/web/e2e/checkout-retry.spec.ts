@@ -63,6 +63,38 @@ test('502 بعد أن دفع الخادم: «ادفع» ثانيةً بالمف�
   expect(await prisma.order.count({ where: { customerUserId: userId } })).toBe(1);
 });
 
+// CHK-105 (J-08، 20 أكتوبر 2026): بعد النجاح عاد «ادفع» فعّالاً أثناء الانتقال، فضغطة ثانية
+// أرسلت محاولة بمفتاح جديد على سلة فرغت وأظهرت «السلة فارغة.» تحت طلب دُفع للتوّ
+test('بعد نجاح الدفع يبقى الزرّ معطّلاً حتى تنتقل الصفحة — لا محاولة ثانية', async ({ page }) => {
+  const v = await makeVendor(tag());
+  const { userId } = await signInBuyer(page);
+  await addToCart(page, v.productSlug);
+  await fillAndPrice(page);
+
+  // صفحة الطلب بطيئة كأول فتحة في وضع التطوير: الانتقال يُمسك ثلاث ثوانٍ
+  await page.route(
+    (url) => url.pathname.startsWith('/orders/'),
+    async (route) => {
+      await new Promise((r) => setTimeout(r, 3_000));
+      await route.continue().catch(() => undefined);
+    },
+  );
+  let posts = 0;
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && new URL(r.url()).pathname === '/api/v1/checkout') posts++;
+  });
+  const paid = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/v1/checkout');
+  await payButton(page).click();
+  expect((await paid).status()).toBe(200);
+
+  // الطلب دُفع والصفحة لم تنتقل بعد: لا «ادفع» يُضغط
+  await expect(page.getByRole('button', { name: 'جارٍ الدفع…' })).toBeDisabled();
+  await expect(payButton(page)).toHaveCount(0);
+  await page.waitForURL(/\/orders\//);
+  expect(posts).toBe(1);
+  expect(await prisma.order.count({ where: { customerUserId: userId } })).toBe(1);
+});
+
 test('504 ثم إعادة تحميل الصفحة: المفتاح نفسه يبقى في الجلسة', async ({ page }) => {
   const v = await makeVendor(tag());
   const { userId } = await signInBuyer(page);

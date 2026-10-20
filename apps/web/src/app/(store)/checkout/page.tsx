@@ -285,6 +285,7 @@ function CheckoutForm() {
     setError(null);
     const cart = cartHeaders();
     const key = attemptKey(cart['x-cart-token'] ?? null);
+    let leaving = false;
     try {
       const result = await api<OrderResult>('/checkout', {
         method: 'POST',
@@ -307,6 +308,7 @@ function CheckoutForm() {
       if (result.outcome === 'paid' || result.outcome === 'awaiting_transfer') writeDraft(null);
       // الخادم فرّغ السلة (دُفع الطلب أو حُجز بانتظار التحويل) — الرأس يعيد قراءة عدّادها
       window.dispatchEvent(new Event(CART_EVENT));
+      leaving = true;
       router.push(`/orders/${result.orderNumber}`);
     } catch (err) {
       // انتهت الجلسة ولم يُجدَّدها الرمز: لا طلب أُنشئ، فيعود بعد الدخول بالمحاولة نفسها
@@ -331,7 +333,10 @@ function CheckoutForm() {
       if (definitive(err)) endAttempt();
       setError(err instanceof Error ? err.message : 'تعذّر إتمام الطلب.');
     } finally {
-      setBusy(false);
+      // أجاب الخادم بطلب والصفحة تنتقل إليه: «ادفع» يبقى معطّلاً حتى تنتقل. كان يعود فعّالاً
+      // أثناء الانتقال، فضغطة ثانية أرسلت محاولة بمفتاح جديد على سلة فرغت — «السلة فارغة.»
+      // تحت طلب دُفع للتوّ (J-08، 20 أكتوبر 2026)
+      if (!leaving) setBusy(false);
     }
   }
 
