@@ -983,6 +983,37 @@ describe('تنبيهات الإدارة الدورية — مرة لكل حال�
     expect(await about('admin_acceptance_due', b.subOrderNumber)).toHaveLength(0);
   });
 
+  // كانت الدورة تقرأ أقدم 200 وحدها، والمنبَّه عنه يبقى بينها حتى يُحسم — فما بعدها لا يُنبَّه أبداً.
+  // ظهر على قاعدة التطوير وفيها 392 طلباً تقارب مهلتها (20 أكتوبر 2026). الدفعة هنا 1 بدل 200
+  it('أكثر من دفعة: المنبَّه عنه لا يحجب ما بعده — طلبات تقارب مهلتها ومرتجعات عالقة', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const { a, b, order } = await placeOrder([1, 1]);
+    for (const [i, s] of [a, b].entries()) await deliver(i, s.id);
+    const returns = [];
+    for (const s of [a, b]) {
+      const req = await call('POST', `/me/orders/${order.orderNumber}/stores/${s.id}/return`, buyer.token, {
+        items: [{ orderItemId: s.items[0]!.id, qty: 1 }],
+        reasonCode: 'damaged',
+      });
+      expect(req.statusCode, req.body).toBe(201);
+      returns.push(req.json().returnRequestId as string);
+    }
+    // a أقدم من b في الحالتين: الدورة القديمة تعيد a في كل دفعة
+    await prisma.returnRequest.update({ where: { id: returns[0]! }, data: { requestedAt: new Date(Date.now() - 5 * 86_400_000) } });
+    await prisma.returnRequest.update({ where: { id: returns[1]! }, data: { requestedAt: new Date(Date.now() - 4 * 86_400_000) } });
+    await alerts.stalledReturns(new Date(), 1);
+    await alerts.stalledReturns(new Date(), 1);
+    for (const s of [a, b]) expect(await about('admin_return_stalled', s.subOrderNumber), s.subOrderNumber).toHaveLength(1);
+
+    const { a: c, b: d } = await placeOrder([1, 1]);
+    await prisma.subOrder.update({ where: { id: c.id }, data: { placedAt: new Date(Date.now() - 41 * 3_600_000) } });
+    await prisma.subOrder.update({ where: { id: d.id }, data: { placedAt: new Date(Date.now() - 39 * 3_600_000) } });
+    await alerts.acceptanceDue(new Date(), 1);
+    await alerts.acceptanceDue(new Date(), 1);
+    for (const s of [c, d]) expect(await about('admin_acceptance_due', s.subOrderNumber), s.subOrderNumber).toHaveLength(1);
+  });
+
   it('انحراف في التدقيق: يُنبَّه من يرى التقارير مرة في اليوم لكل منظر — لا من لا يراها', async () => {
     if (!dbUp) return;
     const alerts = app.get(AdminAlertsScheduler);
