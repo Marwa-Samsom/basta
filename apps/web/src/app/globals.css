@@ -1018,6 +1018,8 @@ a.stat:hover { box-shadow: var(--shadow-md); }
 .list-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-3); padding-block: var(--space-4); }
 .list-more__count { color: var(--text-muted); font-size: var(--text-sm); }
 .list-more__error { color: var(--danger-text); font-size: var(--text-sm); }
+/* زرّ الترتيب بالتاريخ بجانب البحث */
+.sort-btn { white-space: nowrap; }
 
 .empty {
   display: grid;

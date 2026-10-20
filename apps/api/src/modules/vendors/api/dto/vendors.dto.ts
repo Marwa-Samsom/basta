@@ -161,6 +161,11 @@ export class ReviewQueueQueryDto {
   @IsString()
   @MaxLength(100)
   search?: string;
+
+  @ApiPropertyOptional({ enum: ['newest', 'oldest'], description: 'الأقدم أولاً افتراضياً' })
+  @IsOptional()
+  @IsIn(['newest', 'oldest'], { message: 'الترتيب newest (الأحدث أولاً) أو oldest (الأقدم أولاً).' })
+  sort?: 'newest' | 'oldest';
 }
 
 export class RejectVendorDto {

@@ -2,7 +2,8 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, SortButton, Tabs } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { Alert } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -60,7 +61,9 @@ function OrdersInner() {
   const [status, setStatus] = useState(params.get('status') ?? '');
   const [due, setDue] = useState(params.get('due') === 'acceptance');
   const [openNumber, setOpenNumber] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortOrder>('newest');
   const q = new URLSearchParams({
+    sort,
     ...(search.trim() ? { q: search.trim() } : {}),
     ...(status ? { status } : {}),
     ...(due ? { due: 'acceptance' } : {}),
@@ -83,6 +86,7 @@ function OrdersInner() {
         />
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب، بريد العميل، أو المتجر" label="بحث في الطلبات" />
+          <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
       {due ? (

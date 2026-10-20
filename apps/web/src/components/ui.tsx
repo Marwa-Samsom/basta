@@ -218,6 +218,29 @@ export function MoreButton({ list }: { list: { items: unknown[]; total: number; 
   );
 }
 
+/** ترتيب القوائم بتاريخها — ?sort= */
+export type SortOrder = 'newest' | 'oldest';
+
+/**
+ * زرّ الترتيب بالتاريخ — يقلب بين «الأحدث أولاً» و«الأقدم أولاً» بضغطة. القائمة تُطلب من
+ * جديد بترتيبها من أولها، لا تُعكس الصفحة المعروضة وحدها.
+ */
+export function SortButton({ value, onChange }: { value: SortOrder; onChange: (v: SortOrder) => void }) {
+  const newest = value === 'newest';
+  return (
+    <button
+      type="button"
+      className="btn btn--secondary btn--sm sort-btn"
+      onClick={() => onChange(newest ? 'oldest' : 'newest')}
+      aria-label={`الترتيب: ${newest ? 'الأحدث أولاً' : 'الأقدم أولاً'} — اضغط لعكسه`}
+      title="اعكس الترتيب"
+    >
+      <Icon name="sort" size={14} />
+      {newest ? 'الأحدث أولاً' : 'الأقدم أولاً'}
+    </button>
+  );
+}
+
 /**
  * رأس الصفحة — نمط كل شاشة في التصميم: العنوان، وعدّاد أو وصف قصير بجانبه،
  * والإجراءات في الطرف المقابل.

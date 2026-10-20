@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
-import { Alert, EmptyState, MoreButton, PageHead, Spinner } from '@/components/ui';
+import { Alert, EmptyState, MoreButton, PageHead, SortButton, Spinner, type SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
 import {
@@ -57,6 +57,8 @@ export default function ProductsPage() {
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState(initialCategory);
+  // بتاريخ آخر تعديل
+  const [sort, setSort] = useState<SortOrder>('newest');
   const [categories, setCategories] = useState<VendorCategory[]>([]);
   const [page, setPage] = useState<Page<ProductListItem> | null>(null);
   const [counts, setCounts] = useState<Partial<Record<TabKey, number>>>({});
@@ -70,8 +72,8 @@ export default function ProductsPage() {
   const listKey = useRef('');
 
   const load = useCallback(
-    async (status: TabKey, term: string, cat: string): Promise<void> => {
-      const params = new URLSearchParams({ pageSize: '20' });
+    async (status: TabKey, term: string, cat: string, order: SortOrder): Promise<void> => {
+      const params = new URLSearchParams({ pageSize: '20', sort: order });
       if (status !== 'all') params.set('status', status);
       if (term.trim()) params.set('search', term.trim());
       if (cat) params.set('category', cat);
@@ -93,9 +95,9 @@ export default function ProductsPage() {
   );
 
   useEffect(() => {
-    const timer = setTimeout(() => void load(tab, search, category), search ? 350 : 0);
+    const timer = setTimeout(() => void load(tab, search, category, sort), search ? 350 : 0);
     return () => clearTimeout(timer);
-  }, [tab, search, category, load]);
+  }, [tab, search, category, sort, load]);
 
   // قائمة الفئات للتصفية — فشلها يُبقي القائمة بلا تصفية لا يمنعها
   useEffect(() => {
@@ -259,6 +261,7 @@ export default function ProductsPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </span>
+            <SortButton value={sort} onChange={setSort} />
           </div>
 
           {loading && !page ? (

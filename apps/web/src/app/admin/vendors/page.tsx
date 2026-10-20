@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AdminHeader, Empty, Loading, MoreButton, SearchBox, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Loading, MoreButton, SearchBox, SortButton, Tabs } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { TONE, useAdminList, VENDOR_STATUS } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -43,7 +44,9 @@ const PAGE = 100;
 export default function AdminVendorsPage() {
   const [status, setStatus] = useState('in_review');
   const [search, setSearch] = useState('');
-  const query = new URLSearchParams({ status, limit: String(PAGE), ...(search.trim() ? { search: search.trim() } : {}) });
+  // الطابور بالأقدم أولاً — من انتظر أطول يُراجَع أولاً
+  const [sort, setSort] = useState<SortOrder>('oldest');
+  const query = new URLSearchParams({ status, limit: String(PAGE), sort, ...(search.trim() ? { search: search.trim() } : {}) });
   // الطابور يُقرأ بالإزاحة — حالة أو بحث آخر يبدأ القائمة من أولها
   const list = useAdminList<Item>(`/admin/vendors?${query}`, (v) => v.id, 'offset');
   const { data, error, forbidden, reload } = list;
@@ -65,6 +68,7 @@ export default function AdminVendorsPage() {
         />
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="اسم المتجر أو رابطه أو بريد صاحبه" label="بحث في المتاجر" />
+          <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
       {!data ? (

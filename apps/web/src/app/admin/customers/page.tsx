@@ -1,7 +1,8 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, SortButton } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { PARENT_STATUS, TONE, useAction, useAdminData, useAdminList } from '@/lib/admin';
@@ -30,7 +31,10 @@ interface Profile extends Omit<Row, 'orders'> {
 export default function AdminCustomersPage() {
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
-  const list = useAdminList<Row>(`/admin/customers${search.trim() ? `?q=${encodeURIComponent(search.trim())}` : ''}`, (c) => c.id);
+  // بتاريخ التسجيل
+  const [sort, setSort] = useState<SortOrder>('newest');
+  const query = new URLSearchParams({ sort, ...(search.trim() ? { q: search.trim() } : {}) });
+  const list = useAdminList<Row>(`/admin/customers?${query}`, (c) => c.id);
   const { data, error, forbidden, reload } = list;
 
   return (
@@ -39,6 +43,7 @@ export default function AdminCustomersPage() {
       <div className="toolbar">
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="الاسم أو البريد أو الهاتف" label="بحث في العملاء" />
+          <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
       {!data ? (

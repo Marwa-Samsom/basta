@@ -364,6 +364,11 @@ export class ListProductsQueryDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+
+  /** بتاريخ آخر تعديل — الأحدث أولاً افتراضياً */
+  @IsOptional()
+  @IsIn(['newest', 'oldest'], { message: 'الترتيب newest (الأحدث أولاً) أو oldest (الأقدم أولاً).' })
+  sort?: 'newest' | 'oldest';
 }
 
 /** مع أي خيار تظهر الصورة — قيمة (اللون الأحمر) أو متغيّر بعينه أو لا شيء (للجميع) */

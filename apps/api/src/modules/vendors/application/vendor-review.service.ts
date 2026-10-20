@@ -47,7 +47,7 @@ export class VendorReviewService {
     private readonly events: VendorEvents,
   ) {}
 
-  async queue(query: { status?: string; limit?: number; offset?: number; search?: string } = {}): Promise<{
+  async queue(query: { status?: string; limit?: number; offset?: number; search?: string; sort?: 'newest' | 'oldest' } = {}): Promise<{
     items: readonly ReviewQueueItem[];
     total: number;
   }> {
@@ -76,7 +76,8 @@ export class VendorReviewService {
     const [rows, total] = await Promise.all([
       this.prisma.vendor.findMany({
         where,
-        orderBy: [{ submittedAt: 'asc' }, { createdAt: 'asc' }],
+        // الطابور بالأقدم أولاً، و«الأحدث أولاً» يعكسه
+        orderBy: [{ submittedAt: query.sort === 'newest' ? 'desc' : 'asc' }, { createdAt: query.sort === 'newest' ? 'desc' : 'asc' }, { id: 'asc' }],
         take,
         skip,
         select: {

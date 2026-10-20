@@ -37,7 +37,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { InvalidInputError } from '../../../common/errors/domain-error';
 import type { Actor } from '../../../common/security/actor';
 import { CurrentActor, Public, RequirePermission, Roles } from '../../../common/security/decorators';
-import { pageOf, termOf } from '../../../common/paging';
+import { pageOf, sortOf, termOf } from '../../../common/paging';
 import { BANNER_PLACEMENTS, ContentService, type CouponInput } from '../application/content.service';
 import { OperationsService } from '../application/operations.service';
 import { ReportsService, type Range } from '../application/reports.service';
@@ -336,8 +336,9 @@ export class AdminOperationsController {
 
   @Get('customers')
   @RequirePermission('customers.manage')
-  customers(@Query('q') q?: string, @Query('page') page?: string) {
-    return this.ops.customers({ ...(q ? { search: q } : {}), page: Number(page) || 1 });
+  customers(@Query('q') q?: string, @Query('page') page?: string, @Query('sort') sort?: string) {
+    const order = sortOf(sort);
+    return this.ops.customers({ ...(q ? { search: q } : {}), page: Number(page) || 1, ...(order ? { sort: order } : {}) });
   }
 
   @Get('customers/:id')
@@ -377,8 +378,10 @@ export class AdminOperationsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('page') page?: string,
+    @Query('sort') sort?: string,
   ) {
     const r = from || to ? rangeOf(from, to) : null;
+    const order = sortOf(sort);
     return this.ops.auditLog({
       ...(actor ? { actor } : {}),
       ...(action ? { action } : {}),
@@ -386,6 +389,7 @@ export class AdminOperationsController {
       ...(entityId ? { entityId } : {}),
       ...(r ? { from: r.from, to: r.to } : {}),
       page: Number(page) || 1,
+      ...(order ? { sort: order } : {}),
     });
   }
 
@@ -423,8 +427,10 @@ export class AdminOperationsController {
 
   @Get('orders')
   @RequirePermission('orders.manage')
-  orders(@Query('q') q?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('due') due?: string) {
+  orders(@Query('q') q?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('due') due?: string, @Query('sort') sort?: string) {
+    const order = sortOf(sort);
     return this.ops.orders({
+      ...(order ? { sort: order } : {}),
       ...(q ? { search: q } : {}),
       ...(status ? { status: assertOneOf(status, Object.values(OrderStatus), 'حالة الطلب') } : {}),
       ...(due ? { due: assertOneOf(due, ['acceptance'] as const, 'التصفية') } : {}),
@@ -434,16 +440,18 @@ export class AdminOperationsController {
 
   @Get('returns')
   @RequirePermission('orders.manage')
-  returns(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+  returns(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string, @Query('sort') sort?: string) {
     const term = termOf(search);
-    return this.ops.returns({ ...(status ? { status } : {}), ...(term ? { search: term } : {}), page: pageOf(page) });
+    const order = sortOf(sort);
+    return this.ops.returns({ ...(status ? { status } : {}), ...(term ? { search: term } : {}), page: pageOf(page), ...(order ? { sort: order } : {}) });
   }
 
   @Get('returns/refunds')
   @RequirePermission('orders.manage')
-  refunds(@Query('search') search?: string, @Query('page') page?: string) {
+  refunds(@Query('search') search?: string, @Query('page') page?: string, @Query('sort') sort?: string) {
     const term = termOf(search);
-    return this.ops.refunds({ ...(term ? { search: term } : {}), page: pageOf(page) });
+    const order = sortOf(sort);
+    return this.ops.refunds({ ...(term ? { search: term } : {}), page: pageOf(page), ...(order ? { sort: order } : {}) });
   }
 }
 
@@ -534,9 +542,10 @@ export class AdminContentController {
 
   @Get('reviews')
   @RequirePermission('content.manage')
-  reviews(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+  reviews(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string, @Query('sort') sort?: string) {
     const term = termOf(search);
-    return this.content.reviews({ ...(status ? { status } : {}), ...(term ? { search: term } : {}), page: pageOf(page) });
+    const order = sortOf(sort);
+    return this.content.reviews({ ...(status ? { status } : {}), ...(term ? { search: term } : {}), page: pageOf(page), ...(order ? { sort: order } : {}) });
   }
 
   @Post('reviews/:id/moderate')

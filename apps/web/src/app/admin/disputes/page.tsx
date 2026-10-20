@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox, SortButton, Tabs } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { TextArea } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -39,7 +40,8 @@ export default function AdminDisputesPage() {
   const [status, setStatus] = useState('escalated');
   const [openId, setOpenId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const query = new URLSearchParams({ status, ...(search.trim() ? { search: search.trim() } : {}) });
+  const [sort, setSort] = useState<SortOrder>('newest');
+  const query = new URLSearchParams({ status, sort, ...(search.trim() ? { search: search.trim() } : {}) });
   const list = useAdminList<Row>(`/admin/disputes?${query}`, (d) => d.id);
   const { data, error, forbidden, reload } = list;
   const live = status === 'open' || status === 'escalated';
@@ -61,6 +63,7 @@ export default function AdminDisputesPage() {
         />
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو المتجر أو المشتري" label="بحث في النزاعات" />
+          <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
       {!data ? (

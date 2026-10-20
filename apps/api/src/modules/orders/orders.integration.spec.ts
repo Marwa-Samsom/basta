@@ -1088,5 +1088,14 @@ describe('قائمة طلبات المتجر — تصفية بحالة أو أك
     const p2 = (await call('GET', '/vendor/orders?page=2', v.token)).json() as { items: { id: string }[] };
     expect(p2.items.some((i) => p1.items.some((j) => j.id === i.id))).toBe(false);
     expect(p1.items.length + p2.items.length).toBeLessThanOrEqual(p1.total);
+
+    // الترتيب: الأحدث أولاً افتراضياً، و«الأقدم أولاً» يبدأ بأقدم طلب للمتجر
+    const placed = (r: { items: { placedAt: string }[] }) => r.items.map((i) => Date.parse(i.placedAt));
+    const newest = placed((await call('GET', '/vendor/orders', v.token)).json());
+    const oldest = placed((await call('GET', '/vendor/orders?sort=oldest', v.token)).json());
+    expect(newest).toEqual([...newest].sort((x, y) => y - x));
+    expect(oldest).toEqual([...oldest].sort((x, y) => x - y));
+    expect(oldest[0]).toBeLessThan(newest[0]!);
+    expect((await call('GET', '/vendor/orders?sort=bogus', v.token)).statusCode).toBe(400);
   });
 });

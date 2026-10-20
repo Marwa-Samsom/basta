@@ -9,7 +9,7 @@ import {
   NotFoundError,
 } from '../../../common/errors/domain-error';
 import { MoneyError, parse as parseMoney } from '../../../common/money/money';
-import { like, pageArgs } from '../../../common/paging';
+import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ScopedRepository } from '../../../common/prisma/scoped-repository';
 import { vendorScopeOf, type Actor, type VendorScope } from '../../../common/security/actor';
@@ -196,6 +196,7 @@ export class ProductService {
       category?: string | undefined;
       page?: number | undefined;
       pageSize?: number | undefined;
+      sort?: SortOrder | undefined;
     },
   ): Promise<Page<ProductListItemView>> {
     const page = Math.max(1, query.page ?? 1);
@@ -221,7 +222,7 @@ export class ProductService {
     const [rows, total, vendor] = await Promise.all([
       repo.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: [{ updatedAt: dirOf(query.sort, 'newest') }, { id: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
@@ -742,6 +743,7 @@ export class ProductService {
     search?: string | undefined;
     page?: number | undefined;
     pageSize?: number | undefined;
+    sort?: SortOrder | undefined;
   }): Promise<Page<AdminProductListItemView>> {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
@@ -764,7 +766,7 @@ export class ProductService {
     const [rows, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: [{ updatedAt: dirOf(query.sort, 'newest') }, { id: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {

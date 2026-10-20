@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { like, pageArgs } from '../../../common/paging';
+import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { TransferDetailsService } from '../../payments/public';
 import { allocate } from '../../pricing/public';
 import { AWAITING_TRANSFER } from './order-lifecycle.service';
@@ -87,7 +87,7 @@ export class OrderQueryService {
    * خمسين خمسين ببحث برقم الطلب أو طلب المتجر، أو اسم المتجر، أو اسم المشتري أو بريده —
    * كان الطابور بلا بحث، فسُجّل مرجع ردّ في صفّ غيره (J-07).
    */
-  async awaitingRefunds(q: { search?: string; page: number }) {
+  async awaitingRefunds(q: { search?: string; page: number; sort?: SortOrder }) {
     const t = q.search;
     const where: Prisma.RefundWhereInput = {
       status: AWAITING_TRANSFER,
@@ -106,7 +106,7 @@ export class OrderQueryService {
     const total = await this.prisma.refund.count({ where });
     const rows = await this.prisma.refund.findMany({
       where,
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: [{ createdAt: dirOf(q.sort, 'oldest') }, { id: 'asc' }],
       ...pageArgs(q.page),
       select: {
         id: true,
@@ -155,7 +155,7 @@ export class OrderQueryService {
 
   async vendorList(
     vendorId: string,
-    q: { status?: readonly string[]; search?: string; page?: number },
+    q: { status?: readonly string[]; search?: string; page?: number; sort?: SortOrder },
   ): Promise<{ items: unknown[]; total: number; counts: Record<string, number> }> {
     const where: Prisma.SubOrderWhereInput = {
       vendorId,
@@ -176,7 +176,7 @@ export class OrderQueryService {
     const [rows, total, grouped] = await Promise.all([
       this.prisma.subOrder.findMany({
         where,
-        orderBy: { placedAt: 'desc' },
+        orderBy: [{ placedAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         skip: (page - 1) * PAGE,
         take: PAGE,
         select: {

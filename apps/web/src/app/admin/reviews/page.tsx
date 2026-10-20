@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, SortButton, Tabs } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { useAction, useAdminList } from '@/lib/admin';
@@ -27,7 +28,8 @@ interface Review {
 export default function AdminReviewsPage() {
   const [status, setStatus] = useState('published');
   const [search, setSearch] = useState('');
-  const query = new URLSearchParams({ status, ...(search.trim() ? { search: search.trim() } : {}) });
+  const [sort, setSort] = useState<SortOrder>('newest');
+  const query = new URLSearchParams({ status, sort, ...(search.trim() ? { search: search.trim() } : {}) });
   const list = useAdminList<Review>(`/admin/reviews?${query}`, (r) => r.id);
   const { data, error, forbidden, reload } = list;
   const act = useAction();
@@ -46,6 +48,7 @@ export default function AdminReviewsPage() {
         <Tabs value={status} onChange={setStatus} label="حالة التقييم" options={[{ key: 'published', label: 'منشورة' }, { key: 'rejected', label: 'مخفية' }]} />
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="المنتج أو المشتري أو نصّ المراجعة" label="بحث في التقييمات" />
+          <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
       {!data ? (

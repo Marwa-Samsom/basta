@@ -2,7 +2,8 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useState } from 'react';
-import { AdminHeader, Loading, MoreButton, SearchBox } from '@/components/admin';
+import { AdminHeader, Loading, MoreButton, SearchBox, SortButton } from '@/components/admin';
+import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
 import { useAdminList } from '@/lib/admin';
@@ -34,7 +35,9 @@ function AuditInner() {
   const [entityType, setEntityType] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const entityId = params.get('entityId') ?? '';
+  const [sort, setSort] = useState<SortOrder>('newest');
   const q = new URLSearchParams({
+    sort,
     ...(actor ? { actor } : {}),
     ...(action ? { action } : {}),
     ...(entityType ? { entityType } : {}),
@@ -57,6 +60,7 @@ function AuditInner() {
             <option key={t}>{t}</option>
           ))}
         </select>
+        <SortButton value={sort} onChange={setSort} />
         {filtered ? (
           <span className="toolbar__end">
             <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setActor(''), setAction(''), setEntityType(''))}>

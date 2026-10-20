@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ADMIN_PAGE, pageArgs, pageOf, termOf } from './paging';
+import { ADMIN_PAGE, dirOf, pageArgs, pageOf, sortOf, termOf } from './paging';
 
 describe('صفحات القوائم الإدارية', () => {
   it('رقم الصفحة: الأولى إن غاب أو لم يكن عدداً صحيحاً موجباً', () => {
@@ -23,5 +23,20 @@ describe('صفحات القوائم الإدارية', () => {
     expect(termOf('   ')).toBeUndefined();
     expect(termOf('  غزة ')).toBe('غزة');
     expect(termOf('x'.repeat(300))).toHaveLength(100);
+  });
+
+  it('الترتيب: newest أو oldest أو لا شيء، وغيرهما يُرفض لا يُتجاهل', () => {
+    expect(sortOf(undefined)).toBeUndefined();
+    expect(sortOf('')).toBeUndefined();
+    expect(sortOf('oldest')).toBe('oldest');
+    expect(sortOf('newest')).toBe('newest');
+    expect(() => sortOf('asc')).toThrow(/الترتيب/);
+  });
+
+  it('اتجاه Prisma: المطلوب إن وُجد، وإلا ترتيب القائمة المعتاد', () => {
+    expect(dirOf('oldest', 'newest')).toBe('asc');
+    expect(dirOf('newest', 'oldest')).toBe('desc');
+    expect(dirOf(undefined, 'oldest')).toBe('asc');
+    expect(dirOf(undefined, 'newest')).toBe('desc');
   });
 });

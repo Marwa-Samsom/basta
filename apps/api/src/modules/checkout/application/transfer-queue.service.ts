@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { like, pageArgs } from '../../../common/paging';
+import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Snapshot } from '../domain/snapshot';
 
@@ -18,7 +18,7 @@ export class TransferQueueService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** الواردة — البحث برقم الطلب أو اسم المشتري أو بريده أو جواله */
-  async waiting(q: { search?: string; page: number }, now: Date = new Date()) {
+  async waiting(q: { search?: string; page: number; sort?: SortOrder }, now: Date = new Date()) {
     const t = q.search;
     const where: Prisma.OrderWhereInput = {
       status: 'pending_payment',
@@ -40,7 +40,7 @@ export class TransferQueueService {
     const [rows, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
-        orderBy: [{ placedAt: 'asc' }, { id: 'asc' }],
+        orderBy: [{ placedAt: dirOf(q.sort, 'oldest') }, { id: 'asc' }],
         ...pageArgs(q.page),
         select: {
           orderNumber: true,
@@ -83,7 +83,7 @@ export class TransferQueueService {
   }
 
   /** ما أُكّد، الأحدث أولاً — البحث برقم الطلب أو مرجع التحويل أو اسم المشتري أو بريده */
-  async confirmed(q: { search?: string; page: number }) {
+  async confirmed(q: { search?: string; page: number; sort?: SortOrder }) {
     const t = q.search;
     const where: Prisma.PaymentWhereInput = {
       transferReference: { not: null },
@@ -106,7 +106,7 @@ export class TransferQueueService {
     const [rows, total] = await Promise.all([
       this.prisma.payment.findMany({
         where,
-        orderBy: [{ confirmedAt: 'desc' }, { id: 'asc' }],
+        orderBy: [{ confirmedAt: dirOf(q.sort, 'newest') }, { id: 'asc' }],
         ...pageArgs(q.page),
         select: {
           amountMinorUnits: true,
