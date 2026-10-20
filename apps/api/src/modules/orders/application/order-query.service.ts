@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { like, pageArgs } from '../../../common/paging';
 import { TransferDetailsService } from '../../payments/public';
 import { allocate } from '../../pricing/public';
 import { AWAITING_TRANSFER } from './order-lifecycle.service';
@@ -82,12 +83,31 @@ export class OrderQueryService {
    * الردود التي لا تخرج آلياً — الإدارة تحوّلها وتسجّل مرجعها. معها ما يلزم لتعرف
    * إلى أين: مرجع التحويل الوارد وملاحظة من أكّده (اسم المحوِّل أو حسابه)، والمشتري.
    * الأقدم أولاً: المشتري الذي ينتظر منذ أيام قبل من ألغى للتوّ.
+   *
+   * خمسين خمسين ببحث برقم الطلب أو طلب المتجر، أو اسم المتجر، أو اسم المشتري أو بريده —
+   * كان الطابور بلا بحث، فسُجّل مرجع ردّ في صفّ غيره (J-07).
    */
-  async awaitingRefunds() {
+  async awaitingRefunds(q: { search?: string; page: number }) {
+    const t = q.search;
+    const where: Prisma.RefundWhereInput = {
+      status: AWAITING_TRANSFER,
+      ...(t
+        ? {
+            subOrder: {
+              OR: [
+                { subOrderNumber: like(t) },
+                { vendor: { nameAr: like(t) } },
+                { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ fullName: like(t) }, { email: like(t) }] } }] } },
+              ],
+            },
+          }
+        : {}),
+    };
+    const total = await this.prisma.refund.count({ where });
     const rows = await this.prisma.refund.findMany({
-      where: { status: AWAITING_TRANSFER },
-      orderBy: { createdAt: 'asc' },
-      take: 200,
+      where,
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      ...pageArgs(q.page),
       select: {
         id: true,
         amountMinorUnits: true,
@@ -127,6 +147,7 @@ export class OrderQueryService {
           paidWith: { reference: o.payment?.transferReference ?? null, note: o.payment?.transferNote ?? null },
         };
       }),
+      total,
     };
   }
 

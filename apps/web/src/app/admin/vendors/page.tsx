@@ -2,10 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AdminHeader, Empty, Loading, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Loading, MoreButton, SearchBox, Tabs } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { api } from '@/lib/api';
-import { TONE, useAdminData, VENDOR_STATUS } from '@/lib/admin';
+import { TONE, useAdminList, VENDOR_STATUS } from '@/lib/admin';
 import { when } from '@/lib/orders';
 
 interface Item {
@@ -44,32 +43,11 @@ const PAGE = 100;
 export default function AdminVendorsPage() {
   const [status, setStatus] = useState('in_review');
   const [search, setSearch] = useState('');
-  const [more, setMore] = useState<Item[]>([]);
-  const [loadingMore, setLoadingMore] = useState(false);
   const query = new URLSearchParams({ status, limit: String(PAGE), ...(search.trim() ? { search: search.trim() } : {}) });
-  const { data, error, forbidden, reload } = useAdminData<{ items: Item[]; total: number }>(`/admin/vendors?${query}`);
+  // الطابور يُقرأ بالإزاحة — حالة أو بحث آخر يبدأ القائمة من أولها
+  const list = useAdminList<Item>(`/admin/vendors?${query}`, (v) => v.id, 'offset');
+  const { data, error, forbidden, reload } = list;
   const queue = status === 'in_review';
-  const items = data ? [...data.items, ...more] : [];
-
-  // حالة أو بحث آخر: قائمة أخرى من أولها
-  const changeStatus = (s: string) => {
-    setStatus(s);
-    setMore([]);
-  };
-  const changeSearch = (v: string) => {
-    setSearch(v);
-    setMore([]);
-  };
-
-  const loadMore = async () => {
-    setLoadingMore(true);
-    try {
-      const next = await api<{ items: Item[] }>(`/admin/vendors?${query}&offset=${items.length}`);
-      setMore((m) => [...m, ...next.items]);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
 
   return (
     <div className="ao-page">
@@ -81,22 +59,12 @@ export default function AdminVendorsPage() {
       <div className="toolbar">
         <Tabs
           value={status}
-          onChange={changeStatus}
+          onChange={setStatus}
           label="حالة المتجر"
           options={['in_review', 'approved', 'suspended', 'rejected', 'pending', 'banned'].map((k) => ({ key: k, label: VENDOR_STATUS[k] ?? k }))}
         />
         <div className="toolbar__end">
-          <span className="input-icon ao-search">
-            <Icon name="search" size={15} />
-            <input
-              className="field__control"
-              type="search"
-              placeholder="اسم المتجر أو رابطه أو بريد صاحبه"
-              value={search}
-              onChange={(e) => changeSearch(e.target.value)}
-              aria-label="بحث في المتاجر"
-            />
-          </span>
+          <SearchBox value={search} onChange={setSearch} placeholder="اسم المتجر أو رابطه أو بريد صاحبه" label="بحث في المتاجر" />
         </div>
       </div>
       {!data ? (
@@ -107,7 +75,7 @@ export default function AdminVendorsPage() {
             icon="search"
             title="لا متاجر بهذا البحث"
             actions={
-              <button type="button" className="btn btn--secondary btn--sm" onClick={() => changeSearch('')}>
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
                 أزل التصفية
               </button>
             }
@@ -139,7 +107,7 @@ export default function AdminVendorsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((v) => {
+              {list.items.map((v) => {
                 const late = queue && v.waitingHours !== null && v.waitingHours >= LATE_HOURS;
                 const docsDone = v.documentsTotal > 0 && v.documentsAccepted === v.documentsTotal;
                 return (
@@ -197,16 +165,7 @@ export default function AdminVendorsPage() {
           </table>
         </div>
       )}
-      {data && items.length < data.total ? (
-        <div className="ao-more">
-          <span className="ao-more__count num">
-            {items.length} من {data.total}
-          </span>
-          <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void loadMore()}>
-            {loadingMore ? 'جارٍ التحميل…' : 'المزيد'}
-          </button>
-        </div>
-      ) : null}
+      <MoreButton list={list} />
     </div>
   );
 }

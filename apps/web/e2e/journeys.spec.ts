@@ -116,6 +116,8 @@ test('مسار التسوية: البائع يشحن ← يتحرّر رصيده
 
   // --------------------------------------------------- الإدارة توافق وتحوّل
   await adminPage.reload();
+  // طلبات متاجر الاختبار السابقة تملأ القائمة — يُوجد الطلب باسم متجره
+  await adminPage.getByLabel('بحث في طلبات التحويل').fill(`متجر ${t}`);
   const row = adminPage.getByRole('row', { name: new RegExp(`متجر ${t}`) });
   await row.getByRole('button', { name: 'موافقة' }).click();
   await adminPage.getByRole('tab', { name: 'موافَق — للتحويل' }).click();

@@ -20,6 +20,7 @@ import { CurrentActor, RequirePermission, Roles } from '../../../common/security
 import { FinanceService } from '../application/finance.service';
 import { ReleaseScheduler } from '../application/release-scheduler';
 import { assertOneOf, IsCalendarDate } from '../../../common/validation';
+import { pageOf, termOf } from '../../../common/paging';
 import { PayoutStatus } from '@prisma/client';
 
 const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('المورد غير موجود.') });
@@ -152,8 +153,13 @@ export class AdminFinanceController {
 
   @Get('payouts')
   @RequirePermission('payouts.approve')
-  payouts(@Query('status') status?: string) {
-    return this.finance.payouts({ ...(status ? { status: assertOneOf(status, Object.values(PayoutStatus), 'حالة السحب') } : {}) });
+  payouts(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.finance.adminPayouts({
+      ...(status ? { status: assertOneOf(status, Object.values(PayoutStatus), 'حالة السحب') } : {}),
+      ...(term ? { search: term } : {}),
+      page: pageOf(page),
+    });
   }
 
   @Post('payouts/:id/approve')

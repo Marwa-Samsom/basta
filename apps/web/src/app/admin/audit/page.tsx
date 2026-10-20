@@ -2,10 +2,10 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useState } from 'react';
-import { AdminHeader, Loading } from '@/components/admin';
+import { AdminHeader, Loading, MoreButton, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
-import { useAdminData } from '@/lib/admin';
+import { useAdminList } from '@/lib/admin';
 import { ROLE_LABEL, when } from '@/lib/orders';
 
 interface Entry {
@@ -40,7 +40,8 @@ function AuditInner() {
     ...(entityType ? { entityType } : {}),
     ...(entityId ? { entityId } : {}),
   });
-  const { data, error, forbidden } = useAdminData<{ items: Entry[]; total: number }>(`/admin/audit?${q}`);
+  const list = useAdminList<Entry>(`/admin/audit?${q}`, (e) => e.id);
+  const { data, error, forbidden } = list;
   const filtered = Boolean(actor || action || entityType);
 
   return (
@@ -48,10 +49,7 @@ function AuditInner() {
       <AdminHeader title="سجل التدقيق" hint={data ? `${data.total} سطر${entityId ? ' لهذا الكيان' : ''} — للقراءة فقط` : undefined} />
 
       <div className="toolbar">
-        <label className="input-icon ac2-search">
-          <Icon name="search" size={15} />
-          <input type="search" className="field__control" placeholder="المنفّذ (بريد أو اسم)" value={actor} onChange={(e) => setActor(e.target.value)} aria-label="المنفّذ" />
-        </label>
+        <SearchBox value={actor} onChange={setActor} placeholder="المنفّذ (بريد أو اسم)" label="المنفّذ" className="ac2-search" />
         <input className="field__control num ac2-search" placeholder="الإجراء، مثل payout." dir="ltr" value={action} onChange={(e) => setAction(e.target.value)} aria-label="الإجراء" />
         <select className="field__control" value={entityType} onChange={(e) => setEntityType(e.target.value)} aria-label="نوع الكيان">
           <option value="">كل الأنواع</option>
@@ -94,7 +92,7 @@ function AuditInner() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((e) => (
+              {list.items.map((e) => (
                 <Fragment key={e.id}>
                   <tr data-clickable="true" data-tone={open === e.id ? 'selected' : undefined} onClick={() => setOpen(open === e.id ? null : e.id)}>
                     <td className="ac2-muted-cell">{when(e.createdAt)}</td>
@@ -139,6 +137,7 @@ function AuditInner() {
           </table>
         </div>
       )}
+      <MoreButton list={list} />
     </div>
   );
 }

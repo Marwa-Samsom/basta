@@ -37,6 +37,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { InvalidInputError } from '../../../common/errors/domain-error';
 import type { Actor } from '../../../common/security/actor';
 import { CurrentActor, Public, RequirePermission, Roles } from '../../../common/security/decorators';
+import { pageOf, termOf } from '../../../common/paging';
 import { BANNER_PLACEMENTS, ContentService, type CouponInput } from '../application/content.service';
 import { OperationsService } from '../application/operations.service';
 import { ReportsService, type Range } from '../application/reports.service';
@@ -433,8 +434,16 @@ export class AdminOperationsController {
 
   @Get('returns')
   @RequirePermission('orders.manage')
-  returns(@Query('status') status?: string) {
-    return this.ops.returns(status);
+  returns(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.ops.returns({ ...(status ? { status } : {}), ...(term ? { search: term } : {}), page: pageOf(page) });
+  }
+
+  @Get('returns/refunds')
+  @RequirePermission('orders.manage')
+  refunds(@Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.ops.refunds({ ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 }
 
@@ -525,8 +534,9 @@ export class AdminContentController {
 
   @Get('reviews')
   @RequirePermission('content.manage')
-  reviews(@Query('status') status?: string) {
-    return this.content.reviews(status);
+  reviews(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.content.reviews({ ...(status ? { status } : {}), ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 
   @Post('reviews/:id/moderate')

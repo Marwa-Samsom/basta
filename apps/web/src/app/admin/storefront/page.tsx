@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -25,6 +25,15 @@ const PLACEMENTS: Record<string, string> = { home_hero: 'أعلى الرئيسي
 /** لافتات «أعلى صفحة التصنيف» القديمة — بلا صفحة تظهر فيها منذ صارت الفئات لكل متجر، فأُطفئت */
 const RETIRED: Record<string, string> = { category_top: 'أعلى صفحة التصنيف (أُلغي الموضع)' };
 
+/** المنتج درجةً أعلى في ترتيب المميّز */
+function up(ids: string[], id: string): string[] {
+  const i = ids.indexOf(id);
+  if (i <= 0) return ids;
+  const next = [...ids];
+  [next[i - 1], next[i]] = [next[i]!, next[i - 1]!];
+  return next;
+}
+
 const FILTERS = [
   { key: 'all', label: 'الكل', test: () => true },
   { key: 'home', label: 'الرئيسية', test: (b: Banner) => b.placement.startsWith('home_') },
@@ -34,11 +43,16 @@ const FILTERS = [
  * AD-17 و AD-19 — اللافتات والمنتجات المميّزة. الصورة تُرفع أولاً فتُحوَّل
  * WebP بعرض 1600، ثم تُحفظ اللافتة بمفتاحها. المميّز منتجات منشورة فقط،
  * بالترتيب الذي تضعه هنا.
+ *
+ * المنتج المميّز يُختار ببحث، والقائمة تأتي بأسمائها من الخادم (20 أكتوبر 2026): كانت الأسماء
+ * والاختيار من أحدث مئة منتج منشور، فما سواها يظهر بأول معرّفه ولا يُضاف.
  */
 export default function AdminStorefrontPage() {
   const banners = useAdminData<Banner[]>('/admin/banners');
-  const featured = useAdminData<string[]>('/admin/storefront/featured');
-  const products = useAdminData<{ items: { id: string; nameAr: string; vendor: { nameAr: string } }[] }>('/admin/products?status=active&pageSize=100');
+  const featured = useAdminData<{ id: string; nameAr: string | null; vendor: string | null; active: boolean }[]>('/admin/storefront/featured');
+  const [productSearch, setProductSearch] = useState('');
+  const pq = new URLSearchParams({ status: 'active', pageSize: '20', ...(productSearch.trim() ? { search: productSearch.trim() } : {}) });
+  const products = useAdminData<{ items: { id: string; nameAr: string; vendor: { nameAr: string } }[]; total: number }>(`/admin/products?${pq}`);
   const act = useAction();
   const [draft, setDraft] = useState({ placement: 'home_hero', titleAr: '', linkUrl: '/shops', imageKey: '', imageUrl: '', startsAt: '', endsAt: '' });
   const [showNew, setShowNew] = useState(false);
@@ -60,8 +74,9 @@ export default function AdminStorefrontPage() {
 
   if (!banners.data) return <Loading error={banners.error} forbidden={banners.forbidden} />;
   const all = banners.data;
-  const ids = featured.data ?? [];
-  const nameOf = (id: string) => products.data?.items.find((p) => p.id === id)?.nameAr ?? id.slice(0, 8);
+  // ما لم يعد منشوراً يظهر معلَّماً، ويسقط من أي حفظ — الحفظ يقبل المنشور وحده
+  const rows = featured.data ?? [];
+  const ids = rows.filter((p) => p.active).map((p) => p.id);
   const test = FILTERS.find((x) => x.key === filter)?.test ?? (() => true);
   const term = q.trim();
   const shown = all.filter(test).filter((b) => !term || (b.titleAr ?? '').includes(term));
@@ -251,18 +266,22 @@ export default function AdminStorefrontPage() {
           <span className="ac2-hint">بالترتيب الظاهر — حتى 24 منتجاً منشوراً.</span>
           <span className="ac2-end num ac2-hint">{ids.length} / 24</span>
         </header>
-        {ids.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="ac2-section-empty">لا منتجات مميّزة بعد — أضف منتجاً منشوراً من القائمة أدناه.</p>
         ) : (
           <ol className="ac2-rank">
-            {ids.map((id, i) => (
-              <li key={id} className="ac2-rank__item">
+            {rows.map((p, i) => (
+              <li key={p.id} className="ac2-rank__item">
                 <span className="ac2-rank__num">{i + 1}</span>
-                <span className="ac2-rank__name">{nameOf(id)}</span>
-                <button type="button" className="icon-btn icon-btn--sm" disabled={i === 0} onClick={() => void saveFeatured(ids.map((x, j) => (j === i - 1 ? id : j === i ? ids[i - 1]! : x)))} aria-label="أعلى">
+                <span className="ac2-rank__name">
+                  {p.nameAr ?? p.id.slice(0, 8)}
+                  {p.vendor ? <span className="ac2-hint"> — {p.vendor}</span> : null}
+                  {p.active ? null : <span className="badge badge--warning">لم يعد منشوراً — يسقط عند الحفظ</span>}
+                </span>
+                <button type="button" className="icon-btn icon-btn--sm" disabled={i === 0 || !p.active} onClick={() => void saveFeatured(up(ids, p.id))} aria-label="أعلى">
                   <Icon name="chev-down" size={14} className="ac2-flip" />
                 </button>
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => void saveFeatured(ids.filter((x) => x !== id))}>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => void saveFeatured(ids.filter((x) => x !== p.id))}>
                   إزالة
                 </button>
               </li>
@@ -270,16 +289,27 @@ export default function AdminStorefrontPage() {
           </ol>
         )}
         <div className="card__body">
-          <select className="field__control" value="" onChange={(e) => e.target.value && void saveFeatured([...ids, e.target.value])} aria-label="أضف منتجاً">
-            <option value="">أضف منتجاً منشوراً…</option>
-            {(products.data?.items ?? [])
-              .filter((p) => !ids.includes(p.id))
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nameAr} — {p.vendor.nameAr}
-                </option>
-              ))}
-          </select>
+          <div className="ac2-pick">
+            <SearchBox value={productSearch} onChange={setProductSearch} placeholder="ابحث باسم المنتج أو المتجر" label="ابحث عن منتج منشور" className="ac2-search" />
+            <select className="field__control" value="" onChange={(e) => e.target.value && void saveFeatured([...ids, e.target.value])} aria-label="أضف منتجاً">
+              <option value="">
+                {!products.data
+                  ? '…'
+                  : products.data.total > products.data.items.length
+                    ? `أضف منتجاً — أول ${products.data.items.length} من ${products.data.total}، ضيّق بالبحث`
+                    : products.data.total === 0
+                      ? 'لا منتج منشور بهذا البحث'
+                      : 'أضف منتجاً منشوراً…'}
+              </option>
+              {(products.data?.items ?? [])
+                .filter((p) => !ids.includes(p.id))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nameAr} — {p.vendor.nameAr}
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
       </section>
     </div>

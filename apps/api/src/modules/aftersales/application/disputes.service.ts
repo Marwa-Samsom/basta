@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma, Role } from '@prisma/client';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { like, pageArgs } from '../../../common/paging';
 import { NotificationsService } from '../../notifications/public';
 import { OrderLifecycleService } from '../../orders/public';
 
@@ -17,6 +18,16 @@ export type Party =
 const ROLE: Record<Party['kind'], Role> = { customer: 'customer', vendor: 'vendor_owner', admin: 'admin' };
 
 type Db = Prisma.TransactionClient | PrismaService;
+
+/** صفّ النزاع في القوائم — للأطراف الثلاثة */
+const LIST_SELECT = {
+  id: true,
+  reasonCode: true,
+  status: true,
+  createdAt: true,
+  subOrder: { select: { id: true, subOrderNumber: true, vendor: { select: { nameAr: true } }, order: { select: { orderNumber: true } } } },
+  _count: { select: { messages: true } },
+} satisfies Prisma.DisputeSelect;
 
 /** سبب النزاع كما اختاره المشتري — للإشعار؛ الرمز نفسه إن جدّ سبب لم يُترجم */
 const REASON_AR: Readonly<Record<string, string>> = {
@@ -105,16 +116,36 @@ export class DisputesService {
       where: { ...this.scope(party), ...(status ? { status } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 100,
-      select: {
-        id: true,
-        reasonCode: true,
-        status: true,
-        createdAt: true,
-        subOrder: { select: { id: true, subOrderNumber: true, vendor: { select: { nameAr: true } }, order: { select: { orderNumber: true } } } },
-        _count: { select: { messages: true } },
-      },
+      select: LIST_SELECT,
     });
     return rows;
+  }
+
+  /**
+   * AD-14 للإدارة — بالحالة والبحث وخمسين خمسين. البحث برقم الطلب أو طلب المتجر، أو اسم
+   * المتجر، أو اسم المشتري أو بريده: من يتصل بالدعم يذكر واحداً منها.
+   */
+  async adminList(q: { status: string; search?: string; page: number }) {
+    const t = q.search;
+    const where: Prisma.DisputeWhereInput = {
+      status: q.status,
+      ...(t
+        ? {
+            subOrder: {
+              OR: [
+                { subOrderNumber: like(t) },
+                { vendor: { nameAr: like(t) } },
+                { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ email: like(t) }, { fullName: like(t) }] } }] } },
+              ],
+            },
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.dispute.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...pageArgs(q.page), select: LIST_SELECT }),
+      this.prisma.dispute.count({ where }),
+    ]);
+    return { items, total };
   }
 
   async get(party: Party, id: string) {

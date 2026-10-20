@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
@@ -23,18 +23,29 @@ interface VendorItem {
   nameAr: string;
 }
 
+/** متاجر الاختيار في كل بحث — أكثر منها يُضيَّق بالبحث لا بالتمرير */
+const PICK = 20;
+
 /**
  * AD-10 — العمولة: نسبة على كل منتج يُباع بغضّ النظر عن فئته أو سعره، عامة لكل
  * المنصّة أو خاصة بمتجر (قرار صاحب المشروع 14 أكتوبر 2026 — ألغى مستوى الفئة).
  * القاعدة لا تُحذف: الجديدة تُنهي السابقة بتاريخ، وكل طلب سابق على لقطته.
+ *
+ * المتجر يُختار ببحث (20 أكتوبر 2026): القائمة كانت أقدم مئة متجر معتمد، فما بعدها — «غزة»
+ * بين آلاف متاجر الاختبار — لا تُعطى نسبة خاصة.
  */
 export default function AdminCommissionsPage() {
   const { data, error, forbidden, reload } = useAdminData<Rule[]>('/admin/finance/commissions');
-  const { data: vendors } = useAdminData<{ items: VendorItem[] }>('/admin/vendors?status=approved&limit=100');
   const act = useAction();
   const ask = useConfirm();
   const [scope, setScope] = useState<'global' | 'vendor'>('global');
   const [target, setTarget] = useState('');
+  // اسم المختار يبقى ظاهراً ولو خرج من نتائج بحث لاحق
+  const [targetName, setTargetName] = useState('');
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [ruleSearch, setRuleSearch] = useState('');
+  const vq = new URLSearchParams({ status: 'approved', limit: String(PICK), ...(vendorSearch.trim() ? { search: vendorSearch.trim() } : {}) });
+  const { data: vendors } = useAdminData<{ items: VendorItem[]; total: number }>(scope === 'vendor' ? `/admin/vendors?${vq}` : null);
   const [rate, setRate] = useState('');
   const formRef = useRef<HTMLElement | null>(null);
   const rateRef = useRef<HTMLInputElement | null>(null);
@@ -43,11 +54,15 @@ export default function AdminCommissionsPage() {
 
   const global = data.find((r) => r.scope === 'global') ?? null;
   const custom = data.filter((r) => r.scope === 'vendor');
+  // النسب الخاصة كلها في الصفحة — تُصفّى هنا باسم المتجر
+  const ruleTerm = ruleSearch.trim();
+  const shownCustom = ruleTerm ? custom.filter((r) => (r.vendor?.nameAr ?? '').includes(ruleTerm)) : custom;
 
   // «غيّر» و«نسبة لمتجر» تملأ النموذج وتنقل التركيز إليه
-  const startRule = (s: Rule['scope'], vendorId = '') => {
+  const startRule = (s: Rule['scope'], vendorId = '', vendorName = '') => {
     setScope(s);
     setTarget(vendorId);
+    setTargetName(vendorName);
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     rateRef.current?.focus({ preventScroll: true });
   };
@@ -134,7 +149,8 @@ export default function AdminCommissionsPage() {
         <header className="card__head">
           <h2 className="ac2-title">نسب خاصة بمتاجر</h2>
           <span className="ac2-hint">تتجاوز النسبة العامة للمتجر وحده</span>
-          <span className="ac2-end">
+          <span className="ac2-end ac2-inline">
+            {custom.length > 0 ? <SearchBox value={ruleSearch} onChange={setRuleSearch} placeholder="صفِّ باسم المتجر" label="صفِّ النسب الخاصة باسم المتجر" className="ac2-search" /> : null}
             <button type="button" className="btn btn--secondary btn--sm" onClick={() => startRule('vendor')}>
               <Icon name="plus" size={14} />
               نسبة لمتجر
@@ -143,6 +159,8 @@ export default function AdminCommissionsPage() {
         </header>
         {custom.length === 0 ? (
           <p className="ac2-section-empty">كل المتاجر على النسبة العامة.</p>
+        ) : shownCustom.length === 0 ? (
+          <p className="ac2-section-empty">لا نسبة خاصة لمتجر بهذا الاسم — ابحث عنه في «نسبة جديدة» لتعطيه واحدة.</p>
         ) : (
           <div className="table-wrap">
             <table className="table">
@@ -157,7 +175,7 @@ export default function AdminCommissionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {custom.map((r) => (
+                {shownCustom.map((r) => (
                   <tr key={r.id}>
                     <td>
                       <strong>{r.vendor?.nameAr ?? '—'}</strong>
@@ -170,7 +188,7 @@ export default function AdminCommissionsPage() {
                     </td>
                     <td className="end" data-label="">
                       <span className="ac2-inline">
-                        <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => startRule('vendor', r.vendorId ?? '')}>
+                        <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => startRule('vendor', r.vendorId ?? '', r.vendor?.nameAr ?? '')}>
                           غيّر
                         </button>
                         <button type="button" className="btn btn--ghost btn--sm" disabled={act.busy} onClick={() => void endCustom(r)}>
@@ -192,23 +210,39 @@ export default function AdminCommissionsPage() {
         <div className="ac2-form">
           <label className="field">
             <span className="field__label">النطاق</span>
-            <select className="field__control" value={scope} onChange={(e) => (setScope(e.target.value as typeof scope), setTarget(''))}>
+            <select className="field__control" value={scope} onChange={(e) => (setScope(e.target.value as typeof scope), setTarget(''), setTargetName(''))}>
               <option value="global">عامة — كل المنصّة</option>
               <option value="vendor">خاصة بمتجر</option>
             </select>
           </label>
           {scope === 'vendor' ? (
-            <label className="field">
-              <span className="field__label">المتجر</span>
-              <select className="field__control" value={target} onChange={(e) => setTarget(e.target.value)}>
-                <option value="">اختر</option>
-                {(vendors?.items ?? []).map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.nameAr}
+            <div className="field ac2-form__wide">
+              <span className="field__label" id="commission-vendor">
+                المتجر
+              </span>
+              <div className="ac2-pick">
+                <SearchBox value={vendorSearch} onChange={setVendorSearch} placeholder="ابحث باسم المتجر أو رابطه أو بريد صاحبه" label="ابحث عن متجر" className="ac2-search" />
+                <select
+                  className="field__control"
+                  value={target}
+                  onChange={(e) => {
+                    setTarget(e.target.value);
+                    setTargetName(e.target.selectedOptions[0]?.text ?? '');
+                  }}
+                  aria-labelledby="commission-vendor"
+                >
+                  <option value="">
+                    {!vendors ? '…' : vendors.total > vendors.items.length ? `اختر من أول ${vendors.items.length} من ${vendors.total} — أو ضيّق بالبحث` : vendors.total === 0 ? 'لا متجر معتمد بهذا البحث' : 'اختر'}
                   </option>
-                ))}
-              </select>
-            </label>
+                  {target && !(vendors?.items ?? []).some((v) => v.id === target) ? <option value={target}>{targetName || target.slice(0, 8)}</option> : null}
+                  {(vendors?.items ?? []).map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.nameAr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           ) : null}
           <label className="field">
             <span className="field__label">النسبة %</span>

@@ -656,8 +656,15 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect(await statusOf(a.id)).toBe('delivered');
     expect(await statusOf(b.id)).toBe('completed');
 
-    const queue = await call('GET', '/admin/disputes', admin.token);
-    expect(queue.json().map((d: { id: string }) => d.id)).toContain(id);
+    // الطابور خمسين خمسين ببحث — النزاع يُوجد برقم طلب متجره بأي حالة أحرف، ولا يظهر بحالة غيره
+    const { subOrderNumber } = await prisma.subOrder.findUniqueOrThrow({ where: { id: a.id }, select: { subOrderNumber: true } });
+    const queue = await call('GET', `/admin/disputes?search=${subOrderNumber}`, admin.token);
+    expect(queue.json()).toMatchObject({ total: 1 });
+    expect(queue.json().items.map((d: { id: string }) => d.id)).toEqual([id]);
+    const lower = (await call('GET', `/admin/disputes?search=${encodeURIComponent(subOrderNumber.toLowerCase())}`, admin.token)).json();
+    expect(lower.items.map((d: { id: string }) => d.id)).toEqual([id]);
+    expect((await call('GET', `/admin/disputes?status=open&search=${subOrderNumber}`, admin.token)).json()).toMatchObject({ items: [], total: 0 });
+    expect((await call('GET', '/admin/disputes?search=لا-مطابق-هنا', admin.token)).json()).toMatchObject({ items: [], total: 0 });
     expect((await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: 'أُرسل البديل وقبله المشتري' })).statusCode).toBe(204);
     await scheduler.completeDelivered(now);
     expect(await statusOf(a.id)).toBe('completed');

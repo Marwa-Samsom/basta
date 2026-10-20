@@ -91,7 +91,9 @@ test('التحويل اليدوي: يؤكّد المشتري فيرى كيف ي�
   await expect(page.getByRole('link', { name: new RegExp(number) }).getByText('بانتظار تحويلك')).toBeVisible();
 
   // 3 · المدير يطابق كشف البنك ويؤكّد
+  // الطابور الأقدم أولاً وخمسين خمسين — يُوجد الطلب ببحث رقمه كما في ملاحظة التحويل
   await adminPage.goto('/admin/transfers');
+  await adminPage.getByLabel('بحث في التحويلات').fill(number);
   const row = adminPage.getByRole('row', { name: new RegExp(number) });
   await row.getByLabel(`مرجع التحويل للطلب ${number}`).fill(`CLQ-${t}`);
   await row.getByLabel(`المبلغ الذي وصل للطلب ${number}`).fill('1.00');
@@ -110,6 +112,7 @@ test('التحويل اليدوي: يؤكّد المشتري فيرى كيف ي�
 
   await adminPage.goto('/admin/transfers');
   await adminPage.getByRole('tab', { name: /ردود — للتحويل/ }).click();
+  await adminPage.getByLabel('بحث في التحويلات').fill(number);
   const refundRow = adminPage.getByRole('row', { name: new RegExp(`${number}-1`) });
   await expect(refundRow.getByText('من حساب: مشترٍ E2E', { exact: false })).toBeVisible();
   await refundRow.getByLabel(`مرجع تحويل الردّ ${number}-1`).fill(`OUT-${t}`);

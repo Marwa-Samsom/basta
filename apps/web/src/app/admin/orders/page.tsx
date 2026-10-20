@@ -2,11 +2,11 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, ReasonButton, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, Tabs } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { Alert } from '@/components/ui';
 import { api } from '@/lib/api';
-import { PARENT_STATUS, useAction, useAdminData } from '@/lib/admin';
+import { PARENT_STATUS, useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { labelOf, money, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
 
 interface Row {
@@ -65,7 +65,8 @@ function OrdersInner() {
     ...(status ? { status } : {}),
     ...(due ? { due: 'acceptance' } : {}),
   });
-  const { data, error, forbidden, reload } = useAdminData<{ items: Row[]; total: number }>(`/admin/orders?${q}`);
+  const list = useAdminList<Row>(`/admin/orders?${q}`, (o) => o.orderNumber);
+  const { data, error, forbidden, reload } = list;
 
   return (
     <div className="ao-page">
@@ -81,10 +82,7 @@ function OrdersInner() {
           options={[{ key: '', label: 'الكل' }, ...['processing', 'partially_completed', 'completed', 'canceled', 'refunded', 'payment_failed'].map((k) => ({ key: k, label: PARENT_STATUS[k]! }))]}
         />
         <div className="toolbar__end">
-          <span className="input-icon ao-search">
-            <Icon name="search" size={15} />
-            <input className="field__control" type="search" placeholder="رقم الطلب، بريد العميل، أو المتجر" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="بحث" />
-          </span>
+          <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب، بريد العميل، أو المتجر" label="بحث في الطلبات" />
         </div>
       </div>
       {due ? (
@@ -139,7 +137,7 @@ function OrdersInner() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((o) => {
+              {list.items.map((o) => {
                 const open = openNumber === o.orderNumber;
                 return (
                   <Fragment key={o.orderNumber}>
@@ -198,6 +196,7 @@ function OrdersInner() {
           </table>
         </div>
       )}
+      <MoreButton list={list} />
     </div>
   );
 }

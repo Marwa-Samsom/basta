@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AdminHeader, Empty, Feedback, Loading, Tabs } from '@/components/admin';
+import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox, Tabs } from '@/components/admin';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
-import { useAction, useAdminData } from '@/lib/admin';
+import { useAction, useAdminList } from '@/lib/admin';
 import { minorUnitDigits } from '@/lib/money';
 import { money, when } from '@/lib/orders';
 
@@ -48,7 +48,7 @@ interface RefundRow {
 const TABS = [
   { key: 'incoming', label: 'واردة — بانتظار التأكيد' },
   { key: 'refunds', label: 'ردود — للتحويل' },
-  { key: 'confirmed', label: 'أُكّدت مؤخراً' },
+  { key: 'confirmed', label: 'أُكّدت' },
 ];
 
 /**
@@ -84,23 +84,33 @@ function left(expiresAt: string | null): string {
  */
 export default function AdminTransfersPage() {
   const [tab, setTab] = useState('incoming');
-  const incoming = useAdminData<{ waiting: Waiting[]; confirmed: Confirmed[] }>('/admin/payments/transfers');
-  const refunds = useAdminData<{ items: RefundRow[] }>('/admin/refunds/awaiting-transfer');
+  // بحث واحد بالرقم أو الاسم أو المرجع — يصفّي القوائم الثلاث، وكلٌّ خمسين خمسين
+  const [search, setSearch] = useState('');
+  const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
+  const incoming = useAdminList<Waiting>(`/admin/payments/transfers${query}`, (w) => w.orderNumber);
+  const refunds = useAdminList<RefundRow>(`/admin/refunds/awaiting-transfer${query}`, (r) => r.id);
+  const confirmed = useAdminList<Confirmed>(tab === 'confirmed' ? `/admin/payments/transfers/confirmed${query}` : null, (c) => c.orderNumber);
+  const searching = Boolean(search.trim());
+  const clear = (
+    <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
+      أزل التصفية
+    </button>
+  );
   const act = useAction();
   const ask = useConfirm();
   const [draft, setDraft] = useState<Record<string, { reference: string; amount: string; note: string }>>({});
   const [refundRefs, setRefundRefs] = useState<Record<string, string>>({});
 
   const counts = {
-    incoming: incoming.data?.waiting.length,
-    refunds: refunds.data?.items.length,
+    incoming: incoming.data?.total,
+    refunds: refunds.data?.total,
   };
 
   const edit = (n: string, patch: Partial<{ reference: string; amount: string; note: string }>) =>
     setDraft((d) => ({ ...d, [n]: { reference: '', amount: '', note: '', ...d[n], ...patch } }));
 
   /**
-   * التسجيل يُبلغ المشتري أن ماله خرج، ولا يُتراجع عنه — والطوابير تبدأ بالأقدم بلا بحث، فيُكتب
+   * التسجيل يُبلغ المشتري أن ماله خرج، ولا يُتراجع عنه — والطوابير كانت تبدأ بالأقدم بلا بحث، فيُكتب
    * المرجع في صفّ غير المقصود. سُجّل ردّ طلب تجريبي بمرجع ردّ آخر هكذا (J-07، 20 أكتوبر 2026):
    * السؤال يعيد الطلب والمشتري والمبلغ قبل أن يُبلَّغ أحد.
    */
@@ -132,27 +142,36 @@ export default function AdminTransfersPage() {
     <div className="ao-page">
       <AdminHeader
         title="التحويلات"
-        count={counts.incoming !== undefined ? `${counts.incoming} بانتظار التأكيد` : undefined}
+        count={counts.incoming !== undefined && !searching ? `${counts.incoming} بانتظار التأكيد` : undefined}
         hint="تحتاج صلاحية payouts.approve — التأكيد ينشئ رصيداً للبائعين، والردّ يُبلغ المشتري بأن ماله خرج."
       />
       <Feedback error={act.error} notice={act.notice} />
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        label="نوع التحويل"
-        options={TABS.map((t) => ({
-          key: t.key,
-          label: t.key in counts && counts[t.key as keyof typeof counts] ? `${t.label} (${counts[t.key as keyof typeof counts]})` : t.label,
-        }))}
-      />
+      <div className="toolbar">
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          label="نوع التحويل"
+          options={TABS.map((t) => ({
+            key: t.key,
+            label: t.key in counts && counts[t.key as keyof typeof counts] ? `${t.label} (${counts[t.key as keyof typeof counts]})` : t.label,
+          }))}
+        />
+        <div className="toolbar__end">
+          <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو اسم المشتري أو المرجع" label="بحث في التحويلات" />
+        </div>
+      </div>
 
       {tab === 'incoming' ? (
         !incoming.data ? (
           <Loading error={incoming.error} forbidden={incoming.forbidden} onRetry={incoming.reload} />
-        ) : incoming.data.waiting.length === 0 ? (
-          <Empty icon="wallet" title="لا تحويلات تنتظر التأكيد">
-            حين يؤكّد مشترٍ طلبه يظهر هنا بمبلغه ورقمه حتى يصل تحويله أو تنقضي مهلته.
-          </Empty>
+        ) : incoming.items.length === 0 ? (
+          searching ? (
+            <Empty icon="search" title="لا تحويل ينتظر بهذا البحث" actions={clear} />
+          ) : (
+            <Empty icon="wallet" title="لا تحويلات تنتظر التأكيد">
+              حين يؤكّد مشترٍ طلبه يظهر هنا بمبلغه ورقمه حتى يصل تحويله أو تنقضي مهلته.
+            </Empty>
+          )
         ) : (
           <div className="table-wrap" tabIndex={0} role="region" aria-label="تحويلات بانتظار التأكيد">
             <table className="table ao-table">
@@ -168,7 +187,7 @@ export default function AdminTransfersPage() {
                 </tr>
               </thead>
               <tbody>
-                {incoming.data.waiting.map((w) => {
+                {incoming.items.map((w) => {
                   const d = draft[w.orderNumber] ?? { reference: '', amount: '', note: '' };
                   const received = toMinor(d.amount, w.currency);
                   const mismatch = d.amount.trim() !== '' && received !== w.amountMinorUnits;
@@ -270,14 +289,19 @@ export default function AdminTransfersPage() {
           </div>
         )
       ) : null}
+      {tab === 'incoming' ? <MoreButton list={incoming} /> : null}
 
       {tab === 'refunds' ? (
         !refunds.data ? (
           <Loading error={refunds.error} forbidden={refunds.forbidden} onRetry={refunds.reload} />
-        ) : refunds.data.items.length === 0 ? (
-          <Empty icon="return" title="لا ردود تنتظر التحويل">
-            حين يُلغى أو يُرجع شيء من طلب مدفوع بتحويل يظهر هنا مبلغه حتى تحوّله وتسجّل مرجعك.
-          </Empty>
+        ) : refunds.items.length === 0 ? (
+          searching ? (
+            <Empty icon="search" title="لا ردّ ينتظر بهذا البحث" actions={clear} />
+          ) : (
+            <Empty icon="return" title="لا ردود تنتظر التحويل">
+              حين يُلغى أو يُرجع شيء من طلب مدفوع بتحويل يظهر هنا مبلغه حتى تحوّله وتسجّل مرجعك.
+            </Empty>
+          )
         ) : (
           <div className="table-wrap" tabIndex={0} role="region" aria-label="ردود بانتظار التحويل">
             <table className="table ao-table">
@@ -293,7 +317,7 @@ export default function AdminTransfersPage() {
                 </tr>
               </thead>
               <tbody>
-                {refunds.data.items.map((r) => (
+                {refunds.items.map((r) => (
                   <tr key={r.id}>
                     <td>
                       <span className="ao-stack">
@@ -352,14 +376,19 @@ export default function AdminTransfersPage() {
           </div>
         )
       ) : null}
+      {tab === 'refunds' ? <MoreButton list={refunds} /> : null}
 
       {tab === 'confirmed' ? (
-        !incoming.data ? (
-          <Loading error={incoming.error} forbidden={incoming.forbidden} onRetry={incoming.reload} />
-        ) : incoming.data.confirmed.length === 0 ? (
-          <Empty icon="check-circle" title="لم يُؤكَّد تحويل بعد">
-            آخر عشرين تحويلاً مؤكَّداً تظهر هنا بمرجعها ومن أكّدها.
-          </Empty>
+        !confirmed.data ? (
+          <Loading error={confirmed.error} forbidden={confirmed.forbidden} onRetry={confirmed.reload} />
+        ) : confirmed.items.length === 0 ? (
+          searching ? (
+            <Empty icon="search" title="لا تحويل مؤكَّد بهذا البحث" actions={clear} />
+          ) : (
+            <Empty icon="check-circle" title="لم يُؤكَّد تحويل بعد">
+              التحويلات المؤكَّدة تظهر هنا بمرجعها ومن أكّدها، الأحدث أولاً.
+            </Empty>
+          )
         ) : (
           <div className="table-wrap" tabIndex={0} role="region" aria-label="تحويلات مؤكَّدة">
             <table className="table ao-table">
@@ -372,7 +401,7 @@ export default function AdminTransfersPage() {
                 </tr>
               </thead>
               <tbody>
-                {incoming.data.confirmed.map((c) => (
+                {confirmed.items.map((c) => (
                   <tr key={c.orderNumber}>
                     <td>
                       <span className="ao-stack">
@@ -404,6 +433,7 @@ export default function AdminTransfersPage() {
           </div>
         )
       ) : null}
+      {tab === 'confirmed' ? <MoreButton list={confirmed} /> : null}
 
       <p className="ao-foot-note">
         بيانات الحساب التي يراها المشتري ومهلة التحويل من <Link href="/admin/settings">الإعدادات</Link>.
