@@ -69,18 +69,27 @@ export const session = {
    * (أيّ نصّ وأيّ وجهة). الخادم يفحص كل صلاحية بنفسه في كل طلب.
    */
   roles(): string[] {
-    const access = session.read()?.accessToken;
-    if (!access) return [];
-    try {
-      const payload = access.split('.')[1] ?? '';
-      const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-      const roles = (JSON.parse(json) as { roles?: unknown }).roles;
-      return Array.isArray(roles) ? roles.filter((r): r is string => typeof r === 'string') : [];
-    } catch {
-      return [];
-    }
+    const roles = claims()?.['roles'];
+    return Array.isArray(roles) ? roles.filter((r): r is string => typeof r === 'string') : [];
+  },
+  /** صاحب الرمز الحالي (sub) — لما يُحفظ في المتصفّح باسمه، فلا يراه حساب آخر يدخل التبويب نفسه */
+  userId(): string | null {
+    const sub = claims()?.['sub'];
+    return typeof sub === 'string' ? sub : null;
   },
 };
+
+/** حمولة رمز الوصول بلا تحقق من التوقيع — للعرض وحده */
+function claims(): Record<string, unknown> | null {
+  const access = session.read()?.accessToken;
+  if (!access) return null;
+  try {
+    const payload = access.split('.')[1] ?? '';
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
 
 /** خطأ يحمل ما قاله الخادم: الرسالة والرمز والتفاصيل (ومنها قائمة الموانع). */
 export class ApiError extends Error {
