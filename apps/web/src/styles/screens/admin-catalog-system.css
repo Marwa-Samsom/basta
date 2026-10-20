@@ -95,7 +95,7 @@
 }
 
 /* اختيار من قائمة كبيرة: بحث يضيّقها ثم القائمة المنسدلة بنتائجه */
-.ac2-pick { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.ac2-pick { display: flex; flex-direction: row; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .ac2-pick > select { flex: 1 1 220px; min-inline-size: 0; }
 
 /* شبكة نموذج مضغوطة — الحقول تتراصّ وتنزل حين يضيق العرض */

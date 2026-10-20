@@ -43,6 +43,7 @@ export default function AdminCommissionsPage() {
   // اسم المختار يبقى ظاهراً ولو خرج من نتائج بحث لاحق
   const [targetName, setTargetName] = useState('');
   const [vendorSearch, setVendorSearch] = useState('');
+  const [ruleSearch, setRuleSearch] = useState('');
   const vq = new URLSearchParams({ status: 'approved', limit: String(PICK), ...(vendorSearch.trim() ? { search: vendorSearch.trim() } : {}) });
   const { data: vendors } = useAdminData<{ items: VendorItem[]; total: number }>(scope === 'vendor' ? `/admin/vendors?${vq}` : null);
   const [rate, setRate] = useState('');
@@ -53,6 +54,9 @@ export default function AdminCommissionsPage() {
 
   const global = data.find((r) => r.scope === 'global') ?? null;
   const custom = data.filter((r) => r.scope === 'vendor');
+  // النسب الخاصة كلها في الصفحة — تُصفّى هنا باسم المتجر
+  const ruleTerm = ruleSearch.trim();
+  const shownCustom = ruleTerm ? custom.filter((r) => (r.vendor?.nameAr ?? '').includes(ruleTerm)) : custom;
 
   // «غيّر» و«نسبة لمتجر» تملأ النموذج وتنقل التركيز إليه
   const startRule = (s: Rule['scope'], vendorId = '', vendorName = '') => {
@@ -145,7 +149,8 @@ export default function AdminCommissionsPage() {
         <header className="card__head">
           <h2 className="ac2-title">نسب خاصة بمتاجر</h2>
           <span className="ac2-hint">تتجاوز النسبة العامة للمتجر وحده</span>
-          <span className="ac2-end">
+          <span className="ac2-end ac2-inline">
+            {custom.length > 0 ? <SearchBox value={ruleSearch} onChange={setRuleSearch} placeholder="صفِّ باسم المتجر" label="صفِّ النسب الخاصة باسم المتجر" className="ac2-search" /> : null}
             <button type="button" className="btn btn--secondary btn--sm" onClick={() => startRule('vendor')}>
               <Icon name="plus" size={14} />
               نسبة لمتجر
@@ -154,6 +159,8 @@ export default function AdminCommissionsPage() {
         </header>
         {custom.length === 0 ? (
           <p className="ac2-section-empty">كل المتاجر على النسبة العامة.</p>
+        ) : shownCustom.length === 0 ? (
+          <p className="ac2-section-empty">لا نسبة خاصة لمتجر بهذا الاسم — ابحث عنه في «نسبة جديدة» لتعطيه واحدة.</p>
         ) : (
           <div className="table-wrap">
             <table className="table">
@@ -168,7 +175,7 @@ export default function AdminCommissionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {custom.map((r) => (
+                {shownCustom.map((r) => (
                   <tr key={r.id}>
                     <td>
                       <strong>{r.vendor?.nameAr ?? '—'}</strong>

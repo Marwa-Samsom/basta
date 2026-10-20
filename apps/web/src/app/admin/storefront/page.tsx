@@ -288,26 +288,28 @@ export default function AdminStorefrontPage() {
             ))}
           </ol>
         )}
-        <div className="card__body ac2-pick">
-          <SearchBox value={productSearch} onChange={setProductSearch} placeholder="ابحث باسم المنتج أو المتجر" label="ابحث عن منتج منشور" className="ac2-search" />
-          <select className="field__control" value="" onChange={(e) => e.target.value && void saveFeatured([...ids, e.target.value])} aria-label="أضف منتجاً">
-            <option value="">
-              {!products.data
-                ? '…'
-                : products.data.total > products.data.items.length
-                  ? `أضف منتجاً — أول ${products.data.items.length} من ${products.data.total}، ضيّق بالبحث`
-                  : products.data.total === 0
-                    ? 'لا منتج منشور بهذا البحث'
-                    : 'أضف منتجاً منشوراً…'}
-            </option>
-            {(products.data?.items ?? [])
-              .filter((p) => !ids.includes(p.id))
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nameAr} — {p.vendor.nameAr}
-                </option>
-              ))}
-          </select>
+        <div className="card__body">
+          <div className="ac2-pick">
+            <SearchBox value={productSearch} onChange={setProductSearch} placeholder="ابحث باسم المنتج أو المتجر" label="ابحث عن منتج منشور" className="ac2-search" />
+            <select className="field__control" value="" onChange={(e) => e.target.value && void saveFeatured([...ids, e.target.value])} aria-label="أضف منتجاً">
+              <option value="">
+                {!products.data
+                  ? '…'
+                  : products.data.total > products.data.items.length
+                    ? `أضف منتجاً — أول ${products.data.items.length} من ${products.data.total}، ضيّق بالبحث`
+                    : products.data.total === 0
+                      ? 'لا منتج منشور بهذا البحث'
+                      : 'أضف منتجاً منشوراً…'}
+              </option>
+              {(products.data?.items ?? [])
+                .filter((p) => !ids.includes(p.id))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nameAr} — {p.vendor.nameAr}
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
       </section>
     </div>
