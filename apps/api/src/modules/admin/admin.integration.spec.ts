@@ -228,8 +228,10 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
     }
     expect((await call('POST', `/vendor/orders/${sub.id}/transition`, vendor.token, { to: 'shipped', tracking: 'SELF-1234' })).statusCode).toBe(200);
     await drain(buyer.userId);
-    const shipped = await prisma.notification.findMany({ where: { userId: buyer.userId, templateCode: 'order_status_changed' } });
-    expect(shipped.some((n) => n.channel === 'in_app' && n.body?.includes('تم الشحن'))).toBe(true);
+    // إشعار الشحن يحمل المرجع، والتوصيل الذاتي لا يسمّيه «رقم تتبّع» (BUY-086)
+    const shipped = await prisma.notification.findMany({ where: { userId: buyer.userId, templateCode: 'order_shipped' } });
+    expect(shipped.find((n) => n.channel === 'in_app')?.body).toContain('مرجع التوصيل: SELF-1234');
+    expect(shipped.find((n) => n.channel === 'email')?.body).toContain('مرجع التوصيل: SELF-1234');
     // المشتري بلا اشتراك متصفّح: القناة تُتخطّى بسببها، لا تفشل ولا تُسقط شيئاً
     expect(shipped.find((n) => n.channel === 'push')?.status).toBe('skipped');
 

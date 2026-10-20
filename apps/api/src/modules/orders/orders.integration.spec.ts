@@ -594,6 +594,13 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect(res.body).not.toContain(ADDRESS.street);
     // حدث متأخر لا يعيد المسار للخلف
     expect(await tracking.record(trk, 'in_transit')).toBe(false);
+
+    // إشعار الشحن يحمل رقم الشركة نفسه الذي يُبحث به هنا (BUY-086) — مرة واحدة
+    const notices = await prisma.notification.findMany({
+      where: { userId: buyer.userId, templateCode: 'order_shipped', channel: 'in_app', payloadJson: { path: ['tracking_number'], equals: trk } },
+    });
+    expect(notices).toHaveLength(1);
+    expect(notices[0]!.payloadJson).toMatchObject({ tracking_label: 'رقم التتبّع', store_name: expect.any(String) });
   });
 
   it('رقم التتبّع لشحنته وحدها: لا يُنسخ لشركة الشحن، والتوصيل الذاتي لا يُظهر شحنة غيره', async () => {

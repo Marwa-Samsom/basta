@@ -706,6 +706,7 @@ export class OrderLifecycleService {
         vendorId: true,
         vendor: { select: { nameAr: true } },
         order: { select: { orderNumber: true, customerUserId: true, customer: { select: { fullName: true } } } },
+        shipment: { select: { carrierCode: true, trackingNumber: true } },
       },
     });
     const common = {
@@ -714,7 +715,19 @@ export class OrderLifecycleService {
       store_name: s.vendor.nameAr,
       link: `/account/orders/${s.order.orderNumber}`,
     };
-    if (to === 'shipped' || to === 'delivered' || to === 'delivery_failed') {
+    // الرقم من صفّ الشحنة الذي كُتب للتوّ في المعاملة نفسها — إعادة الشحن بعد «تعذّر» تمرّ هنا أيضاً.
+    // مرجع التوصيل الذاتي يكتبه البائع لنفسه ولا يُتتبَّع في صفحة التتبّع، فلا يُسمّى «رقم تتبّع»
+    if (to === 'shipped' && s.shipment) {
+      const tracking_label = s.shipment.carrierCode === 'self' ? 'مرجع التوصيل' : 'رقم التتبّع';
+      await this.notifications.enqueue(
+        {
+          code: 'order_shipped',
+          userId: s.order.customerUserId,
+          vars: { ...common, tracking_label, tracking_number: s.shipment.trackingNumber },
+        },
+        tx,
+      );
+    } else if (to === 'shipped' || to === 'delivered' || to === 'delivery_failed') {
       // العودة إلى «تم التسليم» بعد رفض إرجاع أو ردّ إرجاع جزئي ليست تسليماً: وصله ما يخصّه
       if (to === 'delivered' && (from === 'return_requested' || from === 'returned')) return;
       await this.notifications.enqueue({ code: 'order_status_changed', userId: s.order.customerUserId, vars: { ...common, status: STATUS_LABELS[to] } }, tx);
