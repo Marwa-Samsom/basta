@@ -179,6 +179,12 @@ const slugPath = (slug: string): string => encodeURIComponent(decodeParam(slug))
 export const getProduct = (slug: string, currency?: string): Promise<ProductPage> =>
   get(`/storefront/products/${slugPath(slug)}`, 60, currency);
 
+/**
+ * صفحة المتجر تُقرأ طازجة في كل زيارة لا من التخزين: حالته (معلَّق أو معتمد) تتغيّر بقرار
+ * إداري، والتخزين يخدم النسخة القديمة لأول زائر بعد انقضائه مهما قدمت — بعد إعادة «غزة»
+ * ظهر «لا يستقبل طلبات حالياً» لأول زائرة بعد يوم كامل (J-18، 21 أكتوبر 2026). الطلب
+ * الواحد للخادم أرخص من متجر يبدو مغلقاً وهو مفتوح، أو مفتوحاً وهو معلَّق.
+ */
 export function getShop(
   slug: string,
   opts: { category?: string | undefined; page?: number | undefined; currency?: string | undefined } = {},
@@ -187,7 +193,7 @@ export function getShop(
   if (opts.category) query.set('category', opts.category);
   if (opts.page && opts.page > 1) query.set('page', String(opts.page));
   const qs = query.toString();
-  return get(`/storefront/shops/${slugPath(slug)}${qs ? `?${qs}` : ''}`, 60, opts.currency);
+  return get(`/storefront/shops/${slugPath(slug)}${qs ? `?${qs}` : ''}`, 0, opts.currency);
 }
 
 export interface CurrencyOption {
