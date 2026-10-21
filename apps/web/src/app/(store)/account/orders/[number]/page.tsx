@@ -12,9 +12,11 @@ import { api, session } from '@/lib/api';
 import {
   DISPUTE_REASONS,
   RETURN_REASONS,
+  carrierName,
   labelOf,
   money,
   toneOf,
+  trackingLabel,
   when,
   type OrderItemView,
   type SubOrderView,
@@ -424,8 +426,8 @@ function StoreCard({
           <div className="sp-ship">
             <p className="sp-ship__head">
               <Icon name="truck" size={17} />
-              رقم التتبّع <span className="sp-ship__no num">{s.shipment.trackingNumber}</span>
-              <span className="sp-ship__carrier num">{s.shipment.carrierCode}</span>
+              {trackingLabel(s.shipment.carrierCode)} <span className="sp-ship__no num">{s.shipment.trackingNumber}</span>
+              <span className="sp-ship__carrier">{carrierName(s.shipment.carrierCode)}</span>
             </p>
             {s.shipment.events.length ? (
               <ul className="sp-events">
