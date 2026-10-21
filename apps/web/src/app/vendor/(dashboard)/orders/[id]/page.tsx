@@ -9,9 +9,11 @@ import {
   ACTION_LABEL,
   RETURN_REASONS,
   ROLE_LABEL,
+  carrierName,
   labelOf,
   money,
   toneOf,
+  trackingLabel,
   when,
   type SubOrderStatus,
   type SubOrderView,
@@ -291,11 +293,11 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
               {order.shipment ? (
                 <div>
                   <dt>الناقل</dt>
-                  <dd className="num">{order.shipment.carrierCode}</dd>
+                  <dd>{carrierName(order.shipment.carrierCode)}</dd>
                 </div>
               ) : null}
               <div>
-                <dt>رقم التتبّع</dt>
+                <dt>{order.shipment ? trackingLabel(order.shipment.carrierCode) : 'رقم التتبّع'}</dt>
                 {order.shipment ? (
                   <dd className="num">{order.shipment.trackingNumber}</dd>
                 ) : (

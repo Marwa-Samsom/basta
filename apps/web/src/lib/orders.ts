@@ -111,6 +111,20 @@ export interface HistoryRow {
   createdAt: string;
 }
 
+/**
+ * التوصيل الذاتي: البائع يوصل بنفسه ويكتب مرجعاً يعرفه به، لا رقماً من شركة يُتتبَّع.
+ * كانت صفحتا الطلب تقولان «رقم التتبّع» وتعرضان الرمز الخام «self» بعد الشحن، والإشعار
+ * وخانة البائع «مرجع التوصيل» (BUY-015، J-14 — 21 أكتوبر 2026).
+ */
+const SELF_DELIVERY = 'self';
+const CARRIER_NAMES: Readonly<Record<string, string>> = { [SELF_DELIVERY]: 'توصيل ذاتي', 'basta-express': 'بسطة إكسبرس' };
+
+/** عنوان الرقم: «مرجع التوصيل» للتوصيل الذاتي، و«رقم التتبّع» لشحنة شركة */
+export const trackingLabel = (carrierCode: string): string => (carrierCode === SELF_DELIVERY ? 'مرجع التوصيل' : 'رقم التتبّع');
+
+/** اسم الناقل بالعربية — والرمز كما هو لناقل لا نعرف اسمه */
+export const carrierName = (carrierCode: string): string => CARRIER_NAMES[carrierCode] ?? carrierCode;
+
 export interface ShipmentView {
   carrierCode: string;
   trackingNumber: string;

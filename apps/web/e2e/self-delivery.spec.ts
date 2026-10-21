@@ -58,6 +58,10 @@ test('بلا شركة شحن: لا زرّ بوليصة، والبائع يشحن
     await expect.poll(async () => (await prisma.subOrder.findUniqueOrThrow({ where: { id: sub.id } })).status).toBe('shipped');
     const shipment = await prisma.shipment.findUniqueOrThrow({ where: { subOrderId: sub.id } });
     expect(shipment).toMatchObject({ carrierCode: 'self', trackingNumber: 'إيصال-4471' });
+    // بعد الشحن: المرجع بعنوانه والناقل باسمه، لا «رقم التتبّع» ولا الرمز الخام «self» (BUY-015)
+    await expect(page.getByRole('term').filter({ hasText: 'مرجع التوصيل' })).toBeVisible();
+    await expect(page.getByText('توصيل ذاتي', { exact: true })).toBeVisible();
+    await expect(page.getByText('self', { exact: true })).toHaveCount(0);
 
     // التسليم يؤكّده البائع — لا مهمة تعلّمه وحدها
     await page.getByRole('button', { name: 'تأكيد التسليم' }).click();
