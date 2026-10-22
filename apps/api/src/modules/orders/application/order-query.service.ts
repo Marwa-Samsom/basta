@@ -220,6 +220,13 @@ export class OrderQueryService {
     });
     if (!sub) throw new NotFoundError('الطلب غير موجود.', { subOrderId });
     const ledgerNet = (await this.ledgerNets(vendorId, [sub.id])).get(sub.id) ?? sub.vendorNetMinorUnits;
+    /**
+     * ما تحمّله البائع من الخصم — من الصافي المحفوظ نفسه، فتجمع سطور التفصيل إليه بالضبط:
+     * صافيه = البنود − حصّته من الخصم − العمولة + الشحن (pricing.ts). كوبون المنصّة لا يُنقص
+     * صافيه (Q-06)، فكانت «الخصم −20.00» تُطرح دائماً والسطور تنقص عن «صافي أرباحك» (VOPS-012).
+     */
+    const vendorDiscount =
+      sub.itemsSubtotalMinorUnits + sub.shippingMinorUnits - sub.commissionMinorUnits - sub.vendorNetMinorUnits;
     return {
       ...present(sub, 'vendor'),
       orderNumber: sub.order.orderNumber,
@@ -230,6 +237,10 @@ export class OrderQueryService {
         itemsSubtotalMinorUnits: sub.itemsSubtotalMinorUnits.toString(),
         shippingMinorUnits: sub.shippingMinorUnits.toString(),
         discountMinorUnits: sub.discountMinorUnits.toString(),
+        /** حصّة البائع من الخصم (كوبونه) — تُطرح من صافيه */
+        vendorDiscountMinorUnits: vendorDiscount.toString(),
+        /** حصّة المنصّة (كوبونها) — يراها البائع ولا تُطرح منه */
+        platformDiscountMinorUnits: (sub.discountMinorUnits - vendorDiscount).toString(),
         commissionMinorUnits: sub.commissionMinorUnits.toString(),
         commissionRateBps: sub.commissionRateBpsSnapshot,
         netMinorUnits: sub.vendorNetMinorUnits.toString(),
