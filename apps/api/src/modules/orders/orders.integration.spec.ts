@@ -54,7 +54,7 @@ const ADDRESS = {
 
 type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
 
-async function call(method: 'GET' | 'POST', url: string, token?: string, body?: unknown, headers: Record<string, string> = {}): Promise<Res> {
+async function call(method: 'GET' | 'POST' | 'PUT', url: string, token?: string, body?: unknown, headers: Record<string, string> = {}): Promise<Res> {
   return app.inject({
     method,
     url: `/api/v1${url}`,
@@ -90,12 +90,16 @@ async function user(tag: string, role: 'customer' | 'vendor_owner' | 'admin', pe
 }
 
 /** طلب مدفوع بسطر من كل بائع — يعيد الطلب بفرعيّاته */
-async function placeOrder(qty: [number, number]) {
+async function placeOrder(qty: [number, number], coupon?: string) {
   const cart = await call('POST', '/cart', undefined, { currency: 'JOD' });
   const token = cart.json().token as string;
   for (const [i, v] of vendors.entries()) {
     const r = await call('POST', '/cart/items', undefined, { variantId: v.variantId, qty: qty[i] }, { 'x-cart-token': token });
     expect(r.statusCode, r.body).toBe(201);
+  }
+  if (coupon) {
+    const r = await call('PUT', '/cart/coupon', undefined, { code: coupon }, { 'x-cart-token': token });
+    expect(r.statusCode, r.body).toBe(200);
   }
   // الإجمالي كما يراه المشتري تحت «ادفع» — يُرسل مع الطلب ولا يُخصم غيره
   const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, { 'x-cart-token': token })).json();
@@ -297,6 +301,53 @@ describe('تفاصيل طلب المشتري — أسطر القطع بعملة 
     const jod = view.stores.find((s) => s.currency === 'JOD')!.items[0]!;
     expect(jod.chargeSubtotalMinorUnits).toBe(jod.lineSubtotalMinorUnits);
     expect(jod.chargeSubtotalMinorUnits).toBe('12500');
+  });
+});
+
+describe('تفصيل مبالغ البائع يجمع إلى صافيه (VOPS-012، 22 أكتوبر 2026)', () => {
+  /** المنتجات − حصّته من الخصم − العمولة + الشحن = «صافي أرباحك» — كما تعرضها صفحته */
+  async function breakdown(subOrderId: string) {
+    const res = await call('GET', `/vendor/orders/${subOrderId}`, vendors[0]!.token);
+    expect(res.statusCode, res.body).toBe(200);
+    const f = res.json().financials as Record<string, string>;
+    const sum =
+      BigInt(f['itemsSubtotalMinorUnits']!) -
+      BigInt(f['vendorDiscountMinorUnits']!) -
+      BigInt(f['commissionMinorUnits']!) +
+      BigInt(f['shippingMinorUnits']!);
+    expect(sum).toBe(BigInt(f['netMinorUnits']!));
+    return f;
+  }
+
+  it('كوبون المنصّة: خصمه كله على المنصّة، لا يُطرح من البائع والسطور تجمع إلى الصافي', async () => {
+    if (!dbUp) return;
+    const coupon = await prisma.coupon.create({
+      data: { code: `PLT${SUFFIX}`.toUpperCase(), scope: 'platform', type: 'percent', valueBps: 1000, fundedBy: 'platform' },
+    });
+    const { a } = await placeOrder([2, 1], coupon.code);
+    expect(a.discountMinorUnits).toBeGreaterThan(0n);
+    const f = await breakdown(a.id);
+    expect(f['vendorDiscountMinorUnits']).toBe('0');
+    expect(f['platformDiscountMinorUnits']).toBe(a.discountMinorUnits.toString());
+  });
+
+  it('كوبون البائع: خصمه كله عليه، يُطرح من صافيه والسطور تجمع إليه', async () => {
+    if (!dbUp) return;
+    const coupon = await prisma.coupon.create({
+      data: {
+        code: `VND${SUFFIX}`.toUpperCase(),
+        scope: 'vendor',
+        vendorId: vendors[0]!.vendorId,
+        type: 'percent',
+        valueBps: 1000,
+        fundedBy: 'vendor',
+      },
+    });
+    const { a } = await placeOrder([2, 1], coupon.code);
+    expect(a.discountMinorUnits).toBeGreaterThan(0n);
+    const f = await breakdown(a.id);
+    expect(f['vendorDiscountMinorUnits']).toBe(a.discountMinorUnits.toString());
+    expect(f['platformDiscountMinorUnits']).toBe('0');
   });
 });
 

@@ -27,6 +27,9 @@ interface VendorDetail extends SubOrderView {
     itemsSubtotalMinorUnits: string;
     shippingMinorUnits: string;
     discountMinorUnits: string;
+    /** حصّتك من الخصم (كوبونك) — تُطرح؛ وحصّة المنصّة (كوبونها) لا تُطرح منك */
+    vendorDiscountMinorUnits: string;
+    platformDiscountMinorUnits: string;
     commissionMinorUnits: string;
     commissionRateBps: number;
     netMinorUnits: string;
@@ -385,10 +388,13 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                 <dt>المنتجات</dt>
                 <dd className="money num">{money(f.itemsSubtotalMinorUnits, order.currency)}</dd>
               </div>
-              <div>
-                <dt>الخصم</dt>
-                <dd className="money num">−{money(f.discountMinorUnits, order.currency)}</dd>
-              </div>
+              {/* حصّتك وحدها: خصم كوبون المنصّة لا يُنقص صافيك، فلا يُطرح هنا — والسطور تجمع إلى الصافي (VOPS-012) */}
+              {BigInt(f.vendorDiscountMinorUnits) > 0n ? (
+                <div>
+                  <dt>الخصم</dt>
+                  <dd className="money num">−{money(f.vendorDiscountMinorUnits, order.currency)}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>عمولة بسطة ({rate}%)</dt>
                 <dd className="money num">−{money(f.commissionMinorUnits, order.currency)}</dd>
@@ -410,6 +416,11 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
               </div>
             </dl>
             <p className="vm-hint">العمولة {rate}% على القطع لا على الشحن.</p>
+            {BigInt(f.platformDiscountMinorUnits) > 0n ? (
+              <p className="vm-hint">
+                خصم كوبون بسطة {money(f.platformDiscountMinorUnits, order.currency)} على حساب المنصّة — لا يُنقص صافيك.
+              </p>
+            ) : null}
             {order.refunds.length > 0 ? (
               <ul className="vm-refunds">
                 {order.refunds.map((r) => (
