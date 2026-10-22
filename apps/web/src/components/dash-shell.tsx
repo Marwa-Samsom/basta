@@ -40,21 +40,27 @@ function activeHref(pathname: string, groups: DashNavGroup[]): string | null {
 export function DashShell({
   ident,
   groups,
+  search,
   tools,
   user,
   sideFoot,
   banner,
   exitHref,
+  density = 'compact',
   children,
 }: {
   ident: ReactNode;
   groups: DashNavGroup[];
+  /** صندوق بحث بين العنوان والأدوات — للمتجر؛ على الجوال سطر كامل تحت الشريط */
+  search?: ReactNode;
   tools?: ReactNode;
   user?: { name: string; sub?: string | undefined } | undefined;
   sideFoot?: ReactNode;
   banner?: ReactNode;
   /** وجهة «✕» أعلى اللوحة: يغادرها إلى الموقع والجلسة باقية — غير «خروج» الذي ينهيها */
   exitHref?: string;
+  /** اللوحتان تُشغَّلان (compact)، والمتجر والحساب يُقرآن (comfortable) — القشرة واحدة */
+  density?: 'compact' | 'comfortable';
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -75,7 +81,7 @@ export function DashShell({
   }, [open]);
 
   return (
-    <div className="dash" data-density="compact">
+    <div className="dash" data-density={density}>
       <aside className="dash__side" data-open={open} id="dash-side">
         {ident}
         <nav className="dash__nav" aria-label="أقسام اللوحة">
@@ -117,7 +123,8 @@ export function DashShell({
           >
             <Icon name="menu" size={18} />
           </button>
-          <span className="dash__title">{title}</span>
+          {title ? <span className="dash__title">{title}</span> : null}
+          {search ? <div className="dash__search">{search}</div> : null}
           <div className="dash__tools">
             <ThemeToggle />
             {tools}

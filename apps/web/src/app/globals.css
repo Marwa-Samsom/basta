@@ -822,6 +822,8 @@ textarea.field__control {
   text-decoration: none;
 }
 .dash__tools { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
+/* بحث المتجر في الشريط العلوي — يتمدّد بين العنوان والأدوات، وعلى الجوال سطر كامل تحته */
+.dash__search { flex: 1 1 320px; min-width: 0; max-inline-size: 640px; display: flex; }
 .dash__user {
   display: flex;
   align-items: center;
@@ -862,7 +864,11 @@ textarea.field__control {
 @media (max-width: 860px) {
   .dash { grid-template-columns: minmax(0, 1fr); }
   .dash__menu { display: inline-grid; }
-  .dash__bar { padding-inline: var(--space-4); }
+  .dash__bar { padding-inline: var(--space-4); flex-wrap: wrap; gap: var(--space-2); }
+  /* العنوان يتقلّص قبل أن تنزل الأدوات سطراً — الشريط سطران على الأكثر (والثاني للبحث) */
+  .dash__title { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dash__tools { gap: 6px; }
+  .dash__search { order: 3; flex-basis: 100%; max-inline-size: none; }
   .dash__main { padding: var(--space-4) var(--space-4) var(--space-10); }
   .dash__side {
     position: fixed;
@@ -1120,39 +1126,23 @@ a.stat:hover { box-shadow: var(--shadow-md); }
    المتجر — المرحلة 07. كثافة comfortable، وكل قيمة رمز.
    =========================================================================== */
 
-.store { min-height: 100dvh; display: flex; flex-direction: column; background: var(--surface-page); }
+.store-root { display: contents; }
 
-/* الرأس — ST-01: سطر العلامة والبحث والأدوات، وتحته رقائق الأقسام */
-.store__head {
-  position: sticky;
-  inset-block-start: 0;
-  z-index: var(--z-sticky);
-  background: var(--surface-card);
-  border-block-end: 1px solid var(--border-default);
-  box-shadow: var(--shadow-sm);
-}
-
-.store__bar {
-  max-width: var(--width-storefront);
+/* قشرة المتجر منذ 22 أكتوبر 2026 قشرة اللوحتين (store-shell): شريط جانبي بالأقسام،
+   وشريط علوي فيه البحث والعملة والجرس والسلة. المحتوى بعرض المتجر في وسط العمود. */
+.store-body {
+  inline-size: 100%;
+  max-inline-size: var(--width-storefront);
   margin-inline: auto;
   display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: var(--space-3) var(--space-8);
+  flex-direction: column;
+  gap: 28px;
 }
 
-.store__brand {
-  font-family: var(--font-display);
-  font-weight: var(--weight-black);
-  font-size: 26px;
-  line-height: 1;
-  color: var(--brand);
-  text-decoration: none;
-  flex: none;
-}
-.store__brand:hover { color: var(--brand-hover); }
-
-.store__tools { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+/* صفحات المنصّة أسفل الشريط الجانبي — كانت في التذييل */
+.store-pages { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 0 var(--space-2) var(--space-2); }
+.store-pages a { font-size: var(--text-xs); color: var(--text-muted); text-decoration: none; }
+.store-pages a:hover { color: var(--text-strong); text-decoration: underline; }
 
 /* عملة العرض — الرمز ظاهر، والقائمة الأصلية شفّافة فوقه تفتح بأسماء العملات كاملة */
 .cur-pick {
@@ -1182,98 +1172,8 @@ a.stat:hover { box-shadow: var(--shadow-md); }
   font: inherit;
 }
 
-.store__cats {
-  max-width: var(--width-storefront);
-  margin-inline: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 var(--space-8) 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.store__all,
-.store__cat {
-  flex: none;
-  min-height: var(--control-sm);
-  padding-inline: var(--space-3);
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--text-sm);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.store__all {
-  border: 1px solid var(--border-strong);
-  color: var(--text-strong);
-  font-weight: var(--weight-semi);
-}
-.store__all:hover { background: var(--surface-sunken); color: var(--text-strong); }
-.store__cat { color: var(--text-body); }
-.store__cat:hover,
-.store__cat[aria-current] { background: var(--brand-subtle); color: var(--brand-text); }
-.store__sell { margin-inline-start: auto; flex: none; }
-
-.store__main {
-  width: 100%;
-  max-width: var(--width-storefront);
-  margin-inline: auto;
-  padding: var(--space-5) var(--space-8) var(--space-10);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-/* التذييل — سطح معكوس كما في التصميم */
-.store__foot {
-  background: var(--surface-inverse);
-  color: var(--text-on-inverse);
-  padding: 28px var(--space-8);
-  display: grid;
-  gap: var(--space-4);
-}
-.store__foot-cols {
-  max-width: var(--width-storefront);
-  inline-size: 100%;
-  margin-inline: auto;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-5);
-}
-.store__foot-col { display: grid; gap: var(--space-2); align-content: start; }
-.store__foot-brand { font-family: var(--font-display); font-weight: var(--weight-black); font-size: 22px; }
-.store__foot-note { font-size: var(--text-sm); opacity: 0.8; line-height: 1.8; }
-.store__foot-title { font-size: var(--text-sm); font-weight: var(--weight-bold); }
-.store__foot a {
-  color: inherit;
-  opacity: 0.8;
-  font-size: var(--text-sm);
-  text-decoration: none;
-  inline-size: fit-content;
-}
-.store__foot a:hover { opacity: 1; text-decoration: underline; color: inherit; }
-.store__foot-base {
-  max-width: var(--width-storefront);
-  inline-size: 100%;
-  margin-inline: auto;
-  padding-block-start: 14px;
-  border-block-start: 1px solid color-mix(in srgb, var(--text-on-inverse) 16%, transparent);
-  font-size: var(--text-2xs);
-  opacity: 0.7;
-}
-
 @media (max-width: 860px) {
-  .store__bar { flex-wrap: wrap; gap: var(--space-3); padding: 10px var(--space-4); }
-  .store__bar .search { order: 3; flex-basis: 100%; }
-  .store__tools { margin-inline-start: auto; }
-  .store__cats { padding-inline: var(--space-4); }
-  .store__main { padding: var(--space-4) var(--space-4) var(--space-10); gap: var(--space-6); }
-  .store__foot { padding: var(--space-6) var(--space-4); }
-  .store__foot-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .store-body { gap: var(--space-6); }
 }
 
 .stack--loose { gap: 28px; }

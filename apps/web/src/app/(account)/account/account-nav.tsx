@@ -73,6 +73,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
 
   return (
     <DashShell
+      density="comfortable"
       ident={
         <DashIdent
           href="/account"
