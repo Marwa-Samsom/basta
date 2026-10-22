@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { InvalidInputError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { csvCell } from '../../../common/csv';
+import { STATUS_LABELS } from '../../orders/public/status-labels';
 
 export interface ReportRange {
   from: Date;
@@ -179,7 +180,11 @@ export class VendorReportsService {
       },
       {
         name: 'الطلبات',
-        rows: Object.entries(rep.orders.byStatus).map(([k, v]) => ({ 'الحالة': k, 'العدد': v })),
+        // الاسم كما تعرضه الصفحة — كان الملف يكتب الرمز (delivered) فيقرؤه البائع إنجليزياً
+        rows: Object.entries(rep.orders.byStatus).map(([k, v]) => ({
+          'الحالة': (STATUS_LABELS as Readonly<Record<string, string>>)[k] ?? k,
+          'العدد': v,
+        })),
       },
     ];
     return { rep, sections };

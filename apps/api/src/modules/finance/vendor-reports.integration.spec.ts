@@ -222,6 +222,9 @@ describe('VD-19 · أرقام البائع من دفتره', () => {
     expect(res.body).toContain('"30000"');
     expect(res.body).toContain('منتج تقارير a');
     expect(res.body).not.toContain('منتج تقارير b');
+    // «الطلبات» بأسماء الحالات العربية كما في الصفحة، لا برموزها (VOPS-097)
+    expect(res.body).toContain('"الحالة","العدد"');
+    expect(res.body).not.toMatch(/"(awaiting_vendor|accepted|preparing|ready_to_ship|shipped|delivered|completed|refunded)"/);
     const x = await call('GET', `/vendor/reports/export.xlsx?from=${today}&to=${today}`, seats[0]!.token);
     expect(x.statusCode).toBe(200);
     expect(x.headers['content-type']).toContain('spreadsheetml');
