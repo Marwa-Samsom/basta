@@ -45,6 +45,7 @@ export function DashShell({
   sideFoot,
   banner,
   exitHref,
+  density = 'compact',
   children,
 }: {
   ident: ReactNode;
@@ -55,6 +56,8 @@ export function DashShell({
   banner?: ReactNode;
   /** وجهة «✕» أعلى اللوحة: يغادرها إلى الموقع والجلسة باقية — غير «خروج» الذي ينهيها */
   exitHref?: string;
+  /** اللوحتان تُشغَّلان (compact)، وحساب المشتري يُقرأ (comfortable) — القشرة واحدة */
+  density?: 'compact' | 'comfortable';
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -75,7 +78,7 @@ export function DashShell({
   }, [open]);
 
   return (
-    <div className="dash" data-density="compact">
+    <div className="dash" data-density={density}>
       <aside className="dash__side" data-open={open} id="dash-side">
         {ident}
         <nav className="dash__nav" aria-label="أقسام اللوحة">

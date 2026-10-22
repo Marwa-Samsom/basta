@@ -31,7 +31,8 @@ test('المشتري يخرج من قائمة حسابه، والجلسة تنت
   const userId = await register(email, `مشترٍ ${t}`);
   const access = await signIn(page, email, '/account');
 
-  await page.getByRole('navigation', { name: 'حسابي' }).getByRole('button', { name: 'خروج' }).click();
+  // الحساب بقشرة اللوحتين: «خروج» أسفل الشريط الجانبي كما في لوحة البائع
+  await page.getByRole('button', { name: 'خروج' }).click();
   await page.waitForURL((u) => u.pathname === '/');
   await expectSignedOut(page, userId, access);
 });
