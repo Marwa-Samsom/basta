@@ -1,7 +1,9 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError } from './api';
+import { api, ApiError, session } from './api';
+import { withNext } from './safe-path';
 import type { Blocker } from '@/components/ui';
 
 export type VendorStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'suspended' | 'banned';
@@ -57,6 +59,7 @@ export function useOnboarding(): {
   reload: () => Promise<void>;
   set: (next: Onboarding) => void;
 } {
+  const router = useRouter();
   const [data, setData] = useState<Onboarding | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
@@ -87,8 +90,16 @@ export function useOnboarding(): {
   /**
    * التحميل الأول داخل التأثير نفسه: كل ضبط للحالة يقع **بعد** `await`، فلا
    * يجري تصيير متتالٍ. و`alive` يمنع الكتابة على مكوّن فُكّ قبل وصول الرد.
+   *
+   * زائر بلا جلسة (رابط محفوظ أو مكتوب) يذهب إلى الدخول ومعه الصفحة نفسها، كقشرة
+   * الإدارة. كانت اللوحة تقف على «مطلوب تسجيل الدخول.» وحده بلا رابط ولا قائمة فيعلق
+   * (VOPS-009). لا يُطلب الخادم أصلاً، والمؤشّر يبقى حتى يصل الدخول.
    */
   useEffect(() => {
+    if (!session.read()) {
+      router.replace(withNext('/login', `${window.location.pathname}${window.location.search}`));
+      return;
+    }
     let alive = true;
     void (async () => {
       try {
@@ -108,7 +119,7 @@ export function useOnboarding(): {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [router]);
 
   return { data, error, loading, missing, reload, set: setData };
 }
