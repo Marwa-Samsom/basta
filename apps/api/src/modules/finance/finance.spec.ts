@@ -112,6 +112,10 @@ describe('حفظ المال — 2,000 فرعي عشوائي بإرجاعات ج�
       });
       const sale = salePostings(sub);
       let vendor = net(sale.vendor);
+      // العمولة الباقية على البائع (المخصوم ناقص المعكوس) — ما يعكسه الاسترداد الكامل
+      const commissionOf = (ps: readonly { entryType: string; direction: string; amount: bigint }[]) =>
+        -net(ps.filter((p) => p.entryType === 'commission_debit'));
+      let commission = commissionOf(sale.vendor);
       const platform = new Map<PlatformEntryType, bigint>();
       for (const p of sale.platform) platform.set(p.entryType, (platform.get(p.entryType) ?? 0n) + net([p]));
       let refunded = 0n;
@@ -125,17 +129,21 @@ describe('حفظ المال — 2,000 فرعي عشوائي بإرجاعات ج�
         const q = 1 + rnd(left);
         const r = partialRefundPostings(sub, state, [{ orderItemId: l.orderItemId, qty: q }]);
         vendor += net(r.vendor);
+        commission += commissionOf(r.vendor);
         for (const p of r.platform) platform.set(p.entryType, (platform.get(p.entryType) ?? 0n) + net([p]));
         refunded += r.buyerGets;
         l.refundedQty += q;
         expect(vendor + sum() + refunded, `خطوة جزئية t=${t}`).toBe(sub.total);
       }
 
-      const full = fullRefundPostings(vendor, platform);
+      const full = fullRefundPostings(vendor, commission, platform);
       vendor += net(full.vendor);
+      commission += commissionOf(full.vendor);
       for (const p of full.platform) platform.set(p.entryType, (platform.get(p.entryType) ?? 0n) + net([p]));
       refunded += full.buyerGets;
       expect(vendor).toBe(0n);
+      // والعمولة نفسها عادت صفراً: لا «عمولة مدفوعة» على ما رُدّ كله (VOPS-098)
+      expect(commission, `عمولة t=${t}`).toBe(0n);
       expect(sum()).toBe(0n);
       expect(refunded).toBe(sub.total);
     }

@@ -163,17 +163,29 @@ export function partialRefundPostings(
 /**
  * استرداد كامل (إلغاء، أو شحنة لم تصل): كل ما بقي يعود للمشتري. يُصفَّر
  * صافي البائع وكل نوع من نصيب المنصة بقيد معاكس — بعد أي إرجاع جزئي سبقه.
+ *
+ * العمولة الباقية تُعكس سطراً وحدها كما في الإرجاع الجزئي، والخصم يُقيَّد بما رُدّ
+ * فعلاً من البيع والشحن: كان سطر واحد بالصافي، فيقرأ التقرير «العمولة المدفوعة» على
+ * طلب لم يُبع و«المرتجعات» أقلّ مما رُدّ (VOPS-098). الصافي نفسه لم يتغيّر.
  */
 export function fullRefundPostings(
   vendorNetBySub: bigint,
+  commissionLeft: bigint,
   platformNetByType: ReadonlyMap<PlatformEntryType, bigint>,
 ): { buyerGets: bigint; vendor: VendorPosting[]; platform: PlatformPosting[] } {
-  const vendor: VendorPosting[] =
-    vendorNetBySub > 0n
-      ? [{ entryType: 'refund_debit', direction: 'debit', amount: vendorNetBySub, memo: 'استرداد كامل' }]
-      : vendorNetBySub < 0n
-        ? [{ entryType: 'adjustment_credit', direction: 'credit', amount: -vendorNetBySub, memo: 'تصفير بعد استرداد كامل' }]
-        : [];
+  const commissionBack = commissionLeft > 0n ? commissionLeft : 0n;
+  // ما يُخصم قبل ردّ العمولة: الصافي + العمولة المعكوسة = ما بقي من البيع والشحن
+  const owed = vendorNetBySub + commissionBack;
+  const vendor: VendorPosting[] = [
+    ...(owed > 0n
+      ? [{ entryType: 'refund_debit' as const, direction: 'debit' as const, amount: owed, memo: 'استرداد كامل' }]
+      : owed < 0n
+        ? [{ entryType: 'adjustment_credit' as const, direction: 'credit' as const, amount: -owed, memo: 'تصفير بعد استرداد كامل' }]
+        : []),
+    ...(commissionBack > 0n
+      ? [{ entryType: 'commission_debit' as const, direction: 'credit' as const, amount: commissionBack, memo: 'عكس عمولة الطلب الملغى', reverses: 'commission_debit' as const }]
+      : []),
+  ];
   const platform: PlatformPosting[] = [];
   let platformNet = 0n;
   for (const [type, v] of platformNetByType) {

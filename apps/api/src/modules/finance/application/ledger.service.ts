@@ -195,8 +195,14 @@ export class LedgerService {
     const sub = await this.money(tx, subOrderId);
     const vendorRows = await tx.ledgerEntry.findMany({
       where: { refType: 'sub_order', refId: subOrderId },
-      select: { direction: true, amountMinorUnits: true },
+      select: { entryType: true, direction: true, amountMinorUnits: true },
     });
+    // العمولة التي لم يعكسها إرجاع جزئي سبق — تُعكس الآن سطراً وحدها
+    const commissionLeft = -net(
+      vendorRows
+        .filter((r) => r.entryType === 'commission_debit')
+        .map((r) => ({ direction: r.direction, amount: r.amountMinorUnits })),
+    );
     const platformRows = await tx.platformLedgerEntry.findMany({
       where: { subOrderId },
       select: { entryType: true, direction: true, amountMinorUnits: true },
@@ -208,6 +214,7 @@ export class LedgerService {
     }
     const plan = fullRefundPostings(
       net(vendorRows.map((r) => ({ direction: r.direction, amount: r.amountMinorUnits }))),
+      commissionLeft,
       byType,
     );
     const ledgerEntryId = await this.postRefundSide(tx, sub, plan.vendor, refundId, by);
