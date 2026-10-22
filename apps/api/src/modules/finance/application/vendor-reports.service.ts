@@ -80,11 +80,15 @@ export class VendorReportsService {
         SELECT "status"::text AS status, COUNT(*)::bigint AS n FROM "sub_orders"
         WHERE "vendorId" = ${vendorId}::uuid AND "placedAt" >= ${r.from} AND "placedAt" < ${r.to}
         GROUP BY "status"`,
-      this.prisma.$queryRaw<{ delivered: bigint; returned: bigint }[]>`
-        SELECT COUNT(*)::bigint AS delivered,
-               COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM "return_requests" rr WHERE rr."subOrderId" = so."id"))::bigint AS returned
+      // المرفوض من السجلّ لا من الحالة: الرفض يصير «مُسترَد» آلياً فكان العدّ صفراً دائماً (VOPS-098)
+      this.prisma.$queryRaw<{ delivered: bigint; returned: bigint; rejected: bigint }[]>`
+        SELECT COUNT(*) FILTER (WHERE so."deliveredAt" IS NOT NULL)::bigint AS delivered,
+               COUNT(*) FILTER (WHERE so."deliveredAt" IS NOT NULL
+                 AND EXISTS (SELECT 1 FROM "return_requests" rr WHERE rr."subOrderId" = so."id"))::bigint AS returned,
+               COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM "sub_order_status_history" h
+                 WHERE h."subOrderId" = so."id" AND h."toStatus" = 'rejected_by_vendor'))::bigint AS rejected
         FROM "sub_orders" so
-        WHERE so."vendorId" = ${vendorId}::uuid AND so."deliveredAt" IS NOT NULL
+        WHERE so."vendorId" = ${vendorId}::uuid
           AND so."placedAt" >= ${r.from} AND so."placedAt" < ${r.to}`,
       this.prisma.$queryRaw<{ currency: string; productId: string; nameAr: string; units: bigint; revenue: bigint }[]>`
         SELECT so."settlementCurrency" AS currency, oi."productId" AS "productId",
@@ -143,7 +147,7 @@ export class VendorReportsService {
       orders: {
         total: statuses.reduce((a, x) => a + Number(x.n), 0),
         byStatus,
-        rejectedByVendor: byStatus['rejected_by_vendor'] ?? 0,
+        rejectedByVendor: Number(delivered[0]?.rejected ?? 0n),
         delivered: deliveredN,
         withReturn: returnedN,
         returnRatePct: deliveredN > 0 ? Math.round((returnedN / deliveredN) * 1000) / 10 : null,

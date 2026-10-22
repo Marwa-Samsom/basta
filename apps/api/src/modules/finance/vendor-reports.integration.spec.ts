@@ -261,3 +261,27 @@ describe('VD-19 · المدى والصلاحية', () => {
     expect((await call('GET', '/vendor/reports', buyerToken)).statusCode).toBe(403);
   });
 });
+
+describe('VD-19 · طلب رفضه البائع (VOPS-098، 22 أكتوبر 2026) — آخر الملف: يغيّر أرقام ب', () => {
+  it('لا «عمولة مدفوعة» عليه، و«المرتجعات» ما رُدّ من بيعه وشحنه، ويُعدّ في «طلبات رُفضت منك»', async () => {
+    if (!dbUp) return;
+    const b = await prisma.subOrder.findFirstOrThrow({ where: { vendorId: seats[1]!.vendorId } });
+    const before = await report(1);
+    expect(before.currencies[0].commissionMinorUnits).not.toBe('0');
+    expect(before.orders.rejectedByVendor).toBe(0);
+
+    await move(1, b.id, 'rejected_by_vendor', { reason: 'نفدت الكمية' });
+    expect((await prisma.subOrder.findUniqueOrThrow({ where: { id: b.id } })).status).toBe('refunded');
+
+    const rep = await report(1);
+    const c = rep.currencies[0];
+    expect(c.salesMinorUnits).toBe('20000');
+    expect(c.commissionMinorUnits).toBe('0');
+    expect(c.refundsMinorUnits).toBe('21500'); // 2 × 100.00 + شحن 15.00
+    expect(c.netMinorUnits).toBe('0');
+    expect(rep.orders.rejectedByVendor).toBe(1);
+    // القيد المعاكس للعمولة يشير إلى قيدها الأصلي
+    const reversal = await prisma.ledgerEntry.findFirstOrThrow({ where: { refId: b.id, entryType: 'commission_debit', direction: 'credit' } });
+    expect(reversal.reversesEntryId).not.toBeNull();
+  });
+});
