@@ -52,3 +52,20 @@ test('دخول بلا وجهة: البائع إلى لوحته، والمدير 
   await page.getByRole('button', { name: 'دخول' }).click();
   await page.waitForURL((u) => u.pathname === '/admin');
 });
+
+test('زائر يفتح لوحة البائع برابطها: إلى الدخول ومعه الصفحة، ثم يعود إليها (VOPS-009)', async ({ page }) => {
+  // كانت اللوحة تقف على «مطلوب تسجيل الدخول.» وحده بلا رابط ولا قائمة — والتأهيل مثلها
+  for (const path of ['/vendor/orders', '/vendor/onboarding/status']) {
+    await page.goto(path);
+    await page.waitForURL((u) => u.pathname === '/login' && u.searchParams.get('next') === path);
+    await expect(page.getByText('مطلوب تسجيل الدخول.')).toHaveCount(0);
+  }
+
+  const vendor = await makeVendor(tag());
+  await page.goto(`/login?next=${encodeURIComponent('/vendor/orders')}`);
+  await page.getByLabel('البريد الإلكتروني').fill(vendor.email);
+  await page.getByLabel('كلمة المرور').fill(PASSWORD);
+  await page.getByRole('button', { name: 'دخول' }).click();
+  await page.waitForURL((u) => u.pathname === '/vendor/orders');
+  await expect(page.getByRole('heading', { name: 'الطلبات', level: 1 })).toBeVisible();
+});
