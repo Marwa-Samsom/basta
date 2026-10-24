@@ -193,21 +193,16 @@
 .ac-help { font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--text-body); }
 .ac-group { display: grid; gap: 6px; }
 .ac-group__label { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--text-strong); }
-.ac-secret {
-  flex: 1;
-  min-width: 0;
-  min-block-size: var(--ctrl-h);
-  padding: var(--space-2) 11px;
-  border: 1px solid var(--border-strong);
+/* رمز QR لتطبيق المصادقة — ورقة بيضاء ثابتة ولو كانت السمة غامقة: الماسح يحتاج التباين */
+.ac-qr {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+  margin-inline: auto;
   border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  color: var(--text-strong);
-  font-size: var(--text-sm);
-  letter-spacing: 0.06em;
-  display: flex;
-  align-items: center;
-  word-break: break-all;
 }
+.ac-qr__paper { fill: var(--qr-paper); }
+.ac-qr__ink { fill: var(--qr-ink); }
 .ac-copied { font-size: var(--text-xs); color: var(--success-text); }
 
 @media (max-width: 480px) {
