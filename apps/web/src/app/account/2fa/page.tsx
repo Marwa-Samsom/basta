@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
+import { QrCode } from '@/components/qr-code';
 import { digitsOnly } from '@/lib/digits';
 import { RecoveryCodes } from '@/components/recovery-codes';
 import { Alert, Field, Spinner, TextInput } from '@/components/ui';
@@ -38,12 +39,17 @@ export default function TwoFactorSetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
   /** تغيير الجهاز على تحقق مفعَّل: إثبات الجهاز الحالي قبل أي مفتاح جديد */
   const [rotating, setRotating] = useState(false);
   const [proof, setProof] = useState({ password: '', code: '' });
   /** العودة لغير الإدارة: الحساب افتراضياً، أو إعدادات البائع إن جاء منها */
   const back = useSyncExternalStore(still, backFromUrl, () => '/account');
+  /**
+   * طلب التهيئة مرة واحدة للصفحة. كل طلب يكتب سرّاً منتظراً جديداً، ووضع React الصارم
+   * يشغّل الأثر مرتين: كانت الصفحة ترسم سرّ الطلب الثاني والخادم قد يحفظ سرّ الأول
+   * إن وصل بعده — فيُمسح رمز لا يُقبل رمزه. الطلب الواحد يخدم التشغيلتين.
+   */
+  const firstSetup = useRef<Promise<{ secret: string; uri: string }> | null>(null);
 
   useEffect(() => {
     if (!session.read()) {
@@ -51,7 +57,8 @@ export default function TwoFactorSetupPage() {
       return;
     }
     let alive = true;
-    api<{ secret: string; uri: string }>('/auth/totp/setup', { method: 'POST' })
+    firstSetup.current ??= api<{ secret: string; uri: string }>('/auth/totp/setup', { method: 'POST' });
+    firstSetup.current
       .then((s) => {
         if (!alive) return;
         setAdmin(session.roles().includes('admin'));
@@ -107,10 +114,6 @@ export default function TwoFactorSetupPage() {
   const finish = () => {
     session.clear();
     router.replace(`/login?next=${encodeURIComponent(admin ? '/admin' : back)}`);
-  };
-
-  const copy = (secret: string) => {
-    void navigator.clipboard?.writeText(secret).then(() => setCopied(true));
   };
 
   return (
@@ -235,8 +238,8 @@ export default function TwoFactorSetupPage() {
               <section className="ac-auth__card">
                 <h2 className="ac-section-title">أضف حسابك في تطبيق المصادقة</h2>
                 <p className="ac-help">
-                  افتح تطبيق مصادقة (Google Authenticator أو Microsoft Authenticator أو غيرهما) وأضف
-                  حساباً بالمفتاح أدناه. على الهاتف نفسه يكفي أن تفتح{' '}
+                  افتح تطبيق مصادقة (Google Authenticator أو Microsoft Authenticator أو غيرهما) وامسح
+                  الرمز أدناه. على الهاتف نفسه يكفي أن تفتح{' '}
                   <a href={setup.uri} dir="ltr">
                     هذا الرابط
                   </a>
@@ -244,25 +247,9 @@ export default function TwoFactorSetupPage() {
                 </p>
 
                 <div className="ac-group">
-                  <span className="ac-group__label">المفتاح السرّي — اكتبه في التطبيق كما هو</span>
-                  <div className="ac-inline">
-                    <code className="ac-secret num">
-                      {setup.secret.replace(/(.{4})/g, '$1 ').trim()}
-                    </code>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label="انسخ المفتاح"
-                      onClick={() => copy(setup.secret)}
-                    >
-                      <Icon name={copied ? 'check' : 'copy'} size={17} />
-                    </button>
-                  </div>
-                  {copied ? (
-                    <span className="ac-copied" role="status">
-                      نُسخ المفتاح.
-                    </span>
-                  ) : null}
+                  <span className="ac-group__label">امسح الرمز بتطبيق المصادقة</span>
+                  {/* الرمز يحمل الرابط نفسه (otpauth) — بدل مفتاح يُنسخ حرفاً حرفاً */}
+                  <QrCode value={setup.uri} label="رمز QR لإضافة الحساب في تطبيق المصادقة" />
                 </div>
 
                 <Field label="أكّد بالرمز من التطبيق (ستة أرقام)" error={error}>
