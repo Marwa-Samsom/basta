@@ -75,6 +75,19 @@ test('مسار الشراء: زائر من صفحة المنتج، يدخل عن
   expect(Object.values(await auditViews()).every((n) => n === 0)).toBe(true);
 });
 
+test('طلبات الإدارة: حال الدفع بالعربية لا برمز الخادم', async ({ browser, page }) => {
+  const t = tag();
+  const v = await makeVendor(t);
+  const number = await shopperBuys(page, v.productSlug, v.productName);
+  const admin = await makeAdmin(t, ['orders.manage']);
+  const adminPage = await (await browser.newContext()).newPage();
+  await login(adminPage, admin.email, '/admin/orders', admin.totp);
+  await adminPage.getByLabel('بحث في الطلبات').fill(number);
+  await adminPage.getByRole('button', { name: 'افتح' }).click();
+  await expect(adminPage.getByText('الدفع: مدفوع')).toBeVisible();
+  await expect(adminPage.getByText('captured')).toHaveCount(0);
+});
+
 test('مسار التسوية: البائع يشحن ← يتحرّر رصيده ← يسحب ← الإدارة تحوّل — والدفتر محفوظ', async ({ browser }) => {
   const t = tag();
   const v = await makeVendor(t);

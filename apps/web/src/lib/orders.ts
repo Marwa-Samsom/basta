@@ -77,6 +77,19 @@ export const REFUND_STATUS: Readonly<Record<string, string>> = {
   failed: 'فشل',
 };
 
+/** حال الدفع للإدارة — رمز الخادم لا يُعرض كما هو (PaymentStatus بحالاته التسع) */
+export const PAYMENT_STATUS: Readonly<Record<string, string>> = {
+  pending: 'قيد المعالجة',
+  requires_action: 'بانتظار تأكيد البنك',
+  awaiting_transfer: 'بانتظار التحويل',
+  authorized: 'محجوز على البطاقة',
+  captured: 'مدفوع',
+  partially_refunded: 'مُسترَد جزئياً',
+  refunded: 'مُسترَد',
+  failed: 'فشل',
+  voided: 'أُلغي قبل التحصيل',
+};
+
 export const money = (minor: string | number | bigint, currency: string): string =>
   formatMoney(BigInt(minor), currency);
 

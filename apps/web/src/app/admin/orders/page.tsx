@@ -8,7 +8,7 @@ import { Icon } from '@/components/icons';
 import { Alert } from '@/components/ui';
 import { api } from '@/lib/api';
 import { PARENT_STATUS, useAction, useAdminData, useAdminList } from '@/lib/admin';
-import { labelOf, money, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
+import { labelOf, money, PAYMENT_STATUS, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
 
 interface Row {
   orderNumber: string;
@@ -214,7 +214,7 @@ function OrderDetail({ number, onChange }: { number: string; onChange: () => voi
       <Feedback error={act.error} notice={act.notice} />
       <p className="ao-order__pay">
         <Icon name="card" size={14} />
-        الدفع: {data.paymentStatus ?? '—'}
+        الدفع: {data.paymentStatus ? (PAYMENT_STATUS[data.paymentStatus] ?? data.paymentStatus) : '—'}
       </p>
       <div className="ao-subs">
         {data.stores.map((s) => (
