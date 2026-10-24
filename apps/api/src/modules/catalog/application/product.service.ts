@@ -472,7 +472,23 @@ export class ProductService {
         if (seen.has(v.id)) throw new InvalidInputError('المتغيّر نفسه مذكور مرتين.', { variantId: v.id });
         seen.add(v.id);
       }
-      const resolved = this.resolveVariants(input.variants, effective, currency);
+      const sent = input.variants;
+      const resolved = this.resolveVariants(sent, effective, currency).map((v, i) => {
+        /**
+         * ما لم يُرسَل لمتغيّر قائم يبقى كما هو، و null يمحوه صراحةً. المحرّر لا خانات له
+         * للسعر قبل الخصم والباركود والوزن — تدخل بالاستيراد — فكان كل حفظ لاسم أو وصف
+         * يكتبها فارغة: يختفي الخصم عن المشتري، والوزن من تسعير الشحن by_weight (VCAT-017).
+         */
+        const was = v.id === undefined ? undefined : current.variants.find((c) => c.id === v.id);
+        if (!was) return v;
+        const given = sent[i];
+        return {
+          ...v,
+          compareAtPriceMinorUnits: given?.compareAtPrice === undefined ? was.compareAtPriceMinorUnits : v.compareAtPriceMinorUnits,
+          barcode: given?.barcode === undefined ? was.barcode : v.barcode,
+          weightGrams: given?.weightGrams === undefined ? was.weightGrams : v.weightGrams,
+        };
+      });
       for (const v of resolved) {
         if (v.id === undefined && v.stock === undefined) {
           throw new InvalidInputError(`كمية المتغيّر الجديد «${v.sku}» مطلوبة — اكتب 0 إن لم يتوفّر.`, {
