@@ -22,6 +22,12 @@ interface VariantDraft {
   sku: string;
   price: string;
   stock: string;
+  /**
+   * الكمية كما قرأها المحرّر من الخادم — تُرسَل `stock` حين يغيّرها البائع وحدها.
+   * الخادم يترجمها جرداً (setTo)، فكان كل حفظ لوصف أو سمة يعيد الرقم الذي فُتحت عليه
+   * الصفحة: بيعٌ جرى أثناءها يرجع قطعاً وهمية تُباع ولا وجود لها (VCAT-018).
+   */
+  stockLoaded?: string;
   lowStockThreshold: string;
   /** معرّف قيمة لكل محور — المفتاح معرّف السمة */
   options: Record<string, string>;
@@ -131,6 +137,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
               sku: v.sku,
               price: (Number(v.price.minorUnits) / 10 ** decimalsOf(v.price.currency)).toString(),
               stock: String(v.stock.onHand),
+              stockLoaded: String(v.stock.onHand),
               lowStockThreshold: v.stock.lowStockThreshold ? String(v.stock.lowStockThreshold) : '',
               options: Object.fromEntries(v.options.map((o) => [o.attributeId, o.valueId])),
               isActive: v.isActive,
@@ -181,7 +188,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
         ...(v.id ? { id: v.id } : {}),
         sku: v.sku.trim(),
         price: v.price.trim(),
-        stock: Number(v.stock || 0),
+        // الجديد يحتاج كميته؛ القائم تُرسَل كميته إن غيّرها البائع وحدها — وإلا يبقى مخزونه كما هو
+        ...(v.id === undefined || v.stock !== v.stockLoaded ? { stock: Number(v.stock || 0) } : {}),
         ...(v.lowStockThreshold ? { lowStockThreshold: Number(v.lowStockThreshold) } : {}),
         ...(axes.length > 0
           ? {
@@ -242,6 +250,21 @@ export function ProductEditor({ productId }: { productId?: string }) {
       : api<ProductDetail>('/vendor/products', { method: 'POST', body: payload() });
   }
 
+  /**
+   * المنتج كما حفظه الخادم صار أساس المقارنة: كمية كل متغيّر قائم تُعرض كما في القاعدة
+   * الآن، فحفظ تالٍ لا يعيد رقماً كتبه البائع قبل بيعٍ جرى بعده.
+   */
+  function settle(saved: ProductDetail): void {
+    setProduct(saved);
+    const onHand = new Map(saved.variants.map((v) => [v.id, String(v.stock.onHand)]));
+    setVariants((rows) =>
+      rows.map((v) => {
+        const now = v.id ? onHand.get(v.id) : undefined;
+        return now === undefined ? v : { ...v, stock: now, stockLoaded: now };
+      }),
+    );
+  }
+
   async function save(): Promise<void> {
     const problem = unsavable();
     if (problem) {
@@ -255,7 +278,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
     setBlockers([]);
     try {
       const saved = await write(isNew ? null : productId);
-      setProduct(saved);
+      settle(saved);
       setNotice('حُفظ المنتج.');
       if (isNew) router.replace(`/vendor/products/${saved.id}`);
     } catch (err) {
@@ -291,7 +314,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
     setNotice(null);
     setBlockers([]);
     try {
-      setProduct(await write(product.id));
+      settle(await write(product.id));
       const next = await api<ProductDetail>(`/vendor/products/${product.id}/publish`, {
         method: 'POST',
       });
