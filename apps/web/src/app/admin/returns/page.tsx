@@ -22,6 +22,8 @@ interface RefundRow {
   id: string;
   amountMinorUnits: string;
   vendorAmountMinorUnits: string | null;
+  /** ما تحمّله البائع فعلاً بعملته — بعد ما ردّته المنصة من عمولتها وضريبتها */
+  vendorChargeMinorUnits: string | null;
   currency: string;
   reason: string;
   status: string;
@@ -197,7 +199,7 @@ export default function AdminReturnsPage() {
                     </td>
                     <td data-label="على البائع" className="end">
                       <span className="ao-stack ao-stack--end">
-                        {r.vendorAmountMinorUnits ? <span className="money num">{money(r.vendorAmountMinorUnits, r.subOrder.settlementCurrency)}</span> : '—'}
+                        {r.vendorChargeMinorUnits ? <span className="money num">{money(r.vendorChargeMinorUnits, r.subOrder.settlementCurrency)}</span> : '—'}
                         {r.vendorNegative ? (
                           <span className="ao-rownote">
                             <Icon name="alert" size={13} />
