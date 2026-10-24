@@ -6,6 +6,7 @@ import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
+import { toLatinDigits } from '@/lib/digits';
 import { when } from '@/lib/orders';
 
 interface Setting {
@@ -34,6 +35,18 @@ interface Tax {
 const COUNTRIES: Record<string, string> = { SA: 'السعودية', AE: 'الإمارات', JO: 'الأردن', EG: 'مصر', KW: 'الكويت' };
 
 /**
+ * قيمة الخانة الرقمية إن صلحت للحفظ، وإلا null. الخانة الفارغة لا تُحفظ صفراً:
+ * Number('') = 0 كان يحفظ «تعليق رصيد البائع» 0 فتتحرّر أموال البائعين فور
+ * التسليم، والصفر قيمة مشروعة يقبلها الخادم فلا يردّها (ACFG-024).
+ */
+function intValue(s: Setting, raw: string): number | null {
+  const digits = toLatinDigits(raw).trim();
+  if (!/^\d+$/.test(digits)) return null;
+  const n = Number(digits);
+  return (s.min === undefined || n >= s.min) && (s.max === undefined || n <= s.max) ? n : null;
+}
+
+/**
  * AD-26 — الإعدادات والضرائب. الإعداد المالي يعرض أثره قبل الحفظ، والحفظ
  * يعيد ذكره في التأكيد. كل تغيير في السجل بقيمته قبل وبعد.
  */
@@ -47,13 +60,14 @@ export default function AdminSettingsPage() {
 
   const save = async (s: Setting) => {
     const raw = draft[s.key] ?? '';
-    const value = s.kind === 'int' ? Number(raw) : raw;
+    const value = s.kind === 'int' ? intValue(s, raw) : raw;
+    if (value === null) return;
     const sure = await ask({
       title: `تغيّر «${s.labelAr}»؟`,
       body: (
         <>
           <p>
-            <bdi className="num">{String(s.value ?? '—')}</bdi> ← <bdi className="num">{raw || '—'}</bdi>
+            <bdi className="num">{String(s.value ?? '—')}</bdi> ← <bdi className="num">{String(value) || '—'}</bdi>
           </p>
           {s.financial ? <p>{s.financial}</p> : null}
         </>
@@ -79,6 +93,7 @@ export default function AdminSettingsPage() {
 
   const row = (s: Setting) => {
     const changed = draft[s.key] !== undefined && draft[s.key] !== String(s.value ?? '');
+    const invalid = s.kind === 'int' && changed && intValue(s, draft[s.key] ?? '') === null;
     return (
       <div key={s.key} className="ac2-setting">
         <div className="ac2-setting__row">
@@ -96,6 +111,8 @@ export default function AdminSettingsPage() {
                 value={draft[s.key] ?? String(s.value ?? '')}
                 onChange={(e) => setDraft({ ...draft, [s.key]: e.target.value })}
                 aria-label={s.labelAr}
+                aria-invalid={invalid || undefined}
+                aria-describedby={invalid ? `${s.key}-error` : undefined}
               />
               {s.unit ? <span className="ac2-unit__suffix">{s.unit}</span> : null}
             </span>
@@ -118,10 +135,15 @@ export default function AdminSettingsPage() {
               ))}
             </select>
           )}
-          <button type="button" className={`btn btn--sm ${changed ? 'btn--primary' : 'btn--secondary'}`} disabled={act.busy || !changed} onClick={() => void save(s)}>
+          <button type="button" className={`btn btn--sm ${changed && !invalid ? 'btn--primary' : 'btn--secondary'}`} disabled={act.busy || !changed || invalid} onClick={() => void save(s)}>
             حفظ
           </button>
         </div>
+        {invalid ? (
+          <span id={`${s.key}-error`} className="field__error" role="alert">
+            اكتب رقماً صحيحاً من <bdi className="num">{s.min}</bdi> إلى <bdi className="num">{s.max}</bdi>.
+          </span>
+        ) : null}
         <span className="ac2-setting__now">
           الحالي: <span className="num">{s.key.endsWith('_bps') ? pct(Number(s.value)) : String(s.value ?? '—')}</span> {s.unit ?? ''}
           {s.updatedAt ? ` · عُدِّل ${when(s.updatedAt)}` : ''}
