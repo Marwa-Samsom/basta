@@ -601,6 +601,7 @@ export class CheckoutService {
           subOrderNumber: `${order.orderNumber}-${n}`,
           settlementCurrency: so.currency,
           fxRateSnapshot: so.fxRateSnapshot,
+          fxSpreadBpsSnapshot: so.fxSpreadBps ?? null,
           itemsSubtotalMinorUnits: BigInt(so.vendor.items),
           shippingMinorUnits: BigInt(so.vendor.shipping),
           discountMinorUnits: BigInt(so.vendor.discount),

@@ -104,6 +104,8 @@ export interface PricedSubOrder {
   readonly vendorNetMinor: bigint;
   /** وحدات عملة البائع الصغرى لكل وحدة صغرى من عملة الدفع */
   readonly fxRateSnapshot: string;
+  /** هامش الصرف (نقاط أساس) الذي دخل fxFactor — صفر حين يسعّر البائع بعملة الدفع (ACFG-093) */
+  readonly fxSpreadBps: number;
   readonly shipping: { readonly minDays: number; readonly maxDays: number };
 }
 
@@ -343,6 +345,7 @@ export function priceCart(input: {
       vendorNetMinor: vendorNet,
       fxFactor: factor,
       fxRateSnapshot: (1 / factor).toFixed(10),
+      fxSpreadBps: vendor.currency === input.fx.orderCurrency ? 0 : input.fx.spreadBps,
       shipping: quote && quote.available ? { minDays: quote.minDays, maxDays: quote.maxDays } : { minDays: 0, maxDays: 0 },
     });
   }
