@@ -45,6 +45,13 @@ const OUTCOME_AR = {
   vendor: { customer: 'حُسم لصالح المشتري، ورُدّ له ما بقي من مبلغ الطلب', vendor: 'حُسم لصالحكم، ويُحرَّر مال الطلب بموعده' },
 } as const;
 
+/**
+ * دُفع بتحويل بنكي: لا ردّ آلي إلى «وسيلة الدفع» — الردّ ينتظر أن تحوّله الإدارة
+ * يدوياً، ثم يصل المشتري مرجعه (refund_transferred). الوعد بغير ذلك يتركه ينتظر
+ * مالاً لم يخرج بعد (ADM-071، 24 أكتوبر 2026).
+ */
+const OUTCOME_CUSTOMER_TRANSFER_AR = 'حُسم لصالحك، وستحوّل لك الإدارة ما بقي من مبلغ هذا المتجر، ونرسل لك مرجع التحويل حين يتمّ';
+
 /** الاسم الأول للتحية — `\s` لا `s`: «Thomas» كان يُقصّ عند أول حرف s */
 const firstName = (full: string | null | undefined): string => (full ?? '').trim().split(/\s+/)[0] || 'عميلنا';
 
@@ -263,7 +270,7 @@ export class DisputesService {
    */
   async resolve(adminUserId: string, id: string, input: { outcome: 'customer' | 'vendor'; resolution: string }): Promise<void> {
     const resolution = input.resolution.trim();
-    const close = async (db: Db) => {
+    const close = (customerOutcome: string) => async (db: Db) => {
       const { count } = await db.dispute.updateMany({
         where: { id, status: { in: OPEN } },
         data: {
@@ -279,16 +286,25 @@ export class DisputesService {
       });
       // كان القرار لا يصل أحداً: يراه من يفتح الصفحة وحده (J-06 — ADM-069، BUY-061)
       await this.notifyParties(db, id, {
-        customer: { code: 'dispute_resolved', vars: { outcome: OUTCOME_AR.customer[input.outcome], resolution } },
+        customer: { code: 'dispute_resolved', vars: { outcome: customerOutcome, resolution } },
         vendor: { code: 'vendor_dispute_resolved', vars: { outcome: OUTCOME_AR.vendor[input.outcome], resolution } },
       });
     };
 
-    if (input.outcome === 'vendor') return this.prisma.$transaction((tx) => close(tx));
+    if (input.outcome === 'vendor') return this.prisma.$transaction((tx) => close(OUTCOME_AR.customer.vendor)(tx));
 
-    const d = await this.prisma.dispute.findUnique({ where: { id }, select: { subOrderId: true } });
+    const d = await this.prisma.dispute.findUnique({
+      where: { id },
+      select: { subOrderId: true, subOrder: { select: { order: { select: { payment: { select: { method: true } } } } } } },
+    });
     if (!d) throw new ConflictError('النزاع مغلق أو غير موجود.');
-    await this.lifecycle.refundForDispute(d.subOrderId, adminUserId, `حسم النزاع لصالح المشتري: ${resolution}`, close);
+    const byTransfer = d.subOrder.order.payment?.method === 'bank_transfer';
+    await this.lifecycle.refundForDispute(
+      d.subOrderId,
+      adminUserId,
+      `حسم النزاع لصالح المشتري: ${resolution}`,
+      close(byTransfer ? OUTCOME_CUSTOMER_TRANSFER_AR : OUTCOME_AR.customer.customer),
+    );
   }
 
   /** إشعار طرفي النزاع أو أحدهما — المشتري باسمه الأول، والبائع لمالك متجره */

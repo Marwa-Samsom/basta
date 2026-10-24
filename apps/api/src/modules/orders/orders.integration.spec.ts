@@ -996,6 +996,28 @@ describe('إشعارات النزاع — التاجر بالفتح والتصع
     // والردّ نفسه ما زال يصل كما كان
     expect(await codes(buyer.userId, since)).toContain('refund_issued');
   });
+
+  it('دُفع بتحويل: الحسم للمشتري لا يعده بردّ إلى «وسيلة دفعه» — الإدارة تحوّل ثم يصله المرجع (ADM-071)', async () => {
+    if (!dbUp) return;
+    const { a } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    // الطلب كأنه دُفع بتحويل أُكّد — المزوّد الموصول في هذه الاختبارات بطاقة
+    const { orderId } = await prisma.subOrder.findUniqueOrThrow({ where: { id: a.id }, select: { orderId: true } });
+    await prisma.payment.update({ where: { orderId }, data: { method: 'bank_transfer' } });
+    const since = new Date();
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_as_described', message: 'اللون مختلف' });
+    const id = opened.json().id as string;
+    expect((await call('POST', `/me/disputes/${id}/escalate`, buyer.token)).statusCode).toBe(204);
+
+    const resolved = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'customer', resolution: 'اللون مختلف عن الصورة' });
+    expect(resolved.statusCode, resolved.body).toBe(204);
+    expect(await payloadOf(buyer.userId, since, 'dispute_resolved')).toMatchObject({
+      outcome: 'حُسم لصالحك، وستحوّل لك الإدارة ما بقي من مبلغ هذا المتجر، ونرسل لك مرجع التحويل حين يتمّ',
+    });
+    // لا «رددنا» قبل أن يخرج المال — الردّ ينتظر تحويل الإدارة ومرجعه
+    expect(await codes(buyer.userId, since)).not.toContain('refund_issued');
+    expect((await prisma.refund.findFirstOrThrow({ where: { subOrderId: a.id } })).status).toBe('awaiting_transfer');
+  });
 });
 
 describe('تنبيهات الإدارة الدورية — مرة لكل حالة، لمن يحمل صلاحيتها (19 أكتوبر 2026)', () => {
