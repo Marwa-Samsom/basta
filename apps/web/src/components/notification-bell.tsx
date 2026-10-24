@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api, session } from '@/lib/api';
 import { when } from '@/lib/orders';
 import { Icon } from '@/components/icons';
@@ -25,6 +25,24 @@ export function NotificationBell() {
   const [inbox, setInbox] = useState<Inbox | null>(null);
   const [open, setOpen] = useState(false);
   const [version, setVersion] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+
+  // تُغلق بنقرة في أي مكان خارجها أو بـ Esc — لا بالجرس وحده
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -49,7 +67,7 @@ export function NotificationBell() {
   };
 
   return (
-    <div className="bell">
+    <div className="bell" ref={root}>
       <button
         type="button"
         className="icon-btn"

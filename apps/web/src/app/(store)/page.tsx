@@ -3,6 +3,7 @@ import '@/styles/screens/storefront-extra.css';
 import { CompareBar } from '@/components/compare';
 import { Icon } from '@/components/icons';
 import { InstallPrompt } from '@/components/install-prompt';
+import { LatestProducts } from '@/components/latest-products';
 import { ProductGrid } from '@/components/product-card';
 import { RecentSection } from '@/components/recent';
 import { EmptyState } from '@/components/ui';
@@ -164,7 +165,7 @@ export default async function HomePage() {
           </h2>
         </div>
         {!isEmpty ? (
-          <ProductGrid products={latest.items} />
+          <LatestProducts first={latest} currency={currency} />
         ) : (
           <EmptyState
             icon="store"

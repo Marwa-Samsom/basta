@@ -308,7 +308,7 @@ a:hover { color: var(--brand-hover); }
   background: var(--brand);
   color: var(--text-on-brand);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   display: grid;
   place-items: center;
 }
@@ -1144,7 +1144,7 @@ a.stat:hover { box-shadow: var(--shadow-md); }
 .store__brand {
   font-family: var(--font-display);
   font-weight: var(--weight-black);
-  font-size: 26px;
+  font-size: 28.6px;
   line-height: 1;
   color: var(--brand);
   text-decoration: none;
@@ -1245,7 +1245,7 @@ a.stat:hover { box-shadow: var(--shadow-md); }
   gap: var(--space-5);
 }
 .store__foot-col { display: grid; gap: var(--space-2); align-content: start; }
-.store__foot-brand { font-family: var(--font-display); font-weight: var(--weight-black); font-size: 22px; }
+.store__foot-brand { font-family: var(--font-display); font-weight: var(--weight-black); font-size: 24.2px; }
 .store__foot-note { font-size: var(--text-sm); opacity: 0.8; line-height: 1.8; }
 .store__foot-title { font-size: var(--text-sm); font-weight: var(--weight-bold); }
 .store__foot a {
