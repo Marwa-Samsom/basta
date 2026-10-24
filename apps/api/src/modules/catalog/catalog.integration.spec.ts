@@ -403,6 +403,46 @@ describe('ADR-010 · عزل البائعين عبر الواجهة', () => {
 });
 
 // ============================================================================
+describe('VCAT-017 · حفظ المحرّر لا يمحو السعر قبل الخصم والباركود والوزن (24 أكتوبر 2026)', () => {
+  dbIt('ما لم يُرسَل لمتغيّر قائم يبقى، و null يمحوه صراحةً', async () => {
+    const A = as('a');
+    const SKU = `DISC-${SUFFIX}`;
+    const created = await A.post('/vendor/products', {
+      vendorCategoryId: await catOf('a'),
+      nameAr: 'منتج بخصم',
+      variants: [{ sku: SKU, price: '79.00', compareAtPrice: '99.00', barcode: '6291041500213', weightGrams: 180, stock: 4 }],
+    });
+    expect(created.statusCode).toBe(201);
+    const product = created.json();
+    const id = bySku(product, SKU).id;
+
+    // ما يرسله المحرّر حين يغيّر البائع الاسم وحده: لا خانات له لهذه الثلاثة
+    const renamed = await A.patch(`/vendor/products/${product.id}`, {
+      nameAr: 'منتج بخصم — تعديل',
+      variants: [{ id, sku: SKU, price: '79.00' }],
+    });
+    expect(renamed.statusCode, renamed.body).toBe(200);
+    expect(bySku(renamed.json(), SKU)).toMatchObject({
+      compareAtPrice: { minorUnits: '9900' },
+      barcode: '6291041500213',
+      weightGrams: 180,
+    });
+    expect(await prisma.productVariant.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      compareAtPriceMinorUnits: 9900n,
+      barcode: '6291041500213',
+      weightGrams: 180,
+    });
+
+    // من يرسلها null يمحوها — المحو قرار صريح لا أثر جانبي لحفظ آخر
+    const cleared = await A.patch(`/vendor/products/${product.id}`, {
+      variants: [{ id, sku: SKU, price: '79.00', compareAtPrice: null, barcode: null, weightGrams: null }],
+    });
+    expect(cleared.statusCode, cleared.body).toBe(200);
+    expect(bySku(cleared.json(), SKU)).toMatchObject({ compareAtPrice: null, barcode: null, weightGrams: null });
+  });
+});
+
+// ============================================================================
 describe('VD-11 · المخزون من الخادم — بحث وتصفية وصفحات (20 أكتوبر 2026)', () => {
   dbIt('متغيّراً متغيّراً بالبحث، و«المنخفض» و«النافد» من الخادم، والمنخفض أولاً، ولا يرى متجرٌ مخزون غيره', async () => {
     const A = as('a');
