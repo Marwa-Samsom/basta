@@ -398,6 +398,18 @@ describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => 
     expect(payment.status).toBe('partially_refunded');
     // بقيت قطعتان عند المشتري: «تم التسليم» لا «مُسترَد» نهائياً (J-05، 19 أكتوبر 2026)
     expect(await statusOf(a.id)).toBe('delivered');
+
+    // «على البائع» في المبالغ المعادة: ما قُيّد عليه فعلاً (الخصم ناقص عمولته المعكوسة)،
+    // لا كل ما رُدّ للمشتري — ذاك يشمل ما ردّته المنصة من عمولتها وضريبتها (ADM-076)
+    const tag = `استرداد ${refunds[0]!.id.slice(0, 8)}`;
+    const vendorRows = await prisma.ledgerEntry.findMany({ where: { refType: 'sub_order', refId: a.id, memo: { contains: tag } } });
+    const charged = vendorRows.reduce((s, e) => s + (e.direction === 'debit' ? e.amountMinorUnits : -e.amountMinorUnits), 0n);
+    expect(vendorRows.some((e) => e.entryType === 'commission_debit' && e.direction === 'credit')).toBe(true);
+    const list = await call('GET', `/admin/returns/refunds?search=${a.subOrderNumber}`, admin.token);
+    expect(list.statusCode, list.body).toBe(200);
+    const row = list.json().items.find((x: { id: string }) => x.id === refunds[0]!.id);
+    expect(row.vendorChargeMinorUnits).toBe(charged.toString());
+    expect(BigInt(row.vendorChargeMinorUnits)).toBeLessThan(BigInt(row.vendorAmountMinorUnits));
   });
 
   it('بعد إرجاع جزئي: يُرجَع الباقي في مهلته، و«مُسترَد» حين لا يبقى شيء — بلا إشعار تسليم ثانٍ', async () => {

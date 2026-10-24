@@ -454,11 +454,24 @@ export class OperationsService {
       where: { vendorId: { in: [...new Set(rows.map((r) => r.subOrder.vendorId))] }, balanceAvailableMinorUnits: { lt: 0 } },
       select: { vendorId: true, currency: true, balanceAvailableMinorUnits: true },
     });
+    // ما ردّته المنصة من حصّتها لكل استرداد (عمولة معكوسة، ضريبة) — قيودها تحمل refundId
+    const platformRows = await this.prisma.platformLedgerEntry.groupBy({
+      by: ['refundId', 'direction'],
+      where: { refundId: { in: rows.map((r) => r.id) } },
+      _sum: { amountMinorUnits: true },
+    });
+    const platformBack = (refundId: string): bigint =>
+      platformRows
+        .filter((p) => p.refundId === refundId)
+        .reduce((a, p) => a + (p.direction === 'debit' ? 1n : -1n) * (p._sum.amountMinorUnits ?? 0n), 0n);
     return {
       items: rows.map((r) => ({
         ...r,
         amountMinorUnits: r.amountMinorUnits.toString(),
         vendorAmountMinorUnits: r.vendorAmountMinorUnits?.toString() ?? null,
+        // ما تحمّله البائع فعلاً: ما رُدّ بعملته ناقص ما ردّته المنصة — المال محفوظ
+        // (audit_money_conservation) فالباقي من قيوده. لا «ما رُدّ للمشتري» كلّه (ADM-076)
+        vendorChargeMinorUnits: r.vendorAmountMinorUnits === null ? null : (r.vendorAmountMinorUnits - platformBack(r.id)).toString(),
         currency: r.subOrder.order.currency,
         vendorNegative:
           negatives.find((n) => n.vendorId === r.subOrder.vendorId && n.currency === r.subOrder.settlementCurrency)?.balanceAvailableMinorUnits.toString() ?? null,
