@@ -11,7 +11,7 @@ const DAY = 86_400_000;
  * المهام الآلية على الطلبات — الفاعل `system` وحده (ORDER-STATES §1):
  *
  *   · بائع لم يقبل خلال vendor_accept_timeout_hours ← إلغاء واسترداد آلي
- *   · تسليم مضى عليه hold_period_days بلا نزاع مفتوح ولا طلب إرجاع ← مكتمل
+ *   · تسليم بلغ موعده المحفوظ (holdReleaseAt) بلا نزاع مفتوح ← مكتمل
  *   · استرداد بقي «معلّقاً» (سقوط بين الالتزام والبوابة) ← يُعاد تنفيذه
  *
  * كل انتقال شرطيّ على الحالة الحالية، فتكرار المهمة أو تزامن نسختين آمن.
@@ -82,12 +82,21 @@ export class OrderScheduler implements OnApplicationBootstrap, OnModuleDestroy {
     return done;
   }
 
+  /**
+   * الإكمال على موعد التسليم المحفوظ (holdReleaseAt) كتحرير المال — لا على الإعداد الحالي.
+   * كان «التسليم + hold_period_days اليوم»: رفع الفترة بعد التسليم يُبقي الطلب مفتوحاً
+   * للنزاع أياماً بعد أن تحرّر ماله، وخفضها يُكمله قبل موعده (ACFG-025، 24 أكتوبر 2026).
+   */
   async completeDelivered(now: Date): Promise<number> {
     const days = await this.setting('hold_period_days', 14);
     const due = await this.prisma.subOrder.findMany({
       where: {
         status: 'delivered',
-        deliveredAt: { lt: new Date(now.getTime() - days * DAY) },
+        OR: [
+          { holdReleaseAt: { lte: now } },
+          // تسليم سبق حفظ الموعد مع الطلب — يبقى على الحساب القديم
+          { holdReleaseAt: null, deliveredAt: { lt: new Date(now.getTime() - days * DAY) } },
+        ],
         // نزاع مفتوح يجمّد الإكمال ولو انقضت المدة — ADR-007
         disputes: { none: { status: { in: ['open', 'escalated'] } } },
       },

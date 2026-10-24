@@ -701,7 +701,11 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     // تسليم الاختبار يُرجَّع إلى ما قبل مدة التعليق، والمهمة بالوقت الحقيقي. كانت تُستدعى
     // «بعد 15 يوماً» فتُكمل كل طلب مُسلَّم في القاعدة — ومنها طلبات التجربة اليدوية الحيّة
     // على قاعدة التطوير، فيُغلق إرجاعها قبل مهلته (J-02، 18 أكتوبر 2026)
-    await prisma.subOrder.updateMany({ where: { id: { in: [a.id, b.id] } }, data: { deliveredAt: new Date(Date.now() - 15 * 86_400_000) } });
+    // وموعده المحفوظ معه — الإكمال يقرؤه كما يقرؤه تحرير المال (ACFG-025)
+    await prisma.subOrder.updateMany({
+      where: { id: { in: [a.id, b.id] } },
+      data: { deliveredAt: new Date(Date.now() - 15 * 86_400_000), holdReleaseAt: new Date(Date.now() - 86_400_000) },
+    });
     const now = new Date();
     await scheduler.completeDelivered(now);
     expect(await statusOf(a.id)).toBe('delivered');
@@ -719,6 +723,23 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect((await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: 'أُرسل البديل وقبله المشتري' })).statusCode).toBe(204);
     await scheduler.completeDelivered(now);
     expect(await statusOf(a.id)).toBe('completed');
+  });
+
+  it('الإكمال على موعد التسليم المحفوظ لا على فترة التعليق اليوم (ACFG-025)', async () => {
+    if (!dbUp) return;
+    const { a, b } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    await deliver(1, b.id);
+    const day = 86_400_000;
+    // سُلّم قبل 15 يوماً على فترة 21 — موعده بعد ستة أيام: لا يُكمَل ولو تجاوز فترة اليوم،
+    // وإلا انقضت نافذة نزاعه قبل أن يتحرّر ماله
+    await prisma.subOrder.update({ where: { id: a.id }, data: { deliveredAt: new Date(Date.now() - 15 * day), holdReleaseAt: new Date(Date.now() + 6 * day) } });
+    // سُلّم قبل عشرة أيام على فترة أقصر — بلغ موعده: يُكمَل ولو لم يتجاوز فترة اليوم،
+    // وإلا بقي مفتوحاً للنزاع بعد أن تحرّر ماله
+    await prisma.subOrder.update({ where: { id: b.id }, data: { deliveredAt: new Date(Date.now() - 10 * day), holdReleaseAt: new Date(Date.now() - day) } });
+    await scheduler.completeDelivered(new Date());
+    expect(await statusOf(a.id)).toBe('delivered');
+    expect(await statusOf(b.id)).toBe('completed');
   });
 
   it('المراجعة لصاحب الشراء بعد التسليم وحده، ومرة واحدة', async () => {
