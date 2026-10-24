@@ -57,18 +57,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const status = exception.getStatus();
       const body = exception.getResponse();
       /**
-       * نصّ خام = خطأ من Fastify قبل أن يبلغ الطلب مساره، في قراءة الجسم: JSON مكسور،
-       * أو مفتاح __proto__ أو constructor (حماية تلويث النموذج الأصلي)، أو جسم فارغ أو
-       * أكبر من الحدّ. Nest يلفّه بنصّ Fastify الإنجليزي (mapExternalException)، ولا
-       * شيء في التطبيق يرمي HttpException بنصّ خام. يصل برمز ورسالة عربية كبقية أخطاء
-       * المدخلات — و«Body is not valid JSON» لجسم صحيح فيه مفتاح محظور كان يضلّل أيضاً.
+       * خطأ من Fastify قبل أن يبلغ الطلب مساره، في قراءة الجسم: JSON مكسور، أو مفتاح
+       * __proto__ أو constructor (حماية تلويث النموذج الأصلي)، أو جسم فارغ أو أكبر من
+       * الحدّ. Nest يلفّه HttpException الأصل نفسه بنصّ Fastify الإنجليزي
+       * (mapExternalException). يصل برمز ورسالة عربية كبقية أخطاء المدخلات —
+       * و«Body is not valid JSON» لجسم صحيح فيه مفتاح محظور كان يضلّل أيضاً.
+       *
+       * الأصل وحده لا الصنف المشتق: ThrottlerException بنصّ خام أيضاً، ورسالته عربية
+       * مكتوبة للمستخدم (throttle.ts) — كانت «محاولات كثيرة… انتظر 15 دقيقة» تصير
+       * «تعذّرت قراءة الطلب» في صفحة الدخول.
        */
-      if (typeof body === 'string') {
+      if (typeof body === 'string' && exception.constructor === HttpException) {
         this.logger.warn(`${req.method} ${req.url} [${req.id ?? '—'}] ${status} ${body}`);
         res.status(status).send(UNREADABLE[status] ?? UNREADABLE_BODY);
         return;
       }
-      res.status(status).send(body);
+      res.status(status).send(typeof body === 'string' ? { message: body } : body);
       return;
     }
 
