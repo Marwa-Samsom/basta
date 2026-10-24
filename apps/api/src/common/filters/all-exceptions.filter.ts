@@ -11,6 +11,16 @@ import { DomainError } from '../errors/domain-error';
 import { captureError } from '../observability/sentry';
 import { writeErrorLog } from '../observability/error-log';
 
+/** جسم طلب لم يُقرأ — بحالة Fastify نفسها (400 أو 413 أو 415)، والافتراضي لما سوى الأخيرتين */
+const UNREADABLE_BODY = {
+  code: 'INVALID_INPUT',
+  message: 'تعذّرت قراءة الطلب: صيغته غير صحيحة أو فيه حقول ممنوعة. راجعه وأعد المحاولة.',
+};
+const UNREADABLE: Record<number, { code: string; message: string }> = {
+  413: { code: 'PAYLOAD_TOO_LARGE', message: 'الطلب أكبر من الحدّ المسموح. صغّر ما ترسله وأعد المحاولة.' },
+  415: { code: 'UNSUPPORTED_MEDIA_TYPE', message: 'صيغة الطلب غير مدعومة. أرسله بصيغة JSON.' },
+};
+
 /**
  * المترجم الوحيد بين أخطاء المجال والاستجابة.
  *
@@ -46,6 +56,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse();
+      /**
+       * خطأ من Fastify قبل أن يبلغ الطلب مساره، في قراءة الجسم: JSON مكسور، أو مفتاح
+       * __proto__ أو constructor (حماية تلويث النموذج الأصلي)، أو جسم فارغ أو أكبر من
+       * الحدّ. Nest يلفّه HttpException الأصل نفسه بنصّ Fastify الإنجليزي
+       * (mapExternalException). يصل برمز ورسالة عربية كبقية أخطاء المدخلات —
+       * و«Body is not valid JSON» لجسم صحيح فيه مفتاح محظور كان يضلّل أيضاً.
+       *
+       * الأصل وحده لا الصنف المشتق: ThrottlerException بنصّ خام أيضاً، ورسالته عربية
+       * مكتوبة للمستخدم (throttle.ts) — كانت «محاولات كثيرة… انتظر 15 دقيقة» تصير
+       * «تعذّرت قراءة الطلب» في صفحة الدخول.
+       */
+      if (typeof body === 'string' && exception.constructor === HttpException) {
+        this.logger.warn(`${req.method} ${req.url} [${req.id ?? '—'}] ${status} ${body}`);
+        res.status(status).send(UNREADABLE[status] ?? UNREADABLE_BODY);
+        return;
+      }
       res.status(status).send(typeof body === 'string' ? { message: body } : body);
       return;
     }

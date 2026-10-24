@@ -146,3 +146,38 @@ describe('مدخل خاطئ لا يصير 500', () => {
     expect(second.statusCode, second.body).toBe(409);
   });
 });
+
+/**
+ * جسم لا يُقرأ يُرفض في Fastify قبل المسار (SYS-062). كان يصل بنصّ Fastify الإنجليزي
+ * «Body is not valid JSON…» بلا رمز — حتى لجسم صحيح فيه مفتاح محظور.
+ */
+describe('جسم لا يُقرأ: رفض برمز ورسالة عربية', () => {
+  const send = (url: string, payload: string, contentType = 'application/json') =>
+    app.inject({ method: 'POST', url, headers: { 'content-type': contentType }, payload });
+
+  it('__proto__ و constructor.prototype و JSON مكسور وجسم فارغ: 400، ولا شيء تلوّث', async () => {
+    if (!dbUp) return;
+    for (const [url, payload] of [
+      ['/api/v1/auth/login', '{"email":"nobody@basta.test","password":"x","__proto__":{"isAdmin":true}}'],
+      ['/api/v1/cart', '{"constructor":{"prototype":{"polluted":true}}}'],
+      ['/api/v1/auth/login', '{"email":'],
+      ['/api/v1/auth/login', ''],
+    ] as const) {
+      const res = await send(url, payload);
+      expect(res.statusCode, `${url} ${payload}`).toBe(400);
+      expect(res.json()).toEqual({ code: 'INVALID_INPUT', message: expect.stringMatching(/^تعذّرت قراءة الطلب/) });
+    }
+    expect(({} as Record<string, unknown>)['isAdmin']).toBeUndefined();
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+  });
+
+  it('أكبر من الحدّ: 413، وصيغة غير مدعومة: 415 — بالعربية', async () => {
+    if (!dbUp) return;
+    const large = await send('/api/v1/auth/login', JSON.stringify({ email: 'x'.repeat(1_100_000) }));
+    expect(large.statusCode).toBe(413);
+    expect(large.json()).toEqual({ code: 'PAYLOAD_TOO_LARGE', message: expect.stringMatching(/^الطلب أكبر من الحدّ/) });
+    const xml = await send('/api/v1/auth/login', '<login/>', 'application/xml');
+    expect(xml.statusCode).toBe(415);
+    expect(xml.json()).toEqual({ code: 'UNSUPPORTED_MEDIA_TYPE', message: expect.stringMatching(/^صيغة الطلب غير مدعومة/) });
+  });
+});
