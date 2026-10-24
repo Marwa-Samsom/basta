@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
 import { QrCode } from '@/components/qr-code';
 import { digitsOnly } from '@/lib/digits';
@@ -44,6 +44,12 @@ export default function TwoFactorSetupPage() {
   const [proof, setProof] = useState({ password: '', code: '' });
   /** العودة لغير الإدارة: الحساب افتراضياً، أو إعدادات البائع إن جاء منها */
   const back = useSyncExternalStore(still, backFromUrl, () => '/account');
+  /**
+   * طلب التهيئة مرة واحدة للصفحة. كل طلب يكتب سرّاً منتظراً جديداً، ووضع React الصارم
+   * يشغّل الأثر مرتين: كانت الصفحة ترسم سرّ الطلب الثاني والخادم قد يحفظ سرّ الأول
+   * إن وصل بعده — فيُمسح رمز لا يُقبل رمزه. الطلب الواحد يخدم التشغيلتين.
+   */
+  const firstSetup = useRef<Promise<{ secret: string; uri: string }> | null>(null);
 
   useEffect(() => {
     if (!session.read()) {
@@ -51,7 +57,8 @@ export default function TwoFactorSetupPage() {
       return;
     }
     let alive = true;
-    api<{ secret: string; uri: string }>('/auth/totp/setup', { method: 'POST' })
+    firstSetup.current ??= api<{ secret: string; uri: string }>('/auth/totp/setup', { method: 'POST' });
+    firstSetup.current
       .then((s) => {
         if (!alive) return;
         setAdmin(session.roles().includes('admin'));

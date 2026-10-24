@@ -72,6 +72,9 @@ export async function makeAdmin(t: string, permissions: readonly string[] = ['pa
   return { email, totp: () => generateSync({ strategy: 'totp', secret, crypto, base32 }) };
 }
 
+/** رمز تطبيق المصادقة الآن لسرّ base32 — كما يحسبه الهاتف بعد مسح الرمز */
+export const totpNow = (secret: string): string => generateSync({ strategy: 'totp', secret, crypto, base32 });
+
 export async function auditViews(): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
   for (const v of ['audit_money_conservation', 'audit_wallet_drift', 'audit_withdrawn_drift', 'audit_inventory_drift', 'audit_order_split_drift']) {
