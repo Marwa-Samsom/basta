@@ -94,6 +94,12 @@ describe('بوابة 08 · البند الخامس — مجموع الفرعية
     expect(cart.subOrders).toHaveLength(3);
     const sum = cart.subOrders.reduce((a, s) => a + s.charge.total, 0n);
     expect(sum).toBe(cart.totals.total);
+    // كل فرعي يحمل الهامش الذي دخل معامله — صفر لعملة الدفع نفسها (ACFG-093)
+    expect(cart.subOrders.map((s) => [s.currency, s.fxSpreadBps])).toEqual([
+      ['SAR', 200],
+      ['JOD', 200],
+      ['USD', 0],
+    ]);
   });
 
   it('500 سلة عشوائية: المساواة لا تنكسر مرة واحدة', () => {

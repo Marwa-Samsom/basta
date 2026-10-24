@@ -20,8 +20,14 @@ type Stringified<T> = {
 };
 
 export type SnapshotLine = Stringified<PricedLine>;
-/** fxFactor للعرض وحده (سعر القطعة في السلة) — الملزِم في اللقطة fxRateSnapshot */
-export type SnapshotSubOrder = Stringified<Omit<PricedSubOrder, 'lines' | 'fxFactor'>> & { lines: SnapshotLine[] };
+/**
+ * fxFactor للعرض وحده (سعر القطعة في السلة) — الملزِم في اللقطة fxRateSnapshot.
+ * fxSpreadBps اختياري: لقطات ما قبل 24 أكتوبر 2026 لا تحمله (ACFG-093).
+ */
+export type SnapshotSubOrder = Stringified<Omit<PricedSubOrder, 'lines' | 'fxFactor' | 'fxSpreadBps'>> & {
+  lines: SnapshotLine[];
+  fxSpreadBps?: number;
+};
 export interface Snapshot {
   readonly version: 1;
   readonly currency: string;
@@ -55,6 +61,7 @@ export function toSnapshot(cart: PricedCart): Snapshot {
       commissionMinor: s(so.commissionMinor),
       vendorNetMinor: s(so.vendorNetMinor),
       fxRateSnapshot: so.fxRateSnapshot,
+      fxSpreadBps: so.fxSpreadBps,
       shipping: so.shipping,
       lines: so.lines.map((l) => ({
         variantId: l.variantId,

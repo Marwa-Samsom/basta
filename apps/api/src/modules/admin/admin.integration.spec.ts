@@ -81,8 +81,8 @@ async function drain(...userIds: string[]): Promise<void> {
   }
 }
 
-async function placeOrder(qty = 2) {
-  const cart = await call('POST', '/cart', undefined, { currency: 'SAR' });
+async function placeOrder(qty = 2, currency = 'SAR') {
+  const cart = await call('POST', '/cart', undefined, { currency });
   const token = cart.json().token as string;
   await call('POST', '/cart/items', undefined, { variantId: vendor.variantId, qty }, { 'x-cart-token': token });
   const address = { recipientName: 'مشترٍ', phone: '+966500000001', country: 'SA', region: 'الرياض', city: 'الرياض', street: 'شارع 1' };
@@ -373,6 +373,29 @@ describe('بوابة 11 · البند 2 — التقرير المالي يطاب
     const rowOf = [...Array(sheet.rowCount).keys()].map((i) => sheet.getRow(i + 1).values as unknown[]).find((v) => v[1] === 'SAR')!;
     expect(String(rowOf[head.indexOf('العمولة') + 1])).toBe(sar.commissionMinorUnits);
   }, 30_000);
+
+  it('دخل فرق الصرف على هامش لحظة الدفع المحفوظ مع الفرعي، لا على الإعداد اليوم (ACFG-093)', async () => {
+    if (!dbUp) return;
+    // متجر بالريال ودفع بالدينار: الهامش يدخل السعر ويُحفظ على الفرعي كما كان نافذاً
+    const order = await placeOrder(1, 'JOD');
+    const live = Number((await prisma.setting.findUnique({ where: { key: 'fx_spread_bps' } }))?.valueJson ?? 200);
+    const sub = await prisma.subOrder.findUniqueOrThrow({ where: { id: order.subOrders[0]!.id } });
+    expect(sub.settlementCurrency).toBe('SAR');
+    expect(sub.fxSpreadBpsSnapshot).toBe(live);
+
+    // هامش لحظة الدفع غير الإعداد اليوم (كأن المدير غيّره بعد الدفع): التقرير يتبع الفرعي.
+    // لا يُغيَّر الإعداد نفسه — ملفات أخرى تسعّر بالتوازي على القاعدة نفسها
+    const then = live + 300;
+    await prisma.subOrder.update({ where: { id: sub.id }, data: { fxSpreadBpsSnapshot: then } });
+    const paidAt = order.paidAt!;
+    const from = paidAt.toISOString();
+    const to = new Date(paidAt.getTime() + 1).toISOString();
+    const res = await call('GET', `/admin/reports/financial?from=${from}&to=${to}`, admin.token);
+    expect(res.statusCode, res.body).toBe(200);
+    const jod = res.json().sales.find((x: { currency: string }) => x.currency === 'JOD');
+    const charge = Number(sub.chargeTotalMinorUnits);
+    expect(jod.fxSpreadMinorUnits).toBe(String(charge - Math.round((charge * 10_000) / (10_000 + then))));
+  });
 
   it('التقرير المالي يحتاج reports.view — مدير المحتوى يُمنع', async () => {
     if (!dbUp) return;

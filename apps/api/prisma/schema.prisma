@@ -815,6 +815,9 @@ model SubOrder {
 
   /// ADR-004: اللقطة تُقرأ في كل احتساب لاحق، ولا يُستشار جدول القواعد ثانيةً
   commissionRateBpsSnapshot Int
+  /// هامش الصرف (نقاط أساس) الذي دخل fxRateSnapshot لحظة التسعير — صفر بعملة واحدة.
+  /// دخل فرق الصرف يُحسب منه لا من الإعداد الحالي (ACFG-093)؛ فارغ لما لم تحمله لقطته
+  fxSpreadBpsSnapshot       Int?
   commissionMinorUnits      BigInt
   /// حصّة هذا الفرعي **بعملة الدفع**. مجموعها = grandTotal الأب بالبناء — بوابة 08
   chargeTotalMinorUnits     BigInt?
