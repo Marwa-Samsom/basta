@@ -368,6 +368,10 @@ function NotifsTab() {
 
 // -------------------------------------------------------------- العملة
 
+/** خانات العملة بعد الفاصلة بالعربية: الريال خانتان والدينار ثلاث */
+const fractionDigits = (digits: number): string =>
+  digits === 0 ? 'بلا كسور' : digits === 2 ? 'خانتان بعد الفاصلة' : digits === 3 ? 'ثلاث خانات بعد الفاصلة' : `${digits} خانات بعد الفاصلة`;
+
 function CurrencyTab() {
   const { data, error, loading } = useOnboarding();
   if (error) return <Alert tone="danger">{error}</Alert>;
@@ -381,9 +385,10 @@ function CurrencyTab() {
       <div className="vs-currency">
         <span className="vs-currency__main">
           <span className="vs-currency__name">{c?.nameAr ?? data.settlementCurrency}</span>
-          <bdi dir="ltr" className="vs-currency__code">
-            {data.settlementCurrency} · {c?.digits ?? 2} decimals
-          </bdi>
+          {/* كانت «SAR · 2 decimals» بالإنجليزية — الرمز وحده لاتيني، والباقي بالعربية */}
+          <span className="vs-currency__code">
+            <bdi dir="ltr">{data.settlementCurrency}</bdi> · {fractionDigits(c?.digits ?? 2)}
+          </span>
         </span>
         {data.settlementCurrencyLocked ? (
           <span className="badge">
