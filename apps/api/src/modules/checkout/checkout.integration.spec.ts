@@ -700,6 +700,27 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
     return (await call('POST', '/auth/login', { body: { email, password } })).json().tokens.accessToken as string;
   }
 
+  it('كوبون المنصّة بمبلغ ثابت يُستعمل: خصم واحد بعملته تموّله المنصّة، ويُسجَّل استعماله (ACFG-035)', async () => {
+    if (!dbUp) return;
+    const variantId = await stocked();
+    // كما تنشئه لوحة الكوبونات: منصّي، ثابت، بعملة — كان يُرفض «غير مدعوم على سلّة متعددة العملات»
+    const c = await prisma.coupon.create({
+      data: { code: `FIX-${SUFFIX}`.toUpperCase(), scope: 'platform', type: 'fixed', valueMinorUnits: 1_500n, currency: 'JOD', fundedBy: 'platform' },
+    });
+    const cart = await cartWithCoupon(variantId, c.code);
+    const res = await checkoutAs(cart, 'tok_success');
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().outcome).toBe('paid');
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { orderNumber: res.json().orderNumber }, include: { subOrders: true } });
+    const sub = order.subOrders[0]!;
+    expect(sub.discountMinorUnits).toBe(1_500n);
+    // المنصّة تموّله: صافي البائع لا ينقص بالخصم
+    expect(sub.vendorNetMinorUnits).toBe(10_000n - sub.commissionMinorUnits + sub.shippingMinorUnits);
+    expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(1);
+    expect(await prisma.$queryRaw<unknown[]>`SELECT * FROM audit_order_split_drift WHERE order_id = ${order.id}::uuid`).toEqual([]);
+  });
+
   it('الحدّ الكلي تحت التزامن: كوبون لاستعمالين وخمسة طلبات معاً — يمرّ اثنان', async () => {
     if (!dbUp) return;
     const variantId = await stocked();

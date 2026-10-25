@@ -360,6 +360,68 @@ describe('الشحن', () => {
   });
 });
 
+describe('كوبون المنصّة بمبلغ ثابت — خصم واحد للطلب، على بائعي عملته (ACFG-035)', () => {
+  const fixed = (valueMinor: bigint, currency = 'SAR'): CouponInput => ({
+    code: 'TEN',
+    scope: 'platform',
+    vendorId: null,
+    type: 'fixed',
+    valueBps: null,
+    valueMinor,
+    maxDiscountMinor: null,
+    minOrderMinor: null,
+    currency,
+    currencyDigits: DIGITS[currency] ?? 2,
+    fundedBy: 'platform',
+  });
+  const tax = { rateBps: 0, inclusive: true };
+  const fx = { ...FX, orderCurrency: 'SAR', orderDigits: 2 };
+  const price = (lines: PricedLineInput[], currencies: Record<string, string>, coupon: CouponInput) =>
+    priceCart({
+      lines,
+      vendors: new Map(Object.entries(currencies).map(([id, c]) => [id, vendor(id, c)])),
+      shipping: new Map(Object.keys(currencies).map((id) => [id, ship(1_500n)])),
+      tax,
+      fx,
+      coupon,
+    });
+
+  it('متجر واحد بعملته: 79.00 يصير 69.00، والبائع يقبض كاملاً (المنصّة تموّل)', () => {
+    const cart = price([line('a', 7_900n, 1)], { a: 'SAR' }, fixed(1_000n));
+    expect(cart.blockers).toEqual([]);
+    const a = cart.subOrders[0]!;
+    expect(a.vendor.discount).toBe(1_000n);
+    expect(cart.coupon).toEqual({ code: 'TEN', discountMinor: 1_000n });
+    expect(a.vendorNetMinor).toBe(7_900n - a.commissionMinor + 1_500n);
+  });
+
+  it('متجران بعملته: 10 مرة واحدة لا 20، مقسومة بنسبة البنود', () => {
+    const cart = price([line('a', 10_000n, 1), line('b', 5_000n, 1)], { a: 'SAR', b: 'SAR' }, fixed(1_000n));
+    expect(cart.totals.discount).toBe(1_000n);
+    expect(cart.subOrders.map((s) => s.vendor.discount)).toEqual([667n, 333n]);
+  });
+
+  it('متجر بعملته وآخر بغيرها: الخصم كله على الأول، ولا صرف صامت للثاني', () => {
+    const cart = price([line('a', 10_000n, 1), line('j', 20_000n, 1)], { a: 'SAR', j: 'JOD' }, fixed(1_000n));
+    const [a, j] = cart.subOrders;
+    expect(a?.vendor.discount).toBe(1_000n);
+    expect(j?.vendor.discount).toBe(0n);
+  });
+
+  it('لا متجر بعملته: مانع باسم الكوبون لا خصم صفر صامت', () => {
+    const cart = price([line('j', 20_000n, 1)], { j: 'JOD' }, fixed(1_000n));
+    expect(cart.coupon).toBeNull();
+    expect(cart.blockers.join(' ')).toMatch(/الكوبون TEN لا ينطبق على منتجات سلّتك/);
+  });
+
+  it('بنود أقل من المبلغ: الخصم بقدرها لا تحت الصفر، والشحن لا يُخصم', () => {
+    const cart = price([line('a', 700n, 1)], { a: 'SAR' }, fixed(1_000n));
+    const a = cart.subOrders[0]!;
+    expect(a.vendor.discount).toBe(700n);
+    expect(a.vendor.total).toBe(1_500n);
+  });
+});
+
 describe('سقف خصم النسبة — للطلب كله، بعملة الكوبون', () => {
   const percent = (cap: bigint, currency: string, digits: number): CouponInput => ({
     code: 'P20',
