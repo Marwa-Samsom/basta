@@ -94,6 +94,8 @@ export default function NotificationsPage() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [unread, setUnread] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
+  // كل ضغطة «حمّل المزيد»: كم أضافت ومن أي مؤشّر بدأت — «السابق» يُسقطها ويعيد المؤشّر
+  const [batches, setBatches] = useState<{ count: number; cursor: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -118,6 +120,7 @@ export default function NotificationsPage() {
         setItems(p.items);
         setUnread(p.unread);
         setCursor(p.nextCursor ?? null);
+        setBatches([]);
       })
       .catch((e: Error) => alive && setError(e.message));
     return () => {
@@ -131,6 +134,7 @@ export default function NotificationsPage() {
     try {
       const p = await fetchPage(cursor);
       setItems((list) => [...(list ?? []), ...p.items]);
+      setBatches((b) => [...b, { count: p.items.length, cursor }]);
       setUnread(p.unread);
       setCursor(p.nextCursor ?? null);
     } catch (e) {
@@ -140,12 +144,22 @@ export default function NotificationsPage() {
     }
   }
 
+  /** «السابق»: تُسقط آخر صفحة أضافها «حمّل المزيد» ويعود مؤشّرها، فتُجلب من جديد إن طُلبت */
+  function less(): void {
+    const last = batches.at(-1);
+    if (!last) return;
+    setItems((list) => (list ?? []).slice(0, Math.max(0, (list ?? []).length - last.count)));
+    setBatches((b) => b.slice(0, -1));
+    setCursor(last.cursor);
+  }
+
   /** تبديل العرض يبدأ من أول الصفحة — والهيكل يظهر حتى يصل الجديد */
   function show(next: 'all' | 'unread'): void {
     if (next === filter) return;
     setItems(null);
     setError(null);
     setCursor(null);
+    setBatches([]);
     setFilter(next);
   }
 
@@ -315,12 +329,19 @@ export default function NotificationsPage() {
               </ul>
             </section>
           ))}
-          {cursor ? (
+          {cursor || batches.length > 0 ? (
             <div className="aa-more">
-              <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => void more()}>
-                {busy ? <span className="spinner" aria-hidden /> : null}
-                حمّل المزيد
-              </button>
+              {batches.length > 0 ? (
+                <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={less}>
+                  السابق
+                </button>
+              ) : null}
+              {cursor ? (
+                <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => void more()}>
+                  {busy ? <span className="spinner" aria-hidden /> : null}
+                  حمّل المزيد
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>

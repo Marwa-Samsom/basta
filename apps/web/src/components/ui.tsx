@@ -1,7 +1,7 @@
 'use client';
 
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import { Icon, type IconName } from '@/components/icons';
 
 /**
@@ -198,11 +198,31 @@ export function Spinner({ label = 'جارٍ التحميل' }: { label?: string 
 /**
  * «المزيد» تحت قائمة طويلة ومعه «<المعروض> من <الإجمالي>» — يختفي حين تكتمل. يأخذ ما يعيده
  * `useAdminList` كما هو: `<MoreButton list={list} />`. في لوحتي الإدارة والبائع.
+ * و«السابق» بجانبه ما دام «المزيد» ألحق صفحة: يُسقط آخرها فتعود القائمة كما كانت قبلها.
  */
-export function MoreButton({ list }: { list: { items: unknown[]; total: number; hasMore: boolean; loadingMore: boolean; moreError: string | null; more: () => void } }) {
-  if (!list.hasMore && !list.moreError) return null;
+export function MoreButton({
+  list,
+}: {
+  list: {
+    items: unknown[];
+    total: number;
+    hasMore: boolean;
+    loadingMore: boolean;
+    moreError: string | null;
+    more: () => void;
+    less?: () => void;
+    canLess?: boolean;
+  };
+}) {
+  const bar = useRef<HTMLDivElement>(null);
+  if (!list.hasMore && !list.moreError && !list.canLess) return null;
+  const less = () => {
+    list.less?.();
+    // القائمة قصرت من تحت — يبقى الزرّان أمام العين لا تقفز الصفحة بعيداً عنهما
+    requestAnimationFrame(() => bar.current?.scrollIntoView({ block: 'center' }));
+  };
   return (
-    <div className="list-more">
+    <div className="list-more" ref={bar}>
       <span className="list-more__count num">
         {list.items.length} من {list.total}
       </span>
@@ -211,9 +231,16 @@ export function MoreButton({ list }: { list: { items: unknown[]; total: number; 
           {list.moreError}
         </span>
       ) : null}
-      <button type="button" className="btn btn--secondary btn--sm" disabled={list.loadingMore} onClick={list.more}>
-        {list.loadingMore ? 'جارٍ التحميل…' : list.moreError ? 'أعد المحاولة' : 'المزيد'}
-      </button>
+      {list.canLess && list.less ? (
+        <button type="button" className="btn btn--ghost btn--sm" disabled={list.loadingMore} onClick={less}>
+          السابق
+        </button>
+      ) : null}
+      {list.hasMore || list.moreError ? (
+        <button type="button" className="btn btn--secondary btn--sm" disabled={list.loadingMore} onClick={list.more}>
+          {list.loadingMore ? 'جارٍ التحميل…' : list.moreError ? 'أعد المحاولة' : 'المزيد'}
+        </button>
+      ) : null}
     </div>
   );
 }

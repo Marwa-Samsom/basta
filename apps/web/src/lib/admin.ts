@@ -71,6 +71,9 @@ export function useAdminList<T, Extra extends object = object>(
   forbidden: boolean;
   reload: () => void;
   more: () => void;
+  /** «السابق»: تُسقط آخر صفحة ألحقها «المزيد» فتعود القائمة كما كانت قبلها */
+  less: () => void;
+  canLess: boolean;
   hasMore: boolean;
   loadingMore: boolean;
   moreError: string | null;
@@ -103,6 +106,11 @@ export function useAdminList<T, Extra extends object = object>(
       .finally(() => setLoadingMore(false));
   };
 
+  const less = () => {
+    setMoreError(null);
+    setExtra((e) => ({ path, pages: (e.path === path ? e.pages : []).slice(0, -1) }));
+  };
+
   const reload = () => {
     setExtra({ path: null, pages: [] });
     setMoreError(null);
@@ -117,6 +125,8 @@ export function useAdminList<T, Extra extends object = object>(
     forbidden: first.forbidden,
     reload,
     more,
+    less,
+    canLess: pages.length > 0,
     // صفحة ملحقة فارغة نهاية القائمة حتى لو نقص المعروض عن الإجمالي بمكرّر أُسقط
     hasMore: !!first.data && items.length < total && pages.at(-1)?.length !== 0,
     loadingMore,
