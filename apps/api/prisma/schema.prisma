@@ -253,6 +253,8 @@ enum VendorStatus {
 
 model Vendor {
   id              String       @id @default(uuid()) @db.Uuid
+  /// متجر واحد لكل حساب: فهرس فريد خام vendors_one_per_owner_idx (VON-011) — لا @unique
+  /// هنا كي تبقى العلاقة User.vendors[] كما يقرؤها الكود
   ownerUserId     String       @db.Uuid
   slug            String       @unique
   nameAr          String

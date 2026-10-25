@@ -22,6 +22,7 @@ import { hashPassword } from '../identity/public';
 import { SearchService } from '../search/public';
 import { DOCUMENT_TYPES } from './domain/onboarding';
 import { DOCUMENTS_ROOT } from './infrastructure/document-storage';
+import { VendorOnboardingService } from './application/vendor-onboarding.service';
 
 const prisma = new PrismaClient();
 let app: NestFastifyApplication;
@@ -250,6 +251,33 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe('DUPLICATE');
+  });
+
+  it('خمسة طلبات «افتح متجراً» متزامنة: متجر واحد، والبقية «لديك متجر مسجَّل بالفعل.» (VON-011)', async () => {
+    if (!dbUp) return;
+    const email = `racer.${SUFFIX}@basta.test`;
+    const userId = await registerUser(email, ['customer']);
+    const token = await login(email);
+    // كانت تمرّ كلها من سؤال «للحساب متجر؟» قبل أن يُكتب أيّها: ثلاثة متاجر من خمسة طلبات.
+    // الخدمة مباشرةً تُبقي الطلبات متداخلة فعلاً (inject يقرّبها من التتالي)، وواحد عبر الواجهة
+    const onboarding = app.get(VendorOnboardingService);
+    const actor = { userId, roles: ['customer'] as const, permissions: [] };
+    const payload = (i: number) => ({ nameAr: `متجر السباق ${i}`, slug: `racer-${i}-${SUFFIX}`.toLowerCase(), country: 'SA', settlementCurrency: 'SAR' });
+    const direct = await Promise.allSettled([1, 2, 3, 4].map((i) => onboarding.apply(actor, payload(i))));
+    const viaApi = await app.inject({ method: 'POST', ...api('/vendor/onboarding/apply', token), payload: payload(5) });
+    const results = [
+      ...direct.map((d) => (d.status === 'fulfilled' ? { statusCode: 201, body: '', json: () => ({}) } : { statusCode: (d.reason as { httpStatus?: number }).httpStatus ?? 500, body: String((d.reason as Error).message), json: () => ({ code: (d.reason as { code?: string }).code, message: (d.reason as Error).message }) })),
+      viaApi,
+    ];
+    const won = results.filter((r) => r.statusCode === 201);
+    expect(won, results.map((r) => `${r.statusCode} ${r.body.slice(0, 80)}`).join('\n')).toHaveLength(1);
+    for (const lost of results.filter((r) => r.statusCode !== 201)) {
+      expect(lost.statusCode).toBe(409);
+      expect(lost.json()).toMatchObject({ code: 'DUPLICATE', message: 'لديك متجر مسجَّل بالفعل.' });
+    }
+    const vendors = await prisma.vendor.findMany({ where: { ownerUserId: userId } });
+    expect(vendors).toHaveLength(1);
+    createdVendorIds.push(vendors[0]!.id);
   });
 
   it('VD-02: الإرسال قبل اكتمال النواقص مرفوض، والموانع تُعاد مجتمعة', async () => {
