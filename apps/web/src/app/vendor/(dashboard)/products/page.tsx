@@ -66,6 +66,8 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
   // «المزيد»: الصفحات التالية تُلحق بالأولى، ومفتاح القائمة يمنع إلحاق صفحة بحث سابق بغيره
   const [extra, setExtra] = useState<ProductListItem[]>([]);
+  // كم ألحقت كل ضغطة «المزيد» — «السابق» يُسقط آخرها بقدرها
+  const [batches, setBatches] = useState<number[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState<string | null>(null);
   const [exhausted, setExhausted] = useState(false);
@@ -82,6 +84,7 @@ export default function ProductsPage() {
         listKey.current = params.toString();
         setPage(next);
         setExtra([]);
+        setBatches([]);
         setMoreError(null);
         setExhausted(false);
         setError(null);
@@ -147,12 +150,22 @@ export default function ProductsPage() {
       const next = await api<Page<ProductListItem>>(`/vendor/products?${params.toString()}`);
       if (listKey.current !== key) return;
       setExtra((e) => [...e, ...next.items]);
+      setBatches((b) => [...b, next.items.length]);
       if (next.items.length === 0) setExhausted(true);
     } catch (err) {
       if (listKey.current === key) setMoreError(err instanceof Error ? err.message : 'تعذّر تحميل المزيد.');
     } finally {
       setLoadingMore(false);
     }
+  };
+
+  const loadLess = (): void => {
+    const last = batches.at(-1);
+    if (last === undefined) return;
+    setExtra((e) => e.slice(0, e.length - last));
+    setBatches((b) => b.slice(0, -1));
+    setExhausted(false);
+    setMoreError(null);
   };
 
   const filtered = Boolean(search.trim()) || tab !== 'all' || Boolean(category);
@@ -373,9 +386,18 @@ export default function ProductsPage() {
           ) : null}
 
           {page && page.items.length > 0 ? (
-            (items.length < page.total && !exhausted) || moreError ? (
+            (items.length < page.total && !exhausted) || moreError || batches.length > 0 ? (
               <MoreButton
-                list={{ items, total: page.total, hasMore: items.length < page.total && !exhausted, loadingMore, moreError, more: () => void loadMore() }}
+                list={{
+                  items,
+                  total: page.total,
+                  hasMore: items.length < page.total && !exhausted,
+                  loadingMore,
+                  moreError,
+                  more: () => void loadMore(),
+                  less: loadLess,
+                  canLess: batches.length > 0,
+                }}
               />
             ) : (
               <div className="card__foot vp-foot">
