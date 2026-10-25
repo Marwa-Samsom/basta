@@ -412,6 +412,30 @@ describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => 
     expect(BigInt(row.vendorChargeMinorUnits)).toBeLessThan(BigInt(row.vendorAmountMinorUnits));
   });
 
+  it('طلب إرجاع حُفظ بسطر مكرّر قبل التصليح: استلامه يُرفض ولا يُردّ نصيب أكثر من السطر (BUY-044)', async () => {
+    if (!dbUp) return;
+    const { a, order } = await placeOrder([3, 1]);
+    await deliver(0, a.id);
+    const line = a.items[0]!;
+    const asked = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+      items: [{ orderItemId: line.id, qty: 1 }],
+      reasonCode: 'damaged',
+    });
+    expect(asked.statusCode, asked.body).toBe(201);
+    // كما حُفظ طلب صاحبة المشروع قبل التصليح: 2 + 2 من سطر فيه 3
+    await prisma.returnRequest.update({
+      where: { id: asked.json().returnRequestId },
+      data: { itemsJson: [{ orderItemId: line.id, qty: 2 }, { orderItemId: line.id, qty: 2 }] },
+    });
+
+    const received = await vendorMove(0, a.id, 'returned');
+    expect(received.statusCode).toBe(400);
+    expect(received.json().message).toMatch(/لا يمكن إرجاع 4 من سطر بقي منه 3/);
+    expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(0);
+    expect(await prisma.orderItem.findUniqueOrThrow({ where: { id: line.id } })).toMatchObject({ refundedQty: 0 });
+    expect(await statusOf(a.id)).toBe('return_requested');
+  });
+
   it('بعد إرجاع جزئي: يُرجَع الباقي في مهلته، و«مُسترَد» حين لا يبقى شيء — بلا إشعار تسليم ثانٍ', async () => {
     if (!dbUp) return;
     const { a, order } = await placeOrder([2, 1]);
@@ -443,6 +467,14 @@ describe('بوابة 09 · البند 2 — الإرجاع الجزئي', () => 
     const tooMany = await returnOf(2);
     expect(tooMany.statusCode).toBe(400);
     expect(tooMany.json().message).toBe('الكمية المتاحة للإرجاع 1.');
+    // ولو كُرّر السطر لتمرّ كل نسخة وحدها (BUY-044): المجموع 2 من قطعة باقية
+    const duplicated = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+      items: [{ orderItemId: line.id, qty: 1 }, { orderItemId: line.id, qty: 1 }],
+      reasonCode: 'size_issue',
+    });
+    expect(duplicated.statusCode).toBe(400);
+    expect(duplicated.json().message).toBe('الكمية المتاحة للإرجاع 1.');
+    expect(await statusOf(a.id)).toBe('delivered');
     const second = await returnOf(1);
     expect(second.statusCode, second.body).toBe(201);
     expect((await vendorMove(0, a.id, 'returned')).statusCode).toBe(200);
