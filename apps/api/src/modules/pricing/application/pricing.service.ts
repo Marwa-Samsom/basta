@@ -258,10 +258,8 @@ export class PricingService {
       const used = await this.prisma.couponRedemption.count({ where: { couponId: c.id, userId } });
       if (used >= c.usageLimitPerUser) return invalid('استعملت هذا الكوبون من قبل.');
     }
-    if (c.scope === 'platform' && c.type === 'fixed') {
-      // الثابت يحتاج عملة البائع، والمنصّي يعبر البائعين بعملاتهم — يُمنع لا يُحوَّل بصمت
-      return invalid('هذا الكوبون غير مدعوم على سلّة متعددة العملات.');
-    }
+    // المنصّي الثابت يُطبَّق على بائعي عملته وحدهم، خصماً واحداً للطلب (spreadFixed) — كان يُرفض هنا
+    // دائماً، فلا يُستعمل كوبون «مبلغ ثابت» تنشئه اللوحة أبداً (ACFG-035)
     return {
       code: c.code,
       scope: c.scope as 'platform' | 'vendor',

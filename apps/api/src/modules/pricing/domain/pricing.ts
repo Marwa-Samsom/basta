@@ -221,6 +221,33 @@ function capPercent(
   });
 }
 
+/**
+ * كوبون المنصّة بمبلغ ثابت خصمٌ واحد للطلب كله لا لكل بائع (ACFG-035، 25 أكتوبر 2026).
+ *
+ * couponDiscount يعطي كل بائع بعملة الكوبون المبلغ كاملاً — صحيح لكوبون البائع، لكن «10 ريال»
+ * من المنصّة على سلة من متجرين بالريال كانت تصير 20. لذا كان يُرفض كل كوبون منصّة ثابت
+ * («غير مدعوم على سلّة متعددة العملات») ولو كانت السلة متجراً واحداً بعملته — فخيار «مبلغ ثابت»
+ * في لوحة الكوبونات ينشئ كوبوناً لا يُستعمل أبداً.
+ *
+ * الآن: المبلغ (أو بنود بائعي عملته إن قلّت عنه) يوزَّع عليهم بنسبة بنودهم بـ allocate، فالمجموع
+ * هو المبلغ بالضبط، ولا تتجاوز حصة بائع بنوده. البائع بعملة أخرى لا يناله شيء — بلا صرف صامت.
+ */
+function spreadFixed(
+  coupon: CouponInput | null,
+  ctxs: { items: bigint; disc: { items: bigint; shipping: bigint } }[],
+): void {
+  if (!coupon || coupon.type !== 'fixed' || coupon.scope !== 'platform') return;
+  const matching = ctxs.filter((c) => c.disc.items > 0n);
+  if (matching.length === 0) return;
+  const pool = matching.reduce((a, c) => a + c.items, 0n);
+  const value = coupon.valueMinor ?? 0n;
+  const shares = allocate(value > pool ? pool : value, matching.map((c) => c.items));
+  matching.forEach((c, i) => {
+    const share = shares[i] ?? 0n;
+    c.disc = { ...c.disc, items: share > c.items ? c.items : share };
+  });
+}
+
 // ------------------------------------------------------------ التسعير
 
 export function priceCart(input: {
@@ -275,6 +302,7 @@ export function priceCart(input: {
     return { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc };
   });
   capPercent(input.coupon, ctxs, input.fx);
+  spreadFixed(input.coupon, ctxs);
 
   for (const { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc } of ctxs) {
     if (disc.items > 0n || disc.shipping > 0n) couponMatched = true;
