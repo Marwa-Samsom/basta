@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import {
   ConflictError,
@@ -144,27 +145,40 @@ export class VendorOnboardingService {
     if (chosen) assertSettlementCurrency(chosen);
 
     const vendorId = randomUUID();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.vendor.create({
-        data: {
-          id: vendorId,
-          ownerUserId: actor.userId,
-          slug,
-          nameAr,
-          nameEn: input.nameEn?.trim() || null,
-          country,
-          businessType: input.businessType ?? null,
-          settlementCurrency: chosen ?? defaultCurrencyFor(country),
-          settlementCurrencyChosenAt: chosen ? new Date() : null,
-          status: 'pending',
-        },
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.vendor.create({
+          data: {
+            id: vendorId,
+            ownerUserId: actor.userId,
+            slug,
+            nameAr,
+            nameEn: input.nameEn?.trim() || null,
+            country,
+            businessType: input.businessType ?? null,
+            settlementCurrency: chosen ?? defaultCurrencyFor(country),
+            settlementCurrencyChosenAt: chosen ? new Date() : null,
+            status: 'pending',
+          },
+        });
+        await tx.userRole.upsert({
+          where: { userId_role: { userId: actor.userId, role: 'vendor_owner' } },
+          update: {},
+          create: { userId: actor.userId, role: 'vendor_owner' },
+        });
       });
-      await tx.userRole.upsert({
-        where: { userId_role: { userId: actor.userId, role: 'vendor_owner' } },
-        update: {},
-        create: { userId: actor.userId, role: 'vendor_owner' },
-      });
-    });
+    } catch (err) {
+      /**
+       * طلبان متزامنان (تبويبان، أو «التالي» مرتين) يمرّان من سؤال «للحساب متجر؟» أعلاه معاً؛
+       * قيد vendors_one_per_owner_idx يردّ الخاسر هنا، فيسمع ما يسمعه الطلب المتأخر (VON-011).
+       * و P2002 غيره (رابط متجر أُخذ في الأثناء) يمضي كما هو.
+       */
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const won = await this.prisma.vendor.findFirst({ where: { ownerUserId: actor.userId }, select: { id: true } });
+        if (won) throw new DuplicateError('لديك متجر مسجَّل بالفعل.', { vendorId: won.id });
+      }
+      throw err;
+    }
 
     await this.audit.record({
       actorUserId: actor.userId,
