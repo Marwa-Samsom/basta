@@ -372,7 +372,8 @@ export class AuthService {
     // السرّ جديد فلا خطوة سابقة له — خطوة السرّ القديم لا تحجب رمز الجهاز الجديد
     const step = isDevFixedCode(token) ? Math.floor(Date.now() / 30_000) : verifyTotpStep(token, openTotpSecret(pending, userId));
     if (step === null) {
-      throw new UnauthorizedException('الرمز غير صحيح. تأكد من وقت جهازك وأعد المحاولة.');
+      // 403 لا 401: صاحب جلسة قائمة — انظر signedInSecondFactor
+      throw new ForbiddenException('الرمز غير صحيح. تأكد من وقت جهازك وأعد المحاولة.');
     }
     const rotating = user.totpEnabledAt !== null;
 
@@ -413,7 +414,7 @@ export class AuthService {
   async regenerateRecoveryCodes(userId: string, code: string, meta: RequestMeta): Promise<{ recoveryCodes: string[] }> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (!user.totpEnabledAt) throw new ConflictException('فعّل التحقق بخطوتين أولاً.');
-    await this.secondFactor(user, code, meta);
+    await this.signedInSecondFactor(user, code, meta);
     const recoveryCodes = await this.prisma.$transaction(async (tx) => {
       const codes = await this.replaceRecoveryCodes(tx, userId);
       await tx.auditLog.create({
@@ -444,8 +445,22 @@ export class AuthService {
       throw new ForbiddenException('كلمة المرور غير صحيحة.');
     }
     if (!user.totpEnabledAt) return;
+    await this.signedInSecondFactor(user, input.code, meta);
+  }
+
+  /**
+   * الإثبات الثاني لصاحب جلسة قائمة (إعادة التحقق، تجديد رموز الاستعادة، التعطيل): الرفض 403
+   * لا 401. الواجهة تقرأ 401 «انتهت الجلسة» فتجدّد الرمز وتعيد الطلب نفسه — رمز خاطئ واحد
+   * كان يُحسب محاولتين من حدّ التخمين ويُدوِّر رمز التحديث بلا داعٍ (AUTH-051 و 059 و 062).
+   * الدخول وحده يبقى 401: لا جلسة قبله تُجدَّد.
+   */
+  private async signedInSecondFactor(
+    user: { id: string; totpSecretEnc: string | null; totpLastStep: number | null },
+    code: string | undefined,
+    meta: RequestMeta,
+  ): Promise<void> {
     try {
-      await this.secondFactor(user, input.code, meta);
+      await this.secondFactor(user, code, meta);
     } catch (err) {
       if (err instanceof UnauthorizedException) throw new ForbiddenException(err.message);
       throw err;
@@ -470,9 +485,9 @@ export class AuthService {
     }
     if (!user.totpEnabledAt) throw new ConflictException('التحقق بخطوتين غير مفعَّل.');
     if (!user.passwordHash || !(await verifyPassword(input.password, user.passwordHash))) {
-      throw new UnauthorizedException('كلمة المرور غير صحيحة.');
+      throw new ForbiddenException('كلمة المرور غير صحيحة.');
     }
-    await this.secondFactor(user, input.code, meta);
+    await this.signedInSecondFactor(user, input.code, meta);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id: userId }, data: { totpSecretEnc: null, totpPendingSecretEnc: null, totpEnabledAt: null } });

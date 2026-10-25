@@ -17,6 +17,26 @@ test('تفعيل التحقق: رمز QR يُمسح بدل مفتاح يُنسخ
   await expect(page.getByRole('link', { name: 'هذا الرابط' })).toHaveAttribute('href', /^otpauth:\/\/totp\//);
 });
 
+test('رمز خاطئ يُرسَل مرة واحدة ويُقال تحت الخانة — لا تجديد جلسة ولا إعادة (AUTH-051)', async ({ page }) => {
+  const sent: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && /\/auth\/(totp\/confirm|refresh)$/.test(new URL(r.url()).pathname)) sent.push(new URL(r.url()).pathname);
+  });
+  await signInBuyer(page);
+  await page.goto('/account/2fa');
+  await expect(page.getByRole('img', { name: 'رمز QR لإضافة الحساب في تطبيق المصادقة' })).toBeVisible();
+  sent.length = 0;
+
+  // كان الرفض 401 فتقرؤه الواجهة انتهاء جلسة: refresh ثم confirm ثانية بالرمز نفسه
+  await page.getByPlaceholder('000000').fill('654321');
+  const answer = page.waitForResponse((r) => r.url().includes('/auth/totp/confirm'));
+  await page.getByRole('button', { name: 'تأكيد وتفعيل' }).click();
+  expect((await answer).status()).toBe(403);
+  await expect(page.getByText('الرمز غير صحيح. تأكد من وقت جهازك وأعد المحاولة.')).toBeVisible();
+  expect(sent.filter((p) => p.endsWith('/totp/confirm'))).toHaveLength(1);
+  expect(sent.filter((p) => p.endsWith('/refresh'))).toHaveLength(0);
+});
+
 test('ما يُمسح يُفعَّل: طلب تهيئة واحد للصفحة، فرمز السرّ المرسوم يقبله الخادم', async ({ page }) => {
   const setups: string[] = [];
   page.on('request', (r) => {

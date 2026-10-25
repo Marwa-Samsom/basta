@@ -192,7 +192,7 @@ describe('التحقق بخطوتين لغير المدير', () => {
     const bare = await call('POST', '/auth/totp/recovery-codes', { token, body: {} });
     expect(bare.statusCode).toBe(400);
     const wrong = await call('POST', '/auth/totp/recovery-codes', { token, body: { code: '000000' } });
-    expect(wrong.statusCode).toBe(401);
+    expect(wrong.statusCode).toBe(403);
 
     const fresh = await call('POST', '/auth/totp/recovery-codes', { token, body: { code: totpOf(secret) } });
     expect(fresh.statusCode, fresh.body).toBe(200);
@@ -211,9 +211,9 @@ describe('التحقق بخطوتين لغير المدير', () => {
     await freshStep(userId);
 
     const noPass = await call('POST', '/auth/totp/disable', { token, body: { password: 'خطأ-خطأ-خطأ', code: totpOf(secret) } });
-    expect(noPass.statusCode).toBe(401);
+    expect(noPass.statusCode).toBe(403);
     const noCode = await call('POST', '/auth/totp/disable', { token, body: { password: PASSWORD, code: '000000' } });
-    expect(noCode.statusCode).toBe(401);
+    expect(noCode.statusCode).toBe(403);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).totpEnabledAt).not.toBeNull();
 
     const ok = await call('POST', '/auth/totp/disable', { token, body: { password: PASSWORD, code: totpOf(secret) } });
@@ -282,7 +282,7 @@ describe('تغيير الجهاز — السرّ الجديد منتظِر حت�
     expect(newSecret).not.toBe(oldSecret);
 
     const wrong = await call('POST', '/auth/totp/confirm', { token, body: { token: totpOf(oldSecret) } });
-    expect(wrong.statusCode).toBe(401);
+    expect(wrong.statusCode).toBe(403);
     const ok = await call('POST', '/auth/totp/confirm', { token, body: { token: totpOf(newSecret) } });
     expect(ok.statusCode, ok.body).toBe(200);
     const newCodes: string[] = ok.json().recoveryCodes;
