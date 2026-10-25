@@ -250,7 +250,8 @@ a.vp-prod__name:hover { color: var(--brand-text); }
   gap: var(--space-4);
   align-items: start;
 }
-.vp-editor__main { display: grid; gap: 14px; min-width: 0; }
+/* عمود واحد لا يتجاوز عرضه: جدول المتغيّرات العريض يتمرّر في غلافه بدل أن يدفع الأقسام تحت الملخّص */
+.vp-editor__main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
 .vp-editor__side {
   position: sticky;
   inset-block-start: var(--space-4);
