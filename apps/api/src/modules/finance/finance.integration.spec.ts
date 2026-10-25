@@ -43,6 +43,8 @@ interface VendorSeat {
 const vendors: VendorSeat[] = [];
 let buyer = { userId: '', token: '' };
 let admin = { userId: '', token: '' };
+/** حدّ السحب الأدنى كما كان قبل الاختبارات — يعود إليه بعدها */
+const minimums = new Map<string, bigint>();
 
 /** عنوان سعودي: الضريبة مضافة 15% — فللمنصة نصيب ضريبي يجب أن يُحفظ */
 const ADDRESS = { recipientName: 'مشترٍ', phone: '+966500000000', country: 'SA', region: 'الرياض', city: 'الرياض', street: 'طريق الملك فهد 1' };
@@ -182,9 +184,14 @@ beforeAll(async () => {
     },
   });
   admin = { userId: a.id, token: await login(`admin.${SUFFIX}@basta.test`, generateSync({ strategy: 'totp', secret: adminSecret, crypto: totpCrypto, base32: totpBase32 })) };
+  // حدّ السحب الأدنى يُفرض منذ VOPS-081: اختبارات الدفتر والتزامن تسحب أرصدة طلباتها الصغيرة،
+  // فيُخفض الحدّ لها ويعود كما كان بعدها — وحالة الحدّ نفسها تضبطه بنفسها
+  for (const c of await prisma.currency.findMany({ where: { code: { in: ['SAR', 'JOD'] } } })) minimums.set(c.code, c.minPayoutMinorUnits);
+  await prisma.currency.updateMany({ where: { code: { in: ['SAR', 'JOD'] } }, data: { minPayoutMinorUnits: 1n } });
 }, 120_000);
 
 afterAll(async () => {
+  for (const [code, minPayoutMinorUnits] of minimums) await prisma.currency.update({ where: { code }, data: { minPayoutMinorUnits } });
   await app?.close();
   await prisma.$disconnect();
 });
@@ -418,6 +425,39 @@ describe('بوابة 10 · البند 4 — السحب المتزامن', () => 
     expect((await call('POST', `/admin/finance/payouts/${id}/paid`, admin.token, { transferReference: 'TRX-2026-0001' })).statusCode).toBe(204);
     expect((await prisma.payoutRequest.findUniqueOrThrow({ where: { id } })).status).toBe('paid');
     expect(await viewCount('audit_withdrawn_drift')).toBe(0);
+  });
+});
+
+describe('VOPS-081 · حدّ السحب الأدنى بعملة المحفظة (25 أكتوبر 2026)', () => {
+  it('يُعرض مع المحفظة، وما تحته يُرفض بلا خصم، وما بلغه يُقبل', async () => {
+    if (!dbUp) return;
+    const i = 0;
+    const { sub } = await placeOrder([2, 0]);
+    await deliver(i, sub(i).id);
+    await prisma.subOrder.update({ where: { id: sub(i).id }, data: { holdReleaseAt: new Date(Date.now() - 60_000) } });
+    await release.tick();
+    const available = (await wallet(i)).balanceAvailableMinorUnits;
+    // الحدّ دون المتاح بقليل: المتاح كله يبلغه، وما ينقص عنه بوحدة لا يبلغه
+    const minimum = available - 1n;
+    expect(minimum).toBeGreaterThan(1n);
+    await prisma.currency.update({ where: { code: 'SAR' }, data: { minPayoutMinorUnits: minimum } });
+    try {
+      const shown = await call('GET', '/vendor/finance/wallets', vendors[i]!.token);
+      expect(shown.json().find((w: { currency: string }) => w.currency === 'SAR').minPayoutMinorUnits).toBe(minimum.toString());
+
+      const payoutsBefore = await prisma.payoutRequest.count({ where: { vendorId: vendors[i]!.vendorId } });
+      const below = await call('POST', '/vendor/finance/payouts', vendors[i]!.token, { currency: 'SAR', amountMinorUnits: (minimum - 1n).toString() });
+      expect(below.statusCode).toBe(409);
+      expect(below.json()).toMatchObject({ code: 'BELOW_MINIMUM_PAYOUT', message: expect.stringMatching(/^الحد الأدنى للسحب .* — رصيدك يتراكم حتى يتجاوزه، ولا يضيع منه شيء\.$/) });
+      expect((await wallet(i)).balanceAvailableMinorUnits).toBe(available);
+      expect(await prisma.payoutRequest.count({ where: { vendorId: vendors[i]!.vendorId } })).toBe(payoutsBefore);
+
+      const atMinimum = await call('POST', '/vendor/finance/payouts', vendors[i]!.token, { currency: 'SAR', amountMinorUnits: minimum.toString() });
+      expect(atMinimum.statusCode, atMinimum.body).toBe(201);
+      expect((await wallet(i)).balanceAvailableMinorUnits).toBe(1n);
+    } finally {
+      await prisma.currency.update({ where: { code: 'SAR' }, data: { minPayoutMinorUnits: 1n } });
+    }
   });
 });
 

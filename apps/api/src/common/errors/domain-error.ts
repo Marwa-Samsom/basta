@@ -65,7 +65,8 @@ export class BelowMinimumPayoutError extends DomainError {
 
   constructor(minimumFormatted: string) {
     super(
-      `الحد الأدنى للسحب ${minimumFormatted}. رصيدك يتراكم حتى يتجاوزه، ولا يضيع منه شيء.`,
+      // المبلغ المنسّق ينتهي بنقطة رمز العملة (ر.س.) — شرطة لا نقطة ثانية بعده
+      `الحد الأدنى للسحب ${minimumFormatted} — رصيدك يتراكم حتى يتجاوزه، ولا يضيع منه شيء.`,
       { minimumFormatted },
     );
   }

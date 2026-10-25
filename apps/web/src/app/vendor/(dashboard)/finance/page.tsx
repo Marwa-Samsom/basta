@@ -15,6 +15,8 @@ interface WalletView {
   withdrawnMinorUnits: string;
   nextReleaseAt: string | null;
   canWithdraw: boolean;
+  /** حدّ السحب الأدنى بعملة المحفظة — ما تحته يتراكم حتى يتجاوزه */
+  minPayoutMinorUnits: string;
 }
 
 interface Payout {
@@ -217,6 +219,11 @@ export default function FinancePage() {
             <div className="vm-split__col">
               {withdrawable.map((w) => {
                 const digits = minorUnitDigits(w.currency);
+                // الحدّ الأدنى ظاهر قبل الطلب: المتاح تحته لا يُطلب، والمكتوب تحته يُقال بجانبه
+                const minimum = BigInt(w.minPayoutMinorUnits);
+                const asked = toMinor(amount[w.currency] ?? '', w.currency);
+                const short = BigInt(w.availableMinorUnits) < minimum;
+                const below = asked !== null && BigInt(asked) < minimum;
                 return (
                   <section key={w.currency} className="card vm-withdraw">
                     <h2 className="vm-card-title">طلب سحب{multi ? ` — ${w.currency}` : ''}</h2>
@@ -224,7 +231,11 @@ export default function FinancePage() {
                       <span className="vm-withdraw__avail-label">المتاح الآن</span>
                       <span className="money num vm-withdraw__avail-value">{money(w.availableMinorUnits, w.currency)}</span>
                     </div>
-                    <Field label={`المبلغ المطلوب (${w.currency})`}>
+                    <Field
+                      label={`المبلغ المطلوب (${w.currency})`}
+                      hint={`الحد الأدنى للسحب ${money(w.minPayoutMinorUnits, w.currency)}`}
+                      error={below ? `أقل من الحد الأدنى للسحب ${money(w.minPayoutMinorUnits, w.currency)}` : null}
+                    >
                       {(props) => (
                         <span className="vm-amount">
                           <input
@@ -254,7 +265,17 @@ export default function FinancePage() {
                         </span>
                       )}
                     </Field>
-                    <button type="button" className="btn btn--primary btn--block vm-withdraw__submit" disabled={busy} onClick={() => void withdraw(w)}>
+                    {short ? (
+                      <p className="vm-hint" role="status">
+                        متاحك أقل من الحد الأدنى للسحب. يتراكم حتى يتجاوزه، ولا يضيع منه شيء.
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--block vm-withdraw__submit"
+                      disabled={busy || short || below}
+                      onClick={() => void withdraw(w)}
+                    >
                       اطلب السحب
                     </button>
                     <p className="vm-hint">تُراجع الإدارة الطلب ثم يُحوَّل إلى حسابك البنكي. يُخصم المبلغ من المتاح فور الطلب، ويعود إليه إن رُفض.</p>

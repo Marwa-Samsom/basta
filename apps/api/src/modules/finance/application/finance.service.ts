@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
+import { BelowMinimumPayoutError, ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
@@ -61,7 +61,7 @@ export class FinanceService {
   // -------------------------------------------------------------- المحفظة
 
   async wallets(vendorId: string) {
-    const [wallets, holds] = await Promise.all([
+    const [wallets, holds, currencies] = await Promise.all([
       this.prisma.wallet.findMany({ where: { vendorId }, orderBy: { currency: 'asc' } }),
       this.prisma.subOrder.findMany({
         // ما لم يُحسم تحريره — المسترَدّ كله يُحسم بلا نقل، فلا يُعرض موعداً لا مال فيه
@@ -69,7 +69,9 @@ export class FinanceService {
         select: { settlementCurrency: true, holdReleaseAt: true },
         orderBy: { holdReleaseAt: 'asc' },
       }),
+      this.prisma.currency.findMany({ select: { code: true, minPayoutMinorUnits: true } }),
     ]);
+    const minimum = new Map(currencies.map((c) => [c.code, c.minPayoutMinorUnits]));
     return wallets.map((w) => ({
       currency: w.currency,
       pendingMinorUnits: w.balancePendingMinorUnits.toString(),
@@ -78,6 +80,8 @@ export class FinanceService {
       // أقرب موعد تحرير — «متى يصير مالي متاحاً؟» أول سؤال لكل بائع
       nextReleaseAt: holds.find((h) => h.settlementCurrency === w.currency)?.holdReleaseAt ?? null,
       canWithdraw: w.balanceAvailableMinorUnits > 0n,
+      // حدّ السحب الأدنى بعملة المحفظة (VD-18) — يُعرض قبل الطلب لا يُكتشف برفضه
+      minPayoutMinorUnits: (minimum.get(w.currency) ?? 0n).toString(),
     }));
   }
 
@@ -269,6 +273,15 @@ export class FinanceService {
         throw new ConflictError('المبلغ أكبر من رصيدك المتاح.', {
           availableMinorUnits: wallet.available.toString(),
         });
+      }
+      /**
+       * حدّ السحب الأدنى لعملة المحفظة (ORDER-STATES §4، VOPS-081): كان معرّفاً في «العملات»
+       * ولا يُقرأ هنا، فيمرّ أي مبلغ موجب — 100.00 تحت حدّ 187.50، بل 0.01. كل تحويل بنكي
+       * له كلفته؛ الرصيد تحت الحدّ يتراكم ولا يضيع.
+       */
+      const currency = await tx.currency.findUnique({ where: { code: input.currency }, select: { minPayoutMinorUnits: true } });
+      if (currency && input.amountMinorUnits < currency.minPayoutMinorUnits) {
+        throw new BelowMinimumPayoutError(formatMoney(money(currency.minPayoutMinorUnits, input.currency)));
       }
       const [entryId] = await this.ledger.appendVendor(
         tx,
