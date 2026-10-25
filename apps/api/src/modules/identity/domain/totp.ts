@@ -32,6 +32,13 @@ export const totpUri = (secret: string, accountLabel: string): string =>
   generateURI({ strategy: 'totp', secret, label: accountLabel, issuer: 'Basta' });
 
 /**
+ * رمز الخطوة السابقة مقبول، واللاحقة لا (RFC 6238 §5.2، ماضٍ فقط). بلا سماحية كان رمزٌ كُتب
+ * في آخر ثوانٍ من نافذته يصل بعد تبدّلها فيُرفض «رمز غير صحيح» — يعيد صاحبه الكتابة، ويسقط
+ * اختبار CI أحياناً (25 أكتوبر 2026). إعادة استعمال الرمز تمنعها afterTimeStep كما كانت.
+ */
+const LATE_TOLERANCE: [number, number] = [30, 0];
+
+/**
  * يُرجع `false` لكل ما ليس رمزاً صحيحاً: مشوّهاً كان أو منتهياً أو بسرّ تالف.
  * التحقق يجب أن يقول «مرفوض» لا أن يرمي خطأً يكشف حالة الحساب.
  */
@@ -40,7 +47,7 @@ export function verifyTotp(token: string, secret: string): boolean {
   if (!/^\d{6}$/.test(cleaned)) return false;
 
   try {
-    return verifySync({ strategy: 'totp', secret, token: cleaned, crypto, base32 }).valid;
+    return verifySync({ strategy: 'totp', secret, token: cleaned, crypto, base32, epochTolerance: LATE_TOLERANCE }).valid;
   } catch {
     return false;
   }
@@ -70,6 +77,7 @@ export function verifyTotpStep(token: string, secret: string, afterTimeStep?: nu
       token: cleaned,
       crypto,
       base32,
+      epochTolerance: LATE_TOLERANCE,
       ...(afterTimeStep !== null && afterTimeStep !== undefined ? { afterTimeStep } : {}),
     });
     return r.valid && 'timeStep' in r ? (r.timeStep as number) : null;
