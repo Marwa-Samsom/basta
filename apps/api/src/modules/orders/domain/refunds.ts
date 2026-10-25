@@ -8,6 +8,7 @@
 
 import { InvalidInputError } from '../../../common/errors/domain-error';
 import { shareBetween } from '../../../common/money/money';
+import { mergeReturnLines } from '../../../common/return-lines';
 
 export interface RefundLine {
   readonly orderItemId: string;
@@ -49,10 +50,13 @@ export function planPartialRefund(input: {
   let charge = 0n;
   const lines: { orderItemId: string; qty: number }[] = [];
 
-  for (const r of input.returned) {
+  if (input.returned.some((r) => !Number.isInteger(r.qty) || r.qty < 1)) {
+    throw new InvalidInputError('كمية الإرجاع عدد موجب.');
+  }
+  // المكرّر مجموعاً — وإلا قيس كل عنصر على المتاح وحده فرُدّ أكثر من السطر (BUY-044)
+  for (const r of mergeReturnLines(input.returned)) {
     const line = input.lines.find((l) => l.orderItemId === r.orderItemId);
     if (!line) throw new InvalidInputError('سطر ليس في هذا الطلب.', { orderItemId: r.orderItemId });
-    if (!Number.isInteger(r.qty) || r.qty < 1) throw new InvalidInputError('كمية الإرجاع عدد موجب.');
     const remaining = line.qty - line.refundedQty;
     if (r.qty > remaining) {
       throw new InvalidInputError(`لا يمكن إرجاع ${r.qty} من سطر بقي منه ${remaining}.`);

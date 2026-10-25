@@ -105,6 +105,16 @@ describe('الاسترداد', () => {
     ).toThrow(/بقي منه 1/);
   });
 
+  it('السطر المكرّر يُقاس مجموعاً: 2 + 2 من سطر فيه 3 مرفوض، و 1 + 1 كقطعتين (BUY-044)', () => {
+    const plan = (returned: { orderItemId: string; qty: number }[]) =>
+      planPartialRefund({ lines, returned, chargeTotalMinor: 42_500n, alreadyRefundedChargeMinor: 0n });
+    // كان كل عنصر يُقاس وحده (2 ≤ 3) فيُردّ نصيب أربع قطع من ثلاث
+    expect(() => plan([{ orderItemId: 'a', qty: 2 }, { orderItemId: 'a', qty: 2 }])).toThrow(/لا يمكن إرجاع 4 من سطر بقي منه 3/);
+    const twice = plan([{ orderItemId: 'a', qty: 1 }, { orderItemId: 'a', qty: 1 }]);
+    expect(twice).toEqual(plan([{ orderItemId: 'a', qty: 2 }]));
+    expect(twice.lines).toEqual([{ orderItemId: 'a', qty: 2 }]);
+  });
+
   it('لا يُردّ أكثر من المدفوع ولو اجتمعت فروق التقريب', () => {
     const plan = planPartialRefund({
       lines: lines.map((l) => ({ ...l, chargeMinor: l.chargeMinor + 3n })),

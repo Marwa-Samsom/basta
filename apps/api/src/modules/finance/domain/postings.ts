@@ -10,6 +10,7 @@
  * من ثلاثة جداول مستقلة — فالخطأ في دالة هنا يظهر هناك.
  */
 import { shareBetween } from '../../../common/money/money';
+import { mergeReturnLines } from '../../../common/return-lines';
 
 export type Direction = 'credit' | 'debit';
 
@@ -121,7 +122,10 @@ export function partialRefundPostings(
   let taxBack = 0n;
   let subsidyBack = 0n;
 
-  for (const r of returned) {
+  // المكرّر مجموعاً: المتاح يُقاس على مجموع السطر لا على كل عنصر وحده (BUY-044)
+  if (returned.some((r) => r.qty < 1)) throw new Error('كمية إرجاع خارج المتاح.');
+  const merged = mergeReturnLines(returned);
+  for (const r of merged) {
     const l = lines.find((x) => x.orderItemId === r.orderItemId);
     if (!l) throw new Error(`سطر ليس في الفرعي: ${r.orderItemId}`);
     if (r.qty < 1 || r.qty > l.qty - l.refundedQty) throw new Error('كمية إرجاع خارج المتاح.');
@@ -141,7 +145,7 @@ export function partialRefundPostings(
   // فرق التقريب من مكوّناته هو لا «باقياً» يُحسب من قيود البائع: لو كان باقياً
   // لابتلع أي خطأ في قيد البائع بصمت، ولما رآه منظر الحفظ أبداً.
   const rounding = saleBack + taxBack - subsidyBack - buyerGets;
-  const lineCount = BigInt(returned.length);
+  const lineCount = BigInt(merged.length);
   if (rounding > 3n * lineCount || rounding < -3n * lineCount) {
     throw new Error(`فرق تقريب غير معقول: ${rounding}`);
   }

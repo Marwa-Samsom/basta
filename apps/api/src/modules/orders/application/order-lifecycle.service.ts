@@ -7,6 +7,7 @@ import {
   NotFoundError,
 } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { mergeReturnLines } from '../../../common/return-lines';
 import { LedgerService } from '../../finance/public';
 import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
@@ -655,10 +656,15 @@ export class OrderLifecycleService {
       throw new ConflictError(`انقضت مهلة الإرجاع (${window} يوماً من التسليم).`);
     }
     if (input.items.length === 0) throw new InvalidInputError('اختر قطعة واحدة على الأقل.');
-    for (const i of input.items) {
+    if (input.items.some((i) => !Number.isInteger(i.qty) || i.qty < 1)) {
+      throw new InvalidInputError('كمية الإرجاع عدد موجب.');
+    }
+    // السطر المكرّر مجموعاً: 2 + 2 من سطر فيه 3 أربع قطع لا قطعتان مرتين (BUY-044)
+    const items = mergeReturnLines(input.items);
+    for (const i of items) {
       const line = sub.items.find((l) => l.id === i.orderItemId);
       if (!line) throw new InvalidInputError('سطر ليس في هذا الطلب.');
-      if (i.qty < 1 || i.qty > line.qty - line.refundedQty) {
+      if (i.qty > line.qty - line.refundedQty) {
         throw new InvalidInputError(`الكمية المتاحة للإرجاع ${line.qty - line.refundedQty}.`);
       }
     }
@@ -670,7 +676,7 @@ export class OrderLifecycleService {
       reason: input.reasonCode,
       returnRequest: {
         id,
-        items: input.items,
+        items,
         reasonCode: input.reasonCode,
         description: input.description?.trim() || null,
       },
@@ -688,7 +694,8 @@ export class OrderLifecycleService {
       orderBy: { requestedAt: 'desc' },
     });
     if (!ret) throw new ConflictError('لا طلب إرجاع قائم لهذا الطلب.', { subOrderId });
-    return { id: ret.id, items: ret.itemsJson as unknown as { orderItemId: string; qty: number }[] };
+    // طلب حُفظ قبل جمع المكرّر يصل مجموعاً: الاسترداد يقيس المتاح على مجموع السطر فيرفض الزائد
+    return { id: ret.id, items: mergeReturnLines(ret.itemsJson as unknown as { orderItemId: string; qty: number }[]) };
   }
 
   // ------------------------------------------------------------ الإشعار
