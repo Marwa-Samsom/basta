@@ -29,6 +29,11 @@ interface VariantDraft {
    */
   stockLoaded?: string;
   lowStockThreshold: string;
+  /** السعر قبل الخصم — يظهر مشطوباً للمشتري إن كان أعلى من السعر؛ فارغ = بلا خصم */
+  compareAtPrice: string;
+  barcode: string;
+  /** بالغرام — يدخل تسعير الشحن بالوزن */
+  weightGrams: string;
   /** معرّف قيمة لكل محور — المفتاح معرّف السمة */
   options: Record<string, string>;
   isActive: boolean;
@@ -39,6 +44,9 @@ const emptyVariant = (): VariantDraft => ({
   price: '',
   stock: '0',
   lowStockThreshold: '',
+  compareAtPrice: '',
+  barcode: '',
+  weightGrams: '',
   options: {},
   isActive: true,
 });
@@ -139,6 +147,11 @@ export function ProductEditor({ productId }: { productId?: string }) {
               stock: String(v.stock.onHand),
               stockLoaded: String(v.stock.onHand),
               lowStockThreshold: v.stock.lowStockThreshold ? String(v.stock.lowStockThreshold) : '',
+              compareAtPrice: v.compareAtPrice
+                ? (Number(v.compareAtPrice.minorUnits) / 10 ** decimalsOf(v.compareAtPrice.currency)).toString()
+                : '',
+              barcode: v.barcode ?? '',
+              weightGrams: v.weightGrams !== null ? String(v.weightGrams) : '',
               options: Object.fromEntries(v.options.map((o) => [o.attributeId, o.valueId])),
               isActive: v.isActive,
             })),
@@ -191,6 +204,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
         // الجديد يحتاج كميته؛ القائم تُرسَل كميته إن غيّرها البائع وحدها — وإلا يبقى مخزونه كما هو
         ...(v.id === undefined || v.stock !== v.stockLoaded ? { stock: Number(v.stock || 0) } : {}),
         ...(v.lowStockThreshold ? { lowStockThreshold: Number(v.lowStockThreshold) } : {}),
+        // خانات ظاهرة: الفارغة تمحو صراحةً (null)، والمكتوبة تُحفظ — ما يراه البائع هو ما يُحفظ
+        compareAtPrice: v.compareAtPrice.trim() || null,
+        barcode: v.barcode.trim() || null,
+        weightGrams: v.weightGrams ? Number(v.weightGrams) : null,
         ...(axes.length > 0
           ? {
               options: axes.flatMap((a) => {
@@ -610,8 +627,11 @@ export function ProductEditor({ productId }: { productId?: string }) {
                     ))}
                     <th scope="col">SKU</th>
                     <th scope="col">السعر{product ? ` · ${product.currency}` : ''}</th>
+                    <th scope="col">قبل الخصم</th>
                     <th scope="col">الكمية</th>
                     <th scope="col">حدّ التنبيه</th>
+                    <th scope="col">الباركود</th>
+                    <th scope="col">الوزن · غ</th>
                     <th scope="col">
                       <span className="visually-hidden">إجراءات</span>
                     </th>
@@ -658,6 +678,17 @@ export function ProductEditor({ productId }: { productId?: string }) {
                           onChange={(e) => update(i, { price: e.target.value })}
                         />
                       </td>
+                      <td data-label="قبل الخصم">
+                        <input
+                          className="field__control num vp-cell vp-cell--price"
+                          dir="ltr"
+                          inputMode="decimal"
+                          placeholder="—"
+                          aria-label={`السعر قبل الخصم للمتغيّر ${num(i + 1)}`}
+                          value={v.compareAtPrice}
+                          onChange={(e) => update(i, { compareAtPrice: e.target.value })}
+                        />
+                      </td>
                       <td data-label="الكمية">
                         <input
                           className="field__control num vp-cell vp-cell--qty"
@@ -678,6 +709,28 @@ export function ProductEditor({ productId }: { productId?: string }) {
                           onChange={(e) =>
                             update(i, { lowStockThreshold: digitsOnly(e.target.value) })
                           }
+                        />
+                      </td>
+                      <td data-label="الباركود">
+                        <input
+                          className="field__control num vp-cell vp-cell--sku"
+                          dir="ltr"
+                          maxLength={64}
+                          placeholder="—"
+                          aria-label={`الباركود للمتغيّر ${num(i + 1)}`}
+                          value={v.barcode}
+                          onChange={(e) => update(i, { barcode: e.target.value })}
+                        />
+                      </td>
+                      <td data-label="الوزن · غ">
+                        <input
+                          className="field__control num vp-cell vp-cell--qty"
+                          dir="ltr"
+                          inputMode="numeric"
+                          placeholder="—"
+                          aria-label={`الوزن بالغرام للمتغيّر ${num(i + 1)}`}
+                          value={v.weightGrams}
+                          onChange={(e) => update(i, { weightGrams: digitsOnly(e.target.value) })}
                         />
                       </td>
                       <td data-label="" className="end">
