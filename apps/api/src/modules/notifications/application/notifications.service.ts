@@ -16,6 +16,7 @@ import {
   usedVariables,
   type Channel,
 } from '../domain/templates';
+import { nextAttemptAt } from '../domain/retry';
 import { deliver } from '../infrastructure/channels';
 
 type Db = Prisma.TransactionClient | PrismaService;
@@ -27,7 +28,6 @@ function prefsOf(raw: Prisma.JsonValue | undefined): Record<string, boolean> {
 }
 
 const EVERY_FIVE_SECONDS = 5_000;
-const MAX_ATTEMPTS = 5;
 
 /**
  * الإشعارات — صندوق صادر (outbox).
@@ -218,8 +218,9 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     if (this.running) return out;
     this.running = true;
     try {
+      // ما فشل قبلاً ينتظر موعده: الإعادة بمهلة تطول لا كل 5 ثوانٍ (domain/retry.ts)
       const queued = await this.prisma.notification.findMany({
-        where: { status: 'queued' },
+        where: { status: 'queued', OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }] },
         orderBy: { createdAt: 'asc' },
         take: limit,
         select: { id: true },
@@ -292,9 +293,10 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
       return finish('sent', { ...stored, recipient, deliveryRef: ref, sentAt: new Date(), error: null });
     } catch (err) {
       const message = (err as Error).message;
-      // خطأ القالب لا يُصلحه التكرار؛ خطأ القناة قد يُصلحه
-      if (n.attempts < MAX_ATTEMPTS && !message.startsWith('متغيّر ناقص')) {
-        await this.prisma.notification.update({ where: { id }, data: { status: 'queued', error: message } });
+      // خطأ القالب لا يُصلحه التكرار؛ خطأ القناة قد يُصلحه — بعد مهلة تطول مع كل فشل
+      const retryAt = message.startsWith('متغيّر ناقص') ? null : nextAttemptAt(n.attempts, new Date());
+      if (retryAt) {
+        await this.prisma.notification.update({ where: { id }, data: { status: 'queued', error: message, nextAttemptAt: retryAt } });
         return null;
       }
       return finish('failed', { error: message });

@@ -1470,6 +1470,8 @@ model Notification {
   subject      String?
   body         String?
   attempts     Int       @default(0)
+  /// بعد فشل محاولة: لا يُعاد قبل هذا الموعد، والمهلة تطول (domain/retry.ts). فارغ = يُرسل فوراً
+  nextAttemptAt DateTime? @db.Timestamptz
   deliveryRef  String?
   sentAt       DateTime? @db.Timestamptz
   readAt       DateTime? @db.Timestamptz
