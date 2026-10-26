@@ -581,9 +581,17 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     const r = await call('POST', '/me/reviews', buyer.token, { orderItemId: sub.items[0]!.id, rating: 1, body: `كلام مسيء ${SUFFIX}` });
     expect(r.statusCode, r.body).toBe(201);
     expect((await call('POST', `/admin/reviews/${r.json().id}/moderate`, limited.token, { status: 'rejected' })).statusCode).toBe(400);
+    const ratingOf = () => prisma.product.findUniqueOrThrow({ where: { id: vendor.productId }, select: { ratingCount: true } });
+    const before = (await ratingOf()).ratingCount;
     expect((await call('POST', `/admin/reviews/${r.json().id}/moderate`, limited.token, { status: 'rejected', reason: 'ألفاظ مسيئة' })).statusCode).toBe(204);
     const visible = (await call('GET', `/products/${vendor.productId}/reviews`)).json();
     expect(JSON.stringify(visible)).not.toContain(`كلام مسيء ${SUFFIX}`);
+    // المخفية لا تُحسب في تقييم المنتج، والمُعادة تُحسب (BUY-070)
+    expect((await ratingOf()).ratingCount).toBe(before - 1);
+    expect(visible.count).toBe(before - 1);
+    expect((await call('POST', `/admin/reviews/${r.json().id}/moderate`, limited.token, { status: 'published' })).statusCode).toBe(204);
+    expect((await ratingOf()).ratingCount).toBe(before);
+    expect((await call('POST', `/admin/reviews/${r.json().id}/moderate`, limited.token, { status: 'rejected', reason: 'ألفاظ مسيئة' })).statusCode).toBe(204);
     // تُوجد بالبحث في نصّها داخل حالتها، ولا تظهر في المنشورة
     const hidden = (await call('GET', `/admin/reviews?status=rejected&search=${encodeURIComponent(`مسيء ${SUFFIX}`)}`, limited.token)).json();
     expect(hidden).toMatchObject({ total: 1 });

@@ -310,6 +310,8 @@ function StoreCard({
   const [qty, setQty] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('damaged');
   const [text, setText] = useState('');
+  /** النجوم المختارة والرأي قبل النشر — لقطعة واحدة في كل مرة */
+  const [draft, setDraft] = useState<{ itemId: string; rating: number; body: string } | null>(null);
   const canceled = ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'].includes(s.status);
   const step = ORDER_OF[s.status] ?? -1;
   const openDispute = s.disputes.find((d) => d.status === 'open' || d.status === 'escalated');
@@ -363,9 +365,11 @@ function StoreCard({
       onChange(null, 'فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.');
     });
 
-  const review = (orderItemId: string, rating: number) =>
+  // الرأي اختياري: النجوم وحدها تكفي (26 أكتوبر 2026)
+  const review = (orderItemId: string, rating: number, body: string) =>
     run(async () => {
-      await api(`/me/reviews`, { method: 'POST', body: { orderItemId, rating } });
+      await api(`/me/reviews`, { method: 'POST', body: { orderItemId, rating, ...(body.trim() ? { body: body.trim() } : {}) } });
+      setDraft(null);
       onChange(null, 'شكراً — نُشرت مراجعتك بشارة «شراء موثّق».');
     });
 
@@ -489,23 +493,56 @@ function StoreCard({
                 </span>
 
                 {s.reviewable && !i.review && i.refundedQty < i.qty ? (
-                  <span className="sp-rate" role="group" aria-label="قيّم المنتج">
-                    <span className="sp-rate__label" aria-hidden>
-                      قيّم المنتج
+                  <>
+                    {/* النجمة تختار ولا تنشر: يكتب رأيه إن شاء ثم «انشر التقييم» */}
+                    <span className="sp-rate" role="group" aria-label="قيّم المنتج">
+                      <span className="sp-rate__label" aria-hidden>
+                        قيّم المنتج
+                      </span>
+                      {[1, 2, 3, 4, 5].map((n) => {
+                        const on = draft?.itemId === i.id && n <= draft.rating;
+                        return (
+                          <button
+                            key={n}
+                            type="button"
+                            className={`sp-rate__star${on ? ' sp-rate__star--on' : ''}`}
+                            disabled={busy}
+                            aria-pressed={draft?.itemId === i.id && draft.rating === n}
+                            onClick={() => setDraft({ itemId: i.id, rating: n, body: draft?.itemId === i.id ? draft.body : '' })}
+                            aria-label={`${n} من 5`}
+                          >
+                            <Icon name={on ? 'star-fill' : 'star'} size={18} />
+                          </button>
+                        );
+                      })}
                     </span>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        className="sp-rate__star"
-                        disabled={busy}
-                        onClick={() => void review(i.id, n)}
-                        aria-label={`${n} من 5`}
-                      >
-                        <Icon name="star" size={18} />
-                      </button>
-                    ))}
-                  </span>
+                    {draft?.itemId === i.id ? (
+                      <div className="sp-rate__form">
+                        <TextArea
+                          label="رأيك"
+                          optional
+                          rows={2}
+                          maxLength={2000}
+                          placeholder="مثلاً: القماش ناعم والمقاس مظبوط"
+                          value={draft.body}
+                          onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+                        />
+                        <div className="sp-panel__actions">
+                          <button
+                            type="button"
+                            className="btn btn--primary btn--sm"
+                            disabled={busy}
+                            onClick={() => void review(i.id, draft.rating, draft.body)}
+                          >
+                            انشر التقييم
+                          </button>
+                          <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setDraft(null)}>
+                            تراجع
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 ) : rating !== null ? (
                   <span className="sp-rated" role="img" aria-label={`قيّمته ${rating}/5`}>
                     {[1, 2, 3, 4, 5].map((n) => (

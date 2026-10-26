@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
+import { refreshRatings } from '../../aftersales/public';
 import { UPLOADS_ROOT, UPLOADS_URL_PREFIX } from '../../catalog/public';
 
 /**
@@ -272,11 +273,13 @@ export class ContentService {
 
   async moderateReview(actorId: string, id: string, status: 'published' | 'rejected', reason?: string | null) {
     if (status === 'rejected' && (reason?.trim().length ?? 0) < 5) throw new InvalidInputError('سبب الإخفاء مطلوب.');
-    const { count } = await this.prisma.review.updateMany({
-      where: { id },
-      data: { status, rejectReason: status === 'rejected' ? reason!.trim() : null },
+    // الإخفاء والإعادة يغيّران تقييم المنتج والمتجر — في المعاملة نفسها (BUY-070)
+    await this.prisma.$transaction(async (tx) => {
+      const review = await tx.review.findUnique({ where: { id }, select: { productId: true, vendorId: true } });
+      if (!review) throw new NotFoundError('المراجعة غير موجودة.', { id });
+      await tx.review.update({ where: { id }, data: { status, rejectReason: status === 'rejected' ? reason!.trim() : null } });
+      await refreshRatings(tx, review);
     });
-    if (count === 0) throw new NotFoundError('المراجعة غير موجودة.', { id });
     await this.audit(actorId, `review.${status}`, 'Review', id, { reason: reason ?? null });
   }
 }
