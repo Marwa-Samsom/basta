@@ -341,3 +341,46 @@ describe('الأوجه والتصفية', () => {
     expect(['meili', 'db']).toContain(res.json().engine);
   });
 });
+
+describe('دليل المتاجر — الاسم كما يُكتب', () => {
+  /**
+   * DISC-038، 26 أكتوبر 2026: كان البحث في الدليل مطابقة حرفية، فمن كتب «اخفاء» لم يجد
+   * متجر «إخفاء». الآن بتطبيع محرّك البحث نفسه، والمتجر المخفيّ يبقى مخفيّاً.
+   */
+  it('بلا همزة ولا شدّة ولا تشكيل، والتاء هاءً والمقصورة ياءً: المتجر نفسه', async () => {
+    if (!dbUp) return;
+    const shop = async (nameAr: string, status: 'approved' | 'suspended') => {
+      const owner = await prisma.user.create({
+        data: { email: `dir.${status}.${SUFFIX}@basta.test`, fullName: 'صاحب متجر', roles: { create: { role: 'vendor_owner' } } },
+      });
+      const vendor = await prisma.vendor.create({
+        data: {
+          ownerUserId: owner.id,
+          slug: `dir-${status}-${SUFFIX}`,
+          nameAr,
+          status,
+          settlementCurrency: 'JOD',
+          country: 'JO',
+          ...(status === 'approved' ? { approvedAt: new Date() } : { suspendedAt: new Date() }),
+        },
+      });
+      await publishProduct(vendor.id, 'قطعة للدليل', 10_000n, 1);
+      return vendor.id;
+    };
+    const name = `إستديو مكتبة مصطفى للكتّان ${SUFFIX}`;
+    const shown = await shop(name, 'approved');
+    // توأم معلَّق بالاسم نفسه: التطبيع يوسّع المطابقة لا الرؤية
+    await shop(name, 'suspended');
+    const found = async (q: string) =>
+      (await app.inject({ method: 'GET', ...api(`/storefront/shops?q=${encodeURIComponent(q)}`) })).json().items.map((i: { id: string }) => i.id);
+
+    for (const q of [
+      name,
+      `استديو مكتبه مصطفي للكتان ${SUFFIX}`,
+      `إسْتُدْيو مَكْتَبَةُ مُصْطَفَى لِلْكَتَّانِ ${SUFFIX}`,
+      `للكتان ${SUFFIX.toUpperCase()}`,
+    ]) {
+      expect(await found(q), q).toEqual([shown]);
+    }
+  });
+});
