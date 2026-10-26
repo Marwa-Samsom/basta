@@ -1305,6 +1305,22 @@ a.stat:hover { box-shadow: var(--shadow-md); }
 .search__input::placeholder { color: var(--text-faint); }
 .search__input:focus-visible { border-color: var(--brand); outline-offset: 0; }
 .search__input::-webkit-search-cancel-button { display: none; }
+/* ✕ لمحو المكتوب — بجانب «ابحث» (عرضه 65)، ويظهر حين يُكتب شيء فقط */
+.search__clear {
+  position: absolute;
+  inset-inline-end: 74px;
+  inline-size: 30px;
+  block-size: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.search__clear:hover { background: var(--surface-sunken); color: var(--text-strong); }
+.search:has(.search__clear) .search__input { padding-inline-end: 110px; }
 .search__go {
   position: absolute;
   inset-inline-end: 5px;
