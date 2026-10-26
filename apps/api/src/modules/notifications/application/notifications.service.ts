@@ -16,7 +16,7 @@ import {
   usedVariables,
   type Channel,
 } from '../domain/templates';
-import { nextAttemptAt } from '../domain/retry';
+import { MAX_ATTEMPTS, SENDING_LEASE_SECONDS, nextAttemptAt } from '../domain/retry';
 import { deliver } from '../infrastructure/channels';
 
 type Db = Prisma.TransactionClient | PrismaService;
@@ -218,9 +218,16 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     if (this.running) return out;
     this.running = true;
     try {
-      // ما فشل قبلاً ينتظر موعده: الإعادة بمهلة تطول لا كل 5 ثوانٍ (domain/retry.ts)
+      const now = new Date();
       const queued = await this.prisma.notification.findMany({
-        where: { status: 'queued', OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }] },
+        where: {
+          OR: [
+            // ما فشل قبلاً ينتظر موعده: الإعادة بمهلة تطول لا كل 5 ثوانٍ (domain/retry.ts)
+            { status: 'queued', OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },
+            // سقط مرسِله بين الحجز والختام: انقضت مهلة «يُرسل» ولم يُختم
+            { status: 'sending', nextAttemptAt: { lte: now } },
+          ],
+        },
         orderBy: { createdAt: 'asc' },
         take: limit,
         select: { id: true },
@@ -236,10 +243,12 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   }
 
   private async sendOne(id: string): Promise<'sent' | 'failed' | 'skipped' | null> {
-    // الحجز شرطيّ: نسختان من المرسِل لا ترسلان الإشعار نفسه مرتين
+    // الحجز شرطيّ: نسختان من المرسِل لا ترسلان الإشعار نفسه مرتين. ويُحجز بمهلة: إن سقط
+    // المرسِل قبل الختام التقطه غيره بعدها، ولا يلتقطه أحد قبلها (SYS-034)
+    const now = new Date();
     const claimed = await this.prisma.notification.updateMany({
-      where: { id, status: 'queued' },
-      data: { status: 'sending', attempts: { increment: 1 } },
+      where: { id, OR: [{ status: 'queued' }, { status: 'sending', nextAttemptAt: { lte: now } }] },
+      data: { status: 'sending', attempts: { increment: 1 }, nextAttemptAt: new Date(now.getTime() + SENDING_LEASE_SECONDS * 1000) },
     });
     if (claimed.count === 0) return null;
     const n = await this.prisma.notification.findUniqueOrThrow({ where: { id } });
@@ -251,9 +260,12 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     // الختام يمحو الأسرار: الرمز يصل صاحبه ثم لا يبقى في صفّ يقرؤه السجل
     const finish = async (status: 'sent' | 'failed' | 'skipped', data: Prisma.NotificationUpdateInput = {}) => {
       const scrubbed = secret ? { payloadJson: redactVars(n.templateCode, vars) } : {};
-      await this.prisma.notification.update({ where: { id }, data: { status, ...data, ...scrubbed } });
+      await this.prisma.notification.update({ where: { id }, data: { status, ...data, ...scrubbed, nextAttemptAt: null } });
       return status;
     };
+
+    // سقط المرسِل أثناء المحاولة الأخيرة: يُختم ولا يُعاد بلا حدّ — قد يكون الإشعار نفسه ما يُسقطه
+    if (n.attempts > MAX_ATTEMPTS) return finish('failed', { error: 'استُنفدت المحاولات: سقط الخادم أثناء آخرها.' });
 
     try {
       // المقفول يُرسل بنصّ الكود وحده — صفّه في القاعدة للعرض لا للإرسال
