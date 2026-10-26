@@ -32,6 +32,8 @@ test('كلمة فوق 120 حرفاً: الخانة تقبل 120 والرابط �
   expect(res?.status()).toBe(200);
   await expect(page.getByText(failure)).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('ق'.repeat(120));
+  // كلمة بلا مسافات تلتفّ داخل العنوان — كانت تمدّ الصفحة إلى 2741 بكسل فتتمرّر عرضاً
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.goto('/');
   const box = page.getByRole('combobox', { name: 'ابحث في بسطة' });

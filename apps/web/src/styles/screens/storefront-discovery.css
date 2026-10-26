@@ -263,7 +263,8 @@
   flex-wrap: wrap;
 }
 .sd-list__titles { display: grid; gap: 5px; min-width: 0; }
-.sd-list__title { font-size: var(--text-2xl); }
+/* كلمة البحث بلا مسافات (حتى 120 حرفاً) تلتفّ لا تمدّ الصفحة عرضاً — DISC-033 */
+.sd-list__title { font-size: var(--text-2xl); overflow-wrap: anywhere; }
 .sd-list__count { font-size: var(--text-sm); color: var(--text-muted); }
 
 /* الترتيب — قائمة منسدلة بـ <details>: تعمل بلا سكربت */
@@ -517,7 +518,7 @@
   background: var(--surface-card);
   box-shadow: var(--shadow-sm);
 }
-.sd-noresults__title { font-size: var(--text-xl); line-height: 1.4; }
+.sd-noresults__title { font-size: var(--text-xl); line-height: 1.4; overflow-wrap: anywhere; }
 .sd-noresults__body { font-size: var(--text-base); color: var(--text-body); line-height: 1.8; }
 .sd-noresults__tips {
   margin: 0;
