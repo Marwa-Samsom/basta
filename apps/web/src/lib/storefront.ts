@@ -287,10 +287,48 @@ export const getCampaigns = (currency?: string): Promise<Campaign[]> =>
 
 export const getPage = (slug: string): Promise<ContentPage> => get(`/pages/${slugPath(slug)}`, 300);
 
+/** أطول كلمة بحث يقبلها الخادم (StorefrontQueryDto.q) — وحدّ خانة البحث */
+export const SEARCH_MAX = 120;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = (v: string) => (UUID.test(v) ? v : null);
+const count = (max: number) => (v: string) => (/^[1-9]\d{0,6}$/.test(v) && Number(v) <= max ? v : null);
+const minor = (v: string) => (/^\d{1,12}$/.test(v) ? v : null);
+
+/**
+ * معاملات القائمة كما يقبلها /storefront/products وحده، بقيمها الصالحة — DISC-033، 26 أكتوبر 2026.
+ * كانت تُمرَّر كلها، والخادم يرفض الحقل غير المعروف والقيمة المعطوبة بـ400 فتسقط الصفحة: رابط
+ * إعلان فيه utm_source، أو page=abc، أو sort=popular، أو كلمة فوق 120 حرفاً يفتح «حدث خلل غير
+ * متوقّع» بدل النتائج. غير المعروف والمعطوب يُسقطان (الصفحة الأولى والترتيب الافتراضي)، والكلمة
+ * الطويلة تُقصّ. والعملة من الكوكي لا من العنوان: رابط منسوخ يفتح بعملة من يفتحه.
+ */
+const LIST_PARAMS: Record<string, (v: string) => string | null> = {
+  q: (v) => v.slice(0, SEARCH_MAX).trim() || null,
+  vendorId: uuid,
+  storeCategory: uuid,
+  brandId: uuid,
+  attrs: (v) => (v.length <= 500 && /^[0-9a-f-]{36}(,[0-9a-f-]{36})*,?$/i.test(v) ? v : null),
+  minPrice: minor,
+  maxPrice: minor,
+  inStock: (v) => (v === 'true' ? v : null),
+  sort: (v) => (['relevance', 'price_asc', 'price_desc', 'newest'].includes(v) ? v : null),
+  page: count(1_000_000),
+  pageSize: count(48),
+};
+
+export function listParams(raw: Record<string, string | string[] | undefined>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, clean] of Object.entries(LIST_PARAMS)) {
+    const value = raw[key];
+    const v = (Array.isArray(value) ? value[0] : value)?.trim();
+    const kept = v ? clean(v) : null;
+    if (kept) out[key] = kept;
+  }
+  return out;
+}
+
 export function listProducts(params: Record<string, string | undefined>, currency?: string): Promise<ListResult> {
-  const query = new URLSearchParams();
-  // العملة من الكوكي لا من العنوان: رابط بحث منسوخ يفتح بعملة من يفتحه
-  for (const [k, v] of Object.entries(params)) if (v && k !== 'currency') query.set(k, v);
+  const query = new URLSearchParams(listParams(params));
   // البحث لا يُخزَّن: كل كلمة استعلام جديد، والتخزين يملأ الذاكرة بلا فائدة
   return get(`/storefront/products?${query.toString()}`, params['q'] ? 0 : 60, currency);
 }

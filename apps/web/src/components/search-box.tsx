@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
 import { apiBase } from '@/lib/api';
+import { SEARCH_MAX } from '@/lib/storefront';
 
 /**
  * صندوق البحث — ST-06.
@@ -84,6 +85,7 @@ function SearchBoxInner() {
         className="search__input"
         placeholder="ابحث عن منتج أو متجر"
         autoComplete="off"
+        maxLength={SEARCH_MAX}
         role="combobox"
         aria-expanded={open && suggestions.length > 0}
         aria-controls={listId}
