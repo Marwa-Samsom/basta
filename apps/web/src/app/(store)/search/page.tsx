@@ -4,12 +4,12 @@ import { Icon } from '@/components/icons';
 import { Crumbs, Listing, hasFilters } from '@/components/listing';
 import { EmptyState } from '@/components/ui';
 import { requestCurrency } from '@/lib/currency-server';
-import { getShops, listProducts } from '@/lib/storefront';
+import { getShops, listParams, listProducts } from '@/lib/storefront';
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const { q } = await searchParams;
+  const { q } = listParams(await searchParams);
   // نتائج البحث لا تُفهرس: كل كلمة صفحة، والصفحات الرقيقة تضرّ بترتيب الموقع
   return { title: q ? `بحث: ${q}` : 'بحث', robots: { index: false, follow: true } };
 }
@@ -21,8 +21,10 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
  * لأن المشتري الذي يُترك أمام صفحة فارغة يغادر.
  */
 export default async function SearchPage({ searchParams }: Props) {
-  const query = await searchParams;
-  const q = query['q']?.trim() ?? '';
+  // ما يعرفه الخادم بقيمته الصالحة وحده — روابط الإعلانات (utm_*) والمعطوب لا تُسقط الصفحة (DISC-033)،
+  // ولا تُحمل في روابط الترتيب والتصفية والصفحات
+  const query = listParams(await searchParams);
+  const q = query['q'] ?? '';
 
   if (!q) {
     return (
