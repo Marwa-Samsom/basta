@@ -32,6 +32,27 @@ test('429 من الاقتراحات: لا خطأ في الصفحة، والبح�
   await page.waitForURL((u) => u.pathname === '/search' && u.searchParams.get('q') === 'قميص');
 });
 
+test('✕ يمحو المكتوب كله ويُغلق الاقتراحات، والمؤشّر يبقى في الخانة', async ({ page }) => {
+  await page.route(suggestRoute, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ suggestions: ['قميص قطني'] }) }),
+  );
+  const clear = page.getByRole('button', { name: 'امسح ما كتبته' });
+
+  await page.goto('/search?q=' + encodeURIComponent('قطن'));
+  await expect(box(page)).toHaveValue('قطن');
+  await expect(clear).toBeVisible();
+
+  await box(page).fill('قمي');
+  await expect(page.getByRole('option', { name: 'قميص قطني' })).toBeVisible();
+  await clear.click();
+  await expect(box(page)).toHaveValue('');
+  await expect(box(page)).toBeFocused();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  // الخانة فارغة: لا ✕، والصفحة لم تتغيّر
+  await expect(clear).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.get('q')).toBe('قطن');
+});
+
 test('ردّ قديم بطيء لا يكتب فوق الأحدث، والاقتراحات الصحيحة تظهر', async ({ page }) => {
   await page.route(suggestRoute, async (route: Route) => {
     const q = new URL(route.request().url()).searchParams.get('q');

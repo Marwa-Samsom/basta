@@ -20,6 +20,7 @@ function SearchBoxInner() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const listId = useId();
+  const input = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** بعد 429 تتوقّف الاقتراحات قليلاً — لا تُثقل خادماً يقول «أبطئ» */
   const pausedUntil = useRef(0);
@@ -76,6 +77,7 @@ function SearchBoxInner() {
       </label>
       <Icon name="search" size={18} className="search__icon" />
       <input
+        ref={input}
         id={`${listId}-input`}
         name="q"
         type="search"
@@ -106,6 +108,23 @@ function SearchBoxInner() {
           }
         }}
       />
+      {/* يمحو المكتوب كله ويُبقي المؤشّر في الخانة لكتابة غيره (26 أكتوبر 2026، بطلب صاحبة المشروع) */}
+      {value ? (
+        <button
+          type="button"
+          className="search__clear"
+          aria-label="امسح ما كتبته"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            setValue('');
+            setSuggestions([]);
+            setActive(-1);
+            input.current?.focus();
+          }}
+        >
+          <Icon name="x" size={16} />
+        </button>
+      ) : null}
       <button type="submit" className="search__go">
         ابحث
       </button>
