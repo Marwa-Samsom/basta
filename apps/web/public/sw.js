@@ -3,7 +3,8 @@
  *
  * ثلاث قواعد، وكل ما عداها يمرّ إلى الشبكة كما هو:
  *   1. ملفات البناء (/_next/static) لا تتغيّر تحت اسمها: من الذاكرة أولاً.
- *   2. صفحات المتجر: الشبكة أولاً، ونسخة آخر زيارة عند الانقطاع، ثم /offline.
+ *   2. صفحات المتجر: الشبكة أولاً، ونسخة آخر زيارة عند الانقطاع، ثم /offline —
+ *      ما فُتح بتحميل كامل وما فُتح بالكبس على رابط داخل الموقع.
  *   3. صور المنتجات: من الذاكرة فوراً وتُحدَّث في الخلفية.
  * **لا يُخزَّن** أي ردّ للواجهة البرمجية ولا صفحات الحساب والسلة والدفع
  * واللوحتين: بيانات شخصية في ذاكرة جهاز مشترك تسريب، وسعر قديم في سلة خطأ.
@@ -60,6 +61,29 @@ self.addEventListener('fetch', (event) => {
         if (res.ok) cache.put(req, res.clone());
         return res;
       }),
+    );
+    return;
+  }
+
+  // التنقّل بالكبس داخل الموقع: Next يطلب جزء الصفحة (rsc) لا الصفحة، فلا يمرّ بالتنقّل أدناه
+  // ولا يُحفظ شيء — فمن تصفّح بالروابط ثم انقطع وجد /offline لما رآه قبل دقيقة. تُجلب الصفحة
+  // كاملةً في الخلفية وتُحفظ؛ لما يُفتح فعلاً وحده، لا لما يجهّزه Next مسبقاً لكل رابط ظاهر
+  if (
+    req.headers.get('rsc') === '1' &&
+    !req.headers.has('next-router-prefetch') &&
+    !req.headers.has('next-router-segment-prefetch') &&
+    !PRIVATE.test(url.pathname)
+  ) {
+    const page = new URL(url);
+    page.searchParams.delete('_rsc');
+    event.waitUntil(
+      fetch(page, { credentials: 'same-origin' })
+        .then((res) =>
+          res.ok && (res.headers.get('content-type') || '').includes('text/html')
+            ? caches.open(PAGES).then((c) => c.put(page.href, res))
+            : undefined,
+        )
+        .catch(() => undefined),
     );
     return;
   }

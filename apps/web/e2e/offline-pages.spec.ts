@@ -55,3 +55,26 @@ test('بلا اتصال: الخاصة تُظهر صفحة بسطة ولا تُح
     await context.setOffline(false);
   }
 });
+
+test('بلا اتصال: صفحة فُتحت بالكبس على رابط داخل الموقع تُفتح من الجهاز أيضاً', async ({ page, context }) => {
+  test.skip(!(await controlled(page)), 'عامل الخدمة يعمل في بناء الإنتاج وحده');
+  const t = tag();
+  const v = await makeVendor(t);
+
+  // المتجر بتحميل كامل، ثم المنتج بالكبس: Next يطلب جزء الصفحة لا الصفحة — كان لا يُحفظ شيء
+  await page.goto(`/s/store-${t}`);
+  // الرابط ظاهر فيجهّزه Next مسبقاً — هذا لا يُحفظ، وإلا جُلبت كل صفحة يظهر رابطها
+  await page.waitForTimeout(1500);
+  expect(await cachedPages(page)).not.toContain(`/p/${v.productSlug}`);
+  await page.getByRole('link', { name: v.productName }).first().click();
+  await expect(page.getByRole('heading', { level: 1, name: v.productName })).toBeVisible();
+  await expect.poll(() => cachedPages(page)).toContain(`/p/${v.productSlug}`);
+
+  await context.setOffline(true);
+  try {
+    await page.goto(`/p/${v.productSlug}`);
+    await expect(page.getByRole('heading', { level: 1, name: v.productName })).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
+});
