@@ -12,6 +12,14 @@ export const RETRY_DELAYS_SECONDS = [10, 30, 60, 5 * 60, 15 * 60, 30 * 60, 60 * 
 
 export const MAX_ATTEMPTS = RETRY_DELAYS_SECONDS.length + 1;
 
+/**
+ * مهلة «يُرسل» — SYS-034، 26 أكتوبر 2026. المرسِل يحجز الإشعار بها: إن سقط خادمه بين الحجز
+ * والختام بقي الإشعار «يُرسل» إلى الأبد ولا شيء يعيده (ومنه رمز الاستعادة). بعد المهلة يلتقطه
+ * أي مرسِل كأنه في الدور. دقيقتان: أطول تسليم سليم أقل من دقيقة (مهل SMTP 10 + 10 + 20
+ * ثانية)، فلا يُعاد إشعار مرسِله حيّ يرسله.
+ */
+export const SENDING_LEASE_SECONDS = 120;
+
 /** موعد المحاولة التالية بعد فشل المحاولة رقم `attempts`، أو null إن استُنفدت المحاولات */
 export function nextAttemptAt(attempts: number, now: Date): Date | null {
   const wait = attempts >= 1 ? RETRY_DELAYS_SECONDS[attempts - 1] : undefined;
