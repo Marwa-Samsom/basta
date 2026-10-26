@@ -7,6 +7,7 @@
  *   3. صور المنتجات: من الذاكرة فوراً وتُحدَّث في الخلفية.
  * **لا يُخزَّن** أي ردّ للواجهة البرمجية ولا صفحات الحساب والسلة والدفع
  * واللوحتين: بيانات شخصية في ذاكرة جهاز مشترك تسريب، وسعر قديم في سلة خطأ.
+ * وهذه عند الانقطاع تُظهر /offline أيضاً، لا خطأ المتصفّح (AUTH-086، 26 أكتوبر 2026).
  */
 const VERSION = 'basta-v1';
 const STATIC = `${VERSION}-static`;
@@ -63,14 +64,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (req.mode === 'navigate' && !PRIVATE.test(url.pathname)) {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res.ok) caches.open(PAGES).then((c) => c.put(req, res.clone()));
-          return res;
-        })
-        .catch(async () => (await caches.match(req)) || (await caches.match('/offline'))),
-    );
+  if (req.mode !== 'navigate') return;
+
+  // الخاصة من الشبكة دائماً ولا تُحفظ. كانت تُترك للمتصفّح فيظهر خطؤه الإنجليزي عند الانقطاع
+  if (PRIVATE.test(url.pathname)) {
+    event.respondWith(fetch(req).catch(async () => (await caches.match('/offline')) || Response.error()));
+    return;
   }
+
+  event.respondWith(
+    fetch(req)
+      .then((res) => {
+        // النسخة قبل تسليم الردّ: بعده يقرأ المتصفّح جسمه فلا يُنسخ — كان الحفظ يفشل صامتاً
+        // فلا تُحفظ صفحة واحدة، و/offline تَعِد بما زاره الزائر ولا شيء منه
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(PAGES).then((c) => c.put(req, copy));
+        }
+        return res;
+      })
+      .catch(async () => (await caches.match(req)) || (await caches.match('/offline'))),
+  );
 });

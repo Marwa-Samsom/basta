@@ -1,0 +1,57 @@
+import { expect, test, type Page } from '@playwright/test';
+import { makeVendor, tag } from './fixtures';
+
+/**
+ * بلا اتصال — AUTH-086، 26 أكتوبر 2026. عامل الخدمة يعمل في بناء الإنتاج وحده، فيُشغَّل
+ * هذا على الإنتاج (E2E_BASE_URL=http://localhost:3100) ويُتخطّى في التطوير.
+ *
+ * كانت الصفحات الخاصة تُترك للمتصفّح فيظهر خطؤه الإنجليزي عند الانقطاع، والعامة لا تُحفظ
+ * أبداً (تُنسخ بعد تسليمها فيفشل الحفظ صامتاً) — و/offline تقول «الصفحات التي زرتها متاحة».
+ */
+async function controlled(page: Page): Promise<boolean> {
+  await page.goto('/');
+  const has = await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) return false;
+    const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((r) => setTimeout(() => r(null), 5000))]);
+    return !!reg;
+  });
+  if (!has) return false;
+  // التحميل الأول قبل أن يتولّى العامل الصفحة؛ بعد إعادة التحميل يمرّ كل تنقّل به
+  await page.reload();
+  return page.evaluate(() => !!navigator.serviceWorker.controller);
+}
+
+const cachedPages = (page: Page) =>
+  page.evaluate(async () => {
+    const c = await caches.open('basta-v1-pages');
+    return (await c.keys()).map((r) => new URL(r.url).pathname);
+  });
+
+test('بلا اتصال: الخاصة تُظهر صفحة بسطة ولا تُحفظ، والعامة التي زيرت تُفتح من الجهاز', async ({ page, context }) => {
+  test.skip(!(await controlled(page)), 'عامل الخدمة يعمل في بناء الإنتاج وحده');
+  const t = tag();
+  const v = await makeVendor(t);
+
+  await page.goto(`/p/${v.productSlug}`);
+  await expect(page.getByRole('heading', { level: 1, name: v.productName })).toBeVisible();
+  await page.goto('/cart');
+  await page.goto('/login');
+  // الحفظ يجري في العامل بعد التسليم — يُنتظر حتى يظهر
+  await expect.poll(() => cachedPages(page)).toContain(`/p/${v.productSlug}`);
+  const saved = await cachedPages(page);
+  expect(saved.filter((p) => /^\/(cart|checkout|orders|account|vendor|admin|login|register)(\/|$)/.test(p))).toEqual([]);
+
+  await context.setOffline(true);
+  try {
+    // كان خطأ المتصفّح (ERR_INTERNET_DISCONNECTED) فيرمي goto نفسه
+    await page.goto('/account');
+    await expect(page.getByRole('heading', { name: 'لا يوجد اتصال بالإنترنت' })).toBeVisible();
+    await expect(page.getByText('السلة والدفع وطلباتك تحتاج اتصالاً')).toBeVisible();
+
+    // ما زيرت تُفتح كما كانت — كانت /offline لأن شيئاً لم يُحفظ
+    await page.goto(`/p/${v.productSlug}`);
+    await expect(page.getByRole('heading', { level: 1, name: v.productName })).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
+});
