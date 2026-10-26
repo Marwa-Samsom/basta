@@ -84,6 +84,15 @@ const CARD_INCLUDE = {
 
 type CardRow = Prisma.ProductGetPayload<{ include: typeof CARD_INCLUDE }>;
 
+/**
+ * الاسم كما يكتبه الناس — تطبيع محرّك البحث نفسه: الهمزات والمدّة ألفاً، والتاء المربوطة
+ * هاءً، والألف المقصورة ياءً، بلا تشكيل ولا شدّة ولا تطويل. يُطبَّق على الطرفين في القاعدة
+ * فلا يختلف تطبيعان.
+ */
+const MARKS = '[ً-ٰٟـ]';
+const fold = (value: Prisma.Sql): Prisma.Sql =>
+  Prisma.sql`translate(regexp_replace(lower(${value}), ${MARKS}, '', 'g'), ${'أإآٱةى'}, ${'ااااهي'})`;
+
 @Injectable()
 export class StorefrontService implements OnModuleInit {
   private readonly logger = new Logger('Storefront');
@@ -315,7 +324,7 @@ export class StorefrontService implements OnModuleInit {
     const where: Prisma.VendorWhereInput = {
       status: 'approved',
       products: { some: VISIBLE },
-      ...(term ? { nameAr: { contains: term, mode: 'insensitive' } } : {}),
+      ...(term ? { id: { in: await this.shopIdsByName(term) } } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.vendor.findMany({
@@ -357,6 +366,17 @@ export class StorefrontService implements OnModuleInit {
         categories: v.categories.map((c) => c.nameAr),
       })),
     };
+  }
+
+  /**
+   * البحث في الدليل باسم المتجر كما يُكتب، كبحث المنتجات (DISC-038، 26 أكتوبر 2026):
+   * كان مطابقة حرفية فلا تجد «اخفاء» متجر «إخفاء»، ولا «دليل ا» متجر «دليل أ».
+   */
+  private async shopIdsByName(term: string): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM vendors
+      WHERE status = 'approved' AND strpos(${fold(Prisma.raw('"nameAr"'))}, ${fold(Prisma.sql`${term}::text`)}) > 0`;
+    return rows.map((r) => r.id);
   }
 
   private async cards(rows: readonly CardRow[], fx: DisplayFx): Promise<StorefrontProductCard[]> {
