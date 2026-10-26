@@ -7,8 +7,9 @@ import { Icon } from '@/components/icons';
 import { RecordView } from '@/components/recent';
 import { Crumbs } from '@/components/listing';
 import { ProductGrid } from '@/components/product-card';
+import { ProductReviews } from '@/components/product-reviews';
 import { requestCurrency } from '@/lib/currency-server';
-import { getProduct, getShop, imageUrl, num } from '@/lib/storefront';
+import { getProduct, getProductReviews, getShop, imageUrl, num } from '@/lib/storefront';
 import { ProductGallery, ProductSelection, VariantPicker, type GalleryImage } from '@/components/variant-picker';
 import { WishHeart } from '@/components/wish-heart';
 import { JsonLd, SITE_URL, breadcrumbJsonLd, productJsonLd } from '@/lib/seo';
@@ -48,8 +49,11 @@ export default async function ProductPage({ params }: Params) {
   const currency = await requestCurrency();
   const product = await getProduct(slug, currency);
 
-  // منتجات أخرى من المتجر نفسه — تحسين لا شرط: تعذّر جلبها لا يُسقط الصفحة
-  const shop = await getShop(product.vendor.slug, { currency }).catch(() => null);
+  // منتجات أخرى من المتجر نفسه، ومراجعات المنتج — تحسين لا شرط: تعذّر جلبهما لا يُسقط الصفحة
+  const [shop, reviews] = await Promise.all([
+    getShop(product.vendor.slug, { currency }).catch(() => null),
+    getProductReviews(product.id).catch(() => null),
+  ]);
   const more = (shop?.products ?? []).filter((p) => p.id !== product.id).slice(0, MORE_FROM_SHOP);
 
   const images: GalleryImage[] = product.images.map((img) => ({
@@ -195,6 +199,8 @@ export default async function ProductPage({ params }: Params) {
           </dl>
         </section>
       ) : null}
+
+      {reviews ? <ProductReviews productId={product.id} initial={reviews} /> : null}
 
       {more.length > 0 ? (
         <section className="sd-section" aria-labelledby="sd-more">

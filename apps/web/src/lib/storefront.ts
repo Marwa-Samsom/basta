@@ -179,6 +179,33 @@ const slugPath = (slug: string): string => encodeURIComponent(decodeParam(slug))
 export const getProduct = (slug: string, currency?: string): Promise<ProductPage> =>
   get(`/storefront/products/${slugPath(slug)}`, 60, currency);
 
+/** مراجعة موثّقة كما تُعرض — الاسم الأول وحده، والمتغيّر الذي اشتُري */
+export interface ProductReview {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  createdAt: string;
+  author: string;
+  variant: string | null;
+  verified: boolean;
+}
+
+export interface ProductReviews {
+  /** بمنزلة عشرية واحدة، و null بلا مراجعات */
+  average: number | null;
+  count: number;
+  distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
+  /** الأحدث أولاً، عشر في الصفحة */
+  items: ProductReview[];
+}
+
+/**
+ * مراجعات المنتج طازجة في كل زيارة كصفحة المتجر: من كتب مراجعته وفتح الصفحة يراها فوراً،
+ * لا بعد دقيقة من التخزين. الصفحة الأولى هنا في HTML؛ ما بعدها يطلبه المتصفّح.
+ */
+export const getProductReviews = (productId: string): Promise<ProductReviews> => get(`/products/${productId}/reviews`, 0);
+
 /**
  * صفحة المتجر تُقرأ طازجة في كل زيارة لا من التخزين: حالته (معلَّق أو معتمد) تتغيّر بقرار
  * إداري، والتخزين يخدم النسخة القديمة لأول زائر بعد انقضائه مهما قدمت — بعد إعادة «غزة»

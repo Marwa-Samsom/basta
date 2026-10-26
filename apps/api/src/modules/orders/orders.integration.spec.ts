@@ -802,6 +802,58 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect(list.json().count).toBeGreaterThanOrEqual(1);
     expect(list.json().items[0].verified).toBe(true);
   });
+
+  it('النشر يحدّث تقييم المنتج والمتجر، والمنتج المسحوب بلا مراجعات (BUY-070، DISC-064)', async () => {
+    if (!dbUp) return;
+    const { a } = await placeOrder([2, 1]);
+    const item = a.items[0]!;
+    await deliver(0, a.id);
+    const ok = await call('POST', '/me/reviews', buyer.token, { orderItemId: item.id, rating: 2, body: 'المقاس أصغر من المكتوب' });
+    expect(ok.statusCode, ok.body).toBe(201);
+
+    // كانت الأعمدة تبقى 0 مهما نُشر — «تقييم المتجر» مخفي في كل صفحة
+    const published = { status: 'published' };
+    const p = await prisma.review.aggregate({ where: { productId: item.productId, ...published }, _avg: { rating: true }, _count: true });
+    const v = await prisma.review.aggregate({ where: { vendorId: vendors[0]!.vendorId, ...published }, _avg: { rating: true }, _count: true });
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: item.productId }, select: { ratingAvg: true, ratingCount: true } });
+    const vendor = await prisma.vendor.findUniqueOrThrow({ where: { id: vendors[0]!.vendorId }, select: { ratingAvg: true, ratingCount: true } });
+    expect(product.ratingCount).toBe(p._count);
+    expect(Number(product.ratingAvg)).toBeCloseTo(p._avg.rating!, 2);
+    expect(vendor.ratingCount).toBe(v._count);
+    expect(Number(vendor.ratingAvg)).toBeCloseTo(v._avg.rating!, 2);
+    const page = (await call('GET', `/products/${item.productId}/reviews`)).json();
+    expect(page).toMatchObject({ count: p._count });
+    expect(page.items[0]).toMatchObject({ rating: 2, body: 'المقاس أصغر من المكتوب', verified: true });
+
+    // مسحوب من المتجر: لا منتج ولا مراجعات — كانت تُعاد كأنه معروض
+    await prisma.product.update({ where: { id: item.productId }, data: { status: 'archived' } });
+    try {
+      expect((await call('GET', `/products/${item.productId}/reviews`)).statusCode).toBe(404);
+    } finally {
+      await prisma.product.update({ where: { id: item.productId }, data: { status: 'active' } });
+    }
+  });
+
+  it('صاحب المتجر يشتري منه ولا يقيّمه — والمتجر الآخر في الطلب نفسه يقيّمه', async () => {
+    if (!dbUp) return;
+    const { order, a, b } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    await deliver(1, b.id);
+    // الطلب نفسه لصاحب المتجر الأول (الشراء من متجرك مسموح — 21 أكتوبر 2026)
+    const owner = vendors[0]!;
+    await prisma.order.update({ where: { id: order.id }, data: { customerUserId: owner.userId } });
+
+    const view = (await call('GET', `/me/orders/${order.orderNumber}`, owner.token)).json();
+    const store = (vendorId: string) => view.stores.find((s: { vendorId?: string; vendor: { id: string } }) => (s.vendorId ?? s.vendor.id) === vendorId);
+    expect(store(owner.vendorId).reviewable).toBe(false);
+    expect(store(vendors[1]!.vendorId).reviewable).toBe(true);
+
+    const own = await call('POST', '/me/reviews', owner.token, { orderItemId: a.items[0]!.id, rating: 5 });
+    expect(own.statusCode).toBe(409);
+    expect(own.json().message).toBe('لا يقيّم صاحب المتجر منتجات متجره.');
+    expect(await prisma.review.count({ where: { orderItemId: a.items[0]!.id } })).toBe(0);
+    expect((await call('POST', '/me/reviews', owner.token, { orderItemId: b.items[0]!.id, rating: 5 })).statusCode).toBe(201);
+  });
 });
 
 describe('الاسترداد يُعاد بلا دفع مرتين', () => {

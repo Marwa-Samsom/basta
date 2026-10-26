@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { refreshRatings } from './ratings';
 
 /**
  * المراجعات الموثّقة — ST-22.
@@ -30,20 +31,28 @@ export class ReviewsService {
       throw new ConflictError('المراجعة بعد استلام الطلب.');
     }
     if (item.refundedQty >= item.qty) throw new ConflictError('أُرجع هذا المنتج كاملاً — لا مراجعة عليه.');
+    // الشراء من متجرك مسموح (21 أكتوبر 2026)، وتقييمه لا: نجومه ترفع متجره (26 أكتوبر 2026)
+    if ((await this.prisma.vendor.count({ where: { id: item.vendorId, ownerUserId: userId } })) > 0) {
+      throw new ConflictError('لا يقيّم صاحب المتجر منتجات متجره.');
+    }
 
     try {
-      return await this.prisma.review.create({
-        data: {
-          orderItemId: input.orderItemId,
-          productId: item.productId,
-          vendorId: item.vendorId,
-          userId,
-          rating: input.rating,
-          title: input.title?.trim() || null,
-          body: input.body?.trim() || null,
-          status: 'published',
-        },
-        select: { id: true },
+      return await this.prisma.$transaction(async (tx) => {
+        const review = await tx.review.create({
+          data: {
+            orderItemId: input.orderItemId,
+            productId: item.productId,
+            vendorId: item.vendorId,
+            userId,
+            rating: input.rating,
+            title: input.title?.trim() || null,
+            body: input.body?.trim() || null,
+            status: 'published',
+          },
+          select: { id: true },
+        });
+        await refreshRatings(tx, { productId: item.productId, vendorId: item.vendorId });
+        return review;
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -54,6 +63,18 @@ export class ReviewsService {
   }
 
   async forProduct(productId: string, page = 1) {
+    // كصفحة المنتج نفسها (VISIBLE في storefront): منشور، غير محذوف، متجره معتمد، وله متغيّر
+    // فعّال — وإلا فلا منتج ولا مراجعات. كانت تُعاد لمنتج مسحوب أو متجر معلَّق (DISC-064)
+    const visible = await this.prisma.product.count({
+      where: {
+        id: productId,
+        status: 'active',
+        deletedAt: null,
+        vendor: { status: 'approved' },
+        variants: { some: { archivedAt: null, isActive: true } },
+      },
+    });
+    if (visible === 0) throw new NotFoundError('المنتج غير موجود.', { productId });
     const where = { productId, status: 'published' };
     const [rows, agg, dist] = await Promise.all([
       this.prisma.review.findMany({

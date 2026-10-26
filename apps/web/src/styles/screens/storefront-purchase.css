@@ -823,6 +823,9 @@
 .sp-rate__star:hover ~ .sp-rate__star,
 .sp-rate__star:focus-visible ~ .sp-rate__star { color: var(--text-faint); }
 .sp-rate__star:disabled { cursor: not-allowed; opacity: 0.5; }
+/* المختارة قبل النشر — والمؤشّر يعاين غيرها فوقها */
+.sp-rate__star--on { color: var(--brand); }
+.sp-rate__form { flex-basis: 100%; padding-inline-start: 44px; display: grid; gap: var(--space-2); max-inline-size: 560px; }
 .sp-rated { display: inline-flex; align-items: center; gap: 1px; color: var(--brand); flex-basis: 100%; padding-inline-start: 44px; }
 .sp-rated__text { font-size: var(--text-2xs); color: var(--text-muted); margin-inline-start: 6px; }
 

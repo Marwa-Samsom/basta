@@ -864,6 +864,61 @@
 .sd-specs__row dt { font-size: var(--text-sm); color: var(--text-muted); }
 .sd-specs__row dd { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--text-strong); }
 
+/* المراجعات — DISC-064: الملخّص جانباً والقائمة بجانبه، ويلتفّان عموداً على الهاتف */
+.sd-reviews {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.sd-reviews__summary {
+  display: grid;
+  gap: 6px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+.sd-reviews__avg { margin: 0; display: flex; align-items: baseline; gap: 6px; }
+.sd-reviews__avg .num { font-size: var(--text-3xl); font-weight: var(--weight-bold); color: var(--text-strong); line-height: 1; }
+.sd-reviews__of { font-size: var(--text-sm); color: var(--text-muted); }
+.sd-reviews__count { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.sd-reviews__dist { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: 6px; }
+.sd-reviews__row {
+  display: grid;
+  grid-template-columns: 10px 12px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.sd-reviews__row-star { color: var(--warning); }
+.sd-reviews__bar { block-size: 6px; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.sd-reviews__bar > span { display: block; block-size: 100%; background: var(--warning); border-radius: inherit; }
+.sd-reviews__row-count { text-align: end; }
+.sd-reviews__main { display: grid; gap: 14px; min-inline-size: 0; }
+.sd-reviews__list { list-style: none; margin: 0; padding: 0; display: grid; }
+.sd-review { display: grid; gap: 6px; padding-block: var(--space-4); border-block-end: 1px solid var(--border-subtle); }
+.sd-review:first-child { padding-block-start: 0; }
+.sd-review__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sd-review__title { font-size: var(--text-sm); color: var(--text-strong); }
+.sd-review__body {
+  margin: 0;
+  max-inline-size: 80ch;
+  font-size: var(--text-sm);
+  line-height: 1.8;
+  color: var(--text-body);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.sd-review__meta { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: var(--text-xs); color: var(--text-muted); }
+.sd-review__author { font-weight: var(--weight-semi); color: var(--text-body); }
+.sd-stars { display: inline-flex; gap: 1px; color: var(--warning); }
+.sd-reviews__empty { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+@media (max-width: 720px) {
+  .sd-reviews { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+}
+
 /* ------------------------------------------------------------ ST-11 / ST-12 صفحة المتجر */
 
 .sd-shop { display: grid; gap: 22px; }

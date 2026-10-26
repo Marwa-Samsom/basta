@@ -310,6 +310,8 @@ export class OrderQueryService {
     });
     if (!order) throw new NotFoundError('الطلب غير موجود.', { orderNumber });
     const returnWindowDays = await this.returnWindow();
+    // متاجر المشتري نفسه: يشتري منها ولا يقيّمها (26 أكتوبر 2026)
+    const own = new Set((await this.prisma.vendor.findMany({ where: { ownerUserId: userId }, select: { id: true } })).map((v) => v.id));
     const awaiting = order.status === 'pending_payment' && order.payment?.status === 'awaiting_transfer';
     const details = awaiting ? await this.transfers.read() : null;
     return {
@@ -359,7 +361,7 @@ export class OrderQueryService {
             s.status === 'delivered' &&
             !!s.deliveredAt &&
             Date.now() - s.deliveredAt.getTime() <= returnWindowDays * 86_400_000,
-          reviewable: s.status === 'delivered' || s.status === 'completed',
+          reviewable: (s.status === 'delivered' || s.status === 'completed') && !own.has(s.vendorId),
         };
       }),
     };
