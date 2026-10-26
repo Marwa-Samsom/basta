@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
-/** منزلتان كما في العمود numeric(3,2) */
-const round2 = (n: number) => Math.round(n * 100) / 100;
+/** منزلتان كما في العمود numeric(3,2) — معدّل نجوم لا مال، فلا شأن لـ money.ts به */
+const round2 = (n: number) => Number(n.toFixed(2));
 
 /**
  * تقييم المنتج والمتجر من مراجعاتهما المنشورة — BUY-070، 26 أكتوبر 2026.
