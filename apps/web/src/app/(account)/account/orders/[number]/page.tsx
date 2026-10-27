@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
 import { AskShop } from '@/components/ask-shop';
 import { useConfirm } from '@/components/confirm';
-import { Icon } from '@/components/icons';
+import { Icon, type IconName } from '@/components/icons';
 import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
+import { countryName } from '@/lib/addresses';
 import { api, session } from '@/lib/api';
 import {
   DISPUTE_REASONS,
@@ -36,6 +37,27 @@ interface Store extends Omit<SubOrderView, 'items'> {
   reviewable: boolean;
 }
 
+interface DeliveryAddress {
+  recipientName?: string | null;
+  country: string;
+  region?: string | null;
+  city?: string | null;
+  area?: string | null;
+  street?: string | null;
+  building?: string | null;
+}
+
+/** وسيلة الدفع بالعربية وأيقونتها — رأس الطلب (ST-19) */
+const PAYMENT_METHODS: Record<string, { label: string; icon: IconName }> = {
+  card: { label: 'بطاقة', icon: 'card' },
+  bank_transfer: { label: 'تحويل بنكي', icon: 'cash' },
+  wallet: { label: 'محفظة', icon: 'wallet' },
+  cod: { label: 'الدفع عند الاستلام', icon: 'cash' },
+};
+
+const deliveredTo = (a: DeliveryAddress): string =>
+  [countryName(a.country), a.region, a.city, a.area, a.street, a.building].filter(Boolean).join(' · ');
+
 interface OrderView {
   number: string;
   status: string;
@@ -49,6 +71,8 @@ interface OrderView {
   taxInclusive?: boolean;
   paymentStatus: string | null;
   paymentMethod?: string | null;
+  /** لقطة العنوان لحظة الطلب — لا العنوان المحفوظ اليوم */
+  shippingAddress?: DeliveryAddress | null;
   /** ينتظر التحويل: كيف يحوّل — قبل أن يُقسَّم الطلب على المتاجر */
   transfer?: TransferInstructionsView;
   /** أُغلق قبل أن يُدفع (انقضت مهلة التحويل أو ألغاه) */
@@ -144,6 +168,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
   const storeCount =
     order.stores.length === 1 ? 'متجر واحد' : order.stores.length === 2 ? 'متجران' : `${order.stores.length} متاجر`;
   const unsplit = order.stores.length === 0;
+  const method = order.paymentMethod ? PAYMENT_METHODS[order.paymentMethod] : undefined;
   const refunded = refundTotals(order.stores);
 
   const cancelTransfer = async () => {
@@ -171,6 +196,32 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
         title={<span className="num">{order.number}</span>}
         meta={unsplit ? when(order.placedAt) : `${when(order.placedAt)} · ${storeCount}`}
       />
+      {/* إلى أين وبماذا دفع — ST-19، أُضيفا بطلب صاحبة المشروع في BUY-011 (27 أكتوبر 2026) */}
+      {order.shippingAddress || method ? (
+        <dl className="sp-orderinfo">
+          {order.shippingAddress ? (
+            <div>
+              <dt>
+                <Icon name="pin" size={15} />
+                التوصيل إلى
+              </dt>
+              <dd>
+                {order.shippingAddress.recipientName ? `${order.shippingAddress.recipientName} — ` : ''}
+                {deliveredTo(order.shippingAddress)}
+              </dd>
+            </div>
+          ) : null}
+          {method ? (
+            <div>
+              <dt>
+                <Icon name={method.icon} size={15} />
+                الدفع
+              </dt>
+              <dd>{method.label}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
