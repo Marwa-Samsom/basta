@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
-import { api, session } from '@/lib/api';
+import { api, ApiError, session } from '@/lib/api';
 import {
   DISPUTE_REASONS,
   RETURN_REASONS,
@@ -106,6 +106,18 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
     }
   }, [number]);
 
+  /**
+   * إجراء رُفض: التنبيه يبقى، وإن كان الرفض لأن الحالة تغيّرت من طرف آخر (409) تُجلب
+   * الحالة الجديدة فلا يبقى زرّ لم يعد مسموحاً تحت التنبيه — BUY-027 (27 أكتوبر 2026)
+   */
+  const fail = useCallback(
+    (e: unknown) => {
+      setError((e as Error).message);
+      if (e instanceof ApiError && e.status === 409) void load();
+    },
+    [load],
+  );
+
   useEffect(() => {
     if (!session.read()) {
       router.replace(`/login?next=/account/orders/${number}`);
@@ -160,7 +172,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
       await load();
       setNotice('ألغيت الطلب، وعادت القطع للمتاجر.');
     } catch (e) {
-      setError((e as Error).message);
+      fail(e);
     }
   };
 
@@ -230,7 +242,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
                 setNotice(msg);
                 setError(null);
               }}
-              onError={setError}
+              onError={fail}
             />
           ))}
         </div>
@@ -302,7 +314,7 @@ function StoreCard({
   orderNumber: string;
   currency: string;
   onChange: (o: OrderView | null, msg: string) => void;
-  onError: (m: string) => void;
+  onError: (e: unknown) => void;
 }) {
   const ask = useConfirm();
   const [mode, setMode] = useState<'return' | 'dispute' | null>(null);
@@ -326,7 +338,7 @@ function StoreCard({
     try {
       await fn();
     } catch (e) {
-      onError((e as Error).message);
+      onError(e);
     } finally {
       setBusy(false);
     }
