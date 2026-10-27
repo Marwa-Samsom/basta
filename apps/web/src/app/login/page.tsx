@@ -3,7 +3,7 @@
 import '@/styles/screens/identity.css';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useRef, useState } from 'react';
+import { type RefObject, Suspense, useRef, useState } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
 import { syncAccountCurrency } from '@/lib/currency';
 import { digitsOnly } from '@/lib/digits';
@@ -14,6 +14,67 @@ import { homeFor, internalPath, withNext } from '@/lib/safe-path';
 interface LoginResponse {
   tokens: Tokens;
   requiresTotpSetup: boolean;
+}
+
+/**
+ * ✕ يمحو المكتوب ويُبقي المؤشّر في الخانة — البريد وكلمة المرور (27 أكتوبر 2026، بطلب صاحبة المشروع).
+ * لا يظهر والخانة فارغة؛ والضغط عليه لا يسرق التركيز من الخانة.
+ */
+function ClearButton({
+  label,
+  input,
+  onClear,
+}: {
+  label: string;
+  input: RefObject<HTMLInputElement | null>;
+  onClear: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="ac-clear"
+      aria-label={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => {
+        onClear();
+        input.current?.focus();
+      }}
+    >
+      <Icon name="x" size={15} />
+    </button>
+  );
+}
+
+/** حقل البريد و✕ في نهايته. اسم الزرّ لا يحوي «البريد الإلكتروني»: البحث بالتسمية يجد الحقل وحده */
+function EmailField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <Field label="البريد الإلكتروني">
+      {(props) => (
+        <span className="ac-clearable">
+          <input
+            ref={input}
+            className="field__control"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            dir="ltr"
+            required
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            {...props}
+          />
+          {value ? <ClearButton label="امسح البريد" input={input} onClear={() => onChange('')} /> : null}
+        </span>
+      )}
+    </Field>
+  );
 }
 
 /**
@@ -53,21 +114,7 @@ function PasswordField({
           >
             <Icon name={shown ? 'eye-off' : 'eye'} size={18} />
           </button>
-          {/* يمحو المكتوب ويُبقي المؤشّر في الخانة — دخول الإدارة (27 أكتوبر 2026، بطلب صاحبة المشروع) */}
-          {value ? (
-            <button
-              type="button"
-              className="ac-pw__clear"
-              aria-label="امسح الحروف"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onChange('');
-                input.current?.focus();
-              }}
-            >
-              <Icon name="x" size={15} />
-            </button>
-          ) : null}
+          {value ? <ClearButton label="امسح الحروف" input={input} onClear={() => onChange('')} /> : null}
         </span>
       )}
     </Field>
@@ -215,16 +262,7 @@ function LoginForm() {
             </>
           ) : (
             <>
-              <TextInput
-                label="البريد الإلكتروني"
-                type="email"
-                autoComplete="email"
-                inputMode="email"
-                dir="ltr"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+              <EmailField value={email} onChange={setEmail} />
               <PasswordField value={password} onChange={setPassword} />
               {/* رابط لا تسمية: البحث بالتسمية «كلمة المرور» يبقى يجد الحقل وحده */}
               <Link href={withNext('/forgot', next)} className="id-forgot">
