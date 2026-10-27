@@ -298,6 +298,7 @@
 .sp-coupon__row { display: flex; gap: 9px; flex-wrap: wrap; }
 .sp-coupon__row .field__control { flex: 1; min-width: 180px; inline-size: auto; font-family: var(--font-mono); }
 .sp-coupon__ok { display: flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--success-text); }
+.sp-coupon__remove { margin-inline-start: auto; }
 
 /* هيكل التحميل */
 .sp-skel { display: flex; flex-direction: column; gap: var(--space-4); }
