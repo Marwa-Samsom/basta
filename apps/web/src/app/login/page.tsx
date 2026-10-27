@@ -3,7 +3,7 @@
 import '@/styles/screens/identity.css';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
 import { syncAccountCurrency } from '@/lib/currency';
 import { digitsOnly } from '@/lib/digits';
@@ -17,8 +17,8 @@ interface LoginResponse {
 }
 
 /**
- * حقل كلمة المرور بزرّ إظهار في طرفه (التصميم). اسم الزرّ لا يحوي «كلمة المرور»
- * عمداً: البحث بالتسمية «كلمة المرور» يجب أن يجد الحقل وحده.
+ * حقل كلمة المرور بزرّ إظهار في طرفه (التصميم)، و✕ يمحو المكتوب في طرفه الآخر.
+ * اسما الزرّين لا يحويان «كلمة المرور» عمداً: البحث بالتسمية «كلمة المرور» يجب أن يجد الحقل وحده.
  */
 function PasswordField({
   value,
@@ -28,11 +28,13 @@ function PasswordField({
   onChange: (value: string) => void;
 }) {
   const [shown, setShown] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
   return (
     <Field label="كلمة المرور">
       {(props) => (
         <span className="ac-pw">
           <input
+            ref={input}
             className="field__control"
             type={shown ? 'text' : 'password'}
             autoComplete="current-password"
@@ -51,6 +53,21 @@ function PasswordField({
           >
             <Icon name={shown ? 'eye-off' : 'eye'} size={18} />
           </button>
+          {/* يمحو المكتوب ويُبقي المؤشّر في الخانة — دخول الإدارة (27 أكتوبر 2026، بطلب صاحبة المشروع) */}
+          {value ? (
+            <button
+              type="button"
+              className="ac-pw__clear"
+              aria-label="امسح الحروف"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange('');
+                input.current?.focus();
+              }}
+            >
+              <Icon name="x" size={15} />
+            </button>
+          ) : null}
         </span>
       )}
     </Field>
