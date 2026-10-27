@@ -612,7 +612,9 @@ function CheckoutForm() {
                 </div>
                 {quote.totals.discount.minorUnits !== '0' ? (
                   <div>
-                    <dt>الخصم</dt>
+                    <dt>
+                      الخصم{quote.couponCode ? <> (<bdi>{quote.couponCode}</bdi>)</> : null}
+                    </dt>
                     <dd className="num sp-sum__saving">− {quote.totals.discount.formatted}</dd>
                   </div>
                 ) : null}

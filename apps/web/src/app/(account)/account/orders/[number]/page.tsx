@@ -45,6 +45,7 @@ interface OrderView {
   itemsSubtotalMinorUnits: string;
   shippingTotalMinorUnits: string;
   discountTotalMinorUnits: string;
+  couponCode?: string | null;
   taxTotalMinorUnits?: string;
   taxInclusive?: boolean;
   paymentStatus: string | null;
@@ -249,7 +250,9 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
               </div>
               {order.discountTotalMinorUnits !== '0' ? (
                 <div>
-                  <dt>الخصم</dt>
+                  <dt>
+                    الخصم{order.couponCode ? <> (<bdi>{order.couponCode}</bdi>)</> : null}
+                  </dt>
                   <dd className="num sp-sum__saving">− {money(order.discountTotalMinorUnits, order.currency)}</dd>
                 </div>
               ) : null}

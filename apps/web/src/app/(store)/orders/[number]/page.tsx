@@ -16,6 +16,7 @@ interface OrderResult {
   subOrderCount: number;
   failure?: { code: string; message: string };
   transfer?: TransferInstructionsView;
+  coupon?: { code: string; discount: { minorUnits: string; currency: string } };
 }
 
 /** طلب تحويل أُغلق قبل أن يُدفع — لا «جرّب بطاقة أخرى» لمن لم يستعمل بطاقة */
@@ -139,6 +140,13 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
             <span>الإجمالي</span>
             <span className="sp-orderno__total money num">{total}</span>
           </p>
+          {order.coupon ? (
+            <p className="sp-hero__text">
+              وفّرت{' '}
+              <span className="money num">{format(order.coupon.discount.minorUnits, order.coupon.discount.currency)}</span> بكوبون{' '}
+              <bdi className="num">{order.coupon.code}</bdi>
+            </p>
+          ) : null}
           {orderNo}
         </section>
         <div className="sp-links">
