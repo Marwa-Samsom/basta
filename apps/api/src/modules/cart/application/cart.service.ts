@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { format, money } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { allocate, convertMinor, DisplayCurrencyService, PricingService, type Quote, type QuoteAddress } from '../../pricing/public';
+import { DisplayCurrencyService, PricingService, type Quote, type QuoteAddress } from '../../pricing/public';
 
 export const MAX_QTY_PER_LINE = 50;
 
@@ -254,19 +254,18 @@ export class CartService {
     const zero = view(0n, cart.currency);
 
     /**
-     * كل مبلغ بعملة السلة (18 أكتوبر 2026). سطر المتجر حصّة من بنوده المحوَّلة
-     * بنسبة قيمته (allocate)، فمجموع الأسطر = مجموع المتجر = ما يدخل الإجمالي بالضبط؛
-     * وسعر القطعة بمعامل المتجر نفسه، كما في صفحة المنتج.
+     * كل مبلغ بعملة السلة (18 أكتوبر 2026). سعر القطعة محوَّلاً بمعامل المتجر كما في
+     * صفحة المنتج، والسطر = القطعة × الكمية، ومجموع الأسطر = مجموع المتجر = ما يدخل
+     * الإجمالي بالضبط — من التسعير نفسه (CHK-014، 27 أكتوبر 2026).
      */
     const priced = quote;
     const groups: CartView['groups'][number][] = (priced?.subOrders ?? []).map((s) => {
       const converted = s.currency !== cart.currency;
-      const lineTotals = allocate(s.charge.items, s.lines.map((l) => l.lineSubtotal));
       return {
         vendorId: s.vendorId,
         vendorNameAr: s.vendorNameAr,
         storeCurrency: s.currency,
-        lines: s.lines.map((l, i) => {
+        lines: s.lines.map((l) => {
           const available = priced!.availability.get(l.variantId) ?? 0;
           if (available < l.qty) {
             blockers.push(
@@ -283,8 +282,8 @@ export class CartService {
             imageKey: l.imageKey,
             qty: l.qty,
             available,
-            unitPrice: view(converted ? convertMinor(l.unitPriceMinor, s.fxFactor) : l.unitPriceMinor, cart.currency),
-            lineTotal: view(lineTotals[i] ?? 0n, cart.currency),
+            unitPrice: view(l.chargeUnitMinor, cart.currency),
+            lineTotal: view(l.chargeSubtotal, cart.currency),
             originalUnitPrice: converted ? view(l.unitPriceMinor, s.currency) : null,
             originalLineTotal: converted ? view(l.lineSubtotal, s.currency) : null,
             priceChanged: atAdd.get(l.variantId) !== l.unitPriceMinor,

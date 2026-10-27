@@ -72,6 +72,57 @@ describe('الصرف', () => {
   });
 });
 
+describe('القطعة × الكمية = السطر بعملة الدفع — CHK-014، 27 أكتوبر 2026', () => {
+  const k = fxFactor('JOD', 3, FX);
+  const priced = (lines: PricedLineInput[], coupon: CouponInput | null = null) =>
+    priceCart({
+      lines,
+      vendors: new Map([['j', vendor('j', 'JOD')]]),
+      shipping: new Map([['j', ship(0n)]]),
+      coupon,
+      tax: { rateBps: 0, inclusive: true },
+      fx: FX,
+    }).subOrders[0]!;
+
+  it('كل قطعة تُحوَّل وحدها، والسطر سعرها × الكمية، والبنود مجموع الأسطر', () => {
+    // 9.000 دينار = 12.95$ للقطعة؛ ثلاث قطع 38.85$ — تحويل المجموع (27.000) كان 38.84$
+    // و1.005 دينار = 1.45$؛ خمس قطع 7.25$ — كانت 7.23$
+    const s = priced([line('j', 9_000n, 3), line('j', 1_005n, 5)]);
+    expect(s.lines.map((l) => [l.chargeUnitMinor, l.chargeSubtotal])).toEqual([
+      [1_295n, 3_885n],
+      [145n, 725n],
+    ]);
+    expect(Math.round(27_000 * k)).toBe(3_884);
+    expect(s.charge.items).toBe(3_885n + 725n);
+    expect(s.charge.total).toBe(s.charge.items);
+  });
+
+  it('خصم البنود كلها بعملة البائع لا يُنزل صافي الدفع تحت الصفر', () => {
+    // 3 × 4.999 دينار: القطعة 7.19$ فالأسطر 21.57$، والخصم الكامل (14.997) محوَّلاً جملةً 21.58$
+    const s = priced([line('j', 4_999n, 3)], {
+      code: 'ALL', scope: 'vendor', vendorId: 'j', type: 'fixed', valueBps: null, valueMinor: 14_997n,
+      maxDiscountMinor: null, minOrderMinor: null, currency: 'JOD', fundedBy: 'vendor',
+    });
+    expect(s.charge.items).toBe(2_157n);
+    expect(Math.round(14_997 * k)).toBe(2_158);
+    expect(s.charge.discount).toBe(2_157n);
+    expect(s.charge.total).toBe(0n);
+  });
+
+  it('بالعملة نفسها لا يتغيّر شيء: السطر والبنود والإجمالي كما بعملة البائع', () => {
+    const s = priceCart({
+      lines: [line('u', 4_750n, 3)],
+      vendors: new Map([['u', vendor('u', 'USD')]]),
+      shipping: new Map([['u', ship(500n)]]),
+      coupon: null,
+      tax: { rateBps: 0, inclusive: true },
+      fx: FX,
+    }).subOrders[0]!;
+    expect(s.lines[0]!.chargeSubtotal).toBe(14_250n);
+    expect(s.charge).toEqual(s.vendor);
+  });
+});
+
 describe('بوابة 08 · البند الخامس — مجموع الفرعية = الأب بالقرش', () => {
   it('سلة من ثلاثة بائعين بثلاث عملات', () => {
     const cart = priceCart({
@@ -159,6 +210,9 @@ describe('بوابة 08 · البند الخامس — مجموع الفرعية
           b.items - b.discount + b.shipping + (inclusive ? 0n : b.tax);
         expect(identity(s.charge)).toBe(s.charge.total);
         expect(identity(s.vendor)).toBe(s.vendor.total);
+        // ما يراه المشتري: سطر = القطعة المحوَّلة × الكمية، والبنود مجموع الأسطر
+        for (const l of s.lines) expect(l.chargeSubtotal).toBe(l.chargeUnitMinor * BigInt(l.qty));
+        expect(s.lines.reduce((a, l) => a + l.chargeSubtotal, 0n)).toBe(s.charge.items);
         // عمولة الأسطر لا تتجاوز النسبة من المجموع (التقريب لأسفل)
         const lineSum = s.lines.reduce((a, l) => a + l.lineSubtotal - l.lineDiscount, 0n);
         expect(s.commissionMinor).toBeLessThanOrEqual(
