@@ -299,13 +299,22 @@ export function priceCart(input: {
     const disc = eligible
       ? couponDiscount(input.coupon, vendorId, vendor.currency, items, shippingMinor)
       : { items: 0n, shipping: 0n };
-    return { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc };
+    /**
+     * الشحن المجاني ينطبق على متجره ولو لم يُعرف شحنه بعد (CHK-032، 27 أكتوبر 2026): في السلة
+     * بلا عنوان الشحن صفر فلا يخصم شيئاً، فكان مانع «لا ينطبق» يعطّل «إتمام الشراء». يخصم
+     * الشحن كاملاً في الدفع بعد «احسب الشحن».
+     */
+    const freeShipping =
+      eligible &&
+      input.coupon?.type === 'free_shipping' &&
+      (input.coupon.scope !== 'vendor' || input.coupon.vendorId === vendorId);
+    return { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc, freeShipping };
   });
   capPercent(input.coupon, ctxs, input.fx);
   spreadFixed(input.coupon, ctxs);
 
-  for (const { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc } of ctxs) {
-    if (disc.items > 0n || disc.shipping > 0n) couponMatched = true;
+  for (const { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc, freeShipping } of ctxs) {
+    if (disc.items > 0n || disc.shipping > 0n || freeShipping) couponMatched = true;
 
     const lineDiscounts = allocate(disc.items, subtotals);
     const discount = disc.items + disc.shipping;
