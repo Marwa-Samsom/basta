@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
-import { Alert, Field, TextInput } from '@/components/ui';
+import { Alert, ClearableInput, Field, TextInput } from '@/components/ui';
 import { Icon, type IconName } from '@/components/icons';
 import { withNext } from '@/lib/safe-path';
 import { COUNTRIES, type Onboarding } from '@/lib/vendor';
@@ -299,7 +299,7 @@ export default function VendorRegisterPage() {
                     <span className="vo-slug__prefix" aria-hidden>
                       basta.com/s/
                     </span>
-                    <input
+                    <ClearableInput
                       className="vo-slug__input"
                       {...props}
                       value={slugValue}

@@ -276,6 +276,10 @@
   font-size: var(--text-sm);
 }
 .vo-slug__input:focus-visible { outline: none; }
+/* عرض الخانة من مكانها لا من حجمها الطبيعي — كان الصندوق يخرج من شاشة الجوال، والفراغ لـ ✕ يزيده */
+.vo-slug > .field__clearable { flex: 1; min-width: 0; }
+.vo-slug .field__clearable > .vo-slug__input { inline-size: 0; }
+.vo-slug .field__clearable:has(> .field__clear) > .vo-slug__input { padding-inline-end: 34px; }
 
 .vo-slug__icon {
   display: flex;

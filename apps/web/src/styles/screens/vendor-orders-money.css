@@ -370,6 +370,10 @@
   font-weight: var(--weight-semi);
 }
 .vm-amount__input:focus-visible { outline: none; }
+/* عرض الخانة من مكانها لا من حجمها الطبيعي — كان الصندوق يخرج من شاشة الجوال، والفراغ لـ ✕ يزيده */
+.vm-amount > .field__clearable { flex: 1; min-width: 0; }
+.vm-amount .field__clearable > .vm-amount__input { inline-size: 0; }
+.vm-amount .field__clearable:has(> .field__clear) > .vm-amount__input { padding-inline-end: 38px; }
 .vm-amount__input::placeholder { color: var(--text-faint); font-weight: var(--weight-normal); }
 .vm-amount__unit {
   display: flex;

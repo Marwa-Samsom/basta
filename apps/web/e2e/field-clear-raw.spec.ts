@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { makeAdmin, makeVendor, PASSWORD, prisma, tag } from './fixtures';
+import { makeAdmin, makeVendor, PASSWORD, prisma, signInBuyer, tag } from './fixtures';
 
 /**
  * ✕ في خانات الإدارة والتاجر المكتوبة بلا TextInput — 27 أكتوبر 2026، بطلب صاحبة المشروع.
@@ -92,4 +92,25 @@ test('التاجر: فئة جديدة، ومصفوفة المتغيّرات بـ
   await clearOf(sku).click();
   await expect(sku).toHaveValue('');
   await expect(sku).toBeFocused();
+});
+
+/**
+ * الخانات المركّبة — خانة في إطار معها وحدتها أو بادئتها (28 أكتوبر 2026، بطلب صاحبة المشروع):
+ * مبلغ السحب، وأسعار الشحن، ورابط المتجر في التسجيل. ✕ داخل الخانة قبل الوحدة أو الأيقونة.
+ */
+test('الخانات المركّبة: مبلغ السحب، وقيمة السلّة في الشحن، ورابط المتجر', async ({ page, browser }) => {
+  const v = await makeVendor(tag());
+  // رصيد متاح ليظهر نموذج السحب — محفظة تجريبية لتاجر الاختبار وحده
+  await prisma.wallet.create({ data: { vendorId: v.vendorId, currency: 'SAR', balanceAvailableMinorUnits: 50_000n } });
+  await signIn(page, v.email, '/vendor/finance');
+  await fillAndClear(page.getByLabel('المبلغ المطلوب (SAR)', { exact: true }), '120.00');
+
+  await page.goto('/vendor/shipping');
+  await fillAndClear(page.getByLabel('قيمة السلّة', { exact: true }), '250');
+
+  // رابط المتجر: لحساب بلا متجر — جلسة مستقلّة
+  const buyerPage = await (await browser.newContext()).newPage();
+  await signInBuyer(buyerPage);
+  await buyerPage.goto('/vendor/register');
+  await fillAndClear(buyerPage.getByLabel('رابط المتجر', { exact: true }), 'qa-clear-shop');
 });
