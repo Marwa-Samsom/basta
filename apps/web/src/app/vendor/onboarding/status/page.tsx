@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Alert, StatusBadge } from '@/components/ui';
 import { Icon, type IconName } from '@/components/icons';
 import { useOnboarding, type Onboarding } from '@/lib/vendor';
@@ -32,13 +31,10 @@ const TITLE: Record<string, string> = {
  * في الرفض: السبب كما كتبه المراجع حرفياً، وطريق واحد واضح للإصلاح.
  */
 export default function StatusPage() {
-  const router = useRouter();
   const { data, loading, missing, error, reload } = useOnboarding();
 
-  if (missing) {
-    router.replace('/vendor/register');
-    return null;
-  }
+  // التحويل إلى التسجيل في useOnboarding نفسه، بعد الرسم
+  if (missing) return null;
   if (loading && !data) {
     return (
       <OnboardingFrame step={5}>

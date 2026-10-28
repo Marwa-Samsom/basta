@@ -29,10 +29,8 @@ export default function DocumentsPage() {
   const { data, loading, missing, error, set, reload } = useOnboarding();
   const [notice, setNotice] = useState<string | null>(null);
 
-  if (missing) {
-    router.replace('/vendor/register');
-    return null;
-  }
+  // التحويل إلى التسجيل في useOnboarding نفسه، بعد الرسم
+  if (missing) return null;
   if (loading && !data) {
     return (
       <OnboardingFrame step={4}>

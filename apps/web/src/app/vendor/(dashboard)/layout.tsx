@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import '@/styles/screens/vendor-products.css';
 import '@/styles/screens/vendor-orders-money.css';
 // ملف المتجر (VD-05) داخل اللوحة يشارك أنماط التأهيل
@@ -57,11 +58,15 @@ const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'dan
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data, loading, missing, error } = useOnboarding();
+  const unsent = data?.status === 'pending' || data?.status === 'rejected';
 
-  if (missing) {
-    router.replace('/vendor/register');
-    return null;
-  }
+  // إلى صفحة الحالة بعد الرسم لا أثناءه — كان React يرفضه («1 Issue»، VON-013، 28 أكتوبر 2026)
+  useEffect(() => {
+    if (unsent) router.replace('/vendor/onboarding/status');
+  }, [unsent, router]);
+
+  // التحويل إلى التسجيل في useOnboarding نفسه، بعد الرسم
+  if (missing) return null;
 
   if (loading && !data) {
     return (
@@ -85,10 +90,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
    * اعتماد متجره (قاعدة الرؤية في الخادم، 15 أكتوبر 2026). منعُه من اللوحة كان
    * يعيد رابط «هيّئ منتجاتك» إلى صفحة الحالة نفسها في حلقة.
    */
-  if (data.status === 'pending' || data.status === 'rejected') {
-    router.replace('/vendor/onboarding/status');
-    return null;
-  }
+  if (unsent) return null;
 
   const status = STATUS[data.status];
 
