@@ -20,7 +20,11 @@ const subscribe = (cb: () => void) => {
  * الإشعارات داخل الموقع — القناة الوحيدة التي لا تحتاج بريداً ولا هاتفاً.
  * تُسأل كل دقيقة، وتظهر لمن دخل وحده.
  */
-export function NotificationBell() {
+/**
+ * «كل الإشعارات» إلى صندوق المنطقة نفسها — كان للجميع صفحة المشتري، والبائع له صندوقه والمدير
+ * صار له صندوقه (28 أكتوبر 2026).
+ */
+export function NotificationBell({ allHref = '/account/notifications' }: { allHref?: string } = {}) {
   const signedIn = useSyncExternalStore(subscribe, () => !!session.read(), () => false);
   const [inbox, setInbox] = useState<Inbox | null>(null);
   const [open, setOpen] = useState(false);
@@ -103,7 +107,7 @@ export function NotificationBell() {
           ))}
           <div className="bell__head">
             <Link
-              href="/account/notifications"
+              href={allHref}
               className="btn btn--ghost btn--sm btn--block"
               onClick={() => setOpen(false)}
             >

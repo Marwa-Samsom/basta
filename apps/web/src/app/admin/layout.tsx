@@ -16,6 +16,8 @@ import { MeContext, can } from '@/components/admin-context';
 /** كل عنصر يظهر لمن يملك صلاحيته — لا رابط يفتح صفحة تقول «ممنوع» */
 const NAV: { href: string; label: string; icon: IconName; perm?: string; group: string; exact?: boolean }[] = [
   { href: '/admin', label: 'لوحة المؤشرات', icon: 'chart', group: 'التشغيل', exact: true },
+  // صندوق المدير (28 أكتوبر 2026): ما يصل الجرس كله، بلا صلاحية — كلٌّ يرى ما وصله
+  { href: '/admin/notifications', label: 'الإشعارات', icon: 'bell', group: 'التشغيل', exact: true },
   { href: '/admin/vendors', label: 'المتاجر', icon: 'store', perm: 'vendors.review', group: 'التشغيل' },
   // لا مراجعة قبل النشر (15 أكتوبر 2026) — القائمة لمتابعة المنشور وإيقاف المخالف
   { href: '/admin/products', label: 'المنتجات', icon: 'package', perm: 'catalog.manage', group: 'التشغيل' },
@@ -32,7 +34,7 @@ const NAV: { href: string; label: string; icon: IconName; perm?: string; group: 
   { href: '/admin/campaigns', label: 'الحملات', icon: 'chart', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/storefront', label: 'الواجهة واللافتات', icon: 'image', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/pages', label: 'صفحات المحتوى', icon: 'file', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
-  { href: '/admin/notifications', label: 'قوالب الإشعارات', icon: 'msg', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
+  { href: '/admin/notifications/templates', label: 'قوالب الإشعارات', icon: 'msg', perm: 'content.manage', group: 'الكتالوج والمحتوى' },
   { href: '/admin/commissions', label: 'العمولة', icon: 'scale', perm: 'commissions.edit', group: 'المال' },
   { href: '/admin/currencies', label: 'العملات والصرف', icon: 'wallet', perm: 'settings.edit', group: 'المال' },
   { href: '/admin/reports', label: 'التقارير', icon: 'chart', perm: 'reports.view', group: 'المال' },
@@ -113,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         groups={groups}
         exitHref="/account"
         // الجرس نفسه الذي في لوحة البائع: يصل المدير ما يخصّ صلاحياته — نزاع مصعَّد، طلب سحب
-        tools={<NotificationBell />}
+        tools={<NotificationBell allHref="/admin/notifications" />}
         sideFoot={
           <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login?next=/admin">
             خروج
