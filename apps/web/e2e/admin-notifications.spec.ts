@@ -18,6 +18,20 @@ async function signIn(page: Page, email: string, next: string, totp?: () => stri
   await page.waitForURL((u) => u.pathname === next);
 }
 
+// شاشة عريضة: كان للصندوق سقف 960px يترك فراغاً عريضاً بجانبه (28 أكتوبر 2026)
+test.use({ viewport: { width: 1600, height: 900 } });
+
+/** الصندوق يملأ عرض المحتوى كإشعارات المشتري */
+async function fillsWidth(page: Page): Promise<void> {
+  const [box, room] = await page.locator('.vx-notifs').evaluate((el) => {
+    const p = el.parentElement as HTMLElement;
+    const s = getComputedStyle(p);
+    return [el.getBoundingClientRect().width, p.clientWidth - parseFloat(s.paddingInlineStart) - parseFloat(s.paddingInlineEnd)];
+  });
+  expect(box).toBeGreaterThan(1000);
+  expect(Math.abs(box - room)).toBeLessThan(2);
+}
+
 test('المدير: «الإشعارات» في القائمة تفتح صندوقه، و«كل الإشعارات» في الجرس إليه، والقوالب في مكانها', async ({ page }) => {
   const t = tag();
   const admin = await makeAdmin(t, ['disputes.resolve', 'content.manage']);
@@ -34,6 +48,7 @@ test('المدير: «الإشعارات» في القائمة تفتح صندو
   await expect(page.getByRole('heading', { name: 'الإشعارات', level: 1 })).toBeVisible();
   const item = page.locator('.vx-note', { hasText: body });
   await expect(item).toContainText('نزاع مصعَّد ينتظر الحسم');
+  await fillsWidth(page);
   await page.getByRole('button', { name: /^النزاعات/ }).click();
   await expect(item).toBeVisible();
 
@@ -50,6 +65,7 @@ test('البائع: «كل الإشعارات» في الجرس إلى صندو�
   const v = await makeVendor(tag());
   await signIn(page, v.email, '/vendor/notifications');
   await expect(page.getByRole('heading', { name: 'الإشعارات', level: 1 })).toBeVisible();
+  await fillsWidth(page);
   await page.getByRole('button', { name: /^الإشعارات/ }).click();
   await expect(page.getByRole('link', { name: 'كل الإشعارات' })).toHaveAttribute('href', '/vendor/notifications');
 });
