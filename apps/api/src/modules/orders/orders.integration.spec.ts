@@ -1239,6 +1239,7 @@ describe('تنبيهات الإدارة الدورية — مرة لكل حال�
     if (!dbUp) return;
     const alerts = app.get(AdminAlertsScheduler);
     const DAY = 86_400_000;
+    const started = new Date();
     const { a } = await placeOrder([1, 1]);
     await deliver(0, a.id);
     const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_received', message: 'لم يصلني شيء مع أن الحالة «تم التسليم»' });
@@ -1266,6 +1267,13 @@ describe('تنبيهات الإدارة الدورية — مرة لكل حال�
     expect((await call('POST', `/admin/disputes/${id}/messages`, admin.token, { body: 'نراجع التسليم مع المتجر ونعود إليك' })).statusCode).toBe(204);
     await alerts.waitingDisputes(new Date(Date.now() + 5 * DAY));
     expect(await about('admin_dispute_waiting', a.subOrderNumber)).toHaveLength(2);
+
+    // الأيام المستقبلية ذكّرت كل مدير بكل نزاع مصعَّد في قاعدة التطوير نفسها، وحجزت مفاتيح أيام لم تأتِ:
+    // تُمحى، ويُسحب نزاع الاختبار — وإلا ذكّر به المجدول الحقيقي بعد يومين
+    await prisma.notification.deleteMany({ where: { templateCode: 'admin_dispute_waiting', createdAt: { gte: started } } });
+    await prisma.adminAlert.deleteMany({ where: { key: { startsWith: 'dispute_waiting:' }, createdAt: { gte: started } } });
+    await prisma.notification.deleteMany({ where: { templateCode: 'admin_dispute_escalated', payloadJson: { path: ['order_number'], equals: a.subOrderNumber } } });
+    await prisma.dispute.update({ where: { id }, data: { status: 'withdrawn', closedAt: new Date() } });
   });
 });
 
