@@ -286,7 +286,8 @@ export class OrderLifecycleService {
     if (to === 'delivered' && from === 'return_requested') {
       await tx.returnRequest.updateMany({
         where: { subOrderId: sub.id, status: 'requested' },
-        data: { status: 'rejected', resolvedBy: actor.userId, resolvedAt: now },
+        // السبب على الطلب نفسه: يراه المشتري في بطاقته وإشعار الرفض (BUY-047)
+        data: { status: 'rejected', resolvedBy: actor.userId, resolvedAt: now, resolutionNote: input.reason?.trim() || null },
       });
     }
 
@@ -735,8 +736,16 @@ export class OrderLifecycleService {
         tx,
       );
     } else if (to === 'shipped' || to === 'delivered' || to === 'delivery_failed') {
-      // العودة إلى «تم التسليم» بعد رفض إرجاع أو ردّ إرجاع جزئي ليست تسليماً: وصله ما يخصّه
-      if (to === 'delivered' && (from === 'return_requested' || from === 'returned')) return;
+      // العودة إلى «تم التسليم» بعد رفض إرجاع أو ردّ إرجاع جزئي ليست تسليماً: وصله ما يخصّه.
+      // ورفض الإرجاع خبره «رُفض» وسببه — كانت الشارة ترجع «تم التسليم» بلا تفسير ولا إشعار (BUY-047)
+      if (to === 'delivered' && from === 'return_requested') {
+        await this.notifications.enqueue(
+          { code: 'return_rejected', userId: s.order.customerUserId, vars: { ...common, reason: input.reason?.trim() || 'لم يذكر المتجر سبباً' } },
+          tx,
+        );
+        return;
+      }
+      if (to === 'delivered' && from === 'returned') return;
       await this.notifications.enqueue({ code: 'order_status_changed', userId: s.order.customerUserId, vars: { ...common, status: STATUS_LABELS[to] } }, tx);
     }
     if (isCancellation(to) && to !== 'canceled_by_customer') {

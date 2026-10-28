@@ -163,7 +163,17 @@ export interface SubOrderView {
   items: OrderItemView[];
   history: HistoryRow[];
   shipment: ShipmentView | null;
-  returns: { id: string; itemsJson: { orderItemId: string; qty: number }[]; reasonCode: string; description: string | null; status: string; requestedAt: string }[];
+  returns: {
+    id: string;
+    itemsJson: { orderItemId: string; qty: number }[];
+    reasonCode: string;
+    description: string | null;
+    status: string;
+    requestedAt: string;
+    resolvedAt?: string | null;
+    /** سبب رفض البائع — BUY-047 */
+    resolutionNote?: string | null;
+  }[];
   refunds: { id: string; amountMinorUnits: string; reason: string; status: string; transferReference?: string | null; createdAt: string }[];
   disputes: { id: string; reasonCode: string; status: string; createdAt: string }[];
 }

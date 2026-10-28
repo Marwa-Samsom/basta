@@ -51,7 +51,7 @@ const SUB_ORDER_DETAIL = {
   },
   returns: {
     orderBy: { requestedAt: 'desc' },
-    select: { id: true, itemsJson: true, reasonCode: true, description: true, status: true, requestedAt: true },
+    select: { id: true, itemsJson: true, reasonCode: true, description: true, status: true, requestedAt: true, resolvedAt: true, resolutionNote: true },
   },
   refunds: {
     orderBy: { createdAt: 'desc' },
