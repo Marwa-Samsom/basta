@@ -9,6 +9,20 @@ import { PASSWORD, makeVendor, prisma, signInBuyer, tag } from './fixtures';
  * مهما نُشر. والنجمة كانت تنشر بضغطة بلا رأي. وصاحب المتجر يشتري منه (21 أكتوبر) ولا يقيّمه.
  */
 
+/**
+ * ما يصنعه الاختبار مباشرة بلا قيد بيع يُمحى بعده — وإلا بقي في قاعدة التطوير نفسها فظهر في لوحة
+ * الإدارة «طلب مدفوع بلا قيد بيع» مع كل تشغيل (لاحظته صاحبة المشروع، 28 أكتوبر 2026).
+ * المراجعات تُمحى مع الطلب، فيعود تقييم منتج الاختبار ومتجره صفراً.
+ */
+const made: { orderId: string; productId: string; vendorId: string }[] = [];
+test.afterEach(async () => {
+  for (const m of made.splice(0)) {
+    await prisma.order.delete({ where: { id: m.orderId } });
+    await prisma.product.update({ where: { id: m.productId }, data: { ratingAvg: 0, ratingCount: 0 } });
+    await prisma.vendor.update({ where: { id: m.vendorId }, data: { ratingAvg: 0, ratingCount: 0 } });
+  }
+});
+
 /** طلب مُسلَّم من متجر الاختبار: سطر لكل قطعة، فلكل سطر مراجعته */
 async function deliveredOrder(customerUserId: string, v: Awaited<ReturnType<typeof makeVendor>>, lines: number, t: string) {
   const order = await prisma.order.create({
@@ -41,6 +55,7 @@ async function deliveredOrder(customerUserId: string, v: Awaited<ReturnType<type
     },
   });
   const product = await prisma.product.findUniqueOrThrow({ where: { slug: v.productSlug } });
+  made.push({ orderId: order.id, productId: product.id, vendorId: v.vendorId });
   const items = [];
   for (let i = 0; i < lines; i++) {
     items.push(
