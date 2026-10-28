@@ -367,7 +367,13 @@ function StoreCard({
     run(async () => {
       await api(`/me/disputes`, { method: 'POST', body: { subOrderId: s.id, reasonCode: reason, message: text } });
       setMode(null);
-      onChange(null, 'فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.');
+      onChange(
+        null,
+        // نزاع الاسترداد يُفتح مصعَّداً: لا بائع يردّ ولا تصعيد ينتظر
+        refundDisputable
+          ? 'فُتح النزاع ووصل الإدارة مباشرة — تتابع استردادك وتردّ عليك هنا.'
+          : 'فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.',
+      );
     });
 
   // الرأي اختياري: النجوم وحدها تكفي (26 أكتوبر 2026)

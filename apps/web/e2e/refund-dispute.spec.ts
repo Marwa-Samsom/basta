@@ -52,6 +52,7 @@ test('«مُسترَد»: نزاع «لم يصلني الاسترداد» يُف
   await expect(panel.locator('select option')).toHaveText(['لم يصلني الاسترداد']);
   await panel.getByRole('textbox').fill('رُدّ المبلغ قبل أسبوع ولم يصل إلى بطاقتي');
   await page.getByRole('button', { name: 'افتح النزاع' }).click();
+  await expect(page.getByText('فُتح النزاع ووصل الإدارة مباشرة — تتابع استردادك وتردّ عليك هنا.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'متابعة النزاع' })).toBeVisible();
   const dispute = await prisma.dispute.findFirstOrThrow({ where: { subOrderId: recent.subId } });
   expect(dispute).toMatchObject({ reasonCode: 'refund_missing', status: 'escalated' });
