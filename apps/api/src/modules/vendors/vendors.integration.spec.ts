@@ -242,6 +242,33 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(bad.statusCode).toBe(400);
   });
 
+  it('اسم المتجر يُحفظ بمسافة واحدة بين كلماته — في التسجيل والتعديل (VON-014، 28 أكتوبر 2026)', async () => {
+    if (!dbUp) return;
+    // كان القصّ للطرفين وحدهما: «ركن␣␣الصوف» حُفظ بمسافتين لا تراهما الصفحة ويظهران في البريد النصي
+    const email = `spaces.${SUFFIX}@basta.test`;
+    await registerUser(email, ['customer']);
+    const res = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/apply', await login(email)),
+      payload: { nameAr: '  ركن   الصوف  ', nameEn: ` Wool   Corner ${SUFFIX} `, country: 'JO' },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const view = res.json().vendor;
+    createdVendorIds.push(view.id);
+    expect(view.nameAr).toBe('ركن الصوف');
+    expect(view.nameEn).toBe(`Wool Corner ${SUFFIX}`);
+
+    // التعديل بالرمز الجديد الذي يحمل دور البائع
+    const shop = await app.inject({
+      method: 'PATCH',
+      ...api('/vendor/onboarding/shop', res.json().tokens.accessToken),
+      payload: { nameAr: 'دار  القطن   والكتان', nameEn: ` Cotton  House ${SUFFIX}` },
+    });
+    expect(shop.statusCode, shop.body).toBe(200);
+    expect(shop.json().nameAr).toBe('دار القطن والكتان');
+    expect(shop.json().nameEn).toBe(`Cotton House ${SUFFIX}`);
+  });
+
   it('لا متجرين على حساب واحد', async () => {
     if (!dbUp) return;
     const res = await app.inject({
