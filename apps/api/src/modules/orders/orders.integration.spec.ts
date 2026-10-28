@@ -214,6 +214,20 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  // إشعارات الإدارة تصل كل مدير يحمل صلاحيتها، ومنهم حسابات قاعدة التطوير نفسها: يُمحى ما كان عن
+  // طلبات مشتري الاختبار، وإلا بقيت في أجراسهم نزاعات وردود لا وجود لها (28 أكتوبر 2026)
+  if (dbUp && buyer) {
+    const orders = await prisma.order.findMany({
+      where: { customerUserId: buyer.userId },
+      select: { orderNumber: true, subOrders: { select: { subOrderNumber: true } } },
+    });
+    const numbers = orders.flatMap((o) => [o.orderNumber, ...o.subOrders.map((s) => s.subOrderNumber)]);
+    if (numbers.length > 0) {
+      await prisma.notification.deleteMany({
+        where: { templateCode: { startsWith: 'admin_' }, OR: numbers.map((n) => ({ payloadJson: { path: ['order_number'], equals: n } })) },
+      });
+    }
+  }
   await app?.close();
   await prisma.$disconnect();
 });
@@ -1135,6 +1149,33 @@ describe('إشعارات النزاع — التاجر بالفتح والتصع
     expect(await codes(buyer.userId, since)).not.toContain('refund_issued');
     expect((await prisma.refund.findFirstOrThrow({ where: { subOrderId: a.id } })).status).toBe('awaiting_transfer');
   });
+
+  it('المشتري يسحب: المتجر يعرف أن ماله فُكّ، والإدارة إن كان النزاع لديها وحدها (BUY-059، 28 أكتوبر 2026)', async () => {
+    if (!dbUp) return;
+    const { a, b } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    await deliver(1, b.id);
+    const since = new Date();
+    // مصعَّد ثم مسحوب — كان المتجر يبقى على «ماله مجمَّد» والإدارة على «ينتظر حسمك»
+    const escalated = (await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_received', message: 'لم يصلني شيء' })).json().id as string;
+    expect((await call('POST', `/me/disputes/${escalated}/escalate`, buyer.token)).statusCode).toBe(204);
+    expect((await call('POST', `/me/disputes/${escalated}/withdraw`, buyer.token)).statusCode).toBe(204);
+    expect(await payloadOf(vendors[0]!.userId, since, 'vendor_dispute_withdrawn')).toMatchObject({
+      order_number: a.subOrderNumber,
+      link: `/vendor/disputes/${escalated}`,
+    });
+    expect(await payloadOf(admin.userId, since, 'admin_dispute_withdrawn')).toMatchObject({ order_number: a.subOrderNumber, link: '/admin/disputes' });
+    // من سحب لا يُبلَّغ بما فعله هو، والسحب الثاني مرفوض بلا إشعار ثانٍ
+    expect((await codes(buyer.userId, since)).filter((c) => c.includes('withdrawn'))).toEqual([]);
+    expect((await call('POST', `/me/disputes/${escalated}/withdraw`, buyer.token)).statusCode).toBe(409);
+    expect((await codes(vendors[0]!.userId, since)).filter((c) => c === 'vendor_dispute_withdrawn')).toHaveLength(1);
+
+    // مفتوح لم يُصعَّد: لم يصل الإدارة منه شيء، فلا تُبلَّغ بسحبه
+    const plain = (await call('POST', '/me/disputes', buyer.token, { subOrderId: b.id, reasonCode: 'damaged', message: 'وصلت مكسورة' })).json().id as string;
+    expect((await call('POST', `/me/disputes/${plain}/withdraw`, buyer.token)).statusCode).toBe(204);
+    expect(await payloadOf(vendors[1]!.userId, since, 'vendor_dispute_withdrawn')).toMatchObject({ order_number: b.subOrderNumber });
+    expect((await told(admin.userId, since)).filter((n) => JSON.stringify(n.payloadJson).includes(b.subOrderNumber))).toEqual([]);
+  });
 });
 
 describe('تنبيهات الإدارة الدورية — مرة لكل حالة، لمن يحمل صلاحيتها (19 أكتوبر 2026)', () => {
@@ -1219,19 +1260,24 @@ describe('تنبيهات الإدارة الدورية — مرة لكل حال�
       { view: 'audit_wallet_drift', rows: 2 },
       { view: 'audit_inventory_drift', rows: 0 },
     ]);
+    // يوم لم يمرّ على قاعدة الاختبار قبل هذا التشغيل: مفتاح التنبيه بيومه
+    const day = new Date(Date.UTC(3000, 0, 1) + Math.floor(Math.random() * 100_000) * 86_400_000);
+    const since = new Date();
     try {
-      // يوم لم يمرّ على قاعدة الاختبار قبل هذا التشغيل: مفتاح التنبيه بيومه
-      const day = new Date(Date.UTC(3000, 0, 1) + Math.floor(Math.random() * 100_000) * 86_400_000);
       expect(await alerts.auditDrift(day)).toBe(1);
       expect(await alerts.auditDrift(day)).toBe(0);
+      const told = await prisma.notification.findMany({ where: { userId: auditor.id, templateCode: 'admin_audit_drift', channel: 'in_app' } });
+      expect(told).toHaveLength(1);
+      expect(told[0]!.payloadJson).toMatchObject({ check: 'رصيد محفظة لا يطابق دفترها', rows: '2' });
+      // مدير الطلبات لا يرى التقارير: لا يصله
+      expect(await toAdmin('admin_audit_drift')).toHaveLength(0);
     } finally {
       drift.mockRestore();
+      // الانحراف مصطنع، وتنبيهه وصل كل من يرى التقارير في قاعدة التطوير — ظهر لصاحبة المشروع
+      // «انحراف في فحوص المال — 2 صف» بلا انحراف (28 أكتوبر 2026): لا يبقى في أجراسهم ولا مفتاحه
+      await prisma.notification.deleteMany({ where: { templateCode: 'admin_audit_drift', createdAt: { gte: since } } });
+      await prisma.adminAlert.deleteMany({ where: { key: { startsWith: 'audit_drift:', endsWith: `:${day.toISOString().slice(0, 10)}` } } });
     }
-    const told = await prisma.notification.findMany({ where: { userId: auditor.id, templateCode: 'admin_audit_drift', channel: 'in_app' } });
-    expect(told).toHaveLength(1);
-    expect(told[0]!.payloadJson).toMatchObject({ check: 'رصيد محفظة لا يطابق دفترها', rows: '2' });
-    // مدير الطلبات لا يرى التقارير: لا يصله
-    expect(await toAdmin('admin_audit_drift')).toHaveLength(0);
   });
 });
 

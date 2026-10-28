@@ -11,6 +11,7 @@ const EVENTS: Record<string, InboxEvent> = {
   admin_dispute_escalated: { title: 'نزاع مصعَّد ينتظر الحسم', icon: 'scale', tone: 'danger', kind: 'dispute' },
   admin_dispute_waiting: { title: 'نزاع ينتظر ردّك', icon: 'clock', tone: 'warning', kind: 'dispute' },
   admin_dispute_message: { title: 'رسالة في نزاع مصعَّد', icon: 'msg', tone: 'info', kind: 'dispute' },
+  admin_dispute_withdrawn: { title: 'سحب المشتري نزاعاً مصعَّداً', icon: 'check-circle', tone: 'success', kind: 'dispute' },
   admin_acceptance_due: { title: 'طلب قارب مهلة القبول', icon: 'clock', tone: 'warning', kind: 'order' },
   admin_return_stalled: { title: 'مرتجع لم يستلمه المتجر', icon: 'return', tone: 'warning', kind: 'order' },
   admin_transfer_awaiting: { title: 'تحويل مشترٍ ينتظر التأكيد', icon: 'cash', tone: 'money', kind: 'money' },

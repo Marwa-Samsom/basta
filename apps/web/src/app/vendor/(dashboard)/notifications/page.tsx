@@ -7,6 +7,11 @@ const EVENTS: Record<string, InboxEvent> = {
   vendor_new_order: { title: 'طلب جديد بانتظار قبولك', icon: 'truck', tone: 'brand', kind: 'order' },
   return_requested: { title: 'طلب إرجاع جديد', icon: 'return', tone: 'warning', kind: 'dispute' },
   dispute_message: { title: 'رسالة في نزاع', icon: 'msg', tone: 'danger', kind: 'dispute' },
+  // كانت تظهر «إشعار» بلا عنوان، والسحب لم يكن يصل أصلاً (BUY-059، 28 أكتوبر 2026)
+  vendor_dispute_opened: { title: 'نزاع جديد على طلب', icon: 'alert', tone: 'danger', kind: 'dispute' },
+  vendor_dispute_escalated: { title: 'صُعِّد نزاع للإدارة', icon: 'scale', tone: 'warning', kind: 'dispute' },
+  vendor_dispute_resolved: { title: 'حُسم نزاع', icon: 'scale', tone: 'info', kind: 'dispute' },
+  vendor_dispute_withdrawn: { title: 'سحب المشتري نزاعه', icon: 'check-circle', tone: 'success', kind: 'dispute' },
   product_rejected: { title: 'لم يُنشر منتجك', icon: 'alert', tone: 'danger', kind: 'product' },
   low_stock: { title: 'مخزون قارب النفاد', icon: 'boxes', tone: 'warning', kind: 'stock' },
   payout_paid: { title: 'حُوِّل مبلغ إلى حسابك', icon: 'check-circle', tone: 'money', kind: 'payout' },
