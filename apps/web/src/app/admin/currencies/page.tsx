@@ -6,6 +6,7 @@ import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { money, when } from '@/lib/orders';
+import { ClearableInput } from '@/components/ui';
 
 interface Data {
   spreadBps: number;
@@ -155,11 +156,11 @@ export default function AdminCurrenciesPage() {
           </label>
           <label className="field">
             <span className="field__label">السعر — وحدات لكل دولار</span>
-            <input className="field__control num" dir="ltr" inputMode="decimal" placeholder="3.7503" aria-invalid={rate !== '' && !rateOk} value={rate} onChange={(e) => setRate(e.target.value)} />
+            <ClearableInput className="field__control num" dir="ltr" inputMode="decimal" placeholder="3.7503" aria-invalid={rate !== '' && !rateOk} value={rate} onChange={(e) => setRate(e.target.value)} />
           </label>
           <label className="field">
             <span className="field__label">المصدر</span>
-            <input className="field__control" value={source} onChange={(e) => setSource(e.target.value)} placeholder="البنك المركزي" />
+            <ClearableInput className="field__control" value={source} onChange={(e) => setSource(e.target.value)} placeholder="البنك المركزي" />
           </label>
           <button
             type="button"

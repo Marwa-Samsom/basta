@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { EmptyState } from '@/components/ui';
+import { ClearableInput, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAction, useAdminData } from '@/lib/admin';
 
@@ -90,11 +90,11 @@ function Attributes() {
           <div className="ac2-form">
             <label className="field">
               <span className="field__label">الرمز (لاتيني)</span>
-              <input className="field__control num" dir="ltr" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value.toLowerCase() })} />
+              <ClearableInput className="field__control num" dir="ltr" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value.toLowerCase() })} />
             </label>
             <label className="field">
               <span className="field__label">الاسم</span>
-              <input className="field__control" value={draft.nameAr} onChange={(e) => setDraft({ ...draft, nameAr: e.target.value })} />
+              <ClearableInput className="field__control" value={draft.nameAr} onChange={(e) => setDraft({ ...draft, nameAr: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">النوع</span>
@@ -109,13 +109,13 @@ function Attributes() {
             {draft.inputType === 'number' ? (
               <label className="field">
                 <span className="field__label">الوحدة</span>
-                <input className="field__control" value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} />
+                <ClearableInput className="field__control" value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} />
               </label>
             ) : null}
             {draft.inputType === 'select' || draft.inputType === 'multiselect' ? (
               <label className="field ac2-form__wide">
                 <span className="field__label">القيم (مفصولة بفاصلة)</span>
-                <input className="field__control" value={draft.values} onChange={(e) => setDraft({ ...draft, values: e.target.value })} />
+                <ClearableInput className="field__control" value={draft.values} onChange={(e) => setDraft({ ...draft, values: e.target.value })} />
               </label>
             ) : null}
             <div className="ac2-form__actions ac2-form__wide">
@@ -234,7 +234,7 @@ function Attributes() {
                             )}
                             {a.inputType === 'select' || a.inputType === 'multiselect' ? (
                               <div className="ac2-inline">
-                                <input className="field__control" placeholder="قيمة جديدة" aria-label={`قيمة جديدة لـ ${a.nameAr}`} value={newValue[a.id] ?? ''} onChange={(e) => setNewValue({ ...newValue, [a.id]: e.target.value })} />
+                                <ClearableInput className="field__control" placeholder="قيمة جديدة" aria-label={`قيمة جديدة لـ ${a.nameAr}`} value={newValue[a.id] ?? ''} onChange={(e) => setNewValue({ ...newValue, [a.id]: e.target.value })} />
                                 <button
                                   type="button"
                                   className="btn btn--secondary btn--sm"

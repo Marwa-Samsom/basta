@@ -185,6 +185,7 @@
 /* حقل وزرّ في سطر واحد — «أكّد بالرمز من التطبيق» في AD-02 */
 .ac-inline { display: flex; gap: 7px; }
 .ac-inline > .field__control { flex: 1; min-width: 0; }
+.ac-inline > .field__clearable { flex: 1; min-width: 0; }
 .ac-inline > .btn { flex: none; font-weight: var(--weight-bold); }
 
 /* AD-02 — المفتاح السرّي نصّاً وزرّ نسخه */

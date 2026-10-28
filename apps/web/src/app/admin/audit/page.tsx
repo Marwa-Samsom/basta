@@ -5,7 +5,7 @@ import { Fragment, Suspense, useState } from 'react';
 import { AdminHeader, Loading, MoreButton, SearchBox, SortButton } from '@/components/admin';
 import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
-import { EmptyState } from '@/components/ui';
+import { ClearableInput, EmptyState } from '@/components/ui';
 import { useAdminList } from '@/lib/admin';
 import { ROLE_LABEL, when } from '@/lib/orders';
 
@@ -53,7 +53,7 @@ function AuditInner() {
 
       <div className="toolbar">
         <SearchBox value={actor} onChange={setActor} placeholder="المنفّذ (بريد أو اسم)" label="المنفّذ" className="ac2-search" />
-        <input className="field__control num ac2-search" placeholder="الإجراء، مثل payout." dir="ltr" value={action} onChange={(e) => setAction(e.target.value)} aria-label="الإجراء" />
+        <ClearableInput className="field__control num ac2-search" placeholder="الإجراء، مثل payout." dir="ltr" value={action} onChange={(e) => setAction(e.target.value)} aria-label="الإجراء" />
         <select className="field__control" value={entityType} onChange={(e) => setEntityType(e.target.value)} aria-label="نوع الكيان">
           <option value="">كل الأنواع</option>
           {ENTITY_TYPES.map((t) => (
