@@ -100,10 +100,15 @@ test('التاجر: فئة جديدة، ومصفوفة المتغيّرات بـ
  */
 test('الخانات المركّبة: مبلغ السحب، وقيمة السلّة في الشحن، ورابط المتجر', async ({ page, browser }) => {
   const v = await makeVendor(tag());
-  // رصيد متاح ليظهر نموذج السحب — محفظة تجريبية لتاجر الاختبار وحده
-  await prisma.wallet.create({ data: { vendorId: v.vendorId, currency: 'SAR', balanceAvailableMinorUnits: 50_000n } });
-  await signIn(page, v.email, '/vendor/finance');
-  await fillAndClear(page.getByLabel('المبلغ المطلوب (SAR)', { exact: true }), '120.00');
+  // رصيد متاح ليظهر نموذج السحب — محفظة تجريبية لتاجر الاختبار وحده، تُمحى بعده: رصيد بلا قيد
+  // يظهر في لوحة الإدارة «رصيد محفظة لا يطابق دفترها» (قاعدة التطوير نفسها، 28 أكتوبر 2026)
+  const wallet = await prisma.wallet.create({ data: { vendorId: v.vendorId, currency: 'SAR', balanceAvailableMinorUnits: 50_000n } });
+  try {
+    await signIn(page, v.email, '/vendor/finance');
+    await fillAndClear(page.getByLabel('المبلغ المطلوب (SAR)', { exact: true }), '120.00');
+  } finally {
+    await prisma.wallet.delete({ where: { id: wallet.id } });
+  }
 
   await page.goto('/vendor/shipping');
   await fillAndClear(page.getByLabel('قيمة السلّة', { exact: true }), '250');
