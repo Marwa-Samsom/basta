@@ -893,6 +893,9 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     const late = await call('POST', '/me/disputes', buyer.token, { subOrderId: b.id, reasonCode: 'refund_missing', message: 'لم يصل المبلغ حتى الآن' });
     expect(late.statusCode).toBe(409);
     expect(late.json().message).toBe('انقضت 14 يوماً على الاسترداد — لا يُفتح عليه نزاع.');
+
+    // التصعيد وصل كل مدير يحسم في قاعدة التطوير نفسها: لا يبقى في أجراسهم نزاع اختبار
+    await prisma.notification.deleteMany({ where: { templateCode: 'admin_dispute_escalated', payloadJson: { path: ['order_number'], equals: a.subOrderNumber } } });
   });
 });
 

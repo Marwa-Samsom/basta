@@ -56,4 +56,9 @@ test('«مُسترَد»: نزاع «لم يصلني الاسترداد» يُف
   await expect(page.getByRole('link', { name: 'متابعة النزاع' })).toBeVisible();
   const dispute = await prisma.dispute.findFirstOrThrow({ where: { subOrderId: recent.subId } });
   expect(dispute).toMatchObject({ reasonCode: 'refund_missing', status: 'escalated' });
+
+  // قاعدة التطوير نفسها: نزاع الاختبار يُسحب وإشعار تصعيده يُمحى من أجراس المديرين — وإلا ذكّرهم به المجدول
+  await prisma.dispute.update({ where: { id: dispute.id }, data: { status: 'withdrawn', closedAt: new Date() } });
+  const { subOrderNumber } = await prisma.subOrder.findUniqueOrThrow({ where: { id: recent.subId } });
+  await prisma.notification.deleteMany({ where: { templateCode: 'admin_dispute_escalated', payloadJson: { path: ['order_number'], equals: subOrderNumber } } });
 });
