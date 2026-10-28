@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { api, ApiError, mediaUrl } from '@/lib/api';
 import { digitsOnly } from '@/lib/digits';
+import { formatMoney } from '@/lib/money';
 import { Alert, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { MAX_IMAGES, ProductImages } from '@/components/product-images';
@@ -354,13 +355,19 @@ export function ProductEditor({ productId }: { productId?: string }) {
   const prices = variants
     .map((v) => v.price.trim())
     .filter((p) => p !== '' && Number.isFinite(Number(p)))
-    .sort((a, b) => Number(a) - Number(b));
+    .map(Number)
+    .sort((a, b) => a - b);
+  // بتنسيق المال كبقية الموقع «12.500 د.أ.» — كان النصّ كما كُتب في الخانة وبعده رمز العملة «12.5 JOD»،
+  // والسعران «12.5» و«12.50» نطاقاً لأنهما نصّان (VON-055، 28 أكتوبر 2026)
+  const priceCurrency = product?.currency ?? store?.settlementCurrency ?? null;
+  const shown = (p: number): string =>
+    priceCurrency ? formatMoney(BigInt(Math.round(p * 10 ** decimalsOf(priceCurrency))), priceCurrency) : String(p);
   const priceRange =
     prices.length === 0
       ? null
       : prices[0] === prices[prices.length - 1]
-        ? prices[0]
-        : `${prices[0]} – ${prices[prices.length - 1]}`;
+        ? shown(prices[0]!)
+        : `${shown(prices[0]!)} – ${shown(prices[prices.length - 1]!)}`;
   const totalStock = variants.reduce((sum, v) => sum + Number(v.stock || 0), 0);
   const descLength = form.descriptionAr.length;
 
@@ -813,10 +820,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                 <dt>نطاق السعر</dt>
                 <dd>
                   {priceRange ? (
-                    <span className="money num">
-                      {priceRange}
-                      {product ? ` ${product.currency}` : ''}
-                    </span>
+                    <span className="money num">{priceRange}</span>
                   ) : (
                     '—'
                   )}
