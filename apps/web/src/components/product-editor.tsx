@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { api, ApiError, mediaUrl } from '@/lib/api';
 import { digitsOnly } from '@/lib/digits';
-import { formatMoney } from '@/lib/money';
 import { Alert, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { MAX_IMAGES, ProductImages } from '@/components/product-images';
 import { useOnboarding } from '@/lib/vendor';
+import { formatMoney } from '@/lib/money';
 import {
   PRODUCT_STATUS,
   num,
