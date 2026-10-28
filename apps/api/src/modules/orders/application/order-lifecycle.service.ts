@@ -7,7 +7,7 @@ import {
   NotFoundError,
 } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { mergeReturnLines } from '../../../common/return-lines';
+import { mergeReturnLines, RETURN_REASON_LABELS } from '../../../common/return-lines';
 import { LedgerService } from '../../finance/public';
 import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
@@ -673,7 +673,8 @@ export class OrderLifecycleService {
     // «requested» يتيماً — مكرَّراً عند الإدارة، ومانعاً تحرير رصيد البائع (J-05)
     const id = randomUUID();
     await this.transition(subOrderId, 'return_requested', { kind: 'customer', userId: customerUserId }, {
-      reason: input.reasonCode,
+      // بالعربي في السجلّ وإشعار البائع؛ الرمز يبقى على طلب الإرجاع نفسه
+      reason: RETURN_REASON_LABELS[input.reasonCode] ?? input.reasonCode,
       returnRequest: {
         id,
         items,
