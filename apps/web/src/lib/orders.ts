@@ -186,6 +186,10 @@ export const DISPUTE_REASONS: Record<string, string> = {
   other: 'مشكلة أخرى',
 };
 
+/** على «مُسترَد»: نزاع «لم يصلني الاسترداد» وحده خلال هذه الأيام من الاسترداد، ويصل الإدارة (BUY-052) */
+export const REFUND_DISPUTE_DAYS = 14;
+export const REFUND_DISPUTE_REASONS: Record<string, string> = { refund_missing: DISPUTE_REASONS['refund_missing']! };
+
 export const DISPUTE_STATUS: Record<string, string> = {
   open: 'مفتوح',
   escalated: 'مُصعَّد للإدارة',

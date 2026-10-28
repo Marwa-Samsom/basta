@@ -10,6 +10,14 @@ import { OrderLifecycleService } from '../../orders/public';
 const DISPUTABLE = ['shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned'] as const;
 const OPEN = ['open', 'escalated'];
 
+/**
+ * «مُسترَد»: نزاع «لم يصلني الاسترداد» وحده، خلال 14 يوماً من الاسترداد — والمال خرج من المنصّة
+ * لا من البائع، فيصل الإدارة مصعَّداً من لحظته (قرار صاحبة المشروع، BUY-052، 28 أكتوبر 2026).
+ * كان «مُسترَد» مغلقاً: من لم يصله ماله لا يجد إلا «راسل المتجر»، والمتجر لا يملك الاسترداد.
+ */
+export const REFUND_DISPUTE_DAYS = 14;
+const DAY = 86_400_000;
+
 export type Party =
   | { kind: 'customer'; userId: string }
   | { kind: 'vendor'; userId: string; vendorId: string }
@@ -81,26 +89,53 @@ export class DisputesService {
         status: true,
         vendorId: true,
         subOrderNumber: true,
+        vendor: { select: { nameAr: true } },
         disputes: { where: { status: { in: OPEN } }, select: { id: true } },
+        statusHistory: { where: { toStatus: 'refunded' }, orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
       },
     });
     if (!sub) throw new NotFoundError('الطلب غير موجود.', { subOrderId });
-    if (!(DISPUTABLE as readonly string[]).includes(sub.status)) {
+    const refundCase = sub.status === 'refunded';
+    if (refundCase) {
+      if (input.reasonCode !== 'refund_missing') {
+        throw new ConflictError('على طلب مُسترَد يُفتح النزاع لسبب «لم يصلني الاسترداد» وحده.', { status: sub.status });
+      }
+      const refundedAt = sub.statusHistory[0]?.createdAt;
+      if (!refundedAt || Date.now() - refundedAt.getTime() > REFUND_DISPUTE_DAYS * DAY) {
+        throw new ConflictError(`انقضت ${REFUND_DISPUTE_DAYS} يوماً على الاسترداد — لا يُفتح عليه نزاع.`, { status: sub.status });
+      }
+    } else if (!(DISPUTABLE as readonly string[]).includes(sub.status)) {
       throw new ConflictError('النزاع متاح بعد الشحن وقبل إكمال الطلب.', { status: sub.status });
     }
     if (sub.disputes.length > 0) throw new ConflictError('لهذا الطلب نزاع قائم.', { disputeId: sub.disputes[0]!.id });
 
     return this.prisma.$transaction(async (tx) => {
       const d = await tx.dispute.create({
-        data: { subOrderId, openedByUserId: customerUserId, against: 'vendor', reasonCode: input.reasonCode },
+        data: { subOrderId, openedByUserId: customerUserId, against: 'vendor', reasonCode: input.reasonCode, ...(refundCase ? { status: 'escalated' } : {}) },
         select: { id: true },
       });
       await tx.disputeMessage.create({
         data: { disputeId: d.id, senderUserId: customerUserId, senderRole: 'customer', body: input.message.trim(), attachments: [] },
       });
       await tx.auditLog.create({
-        data: { actorUserId: customerUserId, actorRole: 'customer', action: 'dispute.open', entityType: 'Dispute', entityId: d.id, afterJson: { subOrderId, reasonCode: input.reasonCode } },
+        data: { actorUserId: customerUserId, actorRole: 'customer', action: 'dispute.open', entityType: 'Dispute', entityId: d.id, afterJson: { subOrderId, reasonCode: input.reasonCode, ...(refundCase ? { escalated: true } : {}) } },
       });
+      // الاسترداد شأن المنصّة: الإدارة تعرف الآن لا حين يتذكّر أحدٌ «صعّد»
+      if (refundCase) {
+        await this.notifications.enqueueAdmins(
+          {
+            code: 'admin_dispute_escalated',
+            permission: 'disputes.resolve',
+            vars: {
+              store_name: sub.vendor.nameAr,
+              order_number: sub.subOrderNumber,
+              reason: REASON_AR[input.reasonCode] ?? input.reasonCode,
+              link: '/admin/disputes',
+            },
+          },
+          tx,
+        );
+      }
       // مال طلبه جُمّد للتوّ: كان لا يعرف بالنزاع إلا إن فتح صفحته (J-06)
       await this.notifications.enqueueVendor(
         {
