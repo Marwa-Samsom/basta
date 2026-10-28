@@ -204,6 +204,13 @@ export const EVENTS: readonly EventDef[] = [
     sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يصلني الطلب', link: '/admin/disputes' },
   },
   {
+    code: 'admin_dispute_waiting',
+    labelAr: 'نزاع مصعَّد بلا ردّ من الإدارة',
+    audience: 'admin',
+    variables: ['store_name', 'order_number', 'reason', 'days', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يصلني الاسترداد', days: '2', link: '/admin/disputes' },
+  },
+  {
     code: 'admin_payout_requested',
     labelAr: 'طلب سحب ينتظر الموافقة',
     audience: 'admin',
@@ -561,6 +568,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'صُعِّد نزاع على الطلب {{order_number}} من متجر {{store_name}} إلى الإدارة. سبب المشتري: {{reason}}.\n\nمال الطلب مجمَّد حتى يُحسم. اقرأ الخيط واحسم من هنا: {{link}}\n\nبسطة',
     'نزاع مصعَّد على {{order_number}}'),
   t('admin_dispute_escalated', 'in_app', 'نزاع مصعَّد على {{order_number}} ({{store_name}}): {{reason}}. ينتظر حسمك.'),
+
+  t('admin_dispute_waiting', 'email',
+    'النزاع على الطلب {{order_number}} من متجر {{store_name}} مصعَّد إلى الإدارة ولم يردّ عليه أحد منها منذ {{days}} أيام. سبب المشتري: {{reason}}.\n\nالمشتري ينتظر، ومال الطلب مجمَّد حتى يُحسم. ردّ عليه أو احسمه من هنا: {{link}}\n\nبسطة',
+    'نزاع {{order_number}} ينتظر ردّكم منذ {{days}} أيام'),
+  t('admin_dispute_waiting', 'in_app', 'نزاع {{order_number}} ({{store_name}}) ينتظر ردّ الإدارة منذ {{days}} أيام: {{reason}}.'),
 
   t('admin_payout_requested', 'email',
     'طلب متجر {{store_name}} سحب {{amount}} إلى حسابه البنكي الموثَّق.\n\nوافق عليه أو ارفضه من هنا: {{link}}\n\nبسطة',

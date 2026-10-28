@@ -18,6 +18,19 @@ const BATCH = 200;
 /** مرتجع لم يُسجَّل استلامه بعدها عالق — صفحة المرتجعات في اللوحة تعلّمه بالعتبة نفسها (STALL_MS) */
 export const RETURN_STALL_DAYS = 3;
 
+/** نزاع مصعَّد بلا ردّ من الإدارة بعدها يُذكَّر به كل يوم — بطلب صاحبة المشروع (28 أكتوبر 2026) */
+export const DISPUTE_WAIT_DAYS = 2;
+
+/** سبب النزاع بالعربي — كما في إشعار التصعيد */
+const DISPUTE_REASON_AR: Readonly<Record<string, string>> = {
+  not_received: 'لم يصلني الطلب',
+  damaged: 'وصل تالفاً',
+  not_as_described: 'لا يطابق الوصف',
+  return_refused: 'رُفض إرجاعي',
+  refund_missing: 'لم يصلني الاسترداد',
+  other: 'مشكلة أخرى',
+};
+
 /** اسم كل فحص كما تعرضه لوحة الإدارة (admin/page.tsx VIEW_LABELS) */
 const DRIFT_LABELS: Readonly<Record<string, string>> = {
   audit_money_conservation: 'حفظ المال (بائع + منصة + مُسترد ≠ مقبوض)',
@@ -36,6 +49,7 @@ const DRIFT_LABELS: Readonly<Record<string, string>> = {
  *
  *   · مرتجع لم يستلمه المتجر بعد 3 أيام — المشتري ينتظر، ومال المتجر لا يُحرَّر
  *   · طلب لم يُقبل وبقي على إلغائه الآلي أقل من 12 ساعة
+ *   · نزاع مصعَّد لم تردّ عليه الإدارة يومين — مرة في اليوم حتى تردّ أو تحسم
  *   · انحراف في منظرات التدقيق — مرة في اليوم لكل منظر ما دام قائماً
  *
  * كل حالة تُنبَّه مرة (alertAdminsOnce بمفتاحها)، لمن يحمل صلاحية التصرّف فيها وحده.
@@ -69,6 +83,7 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
     try {
       await this.stalledReturns(now);
       await this.acceptanceDue(now);
+      await this.waitingDisputes(now);
       if (now.getTime() - this.lastDriftAt >= DRIFT_EVERY_MS) {
         this.lastDriftAt = now.getTime();
         await this.auditDrift(now);
@@ -140,6 +155,59 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
           code: 'admin_acceptance_due',
           permission: 'orders.manage',
           vars: { order_number: s.subOrderNumber, store_name: s.vendor.nameAr, hours: String(left), link: '/admin/orders?due=acceptance' },
+        });
+        if (ok) sent++;
+      }
+      if (rows.length < batch) return sent;
+      cursor = rows[rows.length - 1]!.id;
+    }
+  }
+
+  /**
+   * نزاع مصعَّد آخر كلمة فيه ليست للإدارة، ومضى يومان على تصعيده أو على آخر ردّ منها — لمن
+   * يحسم النزاعات، مرة في اليوم ما دام كذلك. كان المصعَّد يُبلَّغ مرة لحظة تصعيده، ثم لا شيء:
+   * من فاته الإشعار لا يعرف أن مشترياً ينتظر ومال متجر مجمَّد (بطلب صاحبة المشروع، 28 أكتوبر 2026).
+   * وقت التصعيد من سجل التدقيق؛ ما فُتح مصعَّداً (لم يصلني الاسترداد) فمن فتحه.
+   */
+  async waitingDisputes(now: Date, batch = BATCH): Promise<number> {
+    const day = now.toISOString().slice(0, 10);
+    let sent = 0;
+    for (let cursor: string | undefined; ; ) {
+      const rows = await this.prisma.dispute.findMany({
+        where: { status: 'escalated' },
+        select: {
+          id: true,
+          reasonCode: true,
+          createdAt: true,
+          messages: { orderBy: { createdAt: 'desc' }, select: { senderRole: true, createdAt: true } },
+          subOrder: { select: { subOrderNumber: true, vendor: { select: { nameAr: true } } } },
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        take: batch,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+      const escalations = await this.prisma.auditLog.findMany({
+        where: { action: 'dispute.escalate', entityId: { in: rows.map((r) => r.id) } },
+        select: { entityId: true, createdAt: true },
+      });
+      for (const d of rows) {
+        // الإدارة آخر من كتب: الكرة عند غيرها
+        if (d.messages[0]?.senderRole === 'admin') continue;
+        const lastAdmin = d.messages.find((m) => m.senderRole === 'admin')?.createdAt;
+        const escalatedAt = escalations.filter((e) => e.entityId === d.id).reduce((t, e) => (e.createdAt > t ? e.createdAt : t), d.createdAt);
+        const since = lastAdmin && lastAdmin > escalatedAt ? lastAdmin : escalatedAt;
+        const days = Math.floor((now.getTime() - since.getTime()) / DAY_MS);
+        if (days < DISPUTE_WAIT_DAYS) continue;
+        const ok = await this.notifications.alertAdminsOnce(`dispute_waiting:${d.id}:${day}`, {
+          code: 'admin_dispute_waiting',
+          permission: 'disputes.resolve',
+          vars: {
+            order_number: d.subOrder.subOrderNumber,
+            store_name: d.subOrder.vendor.nameAr,
+            reason: DISPUTE_REASON_AR[d.reasonCode] ?? d.reasonCode,
+            days: String(days),
+            link: '/admin/disputes',
+          },
         });
         if (ok) sent++;
       }
