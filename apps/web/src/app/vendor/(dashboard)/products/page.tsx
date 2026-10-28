@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Alert, EmptyState, MoreButton, PageHead, SortButton, Spinner, type SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
@@ -38,25 +39,42 @@ const TABS: readonly { key: TabKey; label: string }[] = [
  * 500 منتج لا تُحمَّل عنده القائمة كلها ليبحث فيها. وعدّاد كل تبويب مجموعه
  * من الخادم (`total` بصفحة من سطر واحد) لا عدّ ما في الصفحة.
  */
-/**
- * التبويب الأول من `?status=` — تقرير الاستيراد يفتح المسوّدات مباشرة.
- * الصفحة لا تُصيَّر في الخادم (القشرة تنتظر حالة المتجر أولاً)، فقراءة
- * العنوان هنا لا تُحدث اختلافاً بين الخادم والمتصفّح.
- */
-const initialTab = (): TabKey => {
-  if (typeof window === 'undefined') return 'all';
-  const wanted = new URLSearchParams(window.location.search).get('status');
-  return TABS.find((t) => t.key === wanted)?.key ?? 'all';
-};
+/** التبويب من `?status=` — الرئيسية تفتح الموقوفة، وتقرير الاستيراد المسوّدات */
+const tabOf = (status: string | null): TabKey => TABS.find((t) => t.key === status)?.key ?? 'all';
 
-/** الفئة من `?category=` — صفحة الفئات تفتح منتجات فئة بعينها، أو none لما بلا فئة */
-const initialCategory = (): string =>
-  typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('category') ?? '');
-
+// useSearchParams يحتاج حدّ Suspense في صفحة تُبنى مسبقاً
 export default function ProductsPage() {
-  const [tab, setTab] = useState<TabKey>(initialTab);
+  return (
+    <Suspense>
+      <ProductsList />
+    </Suspense>
+  );
+}
+
+function ProductsList() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  /**
+   * التبويب والفئة (`?category=` من صفحة الفئات، أو none لما بلا فئة) من العنوان نفسه، لا حالةٌ تُقرأ
+   * منه مرة. كانا يُقرآن من window.location عند التركيب، والانتقال بـ Link يركّب الصفحة قبل أن يتغيّر
+   * العنوان: «موقوفة» من الرئيسية تفتح «الكل». والضغط على تبويب لا يغيّر العنوان، فالتحديث يعيد غير
+   * المعروض (VON-055، 28 أكتوبر 2026).
+   */
+  const tab = tabOf(params.get('status'));
+  const category = params.get('category') ?? '';
+  const setFilter = (next: { tab?: TabKey; category?: string }): void => {
+    const query = new URLSearchParams(params.toString());
+    const nextTab = next.tab ?? tab;
+    const nextCategory = next.category ?? category;
+    if (nextTab === 'all') query.delete('status');
+    else query.set('status', nextTab);
+    if (nextCategory) query.set('category', nextCategory);
+    else query.delete('category');
+    const q = query.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState(initialCategory);
   // بتاريخ آخر تعديل
   const [sort, setSort] = useState<SortOrder>('newest');
   const [categories, setCategories] = useState<VendorCategory[]>([]);
@@ -231,7 +249,7 @@ export default function ProductsPage() {
                   className="tabs__tab"
                   aria-selected={tab === t.key}
                   onClick={() => {
-                    setTab(t.key);
+                    setFilter({ tab: t.key });
                     setLoading(true);
                   }}
                 >
@@ -250,7 +268,7 @@ export default function ProductsPage() {
                 aria-label="تصفية بالفئة"
                 value={category}
                 onChange={(e) => {
-                  setCategory(e.target.value);
+                  setFilter({ category: e.target.value });
                   setLoading(true);
                 }}
               >
@@ -295,7 +313,7 @@ export default function ProductsPage() {
                   className="btn btn--secondary btn--sm"
                   onClick={() => {
                     setSearch('');
-                    setCategory('');
+                    setFilter({ category: '' });
                   }}
                 >
                   امسح البحث والتصفية
