@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
+import { arabicCounts } from '../../../common/arabic-count';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import {
   CHANNELS,
@@ -28,6 +29,12 @@ function prefsOf(raw: Prisma.JsonValue | undefined): Record<string, boolean> {
 }
 
 const EVERY_FIVE_SECONDS = 5_000;
+
+/**
+ * القالب مملوءاً، والعدد ومعدوده فيه بالعربية — «خلال 9 ساعة» في القاعدة تصير «خلال 9 ساعات»
+ * (VOPS-019، 29 أكتوبر 2026). نصوص القوالب تُزرع في القاعدة مرة ولا يكتب الكود فوقها.
+ */
+const fill = (text: string, vars: Readonly<Record<string, string>>): string => arabicCounts(render(text, vars));
 
 /**
  * الإشعارات — صندوق صادر (outbox).
@@ -278,13 +285,13 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
             where: { code_channel_locale: { code: n.templateCode, channel, locale: 'ar' } },
           });
       if (!tpl || !tpl.isEnabled) return finish('skipped', { error: 'القالب غير مفعّل' });
-      const subject = tpl.subject ? render(tpl.subject, vars) : null;
-      const body = render(tpl.body, vars);
+      const subject = tpl.subject ? fill(tpl.subject, vars) : null;
+      const body = fill(tpl.body, vars);
       // ما يُخزَّن: النص نفسه والسرّ محجوب
       const shown = secret ? redactVars(n.templateCode, vars) : vars;
       const stored = {
-        subject: secret ? (tpl.subject ? render(tpl.subject, shown) : null) : subject,
-        body: secret ? render(tpl.body, shown) : body,
+        subject: secret ? (tpl.subject ? fill(tpl.subject, shown) : null) : subject,
+        body: secret ? fill(tpl.body, shown) : body,
       };
 
       const user = await this.prisma.user.findUnique({ where: { id: n.userId }, select: { email: true, phone: true } });
@@ -454,7 +461,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   preview(code: string, subject: string | null, body: string) {
     const ev = eventOf(code);
     if (!ev) throw new NotFoundError('حدث غير معروف.', { code });
-    return { subject: subject ? render(subject, ev.sample) : null, body: render(body, ev.sample) };
+    return { subject: subject ? fill(subject, ev.sample) : null, body: fill(body, ev.sample) };
   }
 
   /** «أرسل تجربة» — للمدير نفسه ببيانات العيّنة، ويُرسل فوراً */

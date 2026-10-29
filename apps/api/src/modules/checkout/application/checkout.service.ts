@@ -22,6 +22,7 @@ import {
 } from '../../payments/public';
 import { PricingService } from '../../pricing/public';
 import { guestOrderKey, orderNumber, toSnapshot, type Snapshot } from '../domain/snapshot';
+import { hoursAr } from '../../../common/arabic-count';
 import { loadEnv } from '../../../common/config/env';
 
 /**
@@ -531,7 +532,7 @@ export class CheckoutService {
   /** انقضت المهلة بلا تحويل: يُختم الطلب، وتعود القطع والكوبون، ويُبلَّغ المشتري — مرة واحدة */
   private async expireTransfer(orderId: string): Promise<void> {
     const { windowHours } = await this.transfers.read();
-    await this.markFailed(orderId, 'transfer_expired', `لم يصل التحويل خلال ${windowHours} ساعة، فأُلغي الطلب وعادت القطع للمخزون.`, async (tx) => {
+    await this.markFailed(orderId, 'transfer_expired', `لم يصل التحويل خلال ${hoursAr(windowHours)}، فأُلغي الطلب وعادت القطع للمخزون.`, async (tx) => {
       const o = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
         select: { orderNumber: true, customerUserId: true, customer: { select: { fullName: true } } },

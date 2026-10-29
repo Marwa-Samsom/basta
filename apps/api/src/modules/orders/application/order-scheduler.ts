@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import { hoursAr } from '../../../common/arabic-count';
 import { writeErrorLog } from '../../../common/observability/error-log';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { OrderLifecycleService, stalledRefund } from './order-lifecycle.service';
@@ -75,7 +76,7 @@ export class OrderScheduler implements OnApplicationBootstrap, OnModuleDestroy {
     for (const s of stale) {
       done += await this.attempt(s.id, () =>
         this.lifecycle.transition(s.id, 'canceled_by_admin', { kind: 'system', userId: null }, {
-          reason: `لم يقبله البائع خلال ${hours} ساعة`,
+          reason: `لم يقبله البائع خلال ${hoursAr(hours)}`,
         }),
       );
     }

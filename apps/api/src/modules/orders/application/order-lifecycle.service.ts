@@ -7,6 +7,7 @@ import {
   NotFoundError,
 } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { daysAr } from '../../../common/arabic-count';
 import { mergeReturnLines } from '../../../common/return-lines';
 import { LedgerService } from '../../finance/public';
 import { NotificationsService } from '../../notifications/public';
@@ -653,7 +654,7 @@ export class OrderLifecycleService {
     }
     const window = await this.setting(this.prisma, 'return_window_days', 14);
     if (Date.now() - sub.deliveredAt.getTime() > window * 86_400_000) {
-      throw new ConflictError(`انقضت مهلة الإرجاع (${window} يوماً من التسليم).`);
+      throw new ConflictError(`انقضت مهلة الإرجاع (${daysAr(window)} من التسليم).`);
     }
     if (input.items.length === 0) throw new InvalidInputError('اختر قطعة واحدة على الأقل.');
     if (input.items.some((i) => !Number.isInteger(i.qty) || i.qty < 1)) {
