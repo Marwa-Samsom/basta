@@ -323,6 +323,8 @@ export class OrderQueryService {
       itemsSubtotalMinorUnits: order.itemsSubtotalMinorUnits.toString(),
       shippingTotalMinorUnits: order.shippingTotalMinorUnits.toString(),
       discountTotalMinorUnits: order.discountTotalMinorUnits.toString(),
+      // الكوبون الذي خصم — يُسمّى بجانب «الخصم» كما في ملخّص الدفع
+      couponCode: (order.pricingSnapshot as { coupon?: { code?: string } | null } | null)?.coupon?.code ?? null,
       // الضريبة في الملخّص كما رآها عند الدفع — بدونها لا يبلغ مجموع الأسطر الإجمالي
       taxTotalMinorUnits: order.taxTotalMinorUnits.toString(),
       taxInclusive: (order.pricingSnapshot as { taxInclusive?: boolean } | null)?.taxInclusive ?? false,

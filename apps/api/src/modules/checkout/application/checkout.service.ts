@@ -105,6 +105,8 @@ export interface OrderResult {
   readonly transfer?: TransferInstructions;
   /** لطلب الضيف وحده: يُرسل في x-order-key لقراءة حالته (guestOrderKey) */
   readonly accessKey?: string;
+  /** الكوبون الذي خصم من الطلب ومبلغ ما وفّره — لـ«تمّ طلبك» */
+  readonly coupon?: { code: string; discount: { minorUnits: string; currency: string } };
 }
 
 /**
@@ -1041,6 +1043,8 @@ export class CheckoutService {
         status: true,
         currency: true,
         grandTotalMinorUnits: true,
+        discountTotalMinorUnits: true,
+        pricingSnapshot: true,
         customerUserId: true,
         _count: { select: { subOrders: true } },
         payment: { select: { status: true, providerIntentId: true, failureCode: true, failureMessage: true, expiresAt: true } },
@@ -1050,6 +1054,7 @@ export class CheckoutService {
     const outcome: OrderOutcome =
       waiting === 'requires_action' ? 'requires_action' : waiting === 'awaiting_transfer' ? 'awaiting_transfer' : this.outcomeOf(order.status);
     const details = outcome === 'awaiting_transfer' ? await this.transfers.read() : null;
+    const couponCode = (order.pricingSnapshot as { coupon?: { code?: string } | null } | null)?.coupon?.code;
 
     return {
       orderId: order.id,
@@ -1057,6 +1062,9 @@ export class CheckoutService {
       outcome,
       total: { minorUnits: order.grandTotalMinorUnits.toString(), currency: order.currency },
       subOrderCount: order._count.subOrders,
+      ...(couponCode && order.discountTotalMinorUnits > 0n
+        ? { coupon: { code: couponCode, discount: { minorUnits: order.discountTotalMinorUnits.toString(), currency: order.currency } } }
+        : {}),
       // تصل النتيجة من وضع الطلب (أو أعاده بمفتاح عدم التكرار نفسه) أو من أثبت المفتاح
       ...(order.customerUserId ? {} : { accessKey: guestOrderKey(order.id, loadEnv().jwtAccessSecret) }),
       ...(outcome === 'requires_action' && order.payment?.providerIntentId
