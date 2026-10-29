@@ -287,7 +287,8 @@
 .vm-banner__link:hover { color: var(--warning-text); }
 
 .vm-disputes { min-width: 0; }
-.vm-dispute { display: grid; gap: 14px; min-width: 0; max-inline-size: 960px; }
+/* بعرض المحتوى كالتصميم VD-14 — سقف 960px كان يترك نصف الشاشة العريضة فارغاً (VOPS-056) */
+.vm-dispute { display: grid; gap: 14px; min-width: 0; }
 
 /* ---------------------------------------------------- VD-17 المحفظة */
 
