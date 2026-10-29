@@ -346,7 +346,9 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                       </span>
                     ) : null}
                   </span>
-                  <span className="money num vm-line__total">{money(i.lineTotalMinorUnits, order.currency)}</span>
+                  {/* سعر القطعة × الكمية كالتصميم VD-13، ومجموعها «المنتجات» في التفصيل — لا الإجمالي بضريبة
+                      ليست للمتجر: كان «230.00» جنب «المنتجات 200.00» حيث الضريبة تُضاف (VOPS-010، 29 أكتوبر 2026) */}
+                  <span className="money num vm-line__total">{money(i.lineSubtotalMinorUnits, order.currency)}</span>
                 </li>
               ))}
             </ul>
