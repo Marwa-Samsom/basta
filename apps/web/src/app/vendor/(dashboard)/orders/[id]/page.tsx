@@ -77,6 +77,14 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState('');
   const [asking, setAsking] = useState<'reject' | 'deny' | null>(null);
+  /**
+   * فتح خانة السبب أو «تراجع» عنها يبدأها فارغة. كان «تراجع» يُبقي ما كُتب، فوصل المشتري «مكسو«…»»:
+   * كلمة تُركت ثم سبب كُتب بعدها (VOPS-044، 29 أكتوبر 2026) — والخانة نفسها لرفض الطلب ورفض الإرجاع
+   */
+  const ask = (which: 'reject' | 'deny' | null) => {
+    setAsking(which);
+    setReason('');
+  };
   const [tracking, setTracking] = useState('');
   const [carrier, setCarrier] = useState('self');
   const [waybill, setWaybill] = useState<Waybill | null>(null);
@@ -260,7 +268,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                   <Icon name="package" size={15} />
                   استلمت المرتجع
                 </button>
-                <button type="button" className="btn btn--danger" disabled={busy} onClick={() => setAsking('deny')}>
+                <button type="button" className="btn btn--danger" disabled={busy} onClick={() => ask('deny')}>
                   <Icon name="x" size={15} />
                   رفض الإرجاع
                 </button>
@@ -273,7 +281,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                       <Icon name="x" size={15} />
                       تأكيد الرفض
                     </button>
-                    <button type="button" className="btn btn--secondary" onClick={() => setAsking(null)}>
+                    <button type="button" className="btn btn--secondary" onClick={() => ask(null)}>
                       تراجع
                     </button>
                   </div>
@@ -458,7 +466,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
             ))}
 
             {order.actions.includes('rejected_by_vendor') ? (
-              <button type="button" className="btn btn--danger" disabled={busy} onClick={() => setAsking('reject')}>
+              <button type="button" className="btn btn--danger" disabled={busy} onClick={() => ask('reject')}>
                 <Icon name="x" size={16} />
                 رفض الطلب
               </button>
@@ -472,7 +480,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                     <Icon name="x" size={15} />
                     تأكيد الرفض
                   </button>
-                  <button type="button" className="btn btn--secondary" onClick={() => setAsking(null)}>
+                  <button type="button" className="btn btn--secondary" onClick={() => ask(null)}>
                     تراجع
                   </button>
                 </div>
