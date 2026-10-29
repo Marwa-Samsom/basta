@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { cartApi } from '@/lib/cart';
 import type { ProductPage } from '@/lib/storefront';
@@ -174,9 +174,13 @@ export function VariantPicker({ variants, actions }: { variants: Variant[]; acti
       {others.length > 0 ? (
         <p className="sd-others">
           متوفّر الآن:{' '}
-          {others
-            .map((v) => `${v.options.map((o) => o.valueAr).join(' · ')} (${v.available})`)
-            .join('، ')}
+          {others.map((v, i) => (
+            <Fragment key={v.id}>
+              {i > 0 ? '، ' : null}
+              {/* الخيار معزول: «S» اللاتينية كانت تسحب «(5)» إلى مقطعها فيُقرأ العدد قبل المقاس (DISC-053) */}
+              <bdi>{v.options.map((o) => o.valueAr).join(' · ')}</bdi> ({v.available})
+            </Fragment>
+          ))}
         </p>
       ) : null}
     </div>
