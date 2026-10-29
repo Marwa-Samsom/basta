@@ -854,6 +854,49 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect(await prisma.review.count({ where: { orderItemId: a.items[0]!.id } })).toBe(0);
     expect((await call('POST', '/me/reviews', owner.token, { orderItemId: b.items[0]!.id, rating: 5 })).statusCode).toBe(201);
   });
+
+  /**
+   * «مُسترَد» كان مغلقاً أمام النزاع: من لم يصله ماله لا يجد إلا «راسل المتجر»، والمتجر لا يملك
+   * الاسترداد. قرار صاحبة المشروع (BUY-052، 28 أكتوبر 2026): «لم يصلني الاسترداد» وحده، خلال
+   * 14 يوماً من الاسترداد، ويصل الإدارة مصعَّداً من لحظته — وحسمه لصالح المشتري لا يردّ مرة ثانية.
+   */
+  it('«مُسترَد»: نزاع «لم يصلني الاسترداد» وحده خلال 14 يوماً، مصعَّداً للإدارة، بلا ردّ ثانٍ', async () => {
+    if (!dbUp) return;
+    const { order, a, b } = await placeOrder([1, 1]);
+    for (const s of [a, b]) {
+      const res = await call('POST', `/me/orders/${order.orderNumber}/stores/${s.id}/cancel`, buyer.token, {});
+      expect(res.statusCode, res.body).toBe(200);
+    }
+    expect(await statusOf(a.id)).toBe('refunded');
+
+    const wrong = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_received', message: 'لم يصلني الطلب أصلاً' });
+    expect(wrong.statusCode).toBe(409);
+    expect(wrong.json().message).toBe('على طلب مُسترَد يُفتح النزاع لسبب «لم يصلني الاسترداد» وحده.');
+
+    const alerted = () => prisma.notification.count({ where: { userId: admin.userId, templateCode: 'admin_dispute_escalated', channel: 'in_app' } });
+    const before = await alerted();
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'refund_missing', message: 'مرّ أسبوع ولم يصل المبلغ إلى بطاقتي' });
+    expect(opened.statusCode, opened.body).toBe(201);
+    const dispute = await prisma.dispute.findUniqueOrThrow({ where: { id: opened.json().id } });
+    expect(dispute.status).toBe('escalated');
+    expect(await alerted()).toBe(before + 1);
+
+    // الحسم لصالح المشتري يغلق النزاع ولا يردّ المبلغ مرة ثانية
+    const refunds = await prisma.refund.count({ where: { subOrderId: a.id } });
+    const resolved = await call('POST', `/admin/disputes/${dispute.id}/resolve`, admin.token, { outcome: 'customer', resolution: 'رُدّ المبلغ في موعده، ومرجعه لدى البنك' });
+    expect(resolved.statusCode, resolved.body).toBe(204);
+    expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(refunds);
+    expect(await statusOf(a.id)).toBe('refunded');
+
+    // بعد 14 يوماً من الاسترداد لا نزاع
+    await prisma.subOrderStatusHistory.updateMany({ where: { subOrderId: b.id, toStatus: 'refunded' }, data: { createdAt: new Date(Date.now() - 15 * 86_400_000) } });
+    const late = await call('POST', '/me/disputes', buyer.token, { subOrderId: b.id, reasonCode: 'refund_missing', message: 'لم يصل المبلغ حتى الآن' });
+    expect(late.statusCode).toBe(409);
+    expect(late.json().message).toBe('انقضت 14 يوماً على الاسترداد — لا يُفتح عليه نزاع.');
+
+    // التصعيد وصل كل مدير يحسم في قاعدة التطوير نفسها: لا يبقى في أجراسهم نزاع اختبار
+    await prisma.notification.deleteMany({ where: { templateCode: 'admin_dispute_escalated', payloadJson: { path: ['order_number'], equals: a.subOrderNumber } } });
+  });
 });
 
 describe('الاسترداد يُعاد بلا دفع مرتين', () => {

@@ -12,6 +12,8 @@ import { countryName } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
 import {
   DISPUTE_REASONS,
+  REFUND_DISPUTE_DAYS,
+  REFUND_DISPUTE_REASONS,
   RETURN_REASONS,
   carrierName,
   labelOf,
@@ -376,11 +378,16 @@ function StoreCard({
   const [qty, setQty] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('damaged');
   const [text, setText] = useState('');
+  // لحظة فتح الصفحة: الحساب أثناء الرسم يتغيّر مع كل إعادة رسم
+  const [now] = useState(() => Date.now());
   /** النجوم المختارة والرأي قبل النشر — لقطعة واحدة في كل مرة */
   const [draft, setDraft] = useState<{ itemId: string; rating: number; body: string } | null>(null);
   const canceled = ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'].includes(s.status);
   const step = ORDER_OF[s.status] ?? -1;
   const openDispute = s.disputes.find((d) => d.status === 'open' || d.status === 'escalated');
+  // «مُسترَد»: نزاع «لم يصلني الاسترداد» وحده خلال 14 يوماً منه، ويصل الإدارة — قرار صاحبة المشروع (BUY-052)
+  const refundedAt = s.status === 'refunded' ? s.history.find((h) => h.toStatus === 'refunded')?.createdAt : undefined;
+  const refundDisputable = !!refundedAt && now - new Date(refundedAt).getTime() <= REFUND_DISPUTE_DAYS * 86_400_000;
   const disputable = ['shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned'].includes(s.status);
   // الأحدث أولاً من الخادم: رفضٌ يبقى ظاهراً حتى يُطلب إرجاع بعده
   const lastReturn = s.returns[0];
@@ -430,7 +437,13 @@ function StoreCard({
     run(async () => {
       await api(`/me/disputes`, { method: 'POST', body: { subOrderId: s.id, reasonCode: reason, message: text } });
       setMode(null);
-      onChange(null, 'فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.');
+      onChange(
+        null,
+        // نزاع الاسترداد يُفتح مصعَّداً: لا بائع يردّ ولا تصعيد ينتظر
+        refundDisputable
+          ? 'فُتح النزاع ووصل الإدارة مباشرة — تتابع استردادك وتردّ عليك هنا.'
+          : 'فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.',
+      );
     });
 
   // الرأي اختياري: النجوم وحدها تكفي (26 أكتوبر 2026)
@@ -674,8 +687,8 @@ function StoreCard({
               <Icon name="msg" size={14} />
               متابعة النزاع
             </Link>
-          ) : disputable ? (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setMode('dispute'), setReason('not_received'))}>
+          ) : disputable || refundDisputable ? (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setMode('dispute'), setReason(refundDisputable ? 'refund_missing' : 'not_received'))}>
               <Icon name="alert" size={14} />
               لديّ مشكلة
             </button>
@@ -742,9 +755,20 @@ function StoreCard({
 
         {mode === 'dispute' ? (
           <div className="sp-panel">
-            <p className="sp-panel__title">افتح نزاعاً مع {s.vendor.nameAr}</p>
-            <ReasonSelect options={DISPUTE_REASONS} value={reason} onChange={setReason} />
-            <TextArea label="اشرح المشكلة للبائع" value={text} onChange={(e) => setText(e.target.value)} rows={3} />
+            <p className="sp-panel__title">{refundDisputable ? 'لم يصلك المبلغ المسترَد؟' : `افتح نزاعاً مع ${s.vendor.nameAr}`}</p>
+            {refundDisputable ? (
+              <p className="sp-note sp-note--xs">
+                <Icon name="info" size={14} />
+                يصل الإدارة مباشرة: هي التي ترى ردّ المبلغ عند جهة الدفع وتتابعه معك.
+              </p>
+            ) : null}
+            <ReasonSelect options={refundDisputable ? REFUND_DISPUTE_REASONS : DISPUTE_REASONS} value={reason} onChange={setReason} />
+            <TextArea
+              label={refundDisputable ? 'اشرح للإدارة: متى رُدّ المبلغ، وأين تنتظره' : 'اشرح المشكلة للبائع'}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={3}
+            />
             <div className="sp-panel__actions">
               <button type="button" className="btn btn--primary" disabled={busy || text.trim().length < 10} onClick={() => void submitDispute()}>
                 افتح النزاع
