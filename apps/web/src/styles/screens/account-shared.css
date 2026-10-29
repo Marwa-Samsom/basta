@@ -166,6 +166,11 @@
   cursor: pointer;
 }
 .ac-pw__toggle:hover { background: var(--surface-sunken); color: var(--text-strong); }
+/* «كلمة مرور جديدة»: الحقل داخل غلاف ✕ (ClearableInput) وdir="ltr" — بدايته يساراً عند زرّ
+   الإظهار فالفراغ له هناك، و✕ يميناً حيث ينتهي المكتوب؛ وعين Edge الأصلية لا تُكرّر زرّنا */
+.ac-pw > .field__clearable { flex: 1; }
+.ac-pw > .field__clearable > .field__control { padding-inline-start: 44px; }
+.ac-pw > .field__clearable > .field__control::-ms-reveal { display: none; }
 
 /* مؤشر قوة كلمة المرور — شريط 5 بكسل ووسم ملوّن */
 .ac-strength { display: flex; align-items: center; gap: var(--space-2); }

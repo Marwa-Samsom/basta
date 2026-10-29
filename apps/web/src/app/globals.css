@@ -460,6 +460,27 @@ a:hover { color: var(--brand-hover); }
 
 .field__control::placeholder { color: var(--text-faint); }
 
+/* ✕ يمحو المكتوب في نهاية سطر الخانة — اتجاه الغلاف من الخانة (ClearableInput) */
+.field__clearable { position: relative; display: flex; min-width: 0; }
+.field__clearable:has(> .field__clear) > .field__control { padding-inline-end: 36px; }
+.field__clear {
+  position: absolute;
+  inset-inline-end: 6px;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+  inline-size: 26px;
+  block-size: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.field__clear:hover { background: var(--surface-sunken); color: var(--text-strong); }
+
 /* حقل بأيقونة بحث في أوّله — أشرطة الأدوات */
 .input-icon { position: relative; display: flex; align-items: center; min-width: 0; }
 .input-icon > .icon {

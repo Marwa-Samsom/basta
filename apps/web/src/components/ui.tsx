@@ -1,7 +1,7 @@
 'use client';
 
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
-import { useId, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/icons';
 
 /**
@@ -70,8 +70,63 @@ export function TextInput({
    */
   return (
     <Field label={label} hint={hint} error={error} optional={optional} id={id}>
-      {(props) => <input className="field__control" {...props} {...input} />}
+      {(props) => <ClearableInput className="field__control" {...props} {...input} />}
     </Field>
+  );
+}
+
+/** ما يُكتب سطراً. التاريخ والرقم والملف والبحث لها أزرارها الأصلية فلا ✕ فوقها */
+const CLEARABLE_TYPES = new Set(['text', 'email', 'tel', 'url', 'password']);
+
+/**
+ * خانة كتابة بـ ✕ في نهاية المكتوب يمحوها ويُبقي المؤشّر فيها — كل خانات المكوّن المشترك
+ * (27 أكتوبر 2026، بطلب صاحبة المشروع). لا يظهر والخانة فارغة أو معطّلة أو للقراءة وحدها.
+ *
+ * المحو يمرّ بـ `onChange` صاحب الخانة كأن المستخدم مسحها بنفسه، فلا تحتاج صفحة معالجاً
+ * آخر. الغلاف ثابت ولو فرغت الخانة — تبديله يعيد إنشاء الحقل فيضيع التركيز مع أول حرف.
+ * الزرّ خارج تسلسل Tab: من يتنقّل بلوحة المفاتيح ينتقل إلى الخانة التالية لا إلى ✕.
+ * اسمه «امسح المكتوب» لا يحوي تسمية الخانة: البحث بالتسمية يجد الخانة وحدها.
+ */
+export function ClearableInput(input: InputHTMLAttributes<HTMLInputElement>) {
+  const own = useRef<HTMLInputElement>(null);
+  const [typed, setTyped] = useState(() => String(input.defaultValue ?? '') !== '');
+  if (!CLEARABLE_TYPES.has(input.type ?? 'text')) return <input {...input} />;
+
+  const filled = input.value !== undefined ? String(input.value) !== '' : typed;
+  const shown = filled && !input.disabled && !input.readOnly;
+  const clear = () => {
+    const el = own.current;
+    if (!el) return;
+    // الضابط الأصلي ثم حدث «input»: React يراه كتابةً فيستدعي onChange بقيمة فارغة
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(el, '');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.focus();
+  };
+
+  return (
+    // اتجاه الغلاف من الخانة: ✕ في نهاية سطرها — يميناً للبريد والجوال، ويساراً للعربي
+    <span className="field__clearable" dir={input.dir === 'ltr' || input.dir === 'rtl' ? input.dir : undefined}>
+      <input
+        {...input}
+        ref={own}
+        onChange={(e) => {
+          setTyped(e.target.value !== '');
+          input.onChange?.(e);
+        }}
+      />
+      {shown ? (
+        <button
+          type="button"
+          className="field__clear"
+          aria-label="امسح المكتوب"
+          tabIndex={-1}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={clear}
+        >
+          <Icon name="x" size={14} />
+        </button>
+      ) : null}
+    </span>
   );
 }
 
