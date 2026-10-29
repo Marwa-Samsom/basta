@@ -287,7 +287,8 @@
 
 /* ---------------------------------------------------------- VD-21 الإشعارات */
 
-.vx-notifs { max-inline-size: 960px; }
+/* الصندوق بعرض الصفحة كإشعارات المشتري (28 أكتوبر 2026) — كان سقفه 960px فيترك فراغاً عريضاً
+   بجانبه على الشاشات الواسعة، في البائع والإدارة معاً. */
 .vx-notes { list-style: none; margin: 0; padding: 0; }
 .vx-note { border-block-end: 1px solid var(--border-subtle); }
 .vx-note:last-child { border-block-end: 0; }
