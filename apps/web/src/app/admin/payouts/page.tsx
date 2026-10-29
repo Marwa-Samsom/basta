@@ -7,6 +7,7 @@ import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { TONE, useAction, useAdminList } from '@/lib/admin';
 import { money, when } from '@/lib/orders';
+import { ClearableInput } from '@/components/ui';
 
 interface Payout {
   id: string;
@@ -167,7 +168,7 @@ export default function AdminPayoutsPage() {
                       ) : null}
                       {p.status === 'approved' ? (
                         <>
-                          <input
+                          <ClearableInput
                             className="field__control ao-ref"
                             placeholder="مرجع التحويل"
                             dir="ltr"

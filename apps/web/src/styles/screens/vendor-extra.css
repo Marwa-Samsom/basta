@@ -187,6 +187,9 @@
 }
 /* الحلقة على الإطار (:focus-within أعلاه) لا على الحقل داخله */
 .vx-amount input:focus-visible { outline: none; }
+.vx-amount > .field__clearable { flex: 1; min-width: 0; }
+.vx-amount .field__clearable > input { inline-size: 0; }
+.vx-amount .field__clearable:has(> .field__clear) > input { padding-inline-end: 34px; }
 .vx-amount__unit {
   display: flex;
   align-items: center;

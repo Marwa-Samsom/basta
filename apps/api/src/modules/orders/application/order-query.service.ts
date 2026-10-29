@@ -51,7 +51,7 @@ const SUB_ORDER_DETAIL = {
   },
   returns: {
     orderBy: { requestedAt: 'desc' },
-    select: { id: true, itemsJson: true, reasonCode: true, description: true, status: true, requestedAt: true },
+    select: { id: true, itemsJson: true, reasonCode: true, description: true, status: true, requestedAt: true, resolvedAt: true, resolutionNote: true },
   },
   refunds: {
     orderBy: { createdAt: 'desc' },
@@ -323,6 +323,8 @@ export class OrderQueryService {
       itemsSubtotalMinorUnits: order.itemsSubtotalMinorUnits.toString(),
       shippingTotalMinorUnits: order.shippingTotalMinorUnits.toString(),
       discountTotalMinorUnits: order.discountTotalMinorUnits.toString(),
+      // الكوبون الذي خصم — يُسمّى بجانب «الخصم» كما في ملخّص الدفع
+      couponCode: (order.pricingSnapshot as { coupon?: { code?: string } | null } | null)?.coupon?.code ?? null,
       // الضريبة في الملخّص كما رآها عند الدفع — بدونها لا يبلغ مجموع الأسطر الإجمالي
       taxTotalMinorUnits: order.taxTotalMinorUnits.toString(),
       taxInclusive: (order.pricingSnapshot as { taxInclusive?: boolean } | null)?.taxInclusive ?? false,
@@ -475,17 +477,26 @@ function present(s: SubOrderRow, audience: TransitionActor) {
 }
 
 /**
- * أسطر الفرعي بعملة الدفع: بنوده المحوَّلة في لقطة التسعير (charge.items) موزّعةً
- * على أسطره بنسبة قيمتها — فمجموعها بنود المتجر في «قيمة المنتجات» بالضبط، كما في
- * السلة. طلب بلا لقطة: يُحوَّل مجموعه بلقطة صرف الفرعي.
+ * أسطر الفرعي بعملة الدفع، كما في السلة: سطر كل قطعة من لقطة التسعير (القطعة المحوَّلة
+ * × الكمية — CHK-014، 27 أكتوبر 2026)، ومجموعها بنود المتجر في «قيمة المنتجات» بالضبط.
+ * لقطة أقدم بلا أسطر محوَّلة: بنوده المحوَّلة (charge.items) موزّعةً بنسبة قيمتها. وطلب
+ * بلا لقطة: يُحوَّل مجموعه بلقطة صرف الفرعي.
  */
 function chargedLines(
   snapshot: Prisma.JsonValue | null,
-  s: { vendorId: string; fxRateSnapshot: Prisma.Decimal; items: readonly { lineSubtotalMinorUnits: bigint }[] },
+  s: {
+    vendorId: string;
+    fxRateSnapshot: Prisma.Decimal;
+    items: readonly { skuSnapshot: string; lineSubtotalMinorUnits: bigint }[];
+  },
 ): bigint[] {
   const subtotals = s.items.map((i) => i.lineSubtotalMinorUnits);
-  const subs = (snapshot as { subOrders?: { vendorId?: string; charge?: { items?: string } }[] } | null)?.subOrders ?? [];
-  const fromSnapshot = subs.find((x) => x.vendorId === s.vendorId)?.charge?.items;
+  type SnapSub = { vendorId?: string; charge?: { items?: string }; lines?: { sku?: string; chargeSubtotal?: string }[] };
+  const sub = ((snapshot as { subOrders?: SnapSub[] } | null)?.subOrders ?? []).find((x) => x.vendorId === s.vendorId);
+  // SKU فريد داخل المتجر، فيطابق سطر الطلب سطر لقطته
+  const perLine = s.items.map((i) => sub?.lines?.find((l) => l.sku === i.skuSnapshot)?.chargeSubtotal);
+  if (perLine.length > 0 && perLine.every((v) => v !== undefined)) return perLine.map((v) => BigInt(v!));
+  const fromSnapshot = sub?.charge?.items;
   const rate = Number(s.fxRateSnapshot);
   const items =
     fromSnapshot !== undefined

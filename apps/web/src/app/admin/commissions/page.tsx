@@ -7,6 +7,7 @@ import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
+import { ClearableInput } from '@/components/ui';
 
 interface Rule {
   id: string;
@@ -246,7 +247,7 @@ export default function AdminCommissionsPage() {
           ) : null}
           <label className="field">
             <span className="field__label">النسبة %</span>
-            <input ref={rateRef} className="field__control num" inputMode="decimal" dir="ltr" placeholder="3" value={rate} onChange={(e) => setRate(e.target.value)} />
+            <ClearableInput ref={rateRef} className="field__control num" inputMode="decimal" dir="ltr" placeholder="3" value={rate} onChange={(e) => setRate(e.target.value)} />
           </label>
           <div className="ac2-form__actions">
             <button

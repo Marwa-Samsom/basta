@@ -1361,17 +1361,19 @@ model Review {
 }
 
 model ReturnRequest {
-  id          String    @id @default(uuid()) @db.Uuid
-  subOrderId  String    @db.Uuid
-  itemsJson   Json
-  reasonCode  String
-  description String?
-  mediaKeys   String[]
+  id             String    @id @default(uuid()) @db.Uuid
+  subOrderId     String    @db.Uuid
+  itemsJson      Json
+  reasonCode     String
+  description    String?
+  mediaKeys      String[]
   /// فهرس فريد جزئي في المهاجرة: طلب «requested» واحد لكل فرعي — يُكتب في معاملة انتقاله
-  status      String    @default("requested")
-  requestedAt DateTime  @default(now()) @db.Timestamptz
-  resolvedBy  String?   @db.Uuid
-  resolvedAt  DateTime? @db.Timestamptz
+  status         String    @default("requested")
+  requestedAt    DateTime  @default(now()) @db.Timestamptz
+  resolvedBy     String?   @db.Uuid
+  resolvedAt     DateTime? @db.Timestamptz
+  /// سبب رفض البائع — يُعرض للمشتري في بطاقة الطلب وإشعار الرفض (BUY-047)
+  resolutionNote String?
 
   subOrder SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
 

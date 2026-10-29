@@ -2,7 +2,7 @@
 
 import '@/styles/screens/vendor-extra.css';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, EmptyState, Field, PageHead, TextInput } from '@/components/ui';
+import { Alert, ClearableInput, EmptyState, Field, PageHead, TextInput } from '@/components/ui';
 import { digitsOnly } from '@/lib/digits';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
@@ -166,7 +166,7 @@ function AmountField({
     <Field label={label}>
       {(p) => (
         <span className="vx-amount">
-          <input {...p} inputMode="decimal" dir="ltr" value={value} onChange={(e) => onChange(e.target.value)} />
+          <ClearableInput {...p} inputMode="decimal" dir="ltr" value={value} onChange={(e) => onChange(e.target.value)} />
           <span className="vx-amount__unit num">{suffix ?? currency}</span>
         </span>
       )}

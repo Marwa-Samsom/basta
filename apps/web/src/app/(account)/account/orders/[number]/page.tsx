@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation';
 import { use, useCallback, useEffect, useState } from 'react';
 import { AskShop } from '@/components/ask-shop';
 import { useConfirm } from '@/components/confirm';
-import { Icon } from '@/components/icons';
+import { Icon, type IconName } from '@/components/icons';
 import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
-import { api, session } from '@/lib/api';
+import { countryName } from '@/lib/addresses';
+import { api, ApiError, session } from '@/lib/api';
 import {
   DISPUTE_REASONS,
+  REFUND_DISPUTE_DAYS,
+  REFUND_DISPUTE_REASONS,
   RETURN_REASONS,
   carrierName,
   labelOf,
@@ -36,6 +39,27 @@ interface Store extends Omit<SubOrderView, 'items'> {
   reviewable: boolean;
 }
 
+interface DeliveryAddress {
+  recipientName?: string | null;
+  country: string;
+  region?: string | null;
+  city?: string | null;
+  area?: string | null;
+  street?: string | null;
+  building?: string | null;
+}
+
+/** وسيلة الدفع بالعربية وأيقونتها — رأس الطلب (ST-19) */
+const PAYMENT_METHODS: Record<string, { label: string; icon: IconName }> = {
+  card: { label: 'بطاقة', icon: 'card' },
+  bank_transfer: { label: 'تحويل بنكي', icon: 'cash' },
+  wallet: { label: 'محفظة', icon: 'wallet' },
+  cod: { label: 'الدفع عند الاستلام', icon: 'cash' },
+};
+
+const deliveredTo = (a: DeliveryAddress): string =>
+  [countryName(a.country), a.region, a.city, a.area, a.street, a.building].filter(Boolean).join(' · ');
+
 interface OrderView {
   number: string;
   status: string;
@@ -45,10 +69,13 @@ interface OrderView {
   itemsSubtotalMinorUnits: string;
   shippingTotalMinorUnits: string;
   discountTotalMinorUnits: string;
+  couponCode?: string | null;
   taxTotalMinorUnits?: string;
   taxInclusive?: boolean;
   paymentStatus: string | null;
   paymentMethod?: string | null;
+  /** لقطة العنوان لحظة الطلب — لا العنوان المحفوظ اليوم */
+  shippingAddress?: DeliveryAddress | null;
   /** ينتظر التحويل: كيف يحوّل — قبل أن يُقسَّم الطلب على المتاجر */
   transfer?: TransferInstructionsView;
   /** أُغلق قبل أن يُدفع (انقضت مهلة التحويل أو ألغاه) */
@@ -106,6 +133,18 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
     }
   }, [number]);
 
+  /**
+   * إجراء رُفض: التنبيه يبقى، وإن كان الرفض لأن الحالة تغيّرت من طرف آخر (409) تُجلب
+   * الحالة الجديدة فلا يبقى زرّ لم يعد مسموحاً تحت التنبيه — BUY-027 (27 أكتوبر 2026)
+   */
+  const fail = useCallback(
+    (e: unknown) => {
+      setError((e as Error).message);
+      if (e instanceof ApiError && e.status === 409) void load();
+    },
+    [load],
+  );
+
   useEffect(() => {
     if (!session.read()) {
       router.replace(`/login?next=/account/orders/${number}`);
@@ -144,6 +183,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
   const storeCount =
     order.stores.length === 1 ? 'متجر واحد' : order.stores.length === 2 ? 'متجران' : `${order.stores.length} متاجر`;
   const unsplit = order.stores.length === 0;
+  const method = order.paymentMethod ? PAYMENT_METHODS[order.paymentMethod] : undefined;
   const refunded = refundTotals(order.stores);
 
   const cancelTransfer = async () => {
@@ -160,7 +200,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
       await load();
       setNotice('ألغيت الطلب، وعادت القطع للمتاجر.');
     } catch (e) {
-      setError((e as Error).message);
+      fail(e);
     }
   };
 
@@ -171,6 +211,32 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
         title={<span className="num">{order.number}</span>}
         meta={unsplit ? when(order.placedAt) : `${when(order.placedAt)} · ${storeCount}`}
       />
+      {/* إلى أين وبماذا دفع — ST-19، أُضيفا بطلب صاحبة المشروع في BUY-011 (27 أكتوبر 2026) */}
+      {order.shippingAddress || method ? (
+        <dl className="sp-orderinfo">
+          {order.shippingAddress ? (
+            <div>
+              <dt>
+                <Icon name="pin" size={15} />
+                التوصيل إلى
+              </dt>
+              <dd>
+                {order.shippingAddress.recipientName ? `${order.shippingAddress.recipientName} — ` : ''}
+                {deliveredTo(order.shippingAddress)}
+              </dd>
+            </div>
+          ) : null}
+          {method ? (
+            <div>
+              <dt>
+                <Icon name={method.icon} size={15} />
+                الدفع
+              </dt>
+              <dd>{method.label}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
@@ -230,7 +296,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
                 setNotice(msg);
                 setError(null);
               }}
-              onError={setError}
+              onError={fail}
             />
           ))}
         </div>
@@ -249,7 +315,9 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
               </div>
               {order.discountTotalMinorUnits !== '0' ? (
                 <div>
-                  <dt>الخصم</dt>
+                  <dt>
+                    الخصم{order.couponCode ? <> (<bdi>{order.couponCode}</bdi>)</> : null}
+                  </dt>
                   <dd className="num sp-sum__saving">− {money(order.discountTotalMinorUnits, order.currency)}</dd>
                 </div>
               ) : null}
@@ -302,7 +370,7 @@ function StoreCard({
   orderNumber: string;
   currency: string;
   onChange: (o: OrderView | null, msg: string) => void;
-  onError: (m: string) => void;
+  onError: (e: unknown) => void;
 }) {
   const ask = useConfirm();
   const [mode, setMode] = useState<'return' | 'dispute' | null>(null);
@@ -310,12 +378,19 @@ function StoreCard({
   const [qty, setQty] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('damaged');
   const [text, setText] = useState('');
+  // لحظة فتح الصفحة: الحساب أثناء الرسم يتغيّر مع كل إعادة رسم
+  const [now] = useState(() => Date.now());
   /** النجوم المختارة والرأي قبل النشر — لقطعة واحدة في كل مرة */
   const [draft, setDraft] = useState<{ itemId: string; rating: number; body: string } | null>(null);
   const canceled = ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'].includes(s.status);
   const step = ORDER_OF[s.status] ?? -1;
   const openDispute = s.disputes.find((d) => d.status === 'open' || d.status === 'escalated');
+  // «مُسترَد»: نزاع «لم يصلني الاسترداد» وحده خلال 14 يوماً منه، ويصل الإدارة — قرار صاحبة المشروع (BUY-052)
+  const refundedAt = s.status === 'refunded' ? s.history.find((h) => h.toStatus === 'refunded')?.createdAt : undefined;
+  const refundDisputable = !!refundedAt && now - new Date(refundedAt).getTime() <= REFUND_DISPUTE_DAYS * 86_400_000;
   const disputable = ['shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned'].includes(s.status);
+  // الأحدث أولاً من الخادم: رفضٌ يبقى ظاهراً حتى يُطلب إرجاع بعده
+  const lastReturn = s.returns[0];
 
   /** تاريخ بلوغ كل مرحلة من سجلّ الحالات — المرحلة الأولى تاريخ الطلب نفسه */
   const reachedAt = (key: string, i: number): string | null =>
@@ -326,7 +401,7 @@ function StoreCard({
     try {
       await fn();
     } catch (e) {
-      onError((e as Error).message);
+      onError(e);
     } finally {
       setBusy(false);
     }
@@ -362,7 +437,13 @@ function StoreCard({
     run(async () => {
       await api(`/me/disputes`, { method: 'POST', body: { subOrderId: s.id, reasonCode: reason, message: text } });
       setMode(null);
-      onChange(null, 'فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.');
+      onChange(
+        null,
+        // نزاع الاسترداد يُفتح مصعَّداً: لا بائع يردّ ولا تصعيد ينتظر
+        refundDisputable
+          ? 'فُتح النزاع ووصل الإدارة مباشرة — تتابع استردادك وتردّ عليك هنا.'
+          : 'فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.',
+      );
     });
 
   // الرأي اختياري: النجوم وحدها تكفي (26 أكتوبر 2026)
@@ -557,6 +638,13 @@ function StoreCard({
             );
           })}
         </ul>
+        {/* رفض البائع آخر إرجاع: الرفض وسببه هنا — كانت الشارة ترجع «تم التسليم» بلا تفسير (BUY-047) */}
+        {lastReturn?.status === 'rejected' ? (
+          <Alert tone="warning" title={`رفض المتجر طلب الإرجاع${lastReturn.resolvedAt ? ` · ${when(lastReturn.resolvedAt)}` : ''}`}>
+            {lastReturn.resolutionNote ? `السبب: «${lastReturn.resolutionNote}». ` : ''}
+            إن لم توافق على الرفض، افتح «لديّ مشكلة».
+          </Alert>
+        ) : null}
       </div>
 
       <div className="sp-store__foot">
@@ -599,8 +687,8 @@ function StoreCard({
               <Icon name="msg" size={14} />
               متابعة النزاع
             </Link>
-          ) : disputable ? (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setMode('dispute'), setReason('not_received'))}>
+          ) : disputable || refundDisputable ? (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setMode('dispute'), setReason(refundDisputable ? 'refund_missing' : 'not_received'))}>
               <Icon name="alert" size={14} />
               لديّ مشكلة
             </button>
@@ -625,7 +713,8 @@ function StoreCard({
             <p className="sp-panel__title">طلب إرجاع</p>
             <p className="sp-note sp-note--xs">
               <Icon name="info" size={14} />
-              اختر القطع وكمياتها. يُردّ نصيبها فور استلام البائع لها — لا يُردّ الشحن في الإرجاع الجزئي.
+              {/* الشحن لا يُردّ في أي إرجاع، كاملاً كان أو جزئياً — «الجزئي» كان يوحي بردّه في الكامل (BUY-040) */}
+              اختر القطع وكمياتها. يُردّ ثمنها فور استلام البائع لها — الشحن لا يُردّ لأن الشحنة وصلتك.
             </p>
             <div className="sp-panel__lines">
               {/* بعد إرجاع جزئي يبقى الطلب «تم التسليم»: ما رُدّ كله لا يُعرض بقائمة «0» وحدها */}
@@ -666,9 +755,20 @@ function StoreCard({
 
         {mode === 'dispute' ? (
           <div className="sp-panel">
-            <p className="sp-panel__title">افتح نزاعاً مع {s.vendor.nameAr}</p>
-            <ReasonSelect options={DISPUTE_REASONS} value={reason} onChange={setReason} />
-            <TextArea label="اشرح المشكلة للبائع" value={text} onChange={(e) => setText(e.target.value)} rows={3} />
+            <p className="sp-panel__title">{refundDisputable ? 'لم يصلك المبلغ المسترَد؟' : `افتح نزاعاً مع ${s.vendor.nameAr}`}</p>
+            {refundDisputable ? (
+              <p className="sp-note sp-note--xs">
+                <Icon name="info" size={14} />
+                يصل الإدارة مباشرة: هي التي ترى ردّ المبلغ عند جهة الدفع وتتابعه معك.
+              </p>
+            ) : null}
+            <ReasonSelect options={refundDisputable ? REFUND_DISPUTE_REASONS : DISPUTE_REASONS} value={reason} onChange={setReason} />
+            <TextArea
+              label={refundDisputable ? 'اشرح للإدارة: متى رُدّ المبلغ، وأين تنتظره' : 'اشرح المشكلة للبائع'}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={3}
+            />
             <div className="sp-panel__actions">
               <button type="button" className="btn btn--primary" disabled={busy || text.trim().length < 10} onClick={() => void submitDispute()}>
                 افتح النزاع

@@ -1,6 +1,6 @@
 'use client';
 
-import { Field } from '@/components/ui';
+import { ClearableInput, Field } from '@/components/ui';
 import { REGIONS, canonicalRegion } from '@/lib/places';
 
 /**
@@ -46,7 +46,7 @@ export function RegionSelect({
             ))}
           </select>
         ) : (
-          <input className="field__control" {...props} value={value} maxLength={80} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
+          <ClearableInput className="field__control" {...props} value={value} maxLength={80} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
         )
       }
     </Field>

@@ -463,6 +463,7 @@ button.vp-axis { cursor: pointer; font-family: inherit; }
 /* «فئة جديدة» داخل حقل الفئة — حقل وزرّان في سطر، ويلتفّ على الضيّق */
 .vp-newcat { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .vp-newcat .field__control { flex: 1 1 12rem; min-width: 0; }
+.vp-newcat .field__clearable { flex: 1 1 12rem; min-width: 0; }
 
 /* مصفوفة المتغيّرات — جدول بحقول مضغوطة */
 .vp-matrix-wrap { box-shadow: none; }
@@ -478,6 +479,8 @@ button.vp-axis { cursor: pointer; font-family: inherit; }
 .vp-cell--sku { min-width: 9rem; }
 .vp-cell--price { font-weight: var(--weight-semi); min-width: 7rem; }
 .vp-cell--qty { min-width: 5rem; }
+/* المصفوفة كثيفة وكل خلاياها معبّأة: ✕ عند المرور على الخلية أو الكتابة فيها، لا في كل خلية دائماً */
+.vp-matrix .field__clearable:not(:hover, :focus-within) > .field__clear { visibility: hidden; }
 
 /* لوحة العوائق — كلها معاً، لا واحداً في كل محاولة */
 .vp-blockers {
@@ -760,6 +763,8 @@ button.vp-axis { cursor: pointer; font-family: inherit; }
   .vp-seg--block .seg__opt + .seg__opt { border-inline-start: 0; border-block-start: 1px solid var(--border-strong); }
   /* الجدول بطاقات: خلايا المصفوفة حقول بعرض كامل */
   .vp-cell { min-width: 0; inline-size: 60%; }
+  .vp-matrix .field__clearable:has(> .vp-cell) { inline-size: 60%; }
+  .vp-matrix .field__clearable > .vp-cell { inline-size: 100%; }
   /* في المصفوفة لا عنوان بطاقة: الخلية الأولى حقل كغيرها وتحتاج تسميتها */
   .vp-matrix td:first-child { font-size: inherit; font-weight: inherit; }
   .vp-matrix td:first-child::before { content: attr(data-label); }

@@ -6,9 +6,10 @@
  * المشتري، فالمساواة لا تتحقّق بالصدفة بعد التقريب — تُبنى:
  *
  *   1. كل فرعي يُحسب كاملاً بعملة بائعه (لا تقريب هنا، أعداد صحيحة).
- *   2. **إجماليه** يُحوَّل مرة واحدة إلى عملة الدفع ويُقرَّب مرة واحدة.
- *   3. مكوّناته بعملة الدفع تُحوَّل كلٌّ على حدة، ثم يُضبط الفرق على البنود
- *      فتساوي الإجمالي المحوَّل بالضبط.
+ *   2. **سعر القطعة** يُحوَّل إلى عملة الدفع ويُقرَّب، والسطر = القطعة × الكمية،
+ *      وبنود الفرعي = مجموع أسطره. ما يراه المشتري «20.14 × 2» هو 40.28 بالضبط
+ *      (CHK-014، 27 أكتوبر 2026) — كان المجموع يُحوَّل ويوزَّع فيصير 40.29.
+ *   3. الشحن والخصم والضريبة يُحوَّل كلٌّ على حدة، والإجمالي مجموع مكوّناته.
  *   4. الأب = مجموع الإجماليات المحوَّلة. لا تقريب على مستوى الأب إطلاقاً.
  */
 
@@ -87,6 +88,10 @@ export interface PricedLine extends PricedLineInput {
   readonly lineTax: bigint;
   readonly lineTotal: bigint;
   readonly commissionMinor: bigint;
+  /** سعر القطعة بعملة الدفع — كما في صفحة المنتج */
+  readonly chargeUnitMinor: bigint;
+  /** السطر بعملة الدفع قبل الخصم والضريبة = chargeUnitMinor × الكمية */
+  readonly chargeSubtotal: bigint;
 }
 
 export interface PricedSubOrder {
@@ -299,13 +304,22 @@ export function priceCart(input: {
     const disc = eligible
       ? couponDiscount(input.coupon, vendorId, vendor.currency, items, shippingMinor)
       : { items: 0n, shipping: 0n };
-    return { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc };
+    /**
+     * الشحن المجاني ينطبق على متجره ولو لم يُعرف شحنه بعد (CHK-032، 27 أكتوبر 2026): في السلة
+     * بلا عنوان الشحن صفر فلا يخصم شيئاً، فكان مانع «لا ينطبق» يعطّل «إتمام الشراء». يخصم
+     * الشحن كاملاً في الدفع بعد «احسب الشحن».
+     */
+    const freeShipping =
+      eligible &&
+      input.coupon?.type === 'free_shipping' &&
+      (input.coupon.scope !== 'vendor' || input.coupon.vendorId === vendorId);
+    return { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc, freeShipping };
   });
   capPercent(input.coupon, ctxs, input.fx);
   spreadFixed(input.coupon, ctxs);
 
-  for (const { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc } of ctxs) {
-    if (disc.items > 0n || disc.shipping > 0n) couponMatched = true;
+  for (const { vendorId, lines, vendor, quote, shippingMinor, subtotals, items, disc, freeShipping } of ctxs) {
+    if (disc.items > 0n || disc.shipping > 0n || freeShipping) couponMatched = true;
 
     const lineDiscounts = allocate(disc.items, subtotals);
     const discount = disc.items + disc.shipping;
@@ -319,12 +333,14 @@ export function priceCart(input: {
     const lineTaxes = allocate(tax, subtotals.map((s, i) => s - (lineDiscounts[i] ?? 0n)));
 
     const total = items - disc.items + netShipping + (input.tax.inclusive ? 0n : tax);
+    const factor = fxFactor(vendor.currency, vendor.currencyDigits, input.fx);
 
     const priced: PricedLine[] = lines.map((l, i) => {
       const lineSubtotal = subtotals[i] ?? 0n;
       const lineDiscount = lineDiscounts[i] ?? 0n;
       const lineTax = lineTaxes[i] ?? 0n;
       const lineNet = lineSubtotal - lineDiscount;
+      const chargeUnitMinor = convertMinor(l.unitPriceMinor, factor);
       return {
         ...l,
         lineSubtotal,
@@ -333,6 +349,8 @@ export function priceCart(input: {
         lineTotal: lineNet + (input.tax.inclusive ? 0n : lineTax),
         // ADR-001: لكل سطر وبالتقريب لأسفل — لصالح البائع
         commissionMinor: (lineNet * BigInt(l.commissionBps)) / 10_000n,
+        chargeUnitMinor,
+        chargeSubtotal: chargeUnitMinor * BigInt(l.qty),
       };
     });
 
@@ -345,14 +363,15 @@ export function priceCart(input: {
     const vendorNet = items - vendorFunded - commission + shippingMinor;
 
     // -------------------------------------------- عملة الدفع
-    const factor = fxFactor(vendor.currency, vendor.currencyDigits, input.fx);
-    const chargeTotal = convertMinor(total, factor);
-    const chargeDiscount = convertMinor(discount, factor);
-    const chargeShipping = convertMinor(netShipping + disc.shipping, factor);
+    const chargeItems = priced.reduce((a, l) => a + l.chargeSubtotal, 0n);
+    const chargeShipping = convertMinor(shippingMinor, factor);
+    // كلٌّ بسقف ما يخصم منه: خصم البنود كلها (100%) محوَّلاً جملةً قد يزيد فلساً على
+    // مجموع القطع المحوَّلة فرادى، فيصير الصافي سالباً
+    const capAt = (v: bigint, max: bigint): bigint => (v > max ? max : v);
+    const chargeDiscount =
+      capAt(convertMinor(disc.items, factor), chargeItems) + capAt(convertMinor(disc.shipping, factor), chargeShipping);
     const chargeTax = convertMinor(tax, factor);
-    // البنود تأخذ فرق التقريب كله، فتساوي المكوّنات الإجمالي المحوَّل بالضبط
-    const chargeItems =
-      chargeTotal - chargeShipping + chargeDiscount - (input.tax.inclusive ? 0n : chargeTax);
+    const chargeTotal = chargeItems - chargeDiscount + chargeShipping + (input.tax.inclusive ? 0n : chargeTax);
 
     couponApplied += chargeDiscount;
 

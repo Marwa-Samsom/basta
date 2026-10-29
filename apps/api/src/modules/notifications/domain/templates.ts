@@ -77,6 +77,13 @@ export const EVENTS: readonly EventDef[] = [
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', reason: 'نفدت الكمية لدى البائع', link: '/account/orders/BST-260921-A1B2C3' },
   },
   {
+    code: 'return_rejected',
+    labelAr: 'رفض البائع طلب الإرجاع',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'store_name', 'reason', 'link'],
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', reason: 'القطعة مستعملة وليست في غلافها', link: '/account/orders/BST-260921-A1B2C3' },
+  },
+  {
     // نجاح وصل من البوابة بعد أن أُغلق الطلب فاشلاً — رُدّ كله، ولم يُنشأ طلب
     code: 'late_payment_refunded',
     labelAr: 'دفع متأخر رُدّ',
@@ -202,6 +209,13 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'admin',
     variables: ['store_name', 'order_number', 'reason', 'link'],
     sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يصلني الطلب', link: '/admin/disputes' },
+  },
+  {
+    code: 'admin_dispute_waiting',
+    labelAr: 'نزاع مصعَّد بلا ردّ من الإدارة',
+    audience: 'admin',
+    variables: ['store_name', 'order_number', 'reason', 'days', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', reason: 'لم يصلني الاسترداد', days: '2', link: '/admin/disputes' },
   },
   {
     code: 'admin_payout_requested',
@@ -458,6 +472,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
   t('order_canceled', 'sms', 'بسطة: أُلغي ما طلبته من {{store_name}} في {{order_number}}، ويُردّ مبلغه كاملاً.'),
   t('order_canceled', 'in_app', 'أُلغي طلبك من {{store_name}} ({{order_number}}) ويُردّ مبلغه كاملاً.'),
 
+  t('return_rejected', 'email',
+    'مرحباً {{name}}،\n\nرفض {{store_name}} طلب الإرجاع في الطلب {{order_number}}. السبب: «{{reason}}».\n\nإن لم توافق على الرفض، افتح «لديّ مشكلة» من صفحة الطلب ونراجعه معك.\n\n{{link}}\n\nبسطة',
+    'رُفض طلب الإرجاع في {{order_number}}'),
+  t('return_rejected', 'in_app', 'رفض {{store_name}} طلب الإرجاع في {{order_number}}. السبب: «{{reason}}».'),
+
   t('refund_issued', 'email',
     'مرحباً {{name}}،\n\nرددنا {{amount}} إلى وسيلة دفعك عن الطلب {{order_number}}. قد يستغرق ظهوره في كشف بطاقتك بضعة أيام عمل حسب البنك.\n\n{{link}}\n\nبسطة',
     'استرداد {{amount}} عن الطلب {{order_number}}'),
@@ -561,6 +580,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'صُعِّد نزاع على الطلب {{order_number}} من متجر {{store_name}} إلى الإدارة. سبب المشتري: {{reason}}.\n\nمال الطلب مجمَّد حتى يُحسم. اقرأ الخيط واحسم من هنا: {{link}}\n\nبسطة',
     'نزاع مصعَّد على {{order_number}}'),
   t('admin_dispute_escalated', 'in_app', 'نزاع مصعَّد على {{order_number}} ({{store_name}}): {{reason}}. ينتظر حسمك.'),
+
+  t('admin_dispute_waiting', 'email',
+    'النزاع على الطلب {{order_number}} من متجر {{store_name}} مصعَّد إلى الإدارة ولم يردّ عليه أحد منها منذ {{days}} أيام. سبب المشتري: {{reason}}.\n\nالمشتري ينتظر، ومال الطلب مجمَّد حتى يُحسم. ردّ عليه أو احسمه من هنا: {{link}}\n\nبسطة',
+    'نزاع {{order_number}} ينتظر ردّكم منذ {{days}} أيام'),
+  t('admin_dispute_waiting', 'in_app', 'نزاع {{order_number}} ({{store_name}}) ينتظر ردّ الإدارة منذ {{days}} أيام: {{reason}}.'),
 
   t('admin_payout_requested', 'email',
     'طلب متجر {{store_name}} سحب {{amount}} إلى حسابه البنكي الموثَّق.\n\nوافق عليه أو ارفضه من هنا: {{link}}\n\nبسطة',
@@ -670,15 +694,24 @@ export function usedVariables(text: string): string[] {
   return [...new Set([...text.matchAll(VAR)].map((m) => m[1]!))];
 }
 
+/** المتغيّر ونقطة تليه إن وُجدت — للتصيير وحده */
+const VAR_THEN_DOT = /\{\{\s*([a-z_]+)\s*\}\}(\.?)/g;
+
+/** قيمة تنتهي بنقطة ولو لفّتها علامات الاتجاه: «153.48 ر.س.» */
+const endsWithDot = (v: string): boolean => /\.[\u200E\u200F\u2066-\u2069]*$/.test(v);
+
 /**
  * يصيّر القالب. متغيّر ناقص يُسقط الإرسال صراحةً — أفضل من نصّ فيه فراغ
  * أو {{…}} خام يصل المشتري.
+ *
+ * قيمة تنتهي بنقطة («ر.س.») في آخر الجملة تكفيها نقطتها: «{{amount}}.» لا يصير
+ * «140.26 ر.س..» — BUY-030، بطلب صاحبة المشروع (27 أكتوبر 2026).
  */
 export function render(text: string, vars: Readonly<Record<string, string>>): string {
-  return text.replace(VAR, (_, name: string) => {
+  return text.replace(VAR_THEN_DOT, (_, name: string, dot: string) => {
     const v = vars[name];
     if (v === undefined || v === '') throw new Error(`متغيّر ناقص في القالب: ${name}`);
-    return v;
+    return dot && endsWithDot(v) ? v : v + dot;
   });
 }
 

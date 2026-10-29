@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { Icon, type IconName } from '@/components/icons';
-import { TextInput } from '@/components/ui';
+import { ClearableInput, TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -251,7 +251,7 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
             <span className="ac2-fine">{template.reviewedAt ? `راجعه لغوياً: ${template.reviewedBy} · ${when(template.reviewedAt)}` : 'لم يُراجَع لغوياً بعد.'}</span>
             {!template.reviewedAt ? (
               <div className="ac2-inline">
-                <input className="field__control" aria-label="اسم المراجِع" placeholder="اسم المراجِع" value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
+                <ClearableInput className="field__control" aria-label="اسم المراجِع" placeholder="اسم المراجِع" value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
                 <button
                   type="button"
                   className="btn btn--secondary btn--sm"

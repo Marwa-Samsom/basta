@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { format, money } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { allocate, convertMinor, DisplayCurrencyService, PricingService, type Quote, type QuoteAddress } from '../../pricing/public';
+import { DisplayCurrencyService, PricingService, type Quote, type QuoteAddress } from '../../pricing/public';
 
 export const MAX_QTY_PER_LINE = 50;
 
@@ -88,11 +88,11 @@ export class CartService {
     return this.view(cart.sessionToken!);
   }
 
-  async addItem(token: string, variantId: string, qty: number): Promise<CartView> {
+  async addItem(token: string, variantId: string, qty: number, userId: string | null = null): Promise<CartView> {
     if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) {
       throw new InvalidInputError(`الكمية من 1 إلى ${MAX_QTY_PER_LINE}.`);
     }
-    const cart = await this.require(token);
+    const cart = await this.require(token, userId);
     const variant = await this.prisma.productVariant.findFirst({
       where: {
         id: variantId,
@@ -123,8 +123,8 @@ export class CartService {
     return this.view(token);
   }
 
-  async setQty(token: string, variantId: string, qty: number): Promise<CartView> {
-    const cart = await this.require(token);
+  async setQty(token: string, variantId: string, qty: number, userId: string | null = null): Promise<CartView> {
+    const cart = await this.require(token, userId);
     if (qty === 0) {
       await this.prisma.cartItem.deleteMany({ where: { cartId: cart.id, variantId } });
       return this.view(token);
@@ -140,8 +140,8 @@ export class CartService {
     return this.view(token);
   }
 
-  async setCoupon(token: string, code: string | null): Promise<CartView> {
-    const cart = await this.require(token);
+  async setCoupon(token: string, code: string | null, userId: string | null = null): Promise<CartView> {
+    const cart = await this.require(token, userId);
     const normalized = code?.trim().toUpperCase() || null;
     if (normalized) {
       // يُتحقّق الآن فيسمع المشتري السبب عند الإدخال لا عند الدفع
@@ -151,21 +151,21 @@ export class CartService {
     return this.view(token);
   }
 
-  async setCurrency(token: string, currency: string): Promise<CartView> {
-    const [cart, code] = await Promise.all([this.require(token), this.currencyOf(currency)]);
+  async setCurrency(token: string, currency: string, userId: string | null = null): Promise<CartView> {
+    const [cart, code] = await Promise.all([this.require(token, userId), this.currencyOf(currency)]);
     await this.prisma.cart.update({ where: { id: cart.id }, data: { currency: code } });
     return this.view(token);
   }
 
   /** سطور السلة كما هي — للدفع */
-  async lines(token: string): Promise<{
+  async lines(token: string, userId: string | null = null): Promise<{
     cartId: string;
     currency: string;
     couponCode: string | null;
     userId: string | null;
     items: { variantId: string; qty: number }[];
   }> {
-    const cart = await this.require(token);
+    const cart = await this.require(token, userId);
     const items = await this.prisma.cartItem.findMany({
       where: { cartId: cart.id },
       select: { variantId: true, qty: true },
@@ -195,8 +195,8 @@ export class CartService {
     });
   }
 
-  async view(token: string, address: QuoteAddress | null = null): Promise<CartView> {
-    const cart = await this.require(token);
+  async view(token: string, address: QuoteAddress | null = null, userId: string | null = null): Promise<CartView> {
+    const cart = await this.require(token, userId);
     const items = await this.prisma.cartItem.findMany({
       where: { cartId: cart.id },
       orderBy: { addedAt: 'asc' },
@@ -254,19 +254,18 @@ export class CartService {
     const zero = view(0n, cart.currency);
 
     /**
-     * كل مبلغ بعملة السلة (18 أكتوبر 2026). سطر المتجر حصّة من بنوده المحوَّلة
-     * بنسبة قيمته (allocate)، فمجموع الأسطر = مجموع المتجر = ما يدخل الإجمالي بالضبط؛
-     * وسعر القطعة بمعامل المتجر نفسه، كما في صفحة المنتج.
+     * كل مبلغ بعملة السلة (18 أكتوبر 2026). سعر القطعة محوَّلاً بمعامل المتجر كما في
+     * صفحة المنتج، والسطر = القطعة × الكمية، ومجموع الأسطر = مجموع المتجر = ما يدخل
+     * الإجمالي بالضبط — من التسعير نفسه (CHK-014، 27 أكتوبر 2026).
      */
     const priced = quote;
     const groups: CartView['groups'][number][] = (priced?.subOrders ?? []).map((s) => {
       const converted = s.currency !== cart.currency;
-      const lineTotals = allocate(s.charge.items, s.lines.map((l) => l.lineSubtotal));
       return {
         vendorId: s.vendorId,
         vendorNameAr: s.vendorNameAr,
         storeCurrency: s.currency,
-        lines: s.lines.map((l, i) => {
+        lines: s.lines.map((l) => {
           const available = priced!.availability.get(l.variantId) ?? 0;
           if (available < l.qty) {
             blockers.push(
@@ -283,8 +282,8 @@ export class CartService {
             imageKey: l.imageKey,
             qty: l.qty,
             available,
-            unitPrice: view(converted ? convertMinor(l.unitPriceMinor, s.fxFactor) : l.unitPriceMinor, cart.currency),
-            lineTotal: view(lineTotals[i] ?? 0n, cart.currency),
+            unitPrice: view(l.chargeUnitMinor, cart.currency),
+            lineTotal: view(l.chargeSubtotal, cart.currency),
             originalUnitPrice: converted ? view(l.unitPriceMinor, s.currency) : null,
             originalLineTotal: converted ? view(l.lineSubtotal, s.currency) : null,
             priceChanged: atAdd.get(l.variantId) !== l.unitPriceMinor,
@@ -370,9 +369,16 @@ export class CartService {
       .then((items) => this.pricing.quote({ items, currency, address, couponCode, userId }));
   }
 
-  private async require(token: string) {
+  /**
+   * سلة الحساب لا يفتحها حساب آخر (CHK-020، 27 أكتوبر 2026): رمز بقي في متصفّح مشترك كان
+   * يُظهر سلّة من خرج لمن يدخل بعده ويدعه يدفعها. تُردّ كأنها غير موجودة فتبدأ الواجهة سلة
+   * جديدة له. وسلة الضيف تصير لأول حساب يفتحها — فتُحرس هي أيضاً بعد دخوله.
+   */
+  private async require(token: string, userId: string | null = null) {
     const cart = await this.prisma.cart.findUnique({ where: { sessionToken: token } });
     if (!cart || cart.expiresAt < new Date()) throw new NotFoundError('السلة غير موجودة أو انتهت.', {});
+    if (userId && cart.userId && cart.userId !== userId) throw new NotFoundError('السلة غير موجودة أو انتهت.', {});
+    if (userId && !cart.userId) return this.prisma.cart.update({ where: { id: cart.id }, data: { userId } });
     return cart;
   }
 

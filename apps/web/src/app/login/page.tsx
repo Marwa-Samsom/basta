@@ -3,7 +3,7 @@
 import '@/styles/screens/identity.css';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { type RefObject, Suspense, useRef, useState } from 'react';
 import { api, ApiError, session, type Tokens } from '@/lib/api';
 import { syncAccountCurrency } from '@/lib/currency';
 import { digitsOnly } from '@/lib/digits';
@@ -17,8 +17,69 @@ interface LoginResponse {
 }
 
 /**
- * حقل كلمة المرور بزرّ إظهار في طرفه (التصميم). اسم الزرّ لا يحوي «كلمة المرور»
- * عمداً: البحث بالتسمية «كلمة المرور» يجب أن يجد الحقل وحده.
+ * ✕ يمحو المكتوب ويُبقي المؤشّر في الخانة — البريد وكلمة المرور (27 أكتوبر 2026، بطلب صاحبة المشروع).
+ * لا يظهر والخانة فارغة؛ والضغط عليه لا يسرق التركيز من الخانة.
+ */
+function ClearButton({
+  label,
+  input,
+  onClear,
+}: {
+  label: string;
+  input: RefObject<HTMLInputElement | null>;
+  onClear: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="ac-clear"
+      aria-label={label}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => {
+        onClear();
+        input.current?.focus();
+      }}
+    >
+      <Icon name="x" size={15} />
+    </button>
+  );
+}
+
+/** حقل البريد و✕ في نهايته. اسم الزرّ لا يحوي «البريد الإلكتروني»: البحث بالتسمية يجد الحقل وحده */
+function EmailField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <Field label="البريد الإلكتروني">
+      {(props) => (
+        <span className="ac-clearable">
+          <input
+            ref={input}
+            className="field__control"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            dir="ltr"
+            required
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            {...props}
+          />
+          {value ? <ClearButton label="امسح البريد" input={input} onClear={() => onChange('')} /> : null}
+        </span>
+      )}
+    </Field>
+  );
+}
+
+/**
+ * حقل كلمة المرور بزرّ إظهار في طرفه (التصميم)، و✕ يمحو المكتوب في طرفه الآخر.
+ * اسما الزرّين لا يحويان «كلمة المرور» عمداً: البحث بالتسمية «كلمة المرور» يجب أن يجد الحقل وحده.
  */
 function PasswordField({
   value,
@@ -28,11 +89,13 @@ function PasswordField({
   onChange: (value: string) => void;
 }) {
   const [shown, setShown] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
   return (
     <Field label="كلمة المرور">
       {(props) => (
         <span className="ac-pw">
           <input
+            ref={input}
             className="field__control"
             type={shown ? 'text' : 'password'}
             autoComplete="current-password"
@@ -51,6 +114,7 @@ function PasswordField({
           >
             <Icon name={shown ? 'eye-off' : 'eye'} size={18} />
           </button>
+          {value ? <ClearButton label="امسح الحروف" input={input} onClear={() => onChange('')} /> : null}
         </span>
       )}
     </Field>
@@ -198,16 +262,7 @@ function LoginForm() {
             </>
           ) : (
             <>
-              <TextInput
-                label="البريد الإلكتروني"
-                type="email"
-                autoComplete="email"
-                inputMode="email"
-                dir="ltr"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+              <EmailField value={email} onChange={setEmail} />
               <PasswordField value={password} onChange={setPassword} />
               {/* رابط لا تسمية: البحث بالتسمية «كلمة المرور» يبقى يجد الحقل وحده */}
               <Link href={withNext('/forgot', next)} className="id-forgot">

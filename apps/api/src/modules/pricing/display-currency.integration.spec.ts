@@ -196,6 +196,8 @@ describe('عملة العرض — 18 أكتوبر 2026', () => {
     expect(line.originalUnitPrice).toMatchObject({ currency: 'SAR', minorUnits: '25000' });
     expect(line.originalLineTotal).toMatchObject({ currency: 'SAR', minorUnits: '75000' });
     expect(line.lineTotal.currency).toBe('JOD');
+    // القطعة × الكمية = السطر بالضبط (CHK-014، 27 أكتوبر 2026) — كان المجموع يُحوَّل ويوزَّع فيفرق فلساً
+    expect(BigInt(line.lineTotal.minorUnits)).toBe(BigInt(line.unitPrice.minorUnits) * 3n);
 
     const jodGroup = view.groups.find((g) => g.storeCurrency === 'JOD')!;
     expect(jodGroup.lines[0]!.originalUnitPrice).toBeNull();
@@ -216,6 +218,10 @@ describe('عملة العرض — 18 أكتوبر 2026', () => {
     const usd = (await call('PUT', '/cart/currency', { cart, body: { currency: 'usd' } })).json();
     expect(usd.currency).toBe('USD');
     expect(usd.groups.every((g: { subtotal: Money }) => g.subtotal.currency === 'USD')).toBe(true);
+    for (const g of usd.groups as { subtotal: Money; lines: { qty: number; unitPrice: Money; lineTotal: Money }[] }[]) {
+      for (const l of g.lines) expect(BigInt(l.lineTotal.minorUnits)).toBe(BigInt(l.unitPrice.minorUnits) * BigInt(l.qty));
+      expect(String(g.lines.reduce((a, l) => a + BigInt(l.lineTotal.minorUnits), 0n))).toBe(g.subtotal.minorUnits);
+    }
   });
 
   it('حدّا السعر بعملة العرض: الحدّ المعروض بالضبط داخل، وما دونه بوحدة خارج — لكل عملة متجر', async () => {

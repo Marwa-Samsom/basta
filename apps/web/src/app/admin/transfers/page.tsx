@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { useAction, useAdminList } from '@/lib/admin';
 import { minorUnitDigits } from '@/lib/money';
 import { money, when } from '@/lib/orders';
+import { ClearableInput } from '@/components/ui';
 
 interface Waiting {
   orderNumber: string;
@@ -243,7 +244,7 @@ export default function AdminTransfersPage() {
                               }, `أُكّد تحويل ${w.orderNumber} — وصل الطلب إلى المتاجر.`);
                             }}
                           >
-                            <input
+                            <ClearableInput
                               className="field__control"
                               placeholder="مرجع التحويل"
                               dir="ltr"
@@ -251,7 +252,7 @@ export default function AdminTransfersPage() {
                               onChange={(e) => edit(w.orderNumber, { reference: e.target.value })}
                               aria-label={`مرجع التحويل للطلب ${w.orderNumber}`}
                             />
-                            <input
+                            <ClearableInput
                               className="field__control num"
                               placeholder="المبلغ الواصل"
                               dir="ltr"
@@ -261,7 +262,7 @@ export default function AdminTransfersPage() {
                               aria-label={`المبلغ الذي وصل للطلب ${w.orderNumber}`}
                               aria-invalid={mismatch || undefined}
                             />
-                            <input
+                            <ClearableInput
                               className="field__control"
                               placeholder="اسم المحوِّل أو حسابه (اختياري)"
                               value={d.note}
@@ -355,7 +356,7 @@ export default function AdminTransfersPage() {
                     </td>
                     <td data-label="">
                       <div className="ao-actions">
-                        <input
+                        <ClearableInput
                           className="field__control ao-ref"
                           placeholder="مرجع تحويلك"
                           dir="ltr"

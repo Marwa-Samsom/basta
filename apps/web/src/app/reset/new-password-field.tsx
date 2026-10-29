@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/icons';
-import { Field } from '@/components/ui';
+import { ClearableInput, Field } from '@/components/ui';
 
 /** الحدّ الذي يفرضه الخادم (MIN_PASSWORD_LENGTH) — الواجهة لا تخترع قاعدة ثانية */
 export const MIN_PASSWORD = 8;
@@ -19,7 +19,7 @@ export function strength(password: string): 0 | 1 | 2 | 3 {
 }
 
 /**
- * كلمة مرور جديدة: زرّ إظهار في طرف الحقل، وشريط قوّة تحته (SH-02 · SH-04 · ST-25).
+ * كلمة مرور جديدة: زرّ إظهار في طرف الحقل و✕ في طرفه الآخر، وشريط قوّة تحته (SH-02 · SH-04 · ST-25).
  * اسم الزرّ لا يحوي «كلمة المرور»: التسمية تخصّ الحقل وحده.
  */
 export function NewPasswordField({
@@ -40,7 +40,7 @@ export function NewPasswordField({
       {(props) => (
         <>
           <span className="ac-pw">
-            <input
+            <ClearableInput
               className="field__control"
               type={shown ? 'text' : 'password'}
               autoComplete="new-password"

@@ -63,6 +63,15 @@ export interface CartView {
 const readToken = (): string | null =>
   typeof window === 'undefined' ? null : window.localStorage.getItem(TOKEN_KEY);
 
+/**
+ * ينسى المتصفّح سلّته عند الخروج (CHK-020، 27 أكتوبر 2026): كان رمزها يبقى فيرى من يستعمل
+ * الجهاز بعده سلّة من خرج ويدفعها بحسابه. السلة نفسها تبقى في الخادم باسم صاحبها.
+ */
+export function forgetCart(): void {
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event(CART_EVENT));
+}
+
 export const cartHeaders = (): Record<string, string> => {
   const token = readToken();
   return token ? { 'x-cart-token': token } : {};
