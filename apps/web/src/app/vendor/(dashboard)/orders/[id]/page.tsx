@@ -514,6 +514,15 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                 </button>
               </div>
             ) : null}
+
+            {/* شحنة لم تصل وعادت للمتجر — كالتصميم VD-13: القطع للمخزون وكل المبلغ للمشتري. كان الخادم يقبل
+                الانتقال ولا زرّ له، فلا يملك البائع إلا إعادة الشحن (VOPS-036، 29 أكتوبر 2026) */}
+            {order.status === 'delivery_failed' && order.actions.includes('returned') ? (
+              <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void move('returned')}>
+                <Icon name="store" size={16} />
+                أرجعه للمتجر
+              </button>
+            ) : null}
           </section>
         </aside>
       </div>
