@@ -1276,6 +1276,48 @@ describe('تنبيهات الإدارة الدورية — مرة لكل حال�
     // مدير الطلبات لا يرى التقارير: لا يصله
     expect(await toAdmin('admin_audit_drift')).toHaveLength(0);
   });
+
+  // كان المصعَّد يُبلَّغ مرة لحظة تصعيده ثم لا شيء — بطلب صاحبة المشروع (28 أكتوبر 2026)
+  it('نزاع مصعَّد بلا ردّ من الإدارة يومين: تذكير مرة في اليوم، ويتوقّف حين تردّ', async () => {
+    if (!dbUp) return;
+    const alerts = app.get(AdminAlertsScheduler);
+    const DAY = 86_400_000;
+    const started = new Date();
+    const { a } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'not_received', message: 'لم يصلني شيء مع أن الحالة «تم التسليم»' });
+    expect(opened.statusCode, opened.body).toBe(201);
+    const id = opened.json().id as string;
+    expect((await call('POST', `/me/disputes/${id}/escalate`, buyer.token)).statusCode).toBe(204);
+
+    // يوم واحد: لا تذكير
+    await alerts.waitingDisputes(new Date(Date.now() + DAY));
+    expect(await about('admin_dispute_waiting', a.subOrderNumber)).toHaveLength(0);
+
+    // يومان: تذكير واحد ولو دارت المهمة مرتين في اليوم نفسه
+    const twoDays = new Date(Date.now() + 2 * DAY + 60_000);
+    await alerts.waitingDisputes(twoDays);
+    await alerts.waitingDisputes(twoDays);
+    const told = await about('admin_dispute_waiting', a.subOrderNumber);
+    expect(told).toHaveLength(1);
+    expect(told[0]!.payloadJson).toMatchObject({ days: '2', reason: 'لم يصلني الطلب', link: '/admin/disputes' });
+
+    // اليوم التالي وما زال بلا ردّ: تذكير جديد
+    await alerts.waitingDisputes(new Date(Date.now() + 3 * DAY + 60_000));
+    expect(await about('admin_dispute_waiting', a.subOrderNumber)).toHaveLength(2);
+
+    // ردّت الإدارة: الكرة عند غيرها، فلا تذكير
+    expect((await call('POST', `/admin/disputes/${id}/messages`, admin.token, { body: 'نراجع التسليم مع المتجر ونعود إليك' })).statusCode).toBe(204);
+    await alerts.waitingDisputes(new Date(Date.now() + 5 * DAY));
+    expect(await about('admin_dispute_waiting', a.subOrderNumber)).toHaveLength(2);
+
+    // الأيام المستقبلية ذكّرت كل مدير بكل نزاع مصعَّد في قاعدة التطوير نفسها، وحجزت مفاتيح أيام لم تأتِ:
+    // تُمحى، ويُسحب نزاع الاختبار — وإلا ذكّر به المجدول الحقيقي بعد يومين
+    await prisma.notification.deleteMany({ where: { templateCode: 'admin_dispute_waiting', createdAt: { gte: started } } });
+    await prisma.adminAlert.deleteMany({ where: { key: { startsWith: 'dispute_waiting:' }, createdAt: { gte: started } } });
+    await prisma.notification.deleteMany({ where: { templateCode: 'admin_dispute_escalated', payloadJson: { path: ['order_number'], equals: a.subOrderNumber } } });
+    await prisma.dispute.update({ where: { id }, data: { status: 'withdrawn', closedAt: new Date() } });
+  });
 });
 
 describe('قائمة طلبات المتجر — تصفية بحالة أو أكثر', () => {
