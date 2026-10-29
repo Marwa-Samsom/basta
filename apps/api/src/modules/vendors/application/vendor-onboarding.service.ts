@@ -26,6 +26,7 @@ import {
   isValidIban,
   normalizeIban,
   submissionBlockers,
+  storeName,
   suggestSlug,
   vendorSlug,
   type Blocker,
@@ -127,15 +128,16 @@ export class VendorOnboardingService {
       throw new DuplicateError('لديك متجر مسجَّل بالفعل.', { vendorId: existing.id });
     }
 
-    const nameAr = input.nameAr.trim();
+    const nameAr = storeName(input.nameAr);
     if (nameAr.length < 2) throw new InvalidInputError('اسم المتجر بالعربية مطلوب.');
+    const nameEn = input.nameEn ? storeName(input.nameEn) || null : null;
 
     const country = input.country.trim().toUpperCase();
     if (!/^[A-Z]{2}$/.test(country)) {
       throw new InvalidInputError('بلد المتجر يُكتب برمز من حرفين (SA، JO، AE…).', { country });
     }
 
-    const slug = await this.resolveSlug(input.slug ?? vendorSlug(input.nameEn?.trim() || nameAr));
+    const slug = await this.resolveSlug(input.slug ?? vendorSlug(nameEn || nameAr));
 
     if (input.businessType && !['individual', 'company'].includes(input.businessType)) {
       throw new InvalidInputError('نوع النشاط: فرد أو شركة.', { businessType: input.businessType });
@@ -153,7 +155,7 @@ export class VendorOnboardingService {
             ownerUserId: actor.userId,
             slug,
             nameAr,
-            nameEn: input.nameEn?.trim() || null,
+            nameEn,
             country,
             businessType: input.businessType ?? null,
             settlementCurrency: chosen ?? defaultCurrencyFor(country),
@@ -332,11 +334,11 @@ export class VendorOnboardingService {
 
     const data: Record<string, unknown> = {};
     if (input.nameAr !== undefined) {
-      const nameAr = input.nameAr.trim();
+      const nameAr = storeName(input.nameAr);
       if (nameAr.length < 2) throw new InvalidInputError('اسم المتجر بالعربية مطلوب.');
       data['nameAr'] = nameAr;
     }
-    if (input.nameEn !== undefined) data['nameEn'] = input.nameEn?.trim() || null;
+    if (input.nameEn !== undefined) data['nameEn'] = input.nameEn ? storeName(input.nameEn) || null : null;
     if (input.slug !== undefined && input.slug !== vendor.slug) {
       data['slug'] = await this.resolveSlug(input.slug);
     }
