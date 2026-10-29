@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Alert, EmptyState, MoreButton, PageHead, SortButton, type SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { useAdminList } from '@/lib/admin';
-import { labelOf, money, toneOf, when } from '@/lib/orders';
+import { hoursAr, labelOf, money, toneOf, when } from '@/lib/orders';
 
 interface Row {
   id: string;
@@ -49,7 +49,7 @@ export default function VendorOrdersPage() {
   const q = new URLSearchParams({ sort });
   if (tab) q.set('status', tab);
   if (search.trim()) q.set('search', search.trim());
-  const list = useAdminList<Row, { counts: Record<string, number> }>(`/vendor/orders?${q}`, (r) => r.id);
+  const list = useAdminList<Row, { counts: Record<string, number>; acceptanceHours: number }>(`/vendor/orders?${q}`, (r) => r.id);
   const { data, error } = list;
 
   const waiting = data?.counts['awaiting_vendor'] ?? 0;
@@ -87,7 +87,8 @@ export default function VendorOrdersPage() {
 
       {waiting > 0 ? (
         <Alert tone="warning" title={`${waiting} ${waiting === 1 ? 'طلب ينتظر' : 'طلبات تنتظر'} قبولك`}>
-          الطلب الذي لا يُقبل خلال 48 ساعة يُلغى آلياً ويُردّ مال المشتري.
+          {/* المهلة كما تضبطها الإدارة لا «48» ثابتة (VOPS-019) */}
+          الطلب الذي لا يُقبل خلال {hoursAr(data?.acceptanceHours ?? 48)} يُلغى آلياً ويُردّ مال المشتري.
         </Alert>
       ) : null}
 

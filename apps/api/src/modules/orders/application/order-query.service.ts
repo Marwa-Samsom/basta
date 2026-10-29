@@ -156,7 +156,7 @@ export class OrderQueryService {
   async vendorList(
     vendorId: string,
     q: { status?: readonly string[]; search?: string; page?: number; sort?: SortOrder },
-  ): Promise<{ items: unknown[]; total: number; counts: Record<string, number> }> {
+  ): Promise<{ items: unknown[]; total: number; counts: Record<string, number>; acceptanceHours: number }> {
     const where: Prisma.SubOrderWhereInput = {
       vendorId,
       ...(q.status?.length ? { status: { in: q.status as SubOrderStatus[] } } : {}),
@@ -210,6 +210,7 @@ export class OrderQueryService {
       })),
       total,
       counts: Object.fromEntries(grouped.map((g) => [g.status, g._count])),
+      acceptanceHours: await this.acceptanceHours(),
     };
   }
 
@@ -227,9 +228,13 @@ export class OrderQueryService {
      */
     const vendorDiscount =
       sub.itemsSubtotalMinorUnits + sub.shippingMinorUnits - sub.commissionMinorUnits - sub.vendorNetMinorUnits;
+    const hours = await this.acceptanceHours();
     return {
       ...present(sub, 'vendor'),
       orderNumber: sub.order.orderNumber,
+      acceptanceHours: hours,
+      /** موعد الإلغاء الآلي ما دام ينتظر البائع — مهمة الطلبات تلغيه بعده */
+      acceptBy: sub.status === 'awaiting_vendor' ? new Date(sub.placedAt.getTime() + hours * 3_600_000) : null,
       // البائع يرى عنوان الشحن لأنه يشحن — ولا يرى بريد المشتري ولا بطاقته
       shippingAddress: sub.order.shippingAddressSnapshot,
       customerNote: sub.order.customerNote,
@@ -393,6 +398,15 @@ export class OrderQueryService {
    * 18 أكتوبر 2026). قيود الفرعي كلها بمرجعه، وتحرير المعلّق قيدان متقابلان صافيهما صفر.
    * فرعي بلا قيود بعد يغيب عن الخريطة فتُستعمل لقطته.
    */
+  /**
+   * مهلة قبول البائع كما تضبطها الإدارة — المهمة تلغي بها. كانت شاشتا البائع تكتبان «48 ساعة»
+   * ثابتة، فإن ضُبطت 6 ظنّ البائع أن أمامه يومين والطلب يُلغى بعد ست ساعات (VOPS-019، 29 أكتوبر 2026).
+   */
+  private async acceptanceHours(): Promise<number> {
+    const row = await this.prisma.setting.findUnique({ where: { key: 'vendor_accept_timeout_hours' } });
+    return Number(row?.valueJson) || 48;
+  }
+
   private async ledgerNets(vendorId: string, subOrderIds: readonly string[]): Promise<Map<string, bigint>> {
     if (subOrderIds.length === 0) return new Map();
     const rows = await this.prisma.ledgerEntry.groupBy({

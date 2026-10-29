@@ -16,12 +16,15 @@ import {
   toneOf,
   trackingLabel,
   when,
+  hoursAr,
   type SubOrderStatus,
   type SubOrderView,
 } from '@/lib/orders';
 
 interface VendorDetail extends SubOrderView {
   orderNumber: string;
+  /** مهلة القبول كما تضبطها الإدارة — المهمة تلغي بها */
+  acceptanceHours: number;
   shippingAddress: Record<string, string>;
   customerNote: string | null;
   financials: {
@@ -207,7 +210,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       {order.status === 'awaiting_vendor' ? (
-        <Alert tone="warning">اقبل الطلب أو ارفضه خلال 48 ساعة من وصوله، وإلا أُلغي آلياً.</Alert>
+        <Alert tone="warning">اقبل الطلب أو ارفضه خلال {hoursAr(order.acceptanceHours)} من وصوله، وإلا أُلغي آلياً.</Alert>
       ) : null}
 
       {order.status === 'awaiting_vendor' || order.status === 'accepted' ? (
