@@ -69,3 +69,37 @@ test('البائع: «كل الإشعارات» في الجرس إلى صندو�
   await page.getByRole('button', { name: /^الإشعارات/ }).click();
   await expect(page.getByRole('link', { name: 'كل الإشعارات' })).toHaveAttribute('href', '/vendor/notifications');
 });
+
+/** إشعار في صندوق صاحبه كما يتركه الخادم بعد إرساله */
+async function notify(email: string, code: string, body: string, link: string): Promise<void> {
+  const { id } = await prisma.user.findUniqueOrThrow({ where: { email }, select: { id: true } });
+  await prisma.notification.create({ data: { userId: id, channel: 'in_app', templateCode: code, status: 'sent', sentAt: new Date(), body, payloadJson: { link } } });
+}
+
+// كانت إشعارات نزاع البائع تظهر «إشعار» بلا عنوان، وسحب النزاع لا يصل أحداً (BUY-059، 28 أكتوبر 2026)
+test('البائع: إشعارات النزاع بعناوينها — الفتح والتصعيد والحسم والسحب', async ({ page }) => {
+  const t = tag();
+  const v = await makeVendor(t);
+  const titles: Record<string, string> = {
+    vendor_dispute_opened: 'نزاع جديد على طلب',
+    vendor_dispute_escalated: 'صُعِّد نزاع للإدارة',
+    vendor_dispute_resolved: 'حُسم نزاع',
+    vendor_dispute_withdrawn: 'سحب المشتري نزاعه',
+  };
+  for (const code of Object.keys(titles)) await notify(v.email, code, `${code} على BST-${t}-1`, '/vendor/disputes');
+  await signIn(page, v.email, '/vendor/notifications');
+  await page.getByRole('button', { name: /^النزاعات/ }).click();
+  for (const [code, title] of Object.entries(titles)) {
+    await expect(page.locator('.vx-note', { hasText: `${code} على BST-${t}-1` }).locator('.vx-note__title')).toContainText(title);
+  }
+});
+
+test('المدير: سحب نزاع مصعَّد بعنوانه في صندوقه', async ({ page }) => {
+  const t = tag();
+  const admin = await makeAdmin(t, ['disputes.resolve']);
+  const body = `سحب المشتري النزاع المصعَّد على BST-${t}-1 (متجر الاختبار). لم يعد ينتظر حسمك.`;
+  await notify(admin.email, 'admin_dispute_withdrawn', body, '/admin/disputes');
+  await signIn(page, admin.email, '/admin/notifications', admin.totp);
+  await page.getByRole('button', { name: /^النزاعات/ }).click();
+  await expect(page.locator('.vx-note', { hasText: body }).locator('.vx-note__title')).toContainText('سحب المشتري نزاعاً مصعَّداً');
+});

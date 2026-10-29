@@ -285,14 +285,33 @@ export class DisputesService {
     });
   }
 
-  /** انسحاب المشتري: يغلق النزاع ويفكّ تجميد الإكمال */
+  /**
+   * انسحاب المشتري: يغلق النزاع ويفكّ تجميد الإكمال. كان صامتاً: يبقى المتجر على «ماله مجمَّد»
+   * والإدارة على «ينتظر حسمك» (BUY-059، 28 أكتوبر 2026) — الآن يُبلَّغ المتجر، والإدارة إن كان لديها.
+   */
   async withdraw(customerUserId: string, id: string): Promise<void> {
-    await this.get({ kind: 'customer', userId: customerUserId }, id);
-    const { count } = await this.prisma.dispute.updateMany({
-      where: { id, status: { in: OPEN } },
-      data: { status: 'withdrawn', closedAt: new Date() },
+    const d = await this.get({ kind: 'customer', userId: customerUserId }, id);
+    if (!OPEN.includes(d.status)) throw new ConflictError('النزاع مغلق.');
+    await this.prisma.$transaction(async (tx) => {
+      // على الحالة المقروءة: تصعيد بينهما يُرفض، فلا يُبلَّغ بالسحب من لم يكن النزاع لديه
+      const { count } = await tx.dispute.updateMany({
+        where: { id, status: d.status },
+        data: { status: 'withdrawn', closedAt: new Date() },
+      });
+      if (count === 0) throw new ConflictError('النزاع مغلق.');
+      // من سحب يعرف؛ المتجر يُبلَّغ أن ماله فُكّ
+      await this.notifyParties(tx, id, { customer: null, vendor: { code: 'vendor_dispute_withdrawn', vars: {} } });
+      if (d.status === 'escalated') {
+        await this.notifications.enqueueAdmins(
+          {
+            code: 'admin_dispute_withdrawn',
+            permission: 'disputes.resolve',
+            vars: { store_name: d.subOrder.vendor.nameAr, order_number: d.subOrder.subOrderNumber, link: '/admin/disputes' },
+          },
+          tx,
+        );
+      }
     });
-    if (count === 0) throw new ConflictError('النزاع مغلق.');
   }
 
   /**

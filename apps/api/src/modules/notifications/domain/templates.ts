@@ -200,6 +200,14 @@ export const EVENTS: readonly EventDef[] = [
       link: '/vendor/disputes',
     },
   },
+  // كان السحب صامتاً: يبقى المتجر على «ماله مجمَّد» (BUY-059، 28 أكتوبر 2026). يصل دائماً كالقرار
+  {
+    code: 'vendor_dispute_withdrawn',
+    labelAr: 'سحب المشتري النزاع — للبائع',
+    audience: 'vendor',
+    variables: ['store_name', 'order_number', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', link: '/vendor/disputes' },
+  },
   // للإدارة: ما يوقف مال أحد حتى يتحرّك مدير — لمن يحمل صلاحيته وحده (enqueueAdmins).
   // كانت الإدارة تعرف من بطاقات لوحتها وحدها، فنزاع مصعَّد يجمّد مال متجر لا يراه أحد
   // ما لم يفتح اللوحة (19 أكتوبر 2026)
@@ -258,6 +266,14 @@ export const EVENTS: readonly EventDef[] = [
     audience: 'admin',
     variables: ['order_number', 'sender', 'link'],
     sample: { order_number: 'BST-260921-A1B2C3-1', sender: 'المشتري', link: '/admin/disputes' },
+  },
+  // نزاع مصعَّد سحبه المشتري — كان يبقى في الجرس «ينتظر حسمك» (BUY-059، 28 أكتوبر 2026)
+  {
+    code: 'admin_dispute_withdrawn',
+    labelAr: 'سحب المشتري نزاعاً مصعَّداً',
+    audience: 'admin',
+    variables: ['store_name', 'order_number', 'link'],
+    sample: { store_name: 'متجر الورد', order_number: 'BST-260921-A1B2C3-1', link: '/admin/disputes' },
   },
   {
     code: 'admin_return_stalled',
@@ -575,6 +591,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'حُسم نزاع الطلب {{order_number}}'),
   t('vendor_dispute_resolved', 'in_app', 'حُسم نزاع الطلب {{order_number}}: {{outcome}}.'),
 
+  t('vendor_dispute_withdrawn', 'email',
+    'فريق {{store_name}}،\n\nسحب المشتري النزاع على الطلب {{order_number}}، فأُغلق بلا قرار. فُكّ تجميد مال الطلب، ويُكمَل ويُحرَّر ماله بموعده.\n\nالتفاصيل: {{link}}\n\nبسطة',
+    'سحب المشتري نزاع الطلب {{order_number}}'),
+  t('vendor_dispute_withdrawn', 'in_app', 'سحب المشتري نزاع الطلب {{order_number}}. فُكّ تجميد ماله، ويُحرَّر بموعده.'),
+
   // ----------------------------------------------------------------- الإدارة
   t('admin_dispute_escalated', 'email',
     'صُعِّد نزاع على الطلب {{order_number}} من متجر {{store_name}} إلى الإدارة. سبب المشتري: {{reason}}.\n\nمال الطلب مجمَّد حتى يُحسم. اقرأ الخيط واحسم من هنا: {{link}}\n\nبسطة',
@@ -615,6 +636,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'كتب {{sender}} رسالة جديدة في النزاع المصعَّد على الطلب {{order_number}}.\n\nاقرأها قبل أن تحسم: {{link}}\n\nبسطة',
     'رسالة جديدة في نزاع {{order_number}}'),
   t('admin_dispute_message', 'in_app', 'رسالة جديدة من {{sender}} في النزاع المصعَّد على {{order_number}}.'),
+
+  t('admin_dispute_withdrawn', 'email',
+    'سحب المشتري النزاع المصعَّد على الطلب {{order_number}} من متجر {{store_name}}، فأُغلق بلا قرار ولم يعد ينتظر حسمكم.\n\nالخيط: {{link}}\n\nبسطة',
+    'سُحب النزاع المصعَّد على {{order_number}}'),
+  t('admin_dispute_withdrawn', 'in_app', 'سحب المشتري النزاع المصعَّد على {{order_number}} ({{store_name}}). لم يعد ينتظر حسمك.'),
 
   t('admin_return_stalled', 'email',
     'مرتجع الطلب {{order_number}} من متجر {{store_name}} لم يُسجَّل استلامه منذ {{days}} أيام.\n\nالمشتري ينتظر استرداده، ومال الطلب لا يُحرَّر للمتجر ما دام الإرجاع قائماً. تابعه مع المتجر أو سجّل الاستلام بدلاً منه: {{link}}\n\nبسطة',
