@@ -382,6 +382,8 @@ function StoreCard({
   const step = ORDER_OF[s.status] ?? -1;
   const openDispute = s.disputes.find((d) => d.status === 'open' || d.status === 'escalated');
   const disputable = ['shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned'].includes(s.status);
+  // الأحدث أولاً من الخادم: رفضٌ يبقى ظاهراً حتى يُطلب إرجاع بعده
+  const lastReturn = s.returns[0];
 
   /** تاريخ بلوغ كل مرحلة من سجلّ الحالات — المرحلة الأولى تاريخ الطلب نفسه */
   const reachedAt = (key: string, i: number): string | null =>
@@ -623,6 +625,13 @@ function StoreCard({
             );
           })}
         </ul>
+        {/* رفض البائع آخر إرجاع: الرفض وسببه هنا — كانت الشارة ترجع «تم التسليم» بلا تفسير (BUY-047) */}
+        {lastReturn?.status === 'rejected' ? (
+          <Alert tone="warning" title={`رفض المتجر طلب الإرجاع${lastReturn.resolvedAt ? ` · ${when(lastReturn.resolvedAt)}` : ''}`}>
+            {lastReturn.resolutionNote ? `السبب: «${lastReturn.resolutionNote}». ` : ''}
+            إن لم توافق على الرفض، افتح «لديّ مشكلة».
+          </Alert>
+        ) : null}
       </div>
 
       <div className="sp-store__foot">

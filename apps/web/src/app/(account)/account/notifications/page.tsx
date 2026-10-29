@@ -35,6 +35,7 @@ const KINDS: Record<string, { title: string; icon: IconName; tone: Tone }> = {
   order_status_changed: { title: 'تغيّرت حالة طلبك', icon: 'package', tone: 'brand' },
   order_shipped: { title: 'شُحن طلبك', icon: 'truck', tone: 'brand' },
   order_canceled: { title: 'أُلغي جزء من طلبك', icon: 'alert', tone: 'danger' },
+  return_rejected: { title: 'رُفض طلب الإرجاع', icon: 'alert', tone: 'warning' },
   refund_issued: { title: 'أُعيد إليك مبلغ', icon: 'wallet', tone: 'success' },
   refund_transferred: { title: 'حوّلنا لك مبلغاً', icon: 'wallet', tone: 'success' },
   order_awaiting_transfer: { title: 'طلبك بانتظار تحويلك', icon: 'clock', tone: 'warning' },

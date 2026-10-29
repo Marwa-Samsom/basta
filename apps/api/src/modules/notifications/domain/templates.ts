@@ -77,6 +77,13 @@ export const EVENTS: readonly EventDef[] = [
     sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', reason: 'نفدت الكمية لدى البائع', link: '/account/orders/BST-260921-A1B2C3' },
   },
   {
+    code: 'return_rejected',
+    labelAr: 'رفض البائع طلب الإرجاع',
+    audience: 'customer',
+    variables: ['name', 'order_number', 'store_name', 'reason', 'link'],
+    sample: { name: 'سارة', order_number: 'BST-260921-A1B2C3', store_name: 'متجر الورد', reason: 'القطعة مستعملة وليست في غلافها', link: '/account/orders/BST-260921-A1B2C3' },
+  },
+  {
     // نجاح وصل من البوابة بعد أن أُغلق الطلب فاشلاً — رُدّ كله، ولم يُنشأ طلب
     code: 'late_payment_refunded',
     labelAr: 'دفع متأخر رُدّ',
@@ -457,6 +464,11 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'إلغاء جزء من طلبك {{order_number}}'),
   t('order_canceled', 'sms', 'بسطة: أُلغي ما طلبته من {{store_name}} في {{order_number}}، ويُردّ مبلغه كاملاً.'),
   t('order_canceled', 'in_app', 'أُلغي طلبك من {{store_name}} ({{order_number}}) ويُردّ مبلغه كاملاً.'),
+
+  t('return_rejected', 'email',
+    'مرحباً {{name}}،\n\nرفض {{store_name}} طلب الإرجاع في الطلب {{order_number}}. السبب: «{{reason}}».\n\nإن لم توافق على الرفض، افتح «لديّ مشكلة» من صفحة الطلب ونراجعه معك.\n\n{{link}}\n\nبسطة',
+    'رُفض طلب الإرجاع في {{order_number}}'),
+  t('return_rejected', 'in_app', 'رفض {{store_name}} طلب الإرجاع في {{order_number}}. السبب: «{{reason}}».'),
 
   t('refund_issued', 'email',
     'مرحباً {{name}}،\n\nرددنا {{amount}} إلى وسيلة دفعك عن الطلب {{order_number}}. قد يستغرق ظهوره في كشف بطاقتك بضعة أيام عمل حسب البنك.\n\n{{link}}\n\nبسطة',
