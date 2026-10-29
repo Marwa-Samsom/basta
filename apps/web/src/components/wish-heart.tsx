@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import '@/styles/screens/wish-heart.css';
 import { Icon } from '@/components/icons';
@@ -28,15 +28,20 @@ export function WishHeart({
   const saved = ids?.has(productId) ?? false;
   const [busy, setBusy] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(ensureToastRegion, []);
+
+  /**
+   * الوجهة بعد الدخول هي الصفحة بمعاملاتها: من «أحذية» في المتجر يعود إلى «أحذية» لا «الكل»
+   * (DISC-075، 27 أكتوبر 2026). كان المسار وحده فيسقط ?category=.
+   */
+  const toLogin = (): void => router.push(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
 
   async function toggle(): Promise<void> {
     // لا `disabled` أثناء الطلب: تعطيل الزرّ المركَّز يُسقط تركيز لوحة المفاتيح إلى أول الصفحة
     if (busy) return;
     if (!session.read()) {
-      router.push(`/login?next=${encodeURIComponent(pathname)}`);
+      toLogin();
       return;
     }
     const next = !saved;
@@ -46,7 +51,7 @@ export function WishHeart({
       wishToast(next ? 'أُضيف إلى المفضّلة' : 'أُزيل من المفضّلة');
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        router.push(`/login?next=${encodeURIComponent(pathname)}`);
+        toLogin();
         return;
       }
       wishToast(err instanceof Error ? err.message : 'تعذّر تحديث المفضّلة. حاول مرة أخرى.');

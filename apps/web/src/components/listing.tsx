@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DismissableDetails } from '@/components/dismissable-details';
 import { Icon } from '@/components/icons';
 import { ProductGrid } from '@/components/product-card';
 import { num, type ListResult } from '@/lib/storefront';
@@ -209,7 +210,7 @@ export function Listing({
           </p>
         </div>
 
-        <details className="sd-sort">
+        <DismissableDetails className="sd-sort" closeOnSelect>
           <summary className="sd-sort__btn">
             <span className="sd-sort__cap">الترتيب</span>
             {activeSortLabel}
@@ -228,7 +229,7 @@ export function Listing({
               </Link>
             ))}
           </nav>
-        </details>
+        </DismissableDetails>
       </div>
 
       {subcats}
@@ -249,7 +250,7 @@ export function Listing({
       ) : null}
 
       {/* الجوال: التصفية زرّ يفتح درجاً فوق النتائج */}
-      <details className="sd-facets-m">
+      <DismissableDetails className="sd-facets-m">
         <summary className="sd-facets-m__btn">
           <Icon name="filter" size={16} />
           تصفية
@@ -258,7 +259,7 @@ export function Listing({
         <div className="sd-facets-m__body" aria-label="تصفية النتائج" role="group">
           <FacetGroups base={base} params={params} result={result} />
         </div>
-      </details>
+      </DismissableDetails>
 
       <div className="sd-list__layout">
         <aside className="sd-facets" aria-label="تصفية النتائج">

@@ -80,6 +80,8 @@ export function toSnapshot(cart: PricedCart): Snapshot {
         lineTax: s(l.lineTax),
         lineTotal: s(l.lineTotal),
         commissionMinor: s(l.commissionMinor),
+        chargeUnitMinor: s(l.chargeUnitMinor),
+        chargeSubtotal: s(l.chargeSubtotal),
       })),
     })),
   };

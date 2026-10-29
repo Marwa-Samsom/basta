@@ -121,9 +121,34 @@
 .ac-note__title { font-size: var(--text-base); font-weight: var(--weight-bold); }
 .ac-note__body { color: var(--text-body); line-height: 1.8; }
 
-/* كلمة المرور وزرّ الإظهار داخل الحقل في طرفه */
-.ac-pw { position: relative; display: flex; }
-.ac-pw > .field__control { padding-inline-end: 44px; }
+/* كلمة المرور وزرّ الإظهار داخل الحقل في طرفه. الحقل dir="ltr" في صفحة rtl: زرّ الإظهار
+   في نهاية السطر العربي (يساراً) وهي بداية الحقل، فالفراغ له هناك وإلّا اختبأ أول حرف تحته؛
+   و✕ في بداية السطر العربي (يميناً) حيث ينتهي المكتوب، كخانة الكوبون */
+.ac-pw,
+.ac-clearable { position: relative; display: flex; }
+.ac-pw > .field__control { padding-inline-start: 44px; }
+.ac-pw:has(.ac-clear) > .field__control,
+.ac-clearable:has(.ac-clear) > .field__control { padding-inline-end: 38px; }
+/* عين Edge الأصلية كانت ستقعد تحت ✕ — عندنا زرّ الإظهار */
+.ac-pw > .field__control::-ms-reveal { display: none; }
+/* ✕ البريد وكلمة المرور: الحقلان dir="ltr" فنهاية المكتوب يميناً */
+.ac-clear {
+  position: absolute;
+  inset-inline-start: 6px;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+  inline-size: 28px;
+  block-size: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.ac-clear:hover { background: var(--surface-sunken); color: var(--text-strong); }
 .ac-pw__toggle {
   position: absolute;
   inset-inline-end: 4px;

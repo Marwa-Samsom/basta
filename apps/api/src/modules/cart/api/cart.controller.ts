@@ -66,13 +66,13 @@ export class CartController {
 
   @Get()
   @ApiOperation({ summary: 'السلة مسعّرة ومقسّمة حسب البائع' })
-  get(@Headers('x-cart-token') token: string | undefined) {
-    return this.carts.view(CartController.token(token));
+  get(@Headers('x-cart-token') token: string | undefined, @MaybeActor() actor: Actor | null) {
+    return this.carts.view(CartController.token(token), null, actor?.userId ?? null);
   }
 
   @Post('items')
-  add(@Headers('x-cart-token') token: string | undefined, @Body() dto: AddItemDto) {
-    return this.carts.addItem(CartController.token(token), dto.variantId, dto.qty);
+  add(@Headers('x-cart-token') token: string | undefined, @Body() dto: AddItemDto, @MaybeActor() actor: Actor | null) {
+    return this.carts.addItem(CartController.token(token), dto.variantId, dto.qty, actor?.userId ?? null);
   }
 
   @Patch('items/:variantId')
@@ -80,22 +80,27 @@ export class CartController {
     @Headers('x-cart-token') token: string | undefined,
     @Param('variantId') variantId: string,
     @Body() dto: SetQtyDto,
+    @MaybeActor() actor: Actor | null,
   ) {
-    return this.carts.setQty(CartController.token(token), variantId, dto.qty);
+    return this.carts.setQty(CartController.token(token), variantId, dto.qty, actor?.userId ?? null);
   }
 
   @Delete('items/:variantId')
-  remove(@Headers('x-cart-token') token: string | undefined, @Param('variantId') variantId: string) {
-    return this.carts.setQty(CartController.token(token), variantId, 0);
+  remove(
+    @Headers('x-cart-token') token: string | undefined,
+    @Param('variantId') variantId: string,
+    @MaybeActor() actor: Actor | null,
+  ) {
+    return this.carts.setQty(CartController.token(token), variantId, 0, actor?.userId ?? null);
   }
 
   @Put('coupon')
-  coupon(@Headers('x-cart-token') token: string | undefined, @Body() dto: CouponDto) {
-    return this.carts.setCoupon(CartController.token(token), dto.code ?? null);
+  coupon(@Headers('x-cart-token') token: string | undefined, @Body() dto: CouponDto, @MaybeActor() actor: Actor | null) {
+    return this.carts.setCoupon(CartController.token(token), dto.code ?? null, actor?.userId ?? null);
   }
 
   @Put('currency')
-  currency(@Headers('x-cart-token') token: string | undefined, @Body() dto: CurrencyDto) {
-    return this.carts.setCurrency(CartController.token(token), dto.currency);
+  currency(@Headers('x-cart-token') token: string | undefined, @Body() dto: CurrencyDto, @MaybeActor() actor: Actor | null) {
+    return this.carts.setCurrency(CartController.token(token), dto.currency, actor?.userId ?? null);
   }
 }
