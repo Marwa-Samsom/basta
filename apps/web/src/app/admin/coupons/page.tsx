@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { EmptyState } from '@/components/ui';
+import { ClearableInput, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { minorUnitDigits } from '@/lib/money';
@@ -142,7 +142,7 @@ export default function AdminCouponsPage() {
           <div className="ac2-form">
             <label className="field">
               <span className="field__label">الرمز</span>
-              <input className="field__control num" dir="ltr" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} />
+              <ClearableInput className="field__control num" dir="ltr" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} />
             </label>
             <label className="field">
               <span className="field__label">النوع</span>
@@ -157,13 +157,13 @@ export default function AdminCouponsPage() {
             {f.type === 'percent' ? (
               <label className="field">
                 <span className="field__label">النسبة %</span>
-                <input className="field__control num" dir="ltr" inputMode="decimal" value={f.percent} onChange={(e) => setF({ ...f, percent: e.target.value })} />
+                <ClearableInput className="field__control num" dir="ltr" inputMode="decimal" value={f.percent} onChange={(e) => setF({ ...f, percent: e.target.value })} />
               </label>
             ) : null}
             {f.type === 'fixed' ? (
               <label className="field">
                 <span className="field__label">المبلغ</span>
-                <input className="field__control num" dir="ltr" inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
+                <ClearableInput className="field__control num" dir="ltr" inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
               </label>
             ) : null}
             <label className="field">
@@ -176,19 +176,19 @@ export default function AdminCouponsPage() {
             </label>
             <label className="field">
               <span className="field__label">أقصى خصم</span>
-              <input className="field__control num" dir="ltr" inputMode="decimal" value={f.maxDiscount} onChange={(e) => setF({ ...f, maxDiscount: e.target.value })} />
+              <ClearableInput className="field__control num" dir="ltr" inputMode="decimal" value={f.maxDiscount} onChange={(e) => setF({ ...f, maxDiscount: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">حدّ أدنى للطلب</span>
-              <input className="field__control num" dir="ltr" inputMode="decimal" value={f.minOrder} onChange={(e) => setF({ ...f, minOrder: e.target.value })} />
+              <ClearableInput className="field__control num" dir="ltr" inputMode="decimal" value={f.minOrder} onChange={(e) => setF({ ...f, minOrder: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">استعمالات كلية</span>
-              <input className="field__control num" dir="ltr" inputMode="numeric" value={f.limitTotal} onChange={(e) => setF({ ...f, limitTotal: e.target.value })} />
+              <ClearableInput className="field__control num" dir="ltr" inputMode="numeric" value={f.limitTotal} onChange={(e) => setF({ ...f, limitTotal: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">لكل مستخدم</span>
-              <input className="field__control num" dir="ltr" inputMode="numeric" value={f.limitPerUser} onChange={(e) => setF({ ...f, limitPerUser: e.target.value })} />
+              <ClearableInput className="field__control num" dir="ltr" inputMode="numeric" value={f.limitPerUser} onChange={(e) => setF({ ...f, limitPerUser: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">يبدأ</span>

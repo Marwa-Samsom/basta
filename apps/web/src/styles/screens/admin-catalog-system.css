@@ -91,6 +91,7 @@
 .ac2-search .field__control { inline-size: 100%; }
 @media (max-width: 640px) {
   .ac2-search { inline-size: 100%; }
+  .field__clearable:has(> .ac2-search) { inline-size: 100%; }
   .toolbar__end:has(.ac2-search) { inline-size: 100%; }
 }
 
@@ -234,6 +235,7 @@ fieldset.ac2-divider > legend { float: inline-start; inline-size: 100%; padding:
 .ac2-swatch { inline-size: 10px; block-size: 10px; border-radius: var(--radius-full); border: 1px solid var(--border-default); }
 .ac2-inline { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
 .ac2-inline .field__control { flex: 1 1 160px; min-width: 0; }
+.ac2-inline .field__clearable { flex: 1 1 160px; min-width: 0; }
 
 /* ------------------------------------------------------------ AD-10 العمولات */
 
@@ -422,6 +424,7 @@ fieldset.ac2-divider > legend { float: inline-start; inline-size: 100%; padding:
 }
 .ac2-unit:focus-within { border-color: var(--brand); }
 .ac2-unit .field__control { flex: 1; min-width: 0; border: 0; border-radius: 0; font-family: var(--font-mono); }
+.ac2-unit .field__clearable { flex: 1; min-width: 0; }
 .ac2-unit .field__control:focus-visible { outline: none; }
 .ac2-unit__suffix {
   display: flex;
@@ -434,6 +437,9 @@ fieldset.ac2-divider > legend { float: inline-start; inline-size: 100%; padding:
   white-space: nowrap;
 }
 .ac2-setting__select { inline-size: 150px; flex: none; }
+.field__clearable:has(> .ac2-setting__select) { flex: none; }
+/* كل الإعدادات معبّأة بقيمها: ✕ عند المرور على الخانة أو الكتابة فيها، لا في كل سطر دائماً */
+.ac2-setting__row .field__clearable:not(:hover, :focus-within) > .field__clear { visibility: hidden; }
 
 /* ------------------------------------------------------------ AD-17 الحملات */
 

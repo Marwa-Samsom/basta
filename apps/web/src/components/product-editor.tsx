@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { api, ApiError, mediaUrl } from '@/lib/api';
 import { digitsOnly } from '@/lib/digits';
-import { Alert, Field, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Alert, ClearableInput, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { MAX_IMAGES, ProductImages } from '@/components/product-images';
 import { useOnboarding } from '@/lib/vendor';
@@ -479,7 +479,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                     اسم الفئة الجديدة
                   </label>
                   <div className="vp-newcat">
-                    <input
+                    <ClearableInput
                       id="vp-new-category"
                       className="field__control"
                       // يظهر الحقل بطلب البائع نفسه من القائمة — فالتركيز فيه متوقَّع لا مفاجئ
@@ -660,7 +660,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         </td>
                       ))}
                       <td data-label="SKU">
-                        <input
+                        <ClearableInput
                           className="field__control num vp-cell vp-cell--sku"
                           dir="ltr"
                           aria-label={`SKU للمتغيّر ${num(i + 1)}`}
@@ -669,7 +669,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         />
                       </td>
                       <td data-label="السعر">
-                        <input
+                        <ClearableInput
                           className="field__control money num vp-cell vp-cell--price"
                           dir="ltr"
                           inputMode="decimal"
@@ -679,7 +679,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         />
                       </td>
                       <td data-label="قبل الخصم">
-                        <input
+                        <ClearableInput
                           className="field__control num vp-cell vp-cell--price"
                           dir="ltr"
                           inputMode="decimal"
@@ -690,7 +690,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         />
                       </td>
                       <td data-label="الكمية">
-                        <input
+                        <ClearableInput
                           className="field__control num vp-cell vp-cell--qty"
                           dir="ltr"
                           inputMode="numeric"
@@ -700,7 +700,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         />
                       </td>
                       <td data-label="حدّ التنبيه">
-                        <input
+                        <ClearableInput
                           className="field__control num vp-cell vp-cell--qty"
                           dir="ltr"
                           inputMode="numeric"
@@ -712,7 +712,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         />
                       </td>
                       <td data-label="الباركود">
-                        <input
+                        <ClearableInput
                           className="field__control num vp-cell vp-cell--sku"
                           dir="ltr"
                           maxLength={64}
@@ -723,7 +723,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         />
                       </td>
                       <td data-label="الوزن · غ">
-                        <input
+                        <ClearableInput
                           className="field__control num vp-cell vp-cell--qty"
                           dir="ltr"
                           inputMode="numeric"
@@ -946,7 +946,7 @@ function AttrField({
           ))}
         </select>
       ) : (
-        <input
+        <ClearableInput
           id={id}
           className={attr.inputType === 'number' ? 'field__control num' : 'field__control'}
           {...(attr.inputType === 'number' ? { dir: 'ltr' } : {})}

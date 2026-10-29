@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { toLatinDigits } from '@/lib/digits';
 import { when } from '@/lib/orders';
+import { ClearableInput } from '@/components/ui';
 
 interface Setting {
   key: string;
@@ -103,7 +104,7 @@ export default function AdminSettingsPage() {
           </span>
           {s.kind === 'int' ? (
             <span className="ac2-unit">
-              <input
+              <ClearableInput
                 className="field__control num"
                 dir="ltr"
                 inputMode="numeric"
@@ -117,7 +118,7 @@ export default function AdminSettingsPage() {
               {s.unit ? <span className="ac2-unit__suffix">{s.unit}</span> : null}
             </span>
           ) : s.kind === 'text' ? (
-            <input
+            <ClearableInput
               className="field__control ac2-setting__select"
               dir={s.key === 'transfer_iban' || s.key === 'transfer_cliq_alias' ? 'ltr' : undefined}
               maxLength={s.maxLength}
@@ -233,7 +234,7 @@ export default function AdminSettingsPage() {
               </label>
               <label className="field">
                 <span className="field__label">النسبة %</span>
-                <input className="field__control num" dir="ltr" inputMode="decimal" value={tax.rate} onChange={(e) => setTax({ ...tax, rate: e.target.value })} />
+                <ClearableInput className="field__control num" dir="ltr" inputMode="decimal" value={tax.rate} onChange={(e) => setTax({ ...tax, rate: e.target.value })} />
               </label>
             </div>
             <label className="ac2-check">

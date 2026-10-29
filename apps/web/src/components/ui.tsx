@@ -1,6 +1,6 @@
 'use client';
 
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, ReactNode, Ref, TextareaHTMLAttributes } from 'react';
 import { useId, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/icons';
 
@@ -86,11 +86,17 @@ const CLEARABLE_TYPES = new Set(['text', 'email', 'tel', 'url', 'password']);
  * آخر. الغلاف ثابت ولو فرغت الخانة — تبديله يعيد إنشاء الحقل فيضيع التركيز مع أول حرف.
  * الزرّ خارج تسلسل Tab: من يتنقّل بلوحة المفاتيح ينتقل إلى الخانة التالية لا إلى ✕.
  * اسمه «امسح المكتوب» لا يحوي تسمية الخانة: البحث بالتسمية يجد الخانة وحدها.
+ * و`ref` صاحب الخانة يصل إلى الحقل نفسه كما كان (التركيز فيه من الصفحة).
  */
-export function ClearableInput(input: InputHTMLAttributes<HTMLInputElement>) {
-  const own = useRef<HTMLInputElement>(null);
+export function ClearableInput({ ref, ...input }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
+  const own = useRef<HTMLInputElement | null>(null);
   const [typed, setTyped] = useState(() => String(input.defaultValue ?? '') !== '');
-  if (!CLEARABLE_TYPES.has(input.type ?? 'text')) return <input {...input} />;
+  const attach = (el: HTMLInputElement | null) => {
+    own.current = el;
+    if (typeof ref === 'function') ref(el);
+    else if (ref) ref.current = el;
+  };
+  if (!CLEARABLE_TYPES.has(input.type ?? 'text')) return <input {...input} ref={attach} />;
 
   const filled = input.value !== undefined ? String(input.value) !== '' : typed;
   const shown = filled && !input.disabled && !input.readOnly;
@@ -108,7 +114,7 @@ export function ClearableInput(input: InputHTMLAttributes<HTMLInputElement>) {
     <span className="field__clearable" dir={input.dir === 'ltr' || input.dir === 'rtl' ? input.dir : undefined}>
       <input
         {...input}
-        ref={own}
+        ref={attach}
         onChange={(e) => {
           setTyped(e.target.value !== '');
           input.onChange?.(e);

@@ -7,7 +7,7 @@ import { Icon } from '@/components/icons';
 import { QrCode } from '@/components/qr-code';
 import { digitsOnly } from '@/lib/digits';
 import { RecoveryCodes } from '@/components/recovery-codes';
-import { Alert, Field, Spinner, TextInput } from '@/components/ui';
+import { Alert, ClearableInput, Field, Spinner, TextInput } from '@/components/ui';
 import { api, ApiError, session } from '@/lib/api';
 import { internalPath } from '@/lib/safe-path';
 
@@ -255,7 +255,7 @@ export default function TwoFactorSetupPage() {
                 <Field label="أكّد بالرمز من التطبيق (ستة أرقام)" error={error}>
                   {(props) => (
                     <div className="ac-inline">
-                      <input
+                      <ClearableInput
                         className="field__control ac-otp"
                         inputMode="numeric"
                         autoComplete="one-time-code"

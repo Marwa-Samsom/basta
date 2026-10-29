@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Alert, EmptyState, PageHead, Spinner } from '@/components/ui';
+import { Alert, ClearableInput, EmptyState, PageHead, Spinner } from '@/components/ui';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { num, type Page, type ProductListItem, type VendorCategory } from '@/lib/catalog';
@@ -159,7 +159,7 @@ export default function VendorCategoriesPage() {
             فئة جديدة
           </label>
           <div className="vp-newcat">
-            <input
+            <ClearableInput
               id="vc-new"
               className="field__control"
               maxLength={80}
@@ -213,7 +213,7 @@ export default function VendorCategoriesPage() {
                       void rename();
                     }}
                   >
-                    <input
+                    <ClearableInput
                       className="field__control"
                       aria-label={`الاسم الجديد لـ«${c.nameAr}»`}
                       // يظهر الحقل بضغط البائع على «أعد التسمية» — فالتركيز فيه متوقَّع

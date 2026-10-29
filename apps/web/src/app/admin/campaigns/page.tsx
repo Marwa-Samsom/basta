@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { EmptyState } from '@/components/ui';
+import { ClearableInput, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { media, useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -183,7 +183,7 @@ export default function AdminCampaignsPage() {
           <div className="ac2-form">
             <label className="field ac2-form__wide">
               <span className="field__label">اسم الحملة</span>
-              <input className="field__control" maxLength={80} value={form.v.nameAr} onChange={(e) => setForm({ ...form, v: { ...form.v, nameAr: e.target.value } })} />
+              <ClearableInput className="field__control" maxLength={80} value={form.v.nameAr} onChange={(e) => setForm({ ...form, v: { ...form.v, nameAr: e.target.value } })} />
             </label>
             <label className="field">
               <span className="field__label">الموضع</span>

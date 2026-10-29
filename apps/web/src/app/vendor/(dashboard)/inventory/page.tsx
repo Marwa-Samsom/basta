@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { digitsOnly } from '@/lib/digits';
-import { Alert, EmptyState, Field, MoreButton, PageHead, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Alert, ClearableInput, EmptyState, Field, MoreButton, PageHead, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
 import { useAdminList } from '@/lib/admin';
@@ -386,7 +386,7 @@ function AdjustDialog({
             error={belowReserved ? 'الكمية أقل من المحجوز لمشترين في الدفع — حرّر الحجز أو ارفع الكمية.' : null}
           >
             {(props) => (
-              <input
+              <ClearableInput
                 className="field__control num"
                 dir="ltr"
                 inputMode={mode === 'count' ? 'numeric' : 'text'}

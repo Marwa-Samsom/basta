@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { EmptyState } from '@/components/ui';
+import { ClearableInput, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { media, useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -129,11 +129,11 @@ export default function AdminStorefrontPage() {
             </label>
             <label className="field">
               <span className="field__label">العنوان</span>
-              <input className="field__control" value={draft.titleAr} onChange={(e) => setDraft({ ...draft, titleAr: e.target.value })} />
+              <ClearableInput className="field__control" value={draft.titleAr} onChange={(e) => setDraft({ ...draft, titleAr: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">الرابط (مسار داخلي)</span>
-              <input className="field__control num" dir="ltr" value={draft.linkUrl} onChange={(e) => setDraft({ ...draft, linkUrl: e.target.value })} />
+              <ClearableInput className="field__control num" dir="ltr" value={draft.linkUrl} onChange={(e) => setDraft({ ...draft, linkUrl: e.target.value })} />
             </label>
             <label className="field">
               <span className="field__label">يبدأ</span>

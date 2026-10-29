@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Alert, EmptyState, Field, PageHead } from '@/components/ui';
+import { Alert, ClearableInput, EmptyState, Field, PageHead } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { minorUnitDigits } from '@/lib/money';
@@ -238,7 +238,7 @@ export default function FinancePage() {
                     >
                       {(props) => (
                         <span className="vm-amount">
-                          <input
+                          <ClearableInput
                             {...props}
                             className="vm-amount__input"
                             inputMode="decimal"
