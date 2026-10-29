@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useState } from 'react';
 import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, SearchBox, SortButton, Tabs } from '@/components/admin';
 import type { SortOrder } from '@/components/ui';
@@ -56,10 +56,26 @@ const PARENT_TONE: Record<string, string> = {
  * `?due=acceptance` من بطاقة اللوحة: ما قاربت مهلة قبوله وحده، بالقاعدة نفسها التي تعدّه بها.
  */
 function OrdersInner() {
+  const router = useRouter();
+  const pathname = usePathname();
   const params = useSearchParams();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(params.get('status') ?? '');
-  const [due, setDue] = useState(params.get('due') === 'acceptance');
+  /**
+   * الحالة و«قاربت المهلة» من العنوان نفسه، والتغيير يُكتب فيه: كانا حالةً تُقرأ منه مرة، فـ«اعرض كل الطلبات»
+   * تزيل التصفية من الشاشة وحدها ويعيدها التحديث والرابط المنسوخ (ADM-024، 29 أكتوبر 2026)
+   */
+  const status = params.get('status') ?? '';
+  const due = params.get('due') === 'acceptance';
+  const setFilter = (next: { status?: string; due?: boolean }): void => {
+    const query = new URLSearchParams(params.toString());
+    const nextStatus = next.status ?? status;
+    if (nextStatus) query.set('status', nextStatus);
+    else query.delete('status');
+    if (next.due ?? due) query.set('due', 'acceptance');
+    else query.delete('due');
+    const q = query.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
   const [openNumber, setOpenNumber] = useState<string | null>(null);
   const [sort, setSort] = useState<SortOrder>('newest');
   const q = new URLSearchParams({
@@ -77,10 +93,7 @@ function OrdersInner() {
       <div className="toolbar">
         <Tabs
           value={status}
-          onChange={(v) => {
-            setStatus(v);
-            setDue(false);
-          }}
+          onChange={(v) => setFilter({ status: v, due: false })}
           label="حالة الطلب"
           options={[{ key: '', label: 'الكل' }, ...['processing', 'partially_completed', 'completed', 'canceled', 'refunded', 'payment_failed'].map((k) => ({ key: k, label: PARENT_STATUS[k]! }))]}
         />
@@ -95,7 +108,7 @@ function OrdersInner() {
             متاجر لم تقبل طلبها وبقي على انقضاء مهلتها أقل من 12 ساعة — بعدها يُلغى آلياً ويُردّ المبلغ. ذكّر المتجر أو
             ألغِ بنفسك.
           </p>
-          <button type="button" className="btn btn--secondary btn--sm" onClick={() => setDue(false)}>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={() => setFilter({ due: false })}>
             اعرض كل الطلبات
           </button>
         </Alert>
@@ -113,8 +126,7 @@ function OrdersInner() {
                 className="btn btn--secondary btn--sm"
                 onClick={() => {
                   setSearch('');
-                  setStatus('');
-                  setDue(false);
+                  setFilter({ status: '', due: false });
                 }}
               >
                 أزل التصفية
