@@ -12,6 +12,7 @@ import {
   type SubOrderStatus,
   type TransitionActor,
 } from '../domain/state-machine';
+import { settingNumber } from '../domain/setting-value';
 
 const PAGE = 20;
 
@@ -425,8 +426,8 @@ export class OrderQueryService {
 
   private async returnWindow(): Promise<number> {
     const row = await this.prisma.setting.findUnique({ where: { key: 'return_window_days' } });
-    const v = Number(row?.valueJson);
-    return Number.isFinite(v) && v > 0 ? v : 14;
+    // صفر مقبول: الإدارة تُغلق الإرجاع بعد التسليم (VOPS-072)
+    return settingNumber(row?.valueJson, 14, 0);
   }
 }
 
