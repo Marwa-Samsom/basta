@@ -10,12 +10,12 @@ import {
   RETURN_REASONS,
   ROLE_LABEL,
   carrierName,
-  hoursAr,
   labelOf,
   money,
   toneOf,
   trackingLabel,
   when,
+  hoursAr,
   type SubOrderStatus,
   type SubOrderView,
 } from '@/lib/orders';
