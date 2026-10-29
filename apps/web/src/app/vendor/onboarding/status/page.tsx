@@ -74,7 +74,9 @@ export default function StatusPage() {
           {data.status === 'rejected' ? (
             <section className="card vo-verdict" data-tone="danger">
               <StatusBadge status={data.status} />
-              <h2 className="vo-verdict__head">طلبك يحتاج تصحيحاً</h2>
+              {/* ما يُفعل لا تكرار العنوان بمرادف — كان «طلبك يحتاج تصحيحاً» تحت «طلبك يحتاج تعديلاً»
+                  (VON-051، 28 أكتوبر 2026). «تعديل» كالتصميم وإشعار الرفض، والنمط كبطاقة المسوّدة */}
+              <h2 className="vo-verdict__head">عدّل طلبك وأرسله من جديد</h2>
               <p className="vo-verdict__body">
                 لا حاجة لإعادة التسجيل — أصلح ما طلبته الإدارة ثم أرسل الطلب من جديد.
               </p>
