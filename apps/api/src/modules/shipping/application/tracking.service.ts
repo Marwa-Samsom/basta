@@ -8,6 +8,7 @@ import {
   SELF_DELIVERY,
   TRACKING_LABELS,
   TRACKING_ORDER,
+  currentAttempt,
   nextCode,
   type CarrierProvider,
   type TrackingCode,
@@ -54,7 +55,10 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
     ];
   }
 
-  /** بوليصة لطلب جاهز أو قيد التجهيز — لطلب البائع نفسه وحده */
+  /**
+   * بوليصة لطلب جاهز أو قيد التجهيز، أو تعذّر توصيله فيُعاد شحنه — لطلب البائع نفسه وحده.
+   * كان الزرّ يظهر على «تعذّر التوصيل» والخادم يرفضه (VOPS-035)
+   */
   async createWaybill(vendorId: string, subOrderId: string): Promise<Waybill> {
     const carrier = this.carrier;
     if (!carrier) {
@@ -65,8 +69,8 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
       select: { subOrderNumber: true, status: true, order: { select: { shippingAddressSnapshot: true } } },
     });
     if (!sub) throw new NotFoundError('الطلب غير موجود.', { subOrderId });
-    if (sub.status !== 'preparing' && sub.status !== 'ready_to_ship') {
-      throw new ConflictError('البوليصة تُصدر للطلب قيد التجهيز أو الجاهز للشحن.', { status: sub.status });
+    if (sub.status !== 'preparing' && sub.status !== 'ready_to_ship' && sub.status !== 'delivery_failed') {
+      throw new ConflictError('البوليصة تُصدر للطلب قيد التجهيز أو الجاهز للشحن أو الذي تعذّر توصيله.', { status: sub.status });
     }
     const addr = (sub.order.shippingAddressSnapshot ?? {}) as Record<string, string>;
     // الرقم فريد لكل شركة (shipments_carrier_tracking_key): تصادم نادر يُعاد برقم جديد
@@ -99,11 +103,13 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
     // حدث الشركة لشحنتها هي: رقم يكتبه بائع لتوصيله الذاتي قد يطابق رقمها
     const shipment = await this.prisma.shipment.findFirst({
       where: { trackingNumber, carrierCode: this.carrier.code },
-      select: { id: true, subOrderId: true, status: true, events: { select: { code: true } } },
+      select: { id: true, subOrderId: true, status: true, shippedAt: true, events: { select: { code: true, occurredAt: true } } },
     });
     if (!shipment) throw new NotFoundError('رقم تتبّع غير معروف.', { trackingNumber });
-    if (shipment.events.some((e) => e.code === code)) return false;
-    const reached = Math.max(-1, ...shipment.events.map((e) => TRACKING_ORDER.indexOf(e.code as TrackingCode)));
+    // الشحنة المعادة بعد «تعذّر» تبدأ من جديد: «استلمت الشركة» الأولى لا تمنع الثانية
+    const events = currentAttempt(shipment.events, shipment.shippedAt);
+    if (events.some((e) => e.code === code)) return false;
+    const reached = Math.max(-1, ...events.map((e) => TRACKING_ORDER.indexOf(e.code as TrackingCode)));
     if (code !== 'failed' && TRACKING_ORDER.indexOf(code) <= reached) return false;
 
     await this.prisma.shipmentEvent.create({
@@ -125,12 +131,13 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
     if (!this.carrier) return 0;
     const moving = await this.prisma.shipment.findMany({
       where: { carrierCode: this.carrier.code, subOrder: { status: 'shipped' } },
-      select: { trackingNumber: true, events: { select: { code: true }, orderBy: { occurredAt: 'desc' }, take: 1 } },
+      select: { trackingNumber: true, shippedAt: true, events: { select: { code: true, occurredAt: true }, orderBy: { occurredAt: 'asc' } } },
       take: 200,
     });
     let n = 0;
     for (const s of moving) {
-      const next = nextCode((s.events[0]?.code as TrackingCode | undefined) ?? null);
+      const last = currentAttempt(s.events, s.shippedAt).at(-1);
+      const next = nextCode((last?.code as TrackingCode | undefined) ?? null);
       if (next && (await this.record(s.trackingNumber, next).catch(() => false))) n++;
     }
     return n;
@@ -153,6 +160,7 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
     });
     if (!s) throw new NotFoundError('رقم تتبّع غير معروف.', { trackingNumber });
     const carrier = this.carriers().find((c) => c.code === s.carrierCode);
-    return { ...s, carrierName: carrier?.nameAr ?? s.carrierCode };
+    // الرقم الجديد بعد إعادة الشحن بمحاولته وحدها — كان يُظهر «تعذّر التوصيل» أعلى طردٍ في طريقه
+    return { ...s, events: currentAttempt(s.events, s.shippedAt), carrierName: carrier?.nameAr ?? s.carrierCode };
   }
 }

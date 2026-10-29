@@ -43,3 +43,16 @@ export function nextCode(current: TrackingCode | null): TrackingCode | null {
   const i = current ? TRACKING_ORDER.indexOf(current) : -1;
   return TRACKING_ORDER[i + 1] ?? null;
 }
+
+/**
+ * أحداث المحاولة الجارية. شحنة «تعذّر توصيلها» ثم شُحنت من جديد تبدأ مسارها من أوله: ما قبل آخر
+ * «تعذّر» تاريخ يبقى في طلب المشتري، لا يُحسب في التقدّم ولا يُعرض للرقم الجديد. كانت الأحداث القديمة
+ * وآخرها «تعذّر» تُوقف المهمة عن الشحنة المعادة أبداً (VOPS-035، 29 أكتوبر 2026).
+ * قبل إعادة الشحن المحاولة الجارية هي الفاشلة نفسها، فتبقى كلها.
+ */
+export function currentAttempt<T extends { code: string; occurredAt: Date }>(events: readonly T[], shippedAt: Date | null): T[] {
+  const failedAt = Math.max(-Infinity, ...events.filter((e) => e.code === 'failed').map((e) => e.occurredAt.getTime()));
+  const reshipped = shippedAt !== null && shippedAt.getTime() > failedAt;
+  if (failedAt === -Infinity || !reshipped) return [...events];
+  return events.filter((e) => e.occurredAt.getTime() > failedAt);
+}

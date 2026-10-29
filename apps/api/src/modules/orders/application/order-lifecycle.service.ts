@@ -227,16 +227,15 @@ export class OrderLifecycleService {
     const refunds: string[] = [];
 
     if (to === 'shipped') {
+      const tracking = input.tracking!.trim();
+      // رقم البوليصة الصادرة للطلب يبقى باسم شركتها؛ وغيره ما اختاره البائع — المكتوب بيده توصيل ذاتي.
+      // كان التحديث يُبقي شركة الشحنة القديمة، فمرجعٌ كتبه البائع بعد «تعذّر» يصير «بسطة إكسبرس» (VOPS-035)
+      const prior = await tx.shipment.findUnique({ where: { subOrderId: sub.id }, select: { trackingNumber: true, carrierCode: true } });
+      const carrierCode = prior?.trackingNumber === tracking ? prior.carrierCode : (input.carrierCode ?? 'self');
       await tx.shipment.upsert({
         where: { subOrderId: sub.id },
-        create: {
-          subOrderId: sub.id,
-          carrierCode: input.carrierCode ?? 'self',
-          trackingNumber: input.tracking!.trim(),
-          status: 'in_transit',
-          shippedAt: now,
-        },
-        update: { trackingNumber: input.tracking!.trim(), status: 'in_transit', shippedAt: now },
+        create: { subOrderId: sub.id, carrierCode, trackingNumber: tracking, status: 'in_transit', shippedAt: now },
+        update: { carrierCode, trackingNumber: tracking, status: 'in_transit', shippedAt: now },
       });
     }
     if (to === 'delivered' && from === 'shipped') {
