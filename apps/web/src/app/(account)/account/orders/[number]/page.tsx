@@ -312,6 +312,8 @@ function StoreCard({
   const [qty, setQty] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('damaged');
   const [text, setText] = useState('');
+  // لحظة فتح الصفحة: الحساب أثناء الرسم يتغيّر مع كل إعادة رسم
+  const [now] = useState(() => Date.now());
   /** النجوم المختارة والرأي قبل النشر — لقطعة واحدة في كل مرة */
   const [draft, setDraft] = useState<{ itemId: string; rating: number; body: string } | null>(null);
   const canceled = ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'].includes(s.status);
@@ -319,7 +321,7 @@ function StoreCard({
   const openDispute = s.disputes.find((d) => d.status === 'open' || d.status === 'escalated');
   // «مُسترَد»: نزاع «لم يصلني الاسترداد» وحده خلال 14 يوماً منه، ويصل الإدارة — قرار صاحبة المشروع (BUY-052)
   const refundedAt = s.status === 'refunded' ? s.history.find((h) => h.toStatus === 'refunded')?.createdAt : undefined;
-  const refundDisputable = !!refundedAt && Date.now() - new Date(refundedAt).getTime() <= REFUND_DISPUTE_DAYS * 86_400_000;
+  const refundDisputable = !!refundedAt && now - new Date(refundedAt).getTime() <= REFUND_DISPUTE_DAYS * 86_400_000;
   const disputable = ['shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned'].includes(s.status);
 
   /** تاريخ بلوغ كل مرحلة من سجلّ الحالات — المرحلة الأولى تاريخ الطلب نفسه */
