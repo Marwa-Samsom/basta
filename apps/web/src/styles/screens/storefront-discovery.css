@@ -223,6 +223,9 @@
 .sd-cats { display: grid; gap: var(--space-4); max-inline-size: 1100px; }
 .sd-shopdir__search { display: flex; gap: var(--space-2); max-inline-size: 30rem; }
 .sd-shopdir__search .field__control { flex: 1; min-width: 0; }
+/* «متاجر قريبة من بحثك» تحت «لا متجر باسم» (DISC-075) */
+.sd-shopdir__near { display: grid; gap: var(--space-3); }
+.sd-shopdir__near h2 { margin: 0; font-size: var(--text-lg); }
 .sd-shopcard__body { display: grid; gap: 3px; flex: 1; min-width: 0; }
 .sd-shopcard__meta,
 .sd-shopcard__cats {

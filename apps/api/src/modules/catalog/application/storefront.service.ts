@@ -34,6 +34,11 @@ export interface StorefrontShopCard {
   readonly categories: readonly string[];
 }
 
+export interface StorefrontShopsPage extends Page<StorefrontShopCard> {
+  /** «متاجر قريبة من بحثك»: حين لا يطابق اسمٌ الجملة كاملة — ما في اسمه كلمة منها (DISC-075) */
+  readonly suggestions: readonly StorefrontShopCard[];
+}
+
 export interface FacetBucket {
   readonly id: string;
   readonly label: string;
@@ -92,6 +97,41 @@ type CardRow = Prisma.ProductGetPayload<{ include: typeof CARD_INCLUDE }>;
 const MARKS = '[ً-ٰٟـ]';
 const fold = (value: Prisma.Sql): Prisma.Sql =>
   Prisma.sql`translate(regexp_replace(lower(${value}), ${MARKS}, '', 'g'), ${'أإآٱةى'}, ${'ااااهي'})`;
+
+/**
+ * كلمات تصف المتجر لا تسمّيه: «متجر الصوف» يُقترح له بـ«الصوف» وحدها، وإلا اقتُرح كل متجر في اسمه
+ * «متجر». وما دون ثلاثة أحرف لا يميّز اسماً (DISC-075، 29 أكتوبر 2026)
+ */
+const GENERIC_SHOP_WORDS = new Set(['متجر', 'متاجر', 'محل', 'محلات', 'دكان']);
+const SHOP_SUGGESTIONS = 6;
+
+const SHOP_CARD_SELECT = {
+  id: true,
+  slug: true,
+  nameAr: true,
+  descriptionAr: true,
+  ratingAvg: true,
+  ratingCount: true,
+  _count: { select: { products: { where: VISIBLE } } },
+  // الفئة الفارغة لا تقول شيئاً عمّا يبيع المتجر
+  categories: {
+    where: { products: { some: VISIBLE } },
+    orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
+    take: 4,
+    select: { nameAr: true },
+  },
+} satisfies Prisma.VendorSelect;
+
+const shopCard = (v: Prisma.VendorGetPayload<{ select: typeof SHOP_CARD_SELECT }>): StorefrontShopCard => ({
+  id: v.id,
+  slug: v.slug,
+  nameAr: v.nameAr,
+  descriptionAr: v.descriptionAr,
+  ratingAvg: Number(v.ratingAvg),
+  ratingCount: v.ratingCount,
+  productCount: v._count.products,
+  categories: v.categories.map((c) => c.nameAr),
+});
 
 @Injectable()
 export class StorefrontService implements OnModuleInit {
@@ -317,7 +357,7 @@ export class StorefrontService implements OnModuleInit {
    * دليل المتاجر — حلّ محلّ «كل الأقسام» حين صارت الفئات لكل متجر (14 أكتوبر 2026).
    * المعتمد الذي له منتج معروض وحده: متجر فارغ صفحة بلا شيء.
    */
-  async shops(input: { q?: string | undefined; page?: number | undefined }): Promise<Page<StorefrontShopCard>> {
+  async shops(input: { q?: string | undefined; page?: number | undefined }): Promise<StorefrontShopsPage> {
     const page = Math.max(1, input.page ?? 1);
     const pageSize = 24;
     const term = input.q?.trim();
@@ -332,40 +372,37 @@ export class StorefrontService implements OnModuleInit {
         orderBy: [{ ratingCount: 'desc' }, { createdAt: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
-        select: {
-          id: true,
-          slug: true,
-          nameAr: true,
-          descriptionAr: true,
-          ratingAvg: true,
-          ratingCount: true,
-          _count: { select: { products: { where: VISIBLE } } },
-          // الفئة الفارغة لا تقول شيئاً عمّا يبيع المتجر
-          categories: {
-            where: { products: { some: VISIBLE } },
-            orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
-            take: 4,
-            select: { nameAr: true },
-          },
-        },
+        select: SHOP_CARD_SELECT,
       }),
       this.prisma.vendor.count({ where }),
     ]);
-    return {
-      page,
-      pageSize,
-      total,
-      items: rows.map((v) => ({
-        id: v.id,
-        slug: v.slug,
-        nameAr: v.nameAr,
-        descriptionAr: v.descriptionAr,
-        ratingAvg: Number(v.ratingAvg),
-        ratingCount: v.ratingCount,
-        productCount: v._count.products,
-        categories: v.categories.map((c) => c.nameAr),
-      })),
-    };
+    const suggestions = term && total === 0 ? await this.nearShops(term) : [];
+    return { page, pageSize, total, items: rows.map(shopCard), suggestions };
+  }
+
+  /**
+   * «متاجر قريبة من بحثك»: ما في اسمه كلمة مميّزة من البحث، الأكثر كلماتٍ أولاً (DISC-075). كان
+   * «متجر الصوف» ينتهي بـ«لا متجر» ولا يدلّ على «بيت الصوف».
+   */
+  private async nearShops(term: string): Promise<StorefrontShopCard[]> {
+    const words = [...new Set(term.split(/\s+/))].filter((w) => w.length >= 3 && !GENERIC_SHOP_WORDS.has(w.replace(/^ال/, '')));
+    if (words.length === 0) return [];
+    const name = fold(Prisma.raw('"nameAr"'));
+    const score = Prisma.join(
+      words.map((w) => Prisma.sql`(strpos(${name}, ${fold(Prisma.sql`${w}::text`)}) > 0)::int`),
+      ' + ',
+    );
+    const ranked = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM (SELECT id, ${score} AS score, "ratingCount", "createdAt" FROM vendors WHERE status = 'approved') v
+      WHERE score > 0
+      ORDER BY score DESC, "ratingCount" DESC, "createdAt" ASC`;
+    if (ranked.length === 0) return [];
+    const rows = await this.prisma.vendor.findMany({
+      where: { id: { in: ranked.map((r) => r.id) }, status: 'approved', products: { some: VISIBLE } },
+      select: SHOP_CARD_SELECT,
+    });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return ranked.flatMap((r) => (byId.has(r.id) ? [shopCard(byId.get(r.id)!)] : [])).slice(0, SHOP_SUGGESTIONS);
   }
 
   /**

@@ -383,4 +383,38 @@ describe('دليل المتاجر — الاسم كما يُكتب', () => {
       expect(await found(q), q).toEqual([shown]);
     }
   });
+
+  /**
+   * DISC-075، 29 أكتوبر 2026: «متجر الصوف» لم يجد «بيت الصوف» ولم يقترح شيئاً. ما لا يطابقه اسمٌ بالجملة
+   * كاملة يُقترح له ما في اسمه كلمة منها — والكلمة العامة («متجر») لا تقترح كل متجر.
+   */
+  it('بلا متجر بالجملة كاملة: «متاجر قريبة» بكلمة منها، لا بالكلمة العامة', async () => {
+    if (!dbUp) return;
+    const owner = await prisma.user.create({
+      data: { email: `dir.near.${SUFFIX}@basta.test`, fullName: 'صاحب متجر', roles: { create: { role: 'vendor_owner' } } },
+    });
+    const vendor = await prisma.vendor.create({
+      data: { ownerUserId: owner.id, slug: `dir-near-${SUFFIX}`, nameAr: `بيت زعفران${SUFFIX}`, status: 'approved', approvedAt: new Date(), settlementCurrency: 'JOD', country: 'JO' },
+    });
+    await publishProduct(vendor.id, 'قطعة للاقتراح', 10_000n, 1);
+    const search = async (q: string) => (await app.inject({ method: 'GET', ...api(`/storefront/shops?q=${encodeURIComponent(q)}`) })).json();
+
+    try {
+      const near = await search(`متجر زعفران${SUFFIX}`);
+      expect(near.total).toBe(0);
+      expect(near.items).toEqual([]);
+      expect(near.suggestions.map((s: { id: string }) => s.id)).toEqual([vendor.id]);
+      expect(near.suggestions[0]).toMatchObject({ nameAr: `بيت زعفران${SUFFIX}`, productCount: 1 });
+
+      // «متجر» وحدها كانت ستقترح كل متجر في اسمه «متجر»
+      expect((await search(`متجر قزحية${SUFFIX}`)).suggestions).toEqual([]);
+      // الاسم كاملاً نتيجة لا اقتراح
+      const exact = await search(`بيت زعفران${SUFFIX}`);
+      expect(exact.items.map((s: { id: string }) => s.id)).toEqual([vendor.id]);
+      expect(exact.suggestions).toEqual([]);
+    } finally {
+      // الاختبارات على قاعدة التطوير: متجر تجريبي معتمد يبقى في دليل المتاجر لصاحبة المشروع
+      await prisma.vendor.update({ where: { id: vendor.id }, data: { status: 'suspended', suspendedAt: new Date() } });
+    }
+  });
 });

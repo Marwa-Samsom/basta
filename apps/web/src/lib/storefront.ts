@@ -242,6 +242,8 @@ export function getShops(opts: { q?: string | undefined; page?: number | undefin
   page: number;
   pageSize: number;
   total: number;
+  /** «متاجر قريبة من بحثك» حين لا يطابق اسمٌ البحث كاملاً (DISC-075) */
+  suggestions?: ShopCard[];
 }> {
   const query = new URLSearchParams();
   if (opts.q?.trim()) query.set('q', opts.q.trim());
