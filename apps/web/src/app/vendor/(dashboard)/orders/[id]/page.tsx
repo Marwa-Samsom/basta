@@ -250,7 +250,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                   })}
                 </ul>
               </div>
-              <p className="vm-hint">عند الاستلام تعود القطع للمخزون ويُردّ نصيبها للمشتري آلياً. لا يُردّ الشحن في الإرجاع الجزئي.</p>
+              <p className="vm-hint">عند الاستلام تعود القطع للمخزون ويُردّ ثمنها للمشتري آلياً. الشحن لا يُردّ في الإرجاع.</p>
               <div className="row">
                 <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void move('returned', { returnRequestId: openReturn.id })}>
                   <Icon name="package" size={15} />
