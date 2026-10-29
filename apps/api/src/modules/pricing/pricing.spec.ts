@@ -335,6 +335,35 @@ describe('الكوبونات', () => {
     expect(cart.totals.total).toBe(30_000n);
   });
 
+  // CHK-032، 27 أكتوبر 2026 — السلة بلا عنوان تسعّر الشحن صفراً، فكان المانع يعطّل «إتمام الشراء»
+  const freeShip = (scope: 'platform' | 'vendor', vendorId: string | null): CouponInput => ({
+    code: 'SHIP', scope, vendorId, type: 'free_shipping', valueBps: null, valueMinor: null,
+    maxDiscountMinor: null, minOrderMinor: null, currency: null, fundedBy: 'platform',
+  });
+  const noAddress = new Map([
+    ['a', ship(0n)],
+    ['b', ship(0n)],
+  ]);
+
+  it('الشحن المجاني قبل معرفة الشحن: يُقبل بلا مانع ولا خصم، ثم يلغي الشحن حين يُعرف', () => {
+    const before = priceCart({ lines, vendors, shipping: noAddress, tax, fx, coupon: freeShip('platform', null) });
+    expect(before.blockers).toEqual([]);
+    expect(before.coupon).toEqual({ code: 'SHIP', discountMinor: 0n });
+    expect(before.totals.total).toBe(30_000n);
+
+    const after = priceCart({ lines, vendors, shipping, tax, fx, coupon: freeShip('platform', null) });
+    expect(after.blockers).toEqual([]);
+    expect(after.totals.discount).toBe(3_000n);
+    expect(after.totals.total).toBe(30_000n);
+  });
+
+  it('شحن مجاني لمتجر البائع: يُقبل إن كان متجره في السلة، ومانعٌ إن لم يكن', () => {
+    const own = priceCart({ lines, vendors, shipping: noAddress, tax, fx, coupon: freeShip('vendor', 'b') });
+    expect(own.blockers).toEqual([]);
+    const other = priceCart({ lines, vendors, shipping: noAddress, tax, fx, coupon: freeShip('vendor', 'z') });
+    expect(other.blockers.join(' ')).toMatch(/الكوبون SHIP لا ينطبق على منتجات سلّتك/);
+  });
+
   it('كوبون لا ينطبق على شيء مانعٌ بسببه لا خصمٌ صامت بصفر', () => {
     const cart = priceCart({
       lines,
