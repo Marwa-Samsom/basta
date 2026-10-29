@@ -670,15 +670,24 @@ export function usedVariables(text: string): string[] {
   return [...new Set([...text.matchAll(VAR)].map((m) => m[1]!))];
 }
 
+/** المتغيّر ونقطة تليه إن وُجدت — للتصيير وحده */
+const VAR_THEN_DOT = /\{\{\s*([a-z_]+)\s*\}\}(\.?)/g;
+
+/** قيمة تنتهي بنقطة ولو لفّتها علامات الاتجاه: «153.48 ر.س.» */
+const endsWithDot = (v: string): boolean => /\.[\u200E\u200F\u2066-\u2069]*$/.test(v);
+
 /**
  * يصيّر القالب. متغيّر ناقص يُسقط الإرسال صراحةً — أفضل من نصّ فيه فراغ
  * أو {{…}} خام يصل المشتري.
+ *
+ * قيمة تنتهي بنقطة («ر.س.») في آخر الجملة تكفيها نقطتها: «{{amount}}.» لا يصير
+ * «140.26 ر.س..» — BUY-030، بطلب صاحبة المشروع (27 أكتوبر 2026).
  */
 export function render(text: string, vars: Readonly<Record<string, string>>): string {
-  return text.replace(VAR, (_, name: string) => {
+  return text.replace(VAR_THEN_DOT, (_, name: string, dot: string) => {
     const v = vars[name];
     if (v === undefined || v === '') throw new Error(`متغيّر ناقص في القالب: ${name}`);
-    return v;
+    return dot && endsWithDot(v) ? v : v + dot;
   });
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TEMPLATES } from './templates';
+import { format, money } from '../../../common/money/money';
+import { DEFAULT_TEMPLATES, render } from './templates';
 
 /**
  * لا مراجعة للمنتجات قبل النشر (قرار صاحبة المشروع 15 أكتوبر 2026): لا رسالة للبائع تَعِده بها.
@@ -18,5 +19,31 @@ describe('قوالب البائع لا تَعِد بمراجعة المنتجا�
     for (const t of vendorFacing) {
       expect(t.body, `${t.code}/${t.channel}`).not.toMatch(/بعد مراجعته|للمراجعة|نراجع منتج|مراجعة المنتج/);
     }
+  });
+});
+
+/**
+ * «ر.س.» تنتهي بنقطة، فالقالب الذي يختم الجملة بنقطة بعد المبلغ كان يعطي
+ * «140.26 ر.س..» (BUY-030، 27 أكتوبر 2026) — و«د.أ.» مثلها. نقطة واحدة تكفي، و«US$» تأخذ نقطة القالب.
+ */
+describe('لا نقطتان بعد مبلغ ينتهي بنقطة', () => {
+  const placed = DEFAULT_TEMPLATES.find((t) => t.code === 'order_placed' && t.channel === 'in_app')!;
+  const doubleDot = /\.[\u200E\u200F\u2066-\u2069]*\.$/;
+
+  it.each(['SAR', 'JOD'] as const)('«تأكّد طلبك» بـ %s: نقطة واحدة ولو لفّت المبلغَ علامات الاتجاه', (currency) => {
+    const amount = format(money(14_026n, currency));
+    const text = render(placed.body, { order_number: 'BST-261027-RR3SWDX4', amount });
+    expect(text).toBe(`طلبك BST-261027-RR3SWDX4 مؤكَّد — ${amount}`);
+    expect(text).not.toMatch(doubleDot);
+  });
+
+  it('مبلغ لا ينتهي بنقطة يأخذ نقطة القالب', () => {
+    const amount = format(money(4_200n, 'USD'));
+    expect(render(placed.body, { order_number: 'BST-1', amount })).toBe(`طلبك BST-1 مؤكَّد — ${amount}.`);
+  });
+
+  it('النقطة وسط الجملة وبعد غير المبلغ لا تُمسّ', () => {
+    expect(render('{{a}}. ثم {{b}}.', { a: 'س.', b: 'ب' })).toBe('س. ثم ب.');
+    expect(render('{{a}} — {{b}}.', { a: 'ر.س.', b: 'ب' })).toBe('ر.س. — ب.');
   });
 });
