@@ -181,9 +181,13 @@ export class CheckoutController {
   /** تسعير بالعنوان: الشحن لكل بائع والضريبة ببلد المشتري — قبل «ادفع» */
   @Post('quote')
   @HttpCode(HttpStatus.OK)
-  quote(@Headers('x-cart-token') cartToken: string | undefined, @Body() dto: QuoteDto) {
+  quote(@Headers('x-cart-token') cartToken: string | undefined, @Body() dto: QuoteDto, @MaybeActor() actor: Actor | null) {
     if (!cartToken) throw new InvalidInputError('أرسل رمز السلة في الترويسة x-cart-token.');
-    return this.carts.view(cartToken, { country: dto.country.toUpperCase(), region: dto.region, city: dto.city });
+    return this.carts.view(
+      cartToken,
+      { country: dto.country.toUpperCase(), region: dto.region, city: dto.city },
+      actor?.userId ?? null,
+    );
   }
 
   @Post()

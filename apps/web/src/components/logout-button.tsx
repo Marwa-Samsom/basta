@@ -3,11 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { logout } from '@/lib/api';
+import { forgetCart } from '@/lib/cart';
 import { Alert } from '@/components/ui';
 
 /**
- * زرّ الخروج الواحد — للمشتري والبائع والإدارة. ينهي الجلسة في الخادم ثم
- * ينتقل؛ وإن تعذّر ذلك يبقى في مكانه ويقول السبب (lib/api: logout).
+ * زرّ الخروج الواحد — للمشتري والبائع والإدارة. ينهي الجلسة في الخادم وينسى
+ * سلّة المتصفّح ثم ينتقل؛ وإن تعذّر ذلك يبقى في مكانه ويقول السبب (lib/api: logout).
  */
 export function LogoutButton({
   className,
@@ -35,6 +36,7 @@ export function LogoutButton({
           setError(null);
           try {
             await logout();
+            forgetCart();
             router.replace(next);
           } catch (e) {
             setError((e as Error).message);

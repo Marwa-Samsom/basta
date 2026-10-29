@@ -158,7 +158,7 @@ export class CheckoutService {
 
     if (this.provider.method === 'bank_transfer') await this.assertTransferOpen(input.userId);
 
-    const cart = await this.carts.lines(input.cartToken);
+    const cart = await this.carts.lines(input.cartToken, input.userId);
     if (cart.items.length === 0) throw new InvalidInputError('السلة فارغة.');
 
     const quote = await this.pricing.quote({
