@@ -297,6 +297,25 @@
 .sp-coupon__label { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--text-strong); }
 .sp-coupon__row { display: flex; gap: 9px; flex-wrap: wrap; }
 .sp-coupon__row .field__control { flex: 1; min-width: 180px; inline-size: auto; font-family: var(--font-mono); }
+/* الحقل وزرّ ✕ بداخله — dir="ltr" فنهاية الرمز يميناً، والزرّ هناك يظهر حين يُكتب شيء */
+.sp-coupon__field { position: relative; display: flex; flex: 1; min-width: 180px; }
+.sp-coupon__field:has(.sp-coupon__clear) .field__control { padding-inline-end: 40px; }
+.sp-coupon__clear {
+  position: absolute;
+  inset-inline-end: 6px;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+  inline-size: 28px;
+  block-size: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.sp-coupon__clear:hover { background: var(--surface-sunken); color: var(--text-strong); }
 .sp-coupon__ok { display: flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--success-text); }
 
 /* هيكل التحميل */

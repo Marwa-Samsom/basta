@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
 import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { cartApi, type CartLine, type CartView } from '@/lib/cart';
@@ -36,6 +36,7 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [coupon, setCoupon] = useState('');
+  const couponInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -161,14 +162,32 @@ export default function CartPage() {
               كود الخصم
             </label>
             <div className="sp-coupon__row">
-              <input
-                id="coupon"
-                className="field__control"
-                placeholder="رمز الكوبون"
-                dir="ltr"
-                value={coupon}
-                onChange={(e) => setCoupon(e.target.value.toUpperCase())}
-              />
+              {/* الرمز لاتيني يُكتب من اليسار، فالحقل وزرّ محوه يساراً-يميناً: ✕ في نهاية الرمز */}
+              <span className="sp-coupon__field" dir="ltr">
+                <input
+                  ref={couponInput}
+                  id="coupon"
+                  className="field__control"
+                  placeholder="رمز الكوبون"
+                  value={coupon}
+                  onChange={(e) => setCoupon(e.target.value.toUpperCase())}
+                />
+                {/* يمحو المكتوب ويُبقي المؤشّر في الخانة (27 أكتوبر 2026، بطلب صاحبة المشروع) */}
+                {coupon ? (
+                  <button
+                    type="button"
+                    className="sp-coupon__clear"
+                    aria-label="امسح الرمز"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setCoupon('');
+                      couponInput.current?.focus();
+                    }}
+                  >
+                    <Icon name="x" size={15} />
+                  </button>
+                ) : null}
+              </span>
               <button type="submit" className="btn btn--secondary" disabled={busy}>
                 طبّق
               </button>
