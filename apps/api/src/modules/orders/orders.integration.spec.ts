@@ -1289,3 +1289,26 @@ describe('قائمة طلبات المتجر — تصفية بحالة أو أك
     expect((await call('GET', '/vendor/orders?sort=bogus', v.token)).statusCode).toBe(400);
   });
 });
+
+describe('مهلة القبول كما تضبطها الإدارة تصل البائع (VOPS-019، 29 أكتوبر 2026)', () => {
+  // كانت شاشتا البائع تكتبان «48 ساعة» ثابتة: ضُبطت 6 فظنّ البائع أن أمامه يومين والطلب يُلغى بعد ست ساعات
+  it('القائمة والتفاصيل تحملان المهلة، وموعد الإلغاء وقتُ الطلب + المهلة', async () => {
+    if (!dbUp) return;
+    const key = 'vendor_accept_timeout_hours';
+    const before = await prisma.setting.findUnique({ where: { key } });
+    // أطول من المعتاد لا أقصر: مهمة الطلبات في خادم التطوير تقرأ القاعدة نفسها، والأقصر يلغي طلبات قائمة
+    await prisma.setting.upsert({ where: { key }, create: { key, valueJson: 72 }, update: { valueJson: 72 } });
+    try {
+      const { a } = await placeOrder([1, 1]);
+      const list = await call('GET', '/vendor/orders', vendors[0]!.token);
+      expect(list.statusCode, list.body).toBe(200);
+      expect(list.json().acceptanceHours).toBe(72);
+      const detail = (await call('GET', `/vendor/orders/${a.id}`, vendors[0]!.token)).json();
+      expect(detail.acceptanceHours).toBe(72);
+      expect(new Date(detail.acceptBy).getTime() - new Date(detail.placedAt).getTime()).toBe(72 * 3_600_000);
+    } finally {
+      if (before) await prisma.setting.update({ where: { key }, data: { valueJson: Number(before.valueJson) || 48 } });
+      else await prisma.setting.delete({ where: { key } });
+    }
+  });
+});

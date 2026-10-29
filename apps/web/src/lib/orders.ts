@@ -93,6 +93,14 @@ export const PAYMENT_STATUS: Readonly<Record<string, string>> = {
 export const money = (minor: string | number | bigint, currency: string): string =>
   formatMoney(BigInt(minor), currency);
 
+/** عدد الساعات بتمييزه العربي: «ساعة واحدة»، «ساعتين»، «6 ساعات»، «48 ساعة» — لا «6 ساعة» */
+export function hoursAr(n: number): string {
+  if (n === 1) return 'ساعة واحدة';
+  if (n === 2) return 'ساعتين';
+  if (n >= 3 && n <= 10) return `${n} ساعات`;
+  return `${n} ساعة`;
+}
+
 export const when = (iso: string | null | undefined): string =>
   iso
     ? new Intl.DateTimeFormat('ar-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
