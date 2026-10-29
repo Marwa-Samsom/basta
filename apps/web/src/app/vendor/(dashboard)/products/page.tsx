@@ -22,7 +22,23 @@ type TabKey = ProductStatus | 'all';
  * التاريخ نصّ عربي باسم الشهر لا رقم: بصيغة «26/9/2026» العربية علامات
  * اتجاه خفية، فإن وُضع في خلية `num` اللاتينية انقلب إلى «262026/9/».
  */
-const EDITED = new Intl.DateTimeFormat('ar-u-nu-latn', { dateStyle: 'medium' });
+const DAY = 86_400_000;
+const CLOCK = new Intl.DateTimeFormat('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const DAY_MONTH = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long' });
+const DAY_MONTH_YEAR = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' });
+const startOfDay = (d: Date): number => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/**
+ * «آخر تعديل» كالتصميم (VD-06): «اليوم · 09:40»، «أمس · 18:20»، ثم «11 سبتمبر» — وبالسنة إن لم تكن
+ * هذه. كان dateStyle: 'medium'، وهو في العربية أرقام وحدها «2026/10/28» (VCAT-001، 28 أكتوبر 2026).
+ */
+function edited(iso: string, now = new Date()): string {
+  const at = new Date(iso);
+  const days = Math.round((startOfDay(now) - startOfDay(at)) / DAY);
+  if (days <= 0) return `اليوم · ${CLOCK.format(at)}`;
+  if (days === 1) return `أمس · ${CLOCK.format(at)}`;
+  return (at.getFullYear() === now.getFullYear() ? DAY_MONTH : DAY_MONTH_YEAR).format(at);
+}
 
 const TABS: readonly { key: TabKey; label: string }[] = [
   { key: 'all', label: 'الكل' },
@@ -385,7 +401,7 @@ function ProductsList() {
                         </span>
                       </td>
                       <td data-label="آخر تعديل">
-                        {EDITED.format(new Date(p.updatedAt))}
+                        {edited(p.updatedAt)}
                       </td>
                       <td className="end" data-label="">
                         <Link
