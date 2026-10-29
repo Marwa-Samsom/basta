@@ -38,10 +38,8 @@ export default function CurrencyPage() {
     if (!confirming && el.open) el.close();
   }, [confirming]);
 
-  if (missing) {
-    router.replace('/vendor/register');
-    return null;
-  }
+  // التحويل إلى التسجيل في useOnboarding نفسه، بعد الرسم
+  if (missing) return null;
   if (loading && !data) {
     return (
       <OnboardingFrame step={3}>

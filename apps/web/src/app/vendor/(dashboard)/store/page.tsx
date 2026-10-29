@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
@@ -16,7 +15,6 @@ const MAX = 2000;
  * لا في صفحة أخرى: ما يُكتب هنا يظهر هناك.
  */
 export default function StorePage() {
-  const router = useRouter();
   const { data, loading, missing, error, set } = useOnboarding();
   const [form, setForm] = useState<{
     descriptionAr: string;
@@ -40,10 +38,8 @@ export default function StorePage() {
     returnPolicyAr: data?.returnPolicyAr ?? '',
   };
 
-  if (missing) {
-    router.replace('/vendor/register');
-    return null;
-  }
+  // التحويل إلى التسجيل في useOnboarding نفسه، بعد الرسم
+  if (missing) return null;
   if (loading && !data) {
     return (
       <div className="vo-store">

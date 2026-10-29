@@ -54,7 +54,7 @@ export function useOnboarding(): {
   data: Onboarding | null;
   error: string | null;
   loading: boolean;
-  /** لا متجر على هذا الحساب بعد — الشاشة تحوّل إلى التسجيل */
+  /** لا متجر على هذا الحساب بعد — يحوّل إلى التسجيل وحده، والشاشة لا ترسم شيئاً */
   missing: boolean;
   reload: () => Promise<void>;
   set: (next: Onboarding) => void;
@@ -120,6 +120,15 @@ export function useOnboarding(): {
       alive = false;
     };
   }, [router]);
+
+  /**
+   * لا متجر ← التسجيل، بعد الرسم لا أثناءه. كانت كل شاشة تنادي `router.replace` في جسمها،
+   * فيحدّث الموجّه وهو يرسم غيره ويرفضه React («Cannot update a component while rendering»،
+   * ظهر «1 Issue» في VON-013، 28 أكتوبر 2026).
+   */
+  useEffect(() => {
+    if (missing) router.replace('/vendor/register');
+  }, [missing, router]);
 
   return { data, error, loading, missing, reload, set: setData };
 }
