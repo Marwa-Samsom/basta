@@ -125,6 +125,15 @@ export interface HistoryRow {
 }
 
 /**
+ * سبب سطر في مسار الطلب: طلب الإرجاع كان يُكتب رمزاً («size_issue») قبل 28 أكتوبر 2026،
+ * فيُقرأ بالعربي هنا لما سبق — وما بعده يصل بالعربي من الخادم (BUY-047).
+ */
+export function historyReason(h: Pick<HistoryRow, 'toStatus' | 'reason'>): string | null {
+  if (!h.reason || h.toStatus !== 'return_requested') return h.reason;
+  return RETURN_REASONS[h.reason] ?? h.reason;
+}
+
+/**
  * التوصيل الذاتي: البائع يوصل بنفسه ويكتب مرجعاً يعرفه به، لا رقماً من شركة يُتتبَّع.
  * كانت صفحتا الطلب تقولان «رقم التتبّع» وتعرضان الرمز الخام «self» بعد الشحن، والإشعار
  * وخانة البائع «مرجع التوصيل» (BUY-015، J-14 — 21 أكتوبر 2026).

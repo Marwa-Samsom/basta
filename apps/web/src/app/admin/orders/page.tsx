@@ -8,7 +8,7 @@ import { Icon } from '@/components/icons';
 import { Alert } from '@/components/ui';
 import { api } from '@/lib/api';
 import { PARENT_STATUS, useAction, useAdminData, useAdminList } from '@/lib/admin';
-import { labelOf, money, PAYMENT_STATUS, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
+import { historyReason, labelOf, money, PAYMENT_STATUS, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
 
 interface Row {
   orderNumber: string;
@@ -236,7 +236,7 @@ function OrderDetail({ number, onChange }: { number: string; onChange: () => voi
                 <li key={i}>
                   <span className="ao-timeline__what">{h.toLabel}</span>
                   <span className="ao-timeline__when">{when(h.createdAt)}</span>
-                  {h.reason ? <span className="ao-timeline__why">«{h.reason}»</span> : null}
+                  {h.reason ? <span className="ao-timeline__why">«{historyReason(h)}»</span> : null}
                 </li>
               ))}
             </ol>

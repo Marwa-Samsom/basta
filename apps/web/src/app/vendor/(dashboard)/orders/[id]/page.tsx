@@ -10,6 +10,7 @@ import {
   RETURN_REASONS,
   ROLE_LABEL,
   carrierName,
+  historyReason,
   labelOf,
   money,
   toneOf,
@@ -371,7 +372,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                         <span className="vm-timeline__date">{when(h.createdAt)}</span>
                         <span>المنفّذ: {h.actorRole ? ROLE_LABEL[h.actorRole] ?? h.actorRole : 'آلي'}</span>
                       </span>
-                      {h.reason ? <span className="vm-timeline__note">«{h.reason}»</span> : null}
+                      {h.reason ? <span className="vm-timeline__note">«{historyReason(h)}»</span> : null}
                     </span>
                   </li>
                 );
