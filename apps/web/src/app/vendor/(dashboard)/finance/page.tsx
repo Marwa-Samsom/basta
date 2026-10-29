@@ -104,7 +104,10 @@ export default function FinancePage() {
     setBusy(true);
     try {
       await api('/vendor/finance/payouts', { method: 'POST', body: { currency: w.currency, amountMinorUnits: minor } });
-      setNotice(`أُرسل طلب سحب ${money(minor, w.currency)}. يُخصم من المتاح الآن، ويعود إليه إن رُفض.`);
+      // «ر.س.» و«د.أ.» تنتهيان بنقطتهما (وبعدها علامة اتجاه): نقطة الجملة بعدها كانت «ر.س..» (VOPS-079)
+      const asked = money(minor, w.currency);
+      const stop = /\.[\u200e\u200f\u061c]*$/.test(asked) ? '' : '.';
+      setNotice(`أُرسل طلب سحب ${asked}${stop} يُخصم من المتاح الآن، ويعود إليه إن رُفض.`);
       setError(null);
       setAmount({ ...amount, [w.currency]: '' });
       setVersion((v) => v + 1);
