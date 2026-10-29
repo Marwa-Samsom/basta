@@ -196,6 +196,19 @@ export default function CartPage() {
               <p className="sp-coupon__ok">
                 <Icon name="check-circle" size={14} />
                 الكوبون المطبَّق: <span className="num">{cart.couponCode}</span>
+                {/* كان يُزال بـ«طبّق» والخانة فارغة وحدها — طريق لا يراه أحد (27 أكتوبر 2026) */}
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm sp-coupon__remove"
+                  aria-label={`أزل الكوبون ${cart.couponCode}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setCoupon('');
+                    void run(() => cartApi.coupon(null));
+                  }}
+                >
+                  أزل
+                </button>
               </p>
             ) : null}
           </form>
