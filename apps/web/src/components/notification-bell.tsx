@@ -73,7 +73,11 @@ export function NotificationBell() {
         className="icon-btn"
         aria-expanded={open}
         aria-label={`الإشعارات${inbox?.unread ? ` — ${inbox.unread} غير مقروء` : ''}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          // الفتح يجلب الجديد: السؤال كل دقيقة، فإشعار وصل للتوّ كان يغيب عن القائمة حتى الدورة التالية (VOPS-040)
+          if (!open) setVersion((v) => v + 1);
+          setOpen(!open);
+        }}
       >
         <Icon name="bell" size={18} />
         {inbox?.unread ? <span className="icon-btn__dot" aria-hidden /> : null}
