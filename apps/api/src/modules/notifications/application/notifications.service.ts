@@ -37,6 +37,18 @@ const EVERY_FIVE_SECONDS = 5_000;
 const fill = (text: string, vars: Readonly<Record<string, string>>): string => arabicCounts(render(text, vars));
 
 /**
+ * الرابط خارج الموقع كاملاً: البريد والرسالة لا يعرفان الموقع، فـ«/vendor/orders» في نصّهما لا يُضغط ولا
+ * يوصل (VOPS-064، 29 أكتوبر 2026). داخل الموقع والإشعار المنبثق يبقيان بالمسار، والصفّ يحفظ المسار
+ */
+const OUTSIDE_SITE: ReadonlySet<Channel> = new Set(['email', 'sms', 'whatsapp']);
+const withSiteLink = (vars: Record<string, string>, channel: Channel): Record<string, string> => {
+  const site = process.env['NEXT_PUBLIC_SITE_URL']?.replace(/\/+$/, '');
+  const link = vars['link'];
+  if (!OUTSIDE_SITE.has(channel) || !site || !link?.startsWith('/')) return vars;
+  return { ...vars, link: `${site}${link}` };
+};
+
+/**
  * الإشعارات — صندوق صادر (outbox).
  *
  * `enqueue` يُستدعى **داخل معاملة الحدث** (الدفع، الانتقال، التحويل): الإشعار
@@ -285,10 +297,11 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
             where: { code_channel_locale: { code: n.templateCode, channel, locale: 'ar' } },
           });
       if (!tpl || !tpl.isEnabled) return finish('skipped', { error: 'القالب غير مفعّل' });
-      const subject = tpl.subject ? fill(tpl.subject, vars) : null;
-      const body = fill(tpl.body, vars);
+      const sent = withSiteLink(vars, channel);
+      const subject = tpl.subject ? fill(tpl.subject, sent) : null;
+      const body = fill(tpl.body, sent);
       // ما يُخزَّن: النص نفسه والسرّ محجوب
-      const shown = secret ? redactVars(n.templateCode, vars) : vars;
+      const shown = secret ? redactVars(n.templateCode, sent) : sent;
       const stored = {
         subject: secret ? (tpl.subject ? fill(tpl.subject, shown) : null) : subject,
         body: secret ? fill(tpl.body, shown) : body,
