@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { api, ApiError, mediaUrl } from '@/lib/api';
 import { digitsOnly } from '@/lib/digits';
-import { Alert, ClearableInput, Field, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Alert, ClearableInput, EmptyState, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { MAX_IMAGES, ProductImages } from '@/components/product-images';
 import { useOnboarding } from '@/lib/vendor';
@@ -84,6 +84,9 @@ export function ProductEditor({ productId }: { productId?: string }) {
   const isNew = !productId;
 
   const [loading, setLoading] = useState(true);
+  /** تعذّر فتح المحرّر: لا نموذج يُرسم، بل الخطأ و«أعد المحاولة» — أو «غير موجود» لمنتج غائب أو لمتجر آخر */
+  const [loadError, setLoadError] = useState<{ message: string; notFound: boolean } | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [failure, setFailure] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -159,7 +162,12 @@ export function ProductEditor({ productId }: { productId?: string }) {
           );
         }
       } catch (err) {
-        if (alive) setFailure(err instanceof Error ? err.message : 'تعذّر تحميل المحرّر.');
+        if (alive) {
+          setLoadError({
+            message: err instanceof Error ? err.message : 'تعذّر تحميل المحرّر.',
+            notFound: err instanceof ApiError && err.status === 404,
+          });
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -167,10 +175,53 @@ export function ProductEditor({ productId }: { productId?: string }) {
     return () => {
       alive = false;
     };
-  }, [productId]);
+  }, [productId, attempt]);
 
   if (loading) {
     return <Spinner label="جارٍ فتح المحرّر…" />;
+  }
+
+  // ما لم يُحمَّل لا يُرسم نموذجه: كان المحرّر يرسمه فارغاً تحت التنبيه و«احفظ» فعّال، فحفظٌ منه
+  // بعد عودة الشبكة يكتب الفراغ فوق المنتج ويؤرشف متغيّراته الغائبة عنه (VCAT-019 و VCAT-100، 30 أكتوبر 2026)
+  if (loadError) {
+    return (
+      <div className="vp-page">
+        <div className="page-head">
+          <Link className="btn btn--secondary btn--sm vp-back" href="/vendor/products">
+            <Icon name="back" size={14} mirror />
+            المنتجات
+          </Link>
+        </div>
+        {loadError.notFound ? (
+          <EmptyState
+            title="المنتج غير موجود."
+            actions={
+              <Link className="btn btn--secondary" href="/vendor/products">
+                العودة إلى المنتجات
+              </Link>
+            }
+          >
+            ربما الرابط قديم، أو لمنتج متجر آخر.
+          </EmptyState>
+        ) : (
+          <div className="alert alert--danger" role="alert">
+            <p>{loadError.message}</p>
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              onClick={() => {
+                setLoadError(null);
+                setLoading(true);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              <Icon name="refresh" size={15} />
+              أعد المحاولة
+            </button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   const axisChoices = attributes.filter((a) => a.isVariantAxis && a.values.length > 0);
