@@ -51,6 +51,13 @@ const CURRENCY_NAME: Record<string, string> = {
 };
 
 /**
+ * المبلغ في بطاقة المؤشر: مسافة عادية بين الرقم ورمز العملة بدل المسافة غير المنكسرة، فإن
+ * ضاقت البطاقة نزل الرمز كاملاً إلى السطر التالي. كانا كلمة واحدة يقسمها الالتفاف أينما
+ * اتفق — «د» في سطر و«أ.» في آخر، أو النقطة وحدها (ADM-015، 29 أكتوبر 2026).
+ */
+const metricMoney = (minor: string, currency: string): string => money(minor, currency).replace('\u00a0', ' ');
+
+/**
  * AD-03 — اللوحة. المؤشرات **مجمّعة بالعملة** ولا تُجمع عملتان في رقم.
  * الطوابير بطاقات تقود إلى عملها مباشرة، والتنبيه الأحمر لأي انحراف في
  * منظرات التدقيق — خلل مالي لا ينتظر تقريراً شهرياً.
@@ -107,24 +114,24 @@ export default function AdminDashboard() {
           <div className="ao-metrics">
             <div className="ao-metric ao-metric--money">
               <span className="ao-metric__label">المبيعات</span>
-              <span className="ao-metric__value money num">{sales ? money(sales.grossMinorUnits, sales.currency) : '—'}</span>
+              <span className="ao-metric__value money num">{sales ? metricMoney(sales.grossMinorUnits, sales.currency) : '—'}</span>
               <span className="ao-metric__note">
                 <span className="num">{sales?.orders ?? 0}</span> طلب
               </span>
             </div>
             <div className="ao-metric ao-metric--money">
               <span className="ao-metric__label">عمولة المنصّة</span>
-              <span className="ao-metric__value money num">{ledger ? money(ledger.commissionMinorUnits, ledger.currency) : '—'}</span>
+              <span className="ao-metric__value money num">{ledger ? metricMoney(ledger.commissionMinorUnits, ledger.currency) : '—'}</span>
               <span className="ao-metric__note">من دفتر المنصة · بعملة البائع {cur}</span>
             </div>
             <div className="ao-metric ao-metric--money">
               <span className="ao-metric__label">دخل فرق الصرف</span>
-              <span className="ao-metric__value money num">{sales ? money(sales.fxSpreadMinorUnits, sales.currency) : '—'}</span>
+              <span className="ao-metric__value money num">{sales ? metricMoney(sales.fxSpreadMinorUnits, sales.currency) : '—'}</span>
               <span className="ao-metric__note">تقدير من الفرعيات بعملة مختلفة</span>
             </div>
             <div className="ao-metric ao-metric--money">
               <span className="ao-metric__label">متوسط قيمة الطلب</span>
-              <span className="ao-metric__value money num">{sales ? money(sales.averageOrderMinorUnits, sales.currency) : '—'}</span>
+              <span className="ao-metric__value money num">{sales ? metricMoney(sales.averageOrderMinorUnits, sales.currency) : '—'}</span>
             </div>
             <div className="ao-metric">
               <span className="ao-metric__label">معدّل التحويل</span>

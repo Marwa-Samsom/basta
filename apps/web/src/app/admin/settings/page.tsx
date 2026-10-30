@@ -119,7 +119,7 @@ export default function AdminSettingsPage() {
             </span>
           ) : s.kind === 'text' ? (
             <ClearableInput
-              className="field__control ac2-setting__select"
+              className="field__control ac2-setting__text"
               dir={s.key === 'transfer_iban' || s.key === 'transfer_cliq_alias' ? 'ltr' : undefined}
               maxLength={s.maxLength}
               placeholder={s.hint ?? ''}
