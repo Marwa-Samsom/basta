@@ -2,6 +2,7 @@
 
 import { api, ApiError } from './api';
 import { displayCurrency } from './currency';
+import { localStore } from './storage';
 
 /**
  * السلة في المتصفّح — رمز في التخزين المحلي، والسلة نفسها في الخادم.
@@ -60,15 +61,14 @@ export interface CartView {
   blockers: string[];
 }
 
-const readToken = (): string | null =>
-  typeof window === 'undefined' ? null : window.localStorage.getItem(TOKEN_KEY);
+const readToken = (): string | null => localStore.get(TOKEN_KEY);
 
 /**
  * ينسى المتصفّح سلّته عند الخروج (CHK-020، 27 أكتوبر 2026): كان رمزها يبقى فيرى من يستعمل
  * الجهاز بعده سلّة من خرج ويدفعها بحسابه. السلة نفسها تبقى في الخادم باسم صاحبها.
  */
 export function forgetCart(): void {
-  window.localStorage.removeItem(TOKEN_KEY);
+  localStore.remove(TOKEN_KEY);
   window.dispatchEvent(new Event(CART_EVENT));
 }
 
@@ -81,7 +81,7 @@ async function ensureToken(): Promise<string> {
   const existing = readToken();
   if (existing) return existing;
   const cart = await api<CartView>('/cart', { method: 'POST', body: { currency: displayCurrency() } });
-  window.localStorage.setItem(TOKEN_KEY, cart.token);
+  localStore.set(TOKEN_KEY, cart.token);
   return cart.token;
 }
 
@@ -92,7 +92,7 @@ async function withCart<T>(run: (token: string) => Promise<T>): Promise<T> {
     return await run(token);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404 && /السلة/.test(err.message)) {
-      window.localStorage.removeItem(TOKEN_KEY);
+      localStore.remove(TOKEN_KEY);
       return run(await ensureToken());
     }
     throw err;
@@ -118,7 +118,7 @@ export const cartApi = {
         // السلة نفسها غابت أو انتهت — لا 404 عن قطعة فيها: ذاك كان يمحو الرمز فتضيع قطع
         // المتاجر الأخرى معها (CHK-021). الخادم صار يعرضها سطراً «لم يعد متاحاً»
         if (err instanceof ApiError && err.status === 404 && !err.details?.['variantIds']) {
-          window.localStorage.removeItem(TOKEN_KEY);
+          localStore.remove(TOKEN_KEY);
           return null;
         }
         throw err;

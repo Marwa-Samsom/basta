@@ -1,3 +1,5 @@
+import { localStore } from './storage';
+
 /**
  * عميل الواجهة البرمجية.
  *
@@ -51,18 +53,18 @@ export interface Tokens {
 export const session = {
   read(): Tokens | null {
     if (typeof window === 'undefined') return null;
-    window.localStorage.removeItem(LEGACY_REFRESH_KEY);
-    const accessToken = window.localStorage.getItem(ACCESS_KEY);
+    localStore.remove(LEGACY_REFRESH_KEY);
+    const accessToken = localStore.get(ACCESS_KEY);
     return accessToken ? { accessToken } : null;
   },
   write(tokens: Tokens): void {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(ACCESS_KEY, tokens.accessToken);
+    localStore.set(ACCESS_KEY, tokens.accessToken);
   },
   clear(): void {
     if (typeof window === 'undefined') return;
-    window.localStorage.removeItem(ACCESS_KEY);
-    window.localStorage.removeItem(LEGACY_REFRESH_KEY);
+    localStore.remove(ACCESS_KEY);
+    localStore.remove(LEGACY_REFRESH_KEY);
   },
   /**
    * أدوار الرمز الحالي — قراءة بلا تحقق من التوقيع، لقرارات العرض وحدها

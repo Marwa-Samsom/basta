@@ -1,6 +1,7 @@
 'use client';
 
 import { api, session } from './api';
+import { localStore } from './storage';
 
 /**
  * عملة العرض — قرار صاحبة المشروع 18 أكتوبر 2026: المشتري يختار عملة واحدة من
@@ -38,7 +39,7 @@ function writeCookie(code: string): void {
 export async function chooseCurrency(code: string): Promise<void> {
   if (!CODE.test(code)) return;
   writeCookie(code);
-  const cart = window.localStorage.getItem(CART_TOKEN_KEY);
+  const cart = localStore.get(CART_TOKEN_KEY);
   await Promise.allSettled([
     cart ? api('/cart/currency', { method: 'PUT', body: { currency: code }, headers: { 'x-cart-token': cart } }) : null,
     session.read() ? api('/me/account/currency', { method: 'PUT', body: { currency: code } }) : null,
