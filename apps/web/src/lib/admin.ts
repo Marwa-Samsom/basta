@@ -20,8 +20,7 @@ export function useAdminData<T>(path: string | null): {
   reload: () => void;
 } {
   const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [forbidden, setForbidden] = useState(false);
+  const [failure, setFailure] = useState<{ path: string; message: string; forbidden: boolean } | null>(null);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -32,12 +31,11 @@ export function useAdminData<T>(path: string | null): {
         const next = await api<T>(path);
         if (alive) {
           setData(next);
-          setError(null);
+          setFailure(null);
         }
       } catch (e) {
         if (!alive) return;
-        setForbidden(e instanceof ApiError && e.status === 403);
-        setError((e as Error).message);
+        setFailure({ path, message: (e as Error).message, forbidden: e instanceof ApiError && e.status === 403 });
       }
     })();
     return () => {
@@ -46,7 +44,13 @@ export function useAdminData<T>(path: string | null): {
   }, [path, version]);
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
-  return { data, error, forbidden, reload };
+  /**
+   * فشل طلب المسار الحالي يُسقط نتيجة ما قبله: كانت تبقى بلا رسالة، فتظهر «طاقية صوف» المؤرشفة
+   * تحت «بيت الفخار · موقوف»، والقائمة كاملة تحت بحث رفضه الخادم (ADM-048، 30 أكتوبر 2026).
+   * وأثناء التحميل تبقى السابقة حتى تصل التالية، فلا ترمش القائمة مع كل حرف.
+   */
+  const failed = failure?.path === path ? failure : null;
+  return { data: failed ? null : data, error: failed?.message ?? null, forbidden: failed?.forbidden ?? false, reload };
 }
 
 /**
