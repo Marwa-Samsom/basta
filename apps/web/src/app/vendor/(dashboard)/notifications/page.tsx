@@ -5,6 +5,8 @@ import { NotificationsInbox, type InboxEvent } from '@/components/notifications-
 /** كل حدث: عنوانه القصير وأيقونته ولونه ومجموعته في التصفية — نمط ST-27 */
 const EVENTS: Record<string, InboxEvent> = {
   vendor_new_order: { title: 'طلب جديد بانتظار قبولك', icon: 'truck', tone: 'brand', kind: 'order' },
+  // كان «إشعار» بجرس عام خارج «الطلبات» — الإلغاء الآلي بعد 48 ساعة أولها (ADM-051، 30 أكتوبر 2026)
+  vendor_order_canceled: { title: 'أُلغي طلب', icon: 'alert', tone: 'danger', kind: 'order' },
   return_requested: { title: 'طلب إرجاع جديد', icon: 'return', tone: 'warning', kind: 'dispute' },
   dispute_message: { title: 'رسالة في نزاع', icon: 'msg', tone: 'danger', kind: 'dispute' },
   // كانت تظهر «إشعار» بلا عنوان، والسحب لم يكن يصل أصلاً (BUY-059، 28 أكتوبر 2026)

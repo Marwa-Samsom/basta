@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { format, money } from '../../../common/money/money';
-import { DEFAULT_TEMPLATES, render } from './templates';
+import { DEFAULT_TEMPLATES, EVENTS, render } from './templates';
 
 /**
  * لا مراجعة للمنتجات قبل النشر (قرار صاحبة المشروع 15 أكتوبر 2026): لا رسالة للبائع تَعِده بها.
@@ -45,5 +47,30 @@ describe('لا نقطتان بعد مبلغ ينتهي بنقطة', () => {
   it('النقطة وسط الجملة وبعد غير المبلغ لا تُمسّ', () => {
     expect(render('{{a}}. ثم {{b}}.', { a: 'س.', b: 'ب' })).toBe('س. ثم ب.');
     expect(render('{{a}} — {{b}}.', { a: 'ر.س.', b: 'ب' })).toBe('ر.س. — ب.');
+  });
+});
+
+/**
+ * كل إشعار داخل الموقع له عنوان في صفحة إشعاراته: «أُلغي الطلب …» كان يظهر للبائع بعنوان «إشعار»
+ * وجرس عام وخارج رقاقة «الطلبات»، وفي «حسابي» بنصّه عنواناً لتسعة أنواع (ADM-051، 30 أكتوبر 2026).
+ */
+describe('صفحتا الإشعارات تعرفان كل إشعار داخل الموقع', () => {
+  const page = (path: string) => readFileSync(join(__dirname, '../../../../../web/src/app', path), 'utf8');
+  // سطر الحدث في الخريطة بعنوان غير فارغ: «  code: { title: '…'»
+  const titled = (src: string, code: string) =>
+    src.split('\n').some((line) => line.trimStart().startsWith(`${code}: { title: '`) && !line.includes(`title: ''`));
+  const inApp = new Set(DEFAULT_TEMPLATES.filter((t) => t.channel === 'in_app').map((t) => t.code));
+  const audienceOf = new Map(EVENTS.map((e) => [e.code, e.audience]));
+
+  it('لوحة البائع: كل حدث للبائع', () => {
+    const src = page('vendor/(dashboard)/notifications/page.tsx');
+    const missing = [...inApp].filter((c) => audienceOf.get(c) === 'vendor' && !titled(src, c));
+    expect(missing).toEqual([]);
+  });
+
+  it('«حسابي»: كل حدث لمشترٍ أو بائع', () => {
+    const src = page('(account)/account/notifications/page.tsx');
+    const missing = [...inApp].filter((c) => audienceOf.get(c) !== 'admin' && !titled(src, c));
+    expect(missing).toEqual([]);
   });
 });
