@@ -20,6 +20,7 @@ import { InvalidInputError } from '../../../common/errors/domain-error';
 import { pageOf, termOf } from '../../../common/paging';
 import { assertOneOf } from '../../../common/validation';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { AuditService } from '../../identity/public';
 import { NotificationsService } from '../../notifications/public';
 import type { Actor } from '../../../common/security/actor';
 import {
@@ -111,6 +112,7 @@ export class AdminCatalogController {
     private readonly products: ProductService,
     private readonly notifications: NotificationsService,
     private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
   ) {}
 
   @Post('attributes')
@@ -150,9 +152,29 @@ export class AdminCatalogController {
   @Post('products/:id/reject')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'إيقاف منشور مخالف بسبب يراه البائع — يعدّله وينشره من جديد' })
-  async rejectProduct(@Param('id', uuidParam) id: string, @Body() dto: RejectProductDto): Promise<void> {
+  async rejectProduct(
+    @CurrentActor() actor: Actor,
+    @Param('id', uuidParam) id: string,
+    @Body() dto: RejectProductDto,
+    @Req() req: FastifyRequest,
+  ): Promise<void> {
     const reason = await this.products.reject(id, dto.reason);
-    const p = await this.prisma.product.findUnique({ where: { id }, select: { nameAr: true, vendorId: true } });
+    const p = await this.prisma.product.findUnique({
+      where: { id },
+      select: { nameAr: true, vendorId: true, vendor: { select: { nameAr: true } } },
+    });
+    // قرار إداري يمسّ بائعاً كان بلا أثر في السجل: من أوقف، ومتى، ولماذا (ADM-054، 30 أكتوبر 2026)
+    await this.audit.record({
+      actorUserId: actor.userId,
+      actorRole: 'admin',
+      action: 'product.reject',
+      entityType: 'Product',
+      entityId: id,
+      before: { status: 'active' },
+      after: { status: 'rejected', reason, product: p?.nameAr ?? null, vendorId: p?.vendorId ?? null, vendor: p?.vendor.nameAr ?? null },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
     if (p) {
       await this.notifications.enqueueVendor({
         code: 'product_rejected',

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { IdentityModule } from '../identity/public';
 import { InventoryModule } from '../inventory/public';
 import { NotificationsModule } from '../notifications/public';
 import { PricingModule } from '../pricing/public';
@@ -21,7 +22,7 @@ import { LocalImageStorage } from './infrastructure/product-images';
 import { ProductImageGate } from './infrastructure/product-image-gate';
 
 @Module({
-  imports: [InventoryModule, VendorsModule, SearchModule, NotificationsModule, PricingModule],
+  imports: [IdentityModule, InventoryModule, VendorsModule, SearchModule, NotificationsModule, PricingModule],
   controllers: [
     AttributesController,
     AdminCatalogController,

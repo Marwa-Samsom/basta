@@ -21,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { ConflictError, InvalidInputError, InvalidStateTransitionError } from '../../common/errors/domain-error';
-import { hashPassword } from '../identity/public';
+import { hashPassword, TokenService } from '../identity/public';
 import { ProductService, UPLOADS_ROOT, type AttributeView } from './public';
 
 const prisma = new PrismaClient();
@@ -612,6 +612,43 @@ describe('النشر بلا مراجعة — قرار صاحب المشروع 15
 
     expect(await service.reject(product.id, '  مخالف  ')).toBe('مخالف');
     expect((await A.get(`/vendor/products/${product.id}`)).json()).toMatchObject({ status: 'rejected', rejectReason: 'مخالف' });
+  });
+
+  // قرار إداري يمسّ بائعاً كان بلا أثر في السجل (ADM-054، 30 أكتوبر 2026)
+  dbIt('الإيقاف يُكتب في سجل التدقيق: من أوقف، والسبب، والحالة قبله وبعده', async () => {
+    const A = as('a');
+    const product = await simpleProduct('a', `AUDIT-${SUFFIX}`);
+    await withImage('a', product.id);
+    expect((await A.post(`/vendor/products/${product.id}/publish`)).json().status).toBe('active');
+
+    const admin = await prisma.user.create({
+      data: {
+        email: `catalog.admin.${SUFFIX}@basta.test`,
+        fullName: 'مدير الكتالوج',
+        passwordHash: await hashPassword(randomUUID()),
+        roles: { create: { role: 'admin' } },
+        permissions: { create: { permission: 'catalog.manage' } },
+        totpEnabledAt: new Date(),
+      },
+    });
+    try {
+      const { accessToken } = await app.get(TokenService).issue({ sub: admin.id, roles: ['admin'], permissions: ['catalog.manage'] }, {});
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/admin/products/${product.id}/reject`,
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { reason: '  الصورة لا تطابق الوصف  ' },
+      });
+      expect(res.statusCode, res.body).toBe(204);
+
+      const line = await prisma.auditLog.findFirst({ where: { action: 'product.reject', entityId: product.id } });
+      expect(line).toMatchObject({ actorUserId: admin.id, actorRole: 'admin', entityType: 'Product' });
+      expect(line?.beforeJson).toMatchObject({ status: 'active' });
+      expect(line?.afterJson).toMatchObject({ status: 'rejected', reason: 'الصورة لا تطابق الوصف', vendorId: vendors.a.vendorId });
+    } finally {
+      // لا يبقى مدير اختبار يتلقّى تنبيهات الكتالوج على قاعدة التطوير
+      await prisma.user.update({ where: { id: admin.id }, data: { status: 'suspended' } });
+    }
   });
 
   dbIt('متجر قيد المراجعة ينشر فيُحفظ منشوراً مخفياً، ويظهر للمشترين لحظة اعتماد متجره', async () => {
