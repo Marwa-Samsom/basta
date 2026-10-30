@@ -393,7 +393,18 @@ export class VendorOnboardingService {
     originalName: string | null,
   ): Promise<OnboardingView> {
     const vendor = await this.require(scope.vendorId);
-    this.assertEditable(vendor.status as VendorLifecycle);
+    const previous = isDocumentType(type)
+      ? await this.prisma.vendorDocument.findUnique({
+          where: { vendorId_type: { vendorId: scope.vendorId, type } },
+          select: { fileKey: true, status: true },
+        })
+      : null;
+    /**
+     * أثناء المراجعة تُستبدل الوثيقة المرفوضة وحدها فتعود إلى المراجعة والطلب باقٍ في
+     * الطابور — كانت البطاقة تقول «ارفعها من جديد» وزرّها مقفل (ADM-030، 30 أكتوبر 2026).
+     */
+    const replacingRejected = vendor.status === 'in_review' && previous?.status === 'rejected';
+    if (!replacingRejected) this.assertEditable(vendor.status as VendorLifecycle);
     if (!isDocumentType(type)) {
       throw new InvalidInputError(`نوع وثيقة غير معروف: ${type}.`, { type });
     }
@@ -402,35 +413,33 @@ export class VendorOnboardingService {
     const key = `${scope.vendorId}/${type}/${randomUUID()}`;
     await this.storage.save(key, file);
 
-    const previous = await this.prisma.vendorDocument.findUnique({
-      where: { vendorId_type: { vendorId: scope.vendorId, type } },
-      select: { fileKey: true },
-    });
+    const replaced = {
+      fileKey: key,
+      mimeType,
+      sizeBytes: file.length,
+      originalName: originalName?.slice(0, 200) ?? null,
+      // إعادة الرفع تمسح الرفض: المراجع يرى وثيقة جديدة لا وثيقة مرفوضة بملف جديد
+      status: 'pending',
+      rejectReason: null,
+      reviewedBy: null,
+      reviewedAt: null,
+    };
 
     try {
-      await this.prisma.vendorDocument.upsert({
-        where: { vendorId_type: { vendorId: scope.vendorId, type } },
-        create: {
-          vendorId: scope.vendorId,
-          type,
-          fileKey: key,
-          mimeType,
-          sizeBytes: file.length,
-          originalName: originalName?.slice(0, 200) ?? null,
-          status: 'pending',
-        },
-        update: {
-          fileKey: key,
-          mimeType,
-          sizeBytes: file.length,
-          originalName: originalName?.slice(0, 200) ?? null,
-          // إعادة الرفع تمسح الرفض: المراجع يرى وثيقة جديدة لا وثيقة مرفوضة بملف جديد
-          status: 'pending',
-          rejectReason: null,
-          reviewedBy: null,
-          reviewedAt: null,
-        },
-      });
+      if (replacingRejected) {
+        // الشرط داخل الكتابة: وثيقة قبلها المراجع في اللحظة نفسها لا يُستبدل ملفها
+        const { count } = await this.prisma.vendorDocument.updateMany({
+          where: { vendorId: scope.vendorId, type, status: 'rejected' },
+          data: replaced,
+        });
+        if (count === 0) throw new ConflictError('تغيّرت حالة الوثيقة. حدّث الصفحة.', { type });
+      } else {
+        await this.prisma.vendorDocument.upsert({
+          where: { vendorId_type: { vendorId: scope.vendorId, type } },
+          create: { vendorId: scope.vendorId, type, ...replaced },
+          update: replaced,
+        });
+      }
     } catch (err) {
       await this.storage.remove(key);
       throw err;

@@ -48,6 +48,9 @@ export default function DocumentsPage() {
 
   // المسوّدة والمرفوض وحدهما يُعدَّلان — والخادم يرفض ما عداهما
   const frozen = data.status !== 'pending' && data.status !== 'rejected';
+  // وأثناء المراجعة تُستبدل الوثيقة المرفوضة وحدها، فتعود إلى المراجعة (ADM-030)
+  const replaceable = (doc: OnboardingDocument) => !frozen || (data.status === 'in_review' && doc.status === 'rejected');
+  const anyRejected = data.documents.some((d) => d.status === 'rejected');
 
   /** اسم وجهة المانع كما يقرؤه البائع — لا مسار الحقل التقني */
   function targetLabel(field: string): string {
@@ -85,7 +88,9 @@ export default function DocumentsPage() {
 
       {data.status === 'in_review' ? (
         <Alert tone="info" title="طلبك قيد المراجعة">
-          لا يقبل التعديل الآن. تصلك النتيجة على بريدك، وتستطيع متابعة الحالة في أي وقت.
+          {anyRejected
+            ? 'لا يقبل التعديل الآن إلا المستند المرفوض: ارفعه من جديد فيعود إلى المراجعة، وطلبك باقٍ في مكانه.'
+            : 'لا يقبل التعديل الآن. تصلك النتيجة على بريدك، وتستطيع متابعة الحالة في أي وقت.'}
         </Alert>
       ) : data.status === 'approved' ? (
         <Alert tone="info" title="متجرك معتمد">
@@ -111,7 +116,7 @@ export default function DocumentsPage() {
           <DocumentCard
             key={doc.type}
             doc={doc}
-            disabled={frozen}
+            disabled={!replaceable(doc)}
             onUploaded={(next) => {
               set(next);
               setNotice(`رُفعت ${doc.label}.`);

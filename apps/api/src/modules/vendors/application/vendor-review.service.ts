@@ -152,18 +152,41 @@ export class VendorReviewService {
       entityId: documentId,
       after: { vendorId: doc.vendorId, type: doc.type, reason: decision.accept ? null : reason },
     });
+
+    // رسالة المراجع تقول «أُبلغ البائع بالسبب» — وكان لا يصله شيء (ADM-030، 30 أكتوبر 2026)
+    if (!decision.accept) {
+      await this.notifications.enqueueVendor({
+        code: 'vendor_document_rejected',
+        vendorId: doc.vendorId,
+        vars: { document: DOCUMENT_LABELS[doc.type], reason, link: '/vendor/onboarding/documents' },
+      });
+    }
   }
 
   async approve(actor: Actor, vendorId: string): Promise<void> {
     const vendor = await this.require(vendorId);
     assertTransition(vendor.status as VendorLifecycle, 'approved');
 
+    // الاعتماد يقبل المعلّق ضمناً، والمرفوض لا يصير متجراً معتمداً بوثيقة مرفوضة (ADM-034)
+    const rejected = await this.prisma.vendorDocument.findMany({
+      where: { vendorId, status: 'rejected' },
+      select: { type: true },
+    });
+    if (rejected.length > 0) {
+      const names = rejected.map((d) => (isDocumentType(d.type) ? DOCUMENT_LABELS[d.type] : d.type)).join('، ');
+      throw new ConflictError(
+        `لا يُعتمد المتجر وفيه وثيقة مرفوضة: ${names}. اقبلها بعد أن يعيد البائع رفعها، أو اطلب تعديلاً.`,
+        { vendorId, documents: rejected.map((d) => d.type) },
+      );
+    }
+
     /**
      * الشرط على الحالة داخل الكتابة نفسها: مراجعان يضغطان «اعتماد» معاً
-     * لا ينتج عنهما اعتمادان، والثاني يسمع «تغيّرت الحالة».
+     * لا ينتج عنهما اعتمادان، والثاني يسمع «تغيّرت الحالة». ووثيقة رُفضت بين
+     * الفحص والكتابة توقفه كذلك.
      */
     const { count } = await this.prisma.vendor.updateMany({
-      where: { id: vendorId, status: 'in_review' },
+      where: { id: vendorId, status: 'in_review', documents: { none: { status: 'rejected' } } },
       data: {
         status: 'approved',
         approvedAt: new Date(),
