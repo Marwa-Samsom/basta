@@ -451,6 +451,10 @@ fieldset.ac2-divider > legend { float: inline-start; inline-size: 100%; padding:
 /* نصّ حرّ أعرض من القائمة: رقم الحساب (IBAN) ثلاثون حرفاً كان يُقصّ في 150 */
 .ac2-setting__text { inline-size: 100%; }
 .field__clearable:has(> .ac2-setting__text) { flex: 0 1 340px; }
+/* على الجوال يملأ النصّ سطره و«حفظ» بجانبه — بأساس 340 كان الزرّ ينزل وحده تحته */
+@media (max-width: 640px) {
+  .field__clearable:has(> .ac2-setting__text) { flex: 1 1 180px; }
+}
 /* كل الإعدادات معبّأة بقيمها: ✕ عند المرور على الخانة أو الكتابة فيها، لا في كل سطر دائماً */
 .ac2-setting__row .field__clearable:not(:hover, :focus-within) > .field__clear { visibility: hidden; }
 

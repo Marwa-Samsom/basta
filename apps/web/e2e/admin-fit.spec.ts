@@ -2,10 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 import { PASSWORD, makeAdmin, tag } from './fixtures';
 
 /**
- * لوحة الإدارة تتّسع لشاشتها — ADM-015 و ADM-019، 29 أكتوبر 2026 (الموجة 4 · واجهة).
- * وجدتها صاحبة المشروع على 1280 × 600 و 375: رمز العملة في بطاقات المؤشرات ينقسم بين
- * سطرين («د» ثم «أ.»)، وجدولا «مستخدمو الإدارة» و«سجلّ التدقيق» أعرض من مكانهما فيُقصّ
- * آخر عمود، وخانات الإعدادات تركب أسماءها على الجوال ورقم الحساب (IBAN) مقصوص.
+ * لوحة الإدارة تتّسع لشاشتها — ADM-015 و ADM-019، 29–30 أكتوبر 2026 (الموجة 4 · واجهة).
+ * وجدتها صاحبة المشروع على 1280 × 600 و 375: المبلغ في بطاقات المؤشرات ينقسم بين سطرين
+ * («د» ثم «أ.»، وعلى الجوال «263,461.1» ثم «07»)، وجدولا «مستخدمو الإدارة» و«سجلّ التدقيق»
+ * أعرض من مكانهما فيُقصّ آخر عمود، وخانات الإعدادات تركب أسماءها على الجوال ورقم الحساب
+ * (IBAN) مقصوص.
  */
 const ALL = [
   'vendors.review', 'catalog.manage', 'orders.manage', 'orders.cancel', 'disputes.resolve', 'payouts.approve', 'commissions.edit',
@@ -23,38 +24,51 @@ async function signInAdmin(page: Page): Promise<void> {
   await page.waitForURL((u) => u.pathname === '/admin');
 }
 
+/**
+ * بطاقات المال التي ينقسم فيها الرقم أو رمز عملته بين سطرين — كلٌّ منهما سطر واحد دائماً،
+ * والرمز وحده ينزل تحت الرقم إن ضاقت البطاقة.
+ */
+const splitMoney = (page: Page) =>
+  page.locator('.ao-metric__value.money').evaluateAll((els) =>
+    els.flatMap((el) => {
+      const node = el.firstChild;
+      const text = (node?.textContent ?? '').replace(/[\u200e\u200f]+$/, '');
+      const at = Math.max(text.lastIndexOf(' '), text.lastIndexOf('\u00a0'));
+      if (!node || at < 0) return [];
+      const lines = (from: number, to: number) => {
+        const range = document.createRange();
+        range.setStart(node, from);
+        range.setEnd(node, to);
+        return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+      };
+      return lines(0, at) === 1 && lines(at + 1, text.length) === 1 ? [] : [text];
+    }),
+  );
+
 /** عرض الجدول الزائد على مكانه بالبكسل — صفر حين يتّسع */
 const tableOverflow = (page: Page) =>
   page.locator('.table-wrap').first().evaluate((el) => el.scrollWidth - el.clientWidth);
 
-test('على 1280 × 600: رمز العملة لا ينقسم، والجدولان يتّسعان بلا قصّ', async ({ page }) => {
+test('المبلغ لا ينقسم على 1280 ولا على الجوال، والجدولان يتّسعان على 1280 بلا قصّ', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 600 });
   await signInAdmin(page);
 
   await expect(page.getByRole('heading', { name: 'لوحة المؤشرات', level: 1 })).toBeVisible();
-  // كم سطراً يشغل رمز العملة في كل بطاقة مال — سطر واحد دائماً، ولو نزل تحت الرقم
-  const symbolLines = await page.locator('.ao-metric__value.money').evaluateAll((els) =>
-    els.map((el) => {
-      const node = el.firstChild;
-      const text = node?.textContent ?? '';
-      const at = Math.max(text.lastIndexOf(' '), text.lastIndexOf(' '));
-      if (!node || at < 0) return 1;
-      const range = document.createRange();
-      range.setStart(node, at + 1);
-      range.setEnd(node, text.replace(/[‎‏]+$/, '').length);
-      return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
-    }),
-  );
-  expect.soft(symbolLines.filter((n) => n !== 1), 'رمز عملة على سطرين').toEqual([]);
+  expect.soft(await splitMoney(page), 'مبلغ على سطرين — 1280').toEqual([]);
 
   for (const path of ['/admin/users', '/admin/audit']) {
     await page.goto(path);
     await expect(page.locator('.table tbody tr').first()).toBeVisible();
     expect.soft(await tableOverflow(page), path).toBeLessThanOrEqual(1);
   }
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/admin');
+  await expect(page.getByRole('heading', { name: 'لوحة المؤشرات', level: 1 })).toBeVisible();
+  expect.soft(await splitMoney(page), 'مبلغ على سطرين — 375').toEqual([]);
 });
 
-test('الإعدادات: رقم الحساب ظاهر كاملاً، وعلى الجوال لا يركب حقلٌ اسمَ إعداده', async ({ page }) => {
+test('الإعدادات: رقم الحساب ظاهر كاملاً، وعلى الجوال لا يركب حقلٌ اسمَ إعداده و«حفظ» بجانبه', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 600 });
   await signInAdmin(page);
   await page.goto('/admin/settings');
@@ -82,5 +96,11 @@ test('الإعدادات: رقم الحساب ظاهر كاملاً، وعلى �
     }),
   );
   expect.soft(overlaps).toEqual([]);
+
+  // «حفظ» في سطر حقله لا وحده تحته
+  const ibanRow = page.locator('.ac2-setting').filter({ hasText: 'transfer_iban' });
+  const [field, save] = await Promise.all([ibanRow.locator('input').boundingBox(), ibanRow.getByRole('button', { name: 'حفظ' }).boundingBox()]);
+  expect.soft(save && field && save.y < field.y + field.height, '«حفظ» تحت الحقل').toBe(true);
+
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 });
