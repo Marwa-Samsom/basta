@@ -20,7 +20,7 @@ import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
-import { ConflictError, InvalidStateTransitionError } from '../../common/errors/domain-error';
+import { ConflictError, InvalidInputError, InvalidStateTransitionError } from '../../common/errors/domain-error';
 import { hashPassword } from '../identity/public';
 import { ProductService, UPLOADS_ROOT, type AttributeView } from './public';
 
@@ -596,6 +596,22 @@ describe('النشر بلا مراجعة — قرار صاحب المشروع 15
     expect((await A.post(`/vendor/products/${product.id}/unpublish`)).json().status).toBe('draft');
     expect((await shown()).statusCode).toBe(404);
     await expect(service.reject(product.id, 'سبب كافٍ للإيقاف')).rejects.toBeInstanceOf(InvalidStateTransitionError);
+  });
+
+  // خمس مسافات كانت تمرّ بحدّ الطول فيصل البائع سبب فارغ (ADM-051، 30 أكتوبر 2026)
+  dbIt('سبب الإيقاف يُقاس بلا مسافات طرفيه، ويُحفظ ويصل البائع بلاها', async () => {
+    const A = as('a');
+    const service = app.get(ProductService);
+    const product = await simpleProduct('a', `TRIM-${SUFFIX}`);
+    await withImage('a', product.id);
+    expect((await A.post(`/vendor/products/${product.id}/publish`)).json().status).toBe('active');
+
+    await expect(service.reject(product.id, '     ')).rejects.toBeInstanceOf(InvalidInputError);
+    await expect(service.reject(product.id, '  مكسو  ')).rejects.toBeInstanceOf(InvalidInputError);
+    expect((await A.get(`/vendor/products/${product.id}`)).json().status).toBe('active');
+
+    expect(await service.reject(product.id, '  مخالف  ')).toBe('مخالف');
+    expect((await A.get(`/vendor/products/${product.id}`)).json()).toMatchObject({ status: 'rejected', rejectReason: 'مخالف' });
   });
 
   dbIt('متجر قيد المراجعة ينشر فيُحفظ منشوراً مخفياً، ويظهر للمشترين لحظة اعتماد متجره', async () => {

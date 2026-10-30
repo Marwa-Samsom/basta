@@ -151,13 +151,13 @@ export class AdminCatalogController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'إيقاف منشور مخالف بسبب يراه البائع — يعدّله وينشره من جديد' })
   async rejectProduct(@Param('id', uuidParam) id: string, @Body() dto: RejectProductDto): Promise<void> {
-    await this.products.reject(id, dto.reason);
+    const reason = await this.products.reject(id, dto.reason);
     const p = await this.prisma.product.findUnique({ where: { id }, select: { nameAr: true, vendorId: true } });
     if (p) {
       await this.notifications.enqueueVendor({
         code: 'product_rejected',
         vendorId: p.vendorId,
-        vars: { product_name: p.nameAr, reason: dto.reason, link: `/vendor/products/${id}` },
+        vars: { product_name: p.nameAr, reason, link: `/vendor/products/${id}` },
       });
     }
   }
