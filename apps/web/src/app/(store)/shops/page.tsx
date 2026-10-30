@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Icon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
-import { getShops, num } from '@/lib/storefront';
+import { getShops, num, type ShopCard } from '@/lib/storefront';
 
 /**
  * يُصيَّر عند الطلب لا وقت البناء: البناء لا يعتمد على خادم API حيّ (المرحلة 12).
@@ -49,26 +49,7 @@ export default async function ShopsPage({ searchParams }: Props) {
       {result.items.length > 0 ? (
         <div className="sd-shops sd-shops--dir">
           {result.items.map((s) => (
-            <Link key={s.id} href={`/s/${encodeURIComponent(s.slug)}`} className="sd-shopcard">
-              <span className="sd-shopcard__logo" aria-hidden>
-                <Icon name="store" size={22} />
-              </span>
-              <span className="sd-shopcard__body">
-                <span className="sd-shopcard__name">{s.nameAr}</span>
-                <span className="sd-shopcard__meta">
-                  <span className="num">{num(s.productCount)}</span> منتج
-                  {s.ratingCount > 0 ? (
-                    <>
-                      {' · '}
-                      <Icon name="star-fill" size={11} />{' '}
-                      <span className="num">{s.ratingAvg.toFixed(1)}</span>
-                    </>
-                  ) : null}
-                </span>
-                {s.categories.length > 0 ? <span className="sd-shopcard__cats">{s.categories.join(' · ')}</span> : null}
-              </span>
-              <Icon name="chev-end" size={16} mirror className="sd-shopcard__chev" />
-            </Link>
+            <ShopCardLink key={s.id} shop={s} />
           ))}
         </div>
       ) : (
@@ -91,6 +72,18 @@ export default async function ShopsPage({ searchParams }: Props) {
         </EmptyState>
       )}
 
+      {/* لا متجر بالجملة كاملة: ما في اسمه كلمة منها — «متجر الصوف» يدلّ على «بيت الصوف» (DISC-075) */}
+      {result.items.length === 0 && result.suggestions?.length ? (
+        <section className="sd-shopdir__near" aria-labelledby="sd-shop-near">
+          <h2 id="sd-shop-near">متاجر قريبة من بحثك</h2>
+          <div className="sd-shops sd-shops--dir">
+            {result.suggestions.map((s) => (
+              <ShopCardLink key={s.id} shop={s} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {pages > 1 ? (
         <nav className="sd-pager" aria-label="صفحات المتاجر">
           {page > 1 ? (
@@ -109,5 +102,30 @@ export default async function ShopsPage({ searchParams }: Props) {
         </nav>
       ) : null}
     </div>
+  );
+}
+
+function ShopCardLink({ shop: s }: { shop: ShopCard }) {
+  return (
+    <Link href={`/s/${encodeURIComponent(s.slug)}`} className="sd-shopcard">
+      <span className="sd-shopcard__logo" aria-hidden>
+        <Icon name="store" size={22} />
+      </span>
+      <span className="sd-shopcard__body">
+        <span className="sd-shopcard__name">{s.nameAr}</span>
+        <span className="sd-shopcard__meta">
+          <span className="num">{num(s.productCount)}</span> منتج
+          {s.ratingCount > 0 ? (
+            <>
+              {' · '}
+              <Icon name="star-fill" size={11} />{' '}
+              <span className="num">{s.ratingAvg.toFixed(1)}</span>
+            </>
+          ) : null}
+        </span>
+        {s.categories.length > 0 ? <span className="sd-shopcard__cats">{s.categories.join(' · ')}</span> : null}
+      </span>
+      <Icon name="chev-end" size={16} mirror className="sd-shopcard__chev" />
+    </Link>
   );
 }
