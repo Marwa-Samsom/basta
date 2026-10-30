@@ -8,7 +8,7 @@
  */
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { NobleCryptoPlugin, ScureBase32Plugin, generateSecret, generateSync } from 'otplib';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -197,8 +197,9 @@ beforeAll(async () => {
     const variant = await prisma.productVariant.create({
       data: { productId: product.id, vendorId: vendor.id, sku: `SKU-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: price, optionsKey: '', isActive: true },
     });
-    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 50, reserved: 0 } });
-    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 50, reason: 'import' } });
+    // يكفي الملف كله: صارت اختباراته تستهلك أكثر من 50 قطعة فنفد آخرها «INSUFFICIENT_STOCK» (29 أكتوبر 2026)
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 100, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 100, reason: 'import' } });
     vendors.push({ userId: u.id, vendorId: vendor.id, variantId: variant.id, token: await login(u.email) });
   }
 
@@ -1440,6 +1441,40 @@ describe('مهلة القبول كما تضبطها الإدارة تصل الب
     } finally {
       if (before) await prisma.setting.update({ where: { key }, data: { valueJson: Number(before.valueJson) || 48 } });
       else await prisma.setting.delete({ where: { key } });
+    }
+  });
+});
+
+describe('فترة التعليق ومهلة الإرجاع صفراً كما تحفظهما الإدارة (VOPS-072، 29 أكتوبر 2026)', () => {
+  /**
+   * الحدّ الأدنى لهما في شاشة الإعدادات صفر، وكان القارئ يقبل «أكبر من صفر» وحده فيعودان 14 يوماً بصمت:
+   * حفظت الإدارة التعليق صفراً وسُلّم طلب بعده فكان موعد تحريره بعد 14 يوماً.
+   */
+  it('التعليق صفر: يُحرَّر لحظة التسليم — والإرجاع صفر: لا إرجاع بعد التسليم', async () => {
+    if (!dbUp) return;
+    const keys = ['hold_period_days', 'return_window_days'];
+    const before = await prisma.setting.findMany({ where: { key: { in: keys } } });
+    try {
+      for (const key of keys) {
+        await prisma.setting.upsert({ where: { key }, create: { key, valueJson: 0 }, update: { valueJson: 0 } });
+      }
+      const { order, a } = await placeOrder([1, 1]);
+      await deliver(0, a.id);
+      const sub = await prisma.subOrder.findUniqueOrThrow({ where: { id: a.id } });
+      expect(sub.holdReleaseAt!.getTime()).toBe(sub.deliveredAt!.getTime());
+
+      const r = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+        items: [{ orderItemId: a.items[0]!.id, qty: 1 }],
+        reasonCode: 'damaged',
+      });
+      expect(r.statusCode, r.body).toBe(409);
+      expect(r.json().message).toBe('الإرجاع غير متاح بعد التسليم.');
+    } finally {
+      for (const key of keys) {
+        const was = before.find((s) => s.key === key);
+        if (was) await prisma.setting.update({ where: { key }, data: { valueJson: was.valueJson as Prisma.InputJsonValue } });
+        else await prisma.setting.delete({ where: { key } });
+      }
     }
   });
 });

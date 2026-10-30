@@ -16,6 +16,7 @@ import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type PaymentProvider } from '../../payments/public';
 import { allocate } from '../../pricing/public';
 import { planFullRefund, planPartialRefund, toCharge } from '../domain/refunds';
+import { settingNumber } from '../domain/setting-value';
 import {
   assertTransition,
   deriveParent,
@@ -189,7 +190,7 @@ export class OrderLifecycleService {
     if (to === 'completed') data.completedAt = now;
     if (to === 'delivered' && from === 'shipped') {
       data.deliveredAt = now;
-      data.holdReleaseAt = new Date(now.getTime() + (await this.setting(tx, 'hold_period_days', 14)) * 86_400_000);
+      data.holdReleaseAt = new Date(now.getTime() + (await this.setting(tx, 'hold_period_days', 14, 0)) * 86_400_000);
     }
     if (isCancellation(to)) {
       data.canceledAt = now;
@@ -652,9 +653,10 @@ export class OrderLifecycleService {
     if (sub.status !== 'delivered' || !sub.deliveredAt) {
       throw new ConflictError('الإرجاع متاح بعد التسليم وحده.', { status: sub.status });
     }
-    const window = await this.setting(this.prisma, 'return_window_days', 14);
+    const window = await this.setting(this.prisma, 'return_window_days', 14, 0);
     if (Date.now() - sub.deliveredAt.getTime() > window * 86_400_000) {
-      throw new ConflictError(`انقضت مهلة الإرجاع (${daysAr(window)} من التسليم).`);
+      // مهلة صفر: لا إرجاع أصلاً — «انقضت مهلة الإرجاع (0 يوم من التسليم)» لا تقول شيئاً
+      throw new ConflictError(window === 0 ? 'الإرجاع غير متاح بعد التسليم.' : `انقضت مهلة الإرجاع (${daysAr(window)} من التسليم).`);
     }
     if (input.items.length === 0) throw new InvalidInputError('اختر قطعة واحدة على الأقل.');
     if (input.items.some((i) => !Number.isInteger(i.qty) || i.qty < 1)) {
@@ -790,10 +792,10 @@ export class OrderLifecycleService {
     });
   }
 
-  private async setting(db: Tx | PrismaService, key: string, fallback: number): Promise<number> {
+  /** الإعداد بحدّه الأدنى في شاشة الإعدادات — التعليق ومهلة الإرجاع يقبلان الصفر (VOPS-072) */
+  private async setting(db: Tx | PrismaService, key: string, fallback: number, min = 1): Promise<number> {
     const row = await db.setting.findUnique({ where: { key } });
-    const value = Number(row?.valueJson);
-    return Number.isFinite(value) && value > 0 ? value : fallback;
+    return settingNumber(row?.valueJson, fallback, min);
   }
 }
 

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { hoursAr } from '../../../common/arabic-count';
 import { writeErrorLog } from '../../../common/observability/error-log';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { settingNumber } from '../domain/setting-value';
 import { OrderLifecycleService, stalledRefund } from './order-lifecycle.service';
 
 const EVERY_FIVE_MINUTES = 300_000;
@@ -89,7 +90,7 @@ export class OrderScheduler implements OnApplicationBootstrap, OnModuleDestroy {
    * للنزاع أياماً بعد أن تحرّر ماله، وخفضها يُكمله قبل موعده (ACFG-025، 24 أكتوبر 2026).
    */
   async completeDelivered(now: Date): Promise<number> {
-    const days = await this.setting('hold_period_days', 14);
+    const days = await this.setting('hold_period_days', 14, 0);
     const due = await this.prisma.subOrder.findMany({
       where: {
         status: 'delivered',
@@ -143,9 +144,9 @@ export class OrderScheduler implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  private async setting(key: string, fallback: number): Promise<number> {
+  /** الإعداد بحدّه الأدنى في شاشة الإعدادات — التعليق يقبل الصفر، ومهلة القبول لا (VOPS-072) */
+  private async setting(key: string, fallback: number, min = 1): Promise<number> {
     const row = await this.prisma.setting.findUnique({ where: { key } });
-    const v = Number(row?.valueJson);
-    return Number.isFinite(v) && v > 0 ? v : fallback;
+    return settingNumber(row?.valueJson, fallback, min);
   }
 }
