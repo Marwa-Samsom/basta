@@ -189,6 +189,12 @@ function CheckoutForm() {
   const [address, setAddress] = useState<AddressForm>(() => restored ?? BLANK_ADDRESS);
   const [card, setCard] = useState<string>('tok_success');
   const [payment, setPayment] = useState<PaymentMethod | null>(null);
+  /**
+   * تعذّر جلب طريقة الدفع. كان الخطأ يُبتلع فيبقى «جارٍ تحميل طريقة الدفع…» للأبد و«ادفع»
+   * معطّلاً بلا سبب (CHK-061، 31 أكتوبر 2026) — الآن يُقال، و«أعد المحاولة» يجلبها ثانيةً
+   */
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentAttempt, setPaymentAttempt] = useState(0);
   const transfer = payment?.method === 'bank_transfer' ? payment : null;
   /**
    * الإجمالي محسوب لعنوان بعينه: الشحن والضريبة ببلده ومنطقته ومدينته. تغيير
@@ -235,13 +241,13 @@ function CheckoutForm() {
       .then((m) => {
         if (alive) setPayment(m);
       })
-      .catch(() => {
-        // بلا ردّ تبقى البطاقة — والخادم يرفض الوسيلة الخاطئة برسالة تطلب تحديث الصفحة
+      .catch((err: unknown) => {
+        if (alive) setPaymentError(err instanceof Error ? err.message : 'تعذّر الاتصال بالخادم.');
       });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [paymentAttempt]);
 
   useEffect(() => {
     let alive = true;
@@ -507,7 +513,22 @@ function CheckoutForm() {
           </Section>
 
           <Section n={4} title="الدفع" state={stateOf(4)}>
-            {payment === null ? (
+            {payment === null && paymentError ? (
+              <Alert tone="danger" title="تعذّر تحميل طريقة الدفع">
+                <p>{paymentError} عنوانك والشحن المحسوب باقيان.</p>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  onClick={() => {
+                    setPaymentError(null);
+                    setPaymentAttempt((n) => n + 1);
+                  }}
+                >
+                  <Icon name="refresh" size={15} />
+                  أعد المحاولة
+                </button>
+              </Alert>
+            ) : payment === null ? (
               <Spinner label="جارٍ تحميل طريقة الدفع…" />
             ) : transfer ? (
               <>
