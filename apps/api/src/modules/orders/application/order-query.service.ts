@@ -13,6 +13,7 @@ import {
   type TransitionActor,
 } from '../domain/state-machine';
 import { settingNumber } from '../domain/setting-value';
+import { missingAdminPermission } from '../domain/admin-permission';
 
 const PAGE = 20;
 
@@ -377,7 +378,7 @@ export class OrderQueryService {
 
   // ------------------------------------------------------------- الإدارة
 
-  async adminDetail(orderNumber: string): Promise<unknown> {
+  async adminDetail(orderNumber: string, permissions: readonly string[]): Promise<unknown> {
     const order = await this.prisma.order.findUnique({
       where: { orderNumber },
       include: { subOrders: { include: SUB_ORDER_DETAIL }, payment: true },
@@ -389,7 +390,11 @@ export class OrderQueryService {
       currency: order.currency,
       grandTotalMinorUnits: order.grandTotalMinorUnits.toString(),
       paymentStatus: order.payment?.status ?? null,
-      stores: order.subOrders.map((s) => present(s, 'admin')),
+      // زرّ الإجراء لمن يحمل صلاحيته وحده — كان «إلغاء هذا المتجر» يظهر لمن لا يحمل orders.cancel فيضغطه ويرى 403
+      stores: order.subOrders.map((s) => {
+        const view = present(s, 'admin');
+        return { ...view, actions: view.actions.filter((to) => !missingAdminPermission(to, permissions)) };
+      }),
     };
   }
 
