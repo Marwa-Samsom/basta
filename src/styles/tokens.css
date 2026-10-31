@@ -111,6 +111,8 @@
   --surface-raised:  var(--beige-0);
   --surface-sunken:  var(--beige-100);
   --surface-inverse: var(--beige-850);
+  /* هيكل التحميل — يُرى على الصفحة والبطاقة والسطح المرفوع كلها */
+  --skeleton:        var(--beige-100);
 
   /* النص */
   --text-strong: var(--beige-900);
@@ -165,6 +167,8 @@
     --surface-raised:  var(--beige-850);
     --surface-sunken:  var(--beige-950);
     --surface-inverse: var(--beige-100);
+    /* لا sunken هنا: هو لون الصفحة نفسه في الداكن، فكان الهيكل يختفي (CHK-016) */
+    --skeleton:        var(--beige-800);
 
     --text-strong: var(--beige-25);
     --text-body:   var(--beige-200);
@@ -210,6 +214,8 @@
   --surface-raised:  var(--beige-850);
   --surface-sunken:  var(--beige-950);
   --surface-inverse: var(--beige-100);
+  /* لا sunken هنا: هو لون الصفحة نفسه في الداكن، فكان الهيكل يختفي (CHK-016) */
+  --skeleton:        var(--beige-800);
 
   --text-strong: var(--beige-25);
   --text-body:   var(--beige-200);

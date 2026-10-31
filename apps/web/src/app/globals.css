@@ -419,7 +419,7 @@ a:hover { color: var(--brand-hover); }
 .skeleton {
   display: block;
   border-radius: var(--radius-md);
-  background: var(--surface-sunken);
+  background: var(--skeleton);
   animation: shimmer 1.4s ease-in-out infinite;
 }
 @keyframes shimmer { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
