@@ -6,7 +6,7 @@
  *   · بـ SMTP_URL يصل البريد: المستلم والموضوع والنص العربي ونسخة HTML باتجاه عربي
  *   · المستخدم وكلمة المرور من العنوان يصلان الخادم مفكوكين (‎%40 ← @)
  *   · رفض الخادم يُرمى — فيعيده الصندوق الصادر بدل أن يُختم «أُرسل»
- *   · بلا SMTP_URL يبقى الصندوق المحلي كما كان
+ *   · بلا SMTP_URL يبقى الصندوق المحلي — بالرسالة نفسها، ومنها نسخة HTML باتجاه عربي
  */
 import { simpleParser } from 'mailparser';
 import { readFile } from 'node:fs/promises';
@@ -112,5 +112,15 @@ describe('البريد عبر SMTP', () => {
     const mail = await simpleParser(await readFile(ref));
     expect(mail.subject).toBe('رمز استعادة كلمة المرور');
     expect(mail.text?.trim()).toBe('رمزك 482913\nصالح خمس عشرة دقيقة.');
+  });
+
+  it('ملف الصندوق المحلي هو الرسالة التي كانت ستُرسل: نسخة HTML باتجاه عربي والمعرّف واللغة', async () => {
+    // كان نصاً مجرّداً وحده فيعرضه برنامج البريد يساراً (ACFG-068، 31 أكتوبر 2026)
+    const id = '4f5a6b7c-8d9e-4f0a-1b2c-3d4e5f607182';
+    const mail = await simpleParser(await readFile(await deliver(recovery(id))));
+    expect(mail.html).toContain('dir="rtl"');
+    expect(mail.html).toContain('رمزك 482913<br>');
+    expect(mail.messageId).toBe(`<${id}@basta.local>`);
+    expect(mail.headers.get('content-language')).toBe('ar');
   });
 });
