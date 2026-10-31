@@ -149,22 +149,26 @@ export class StorefrontService implements OnModuleInit {
   onModuleInit(): void {
     this.vendorEvents.onVisibilityChanged((vendorId) => this.syncVendor(vendorId));
     // الاختبار يبني فهرسه بنفسه؛ مزامنة خلفية تسابقه (NODE_ENV فيه development من .env)
-    if (!process.env['VITEST']) void this.backfillUsd();
+    if (!process.env['VITEST']) void this.backfillIndex();
   }
 
   /**
-   * فهرس بُني قبل priceUsd (18 أكتوبر 2026) يُرتَّب بالسعر خطأً بين العملات —
-   * يُكمَل عند الإقلاع بلا إعادة بناء يدوية. يُعاد كتابة المرئي فقط، ولا يمسح شيئاً.
+   * فهرس بُني قبل حقل جديد يُكمَل عند الإقلاع بلا إعادة بناء يدوية: priceUsd (18 أكتوبر 2026)
+   * وإلا رُتّب بالسعر خطأً بين العملات، و variantValueIds (31 أكتوبر) وإلا غاب وجه «اللون»
+   * لمنتج ألوانه متغيّرات. يُعاد كتابة المرئي فقط، ولا يمسح شيئاً.
    */
-  private async backfillUsd(): Promise<void> {
+  private async backfillIndex(): Promise<void> {
     try {
-      const missing = await this.search.missing('priceUsd');
+      // حقل صار قابلاً للتصفية للتوّ لا يُسأل عنه قبل أن يُطبَّق الإعداد
+      await this.search.ensureIndex();
+      await this.search.idle(60_000);
+      const missing = Math.max((await this.search.missing('priceUsd')) ?? 0, (await this.search.missing('variantValueIds')) ?? 0);
       if (!missing) return;
       const ids = (await this.prisma.product.findMany({ where: VISIBLE, select: { id: true } })).map((p) => p.id);
       for (let i = 0; i < ids.length; i += 500) await this.syncIndex(ids.slice(i, i + 500));
-      this.logger.log(`أُكمل دولار الفهرس لـ ${ids.length} منتجاً (كان ينقص ${missing})`);
+      this.logger.log(`أُكملت وثائق الفهرس لـ ${ids.length} منتجاً (كان ينقص ${missing})`);
     } catch (err) {
-      this.logger.warn(`تعذّر إكمال دولار الفهرس: ${(err as Error).message}`);
+      this.logger.warn(`تعذّر إكمال الفهرس: ${(err as Error).message}`);
     }
   }
 
@@ -278,8 +282,14 @@ export class StorefrontService implements OnModuleInit {
       });
     }
 
+    // القيمة خاصّية للمنتج، أو محور في أحد متغيّراته الحيّة: «أحمر» قميصٌ أحد ألوانه أحمر
     for (const valueId of input.attributeValueIds ?? []) {
-      and.push({ attrValues: { some: { attributeValueId: valueId } } });
+      and.push({
+        OR: [
+          { attrValues: { some: { attributeValueId: valueId } } },
+          { variants: { some: { archivedAt: null, isActive: true, optionValues: { some: { attributeValueId: valueId } } } } },
+        ],
+      });
     }
 
     if (input.minPriceMinor !== undefined || input.maxPriceMinor !== undefined) {
@@ -505,7 +515,7 @@ export class StorefrontService implements OnModuleInit {
   private async facets(input: SearchInput, fx: DisplayFx): Promise<StorefrontFacets> {
     const base = await this.whereOf({ ...input, attributeValueIds: [], q: undefined }, fx);
 
-    const [brands, vendors, attrValues] = await Promise.all([
+    const [brands, vendors, attrValues, axisRows] = await Promise.all([
       this.prisma.product.groupBy({
         by: ['brandId'],
         where: { ...base, brandId: { not: null } },
@@ -517,7 +527,24 @@ export class StorefrontService implements OnModuleInit {
         where: { product: base, attributeValueId: { not: null } },
         _count: { _all: true },
       }),
+      // اللون والمقاس محوران في المتغيّرات لا خاصّيتان للمنتج (المحرّر لا يعرض المحور خاصّيةً)
+      this.prisma.productVariant.findMany({
+        where: { archivedAt: null, isActive: true, product: base, optionValues: { some: {} } },
+        select: { productId: true, optionValues: { select: { attributeValueId: true } } },
+      }),
     ]);
+
+    // المنتج يُعدّ مرّة للقيمة ولو حملها ثلاثة من متغيّراته (أحمر S و M و L)
+    const productsByValue = new Map<string, Set<string>>();
+    for (const row of axisRows) {
+      for (const { attributeValueId } of row.optionValues) {
+        const products = productsByValue.get(attributeValueId) ?? new Set<string>();
+        products.add(row.productId);
+        productsByValue.set(attributeValueId, products);
+      }
+    }
+    const valueCount = (id: string): number =>
+      (attrValues.find((a) => a.attributeValueId === id)?._count._all ?? 0) + (productsByValue.get(id)?.size ?? 0);
 
     const [brandRows, vendorRows, valueRows] = await Promise.all([
       this.prisma.brand.findMany({
@@ -529,7 +556,7 @@ export class StorefrontService implements OnModuleInit {
         select: { id: true, nameAr: true, settlementCurrency: true },
       }),
       this.prisma.attributeValue.findMany({
-        where: { id: { in: attrValues.flatMap((a) => (a.attributeValueId ? [a.attributeValueId] : [])) } },
+        where: { id: { in: [...attrValues.flatMap((a) => (a.attributeValueId ? [a.attributeValueId] : [])), ...productsByValue.keys()] } },
         select: { id: true, valueAr: true, attributeId: true, attribute: { select: { nameAr: true } } },
       }),
     ]);
@@ -538,7 +565,7 @@ export class StorefrontService implements OnModuleInit {
 
     const byAttribute = new Map<string, { nameAr: string; values: FacetBucket[] }>();
     for (const row of valueRows) {
-      const count = attrValues.find((a) => a.attributeValueId === row.id)?._count._all ?? 0;
+      const count = valueCount(row.id);
       const entry = byAttribute.get(row.attributeId) ?? { nameAr: row.attribute.nameAr, values: [] };
       entry.values.push({ id: row.id, label: row.valueAr, count });
       byAttribute.set(row.attributeId, entry);
@@ -817,7 +844,11 @@ export class StorefrontService implements OnModuleInit {
         attrValues: { select: { attributeValueId: true, attributeValue: { select: { valueAr: true } } } },
         variants: {
           where: { archivedAt: null, isActive: true },
-          select: { id: true, priceMinorUnits: true },
+          select: {
+            id: true,
+            priceMinorUnits: true,
+            optionValues: { select: { attributeValueId: true, attributeValue: { select: { valueAr: true } } } },
+          },
           orderBy: { priceMinorUnits: 'asc' },
         },
       },
@@ -831,6 +862,7 @@ export class StorefrontService implements OnModuleInit {
 
     return rows.map((r) => {
       const cheapest = r.variants[0]?.priceMinorUnits ?? 0n;
+      const axisValues = r.variants.flatMap((v) => v.optionValues);
       const usd = fx.usd(cheapest, r.vendor.settlementCurrency);
       return {
         id: r.id,
@@ -845,10 +877,20 @@ export class StorefrontService implements OnModuleInit {
         vendorSlug: r.vendor.slug,
         storeCategoryId: r.vendorCategory?.id ?? null,
         storeCategoryNameAr: r.vendorCategory?.nameAr ?? null,
-        attributeValueIds: r.attrValues.flatMap((a) => (a.attributeValueId ? [a.attributeValueId] : [])),
-        attributeValuesAr: r.attrValues.flatMap((a) =>
-          a.attributeValue ? [a.attributeValue.valueAr] : [],
-        ),
+        // اللون والمقاس محوران في المتغيّرات: بدونهما لا وجه «اللون» لقميص بألوان (DISC-028، 31 أكتوبر 2026)
+        attributeValueIds: [
+          ...new Set([
+            ...r.attrValues.flatMap((a) => (a.attributeValueId ? [a.attributeValueId] : [])),
+            ...axisValues.map((o) => o.attributeValueId),
+          ]),
+        ],
+        attributeValuesAr: [
+          ...new Set([
+            ...r.attrValues.flatMap((a) => (a.attributeValue ? [a.attributeValue.valueAr] : [])),
+            ...axisValues.map((o) => o.attributeValue.valueAr),
+          ]),
+        ],
+        variantValueIds: [...new Set(axisValues.map((o) => o.attributeValueId))],
         priceMinor: Number(cheapest),
         currency: r.vendor.settlementCurrency,
         ...(usd !== null ? { priceUsd: usd } : {}),

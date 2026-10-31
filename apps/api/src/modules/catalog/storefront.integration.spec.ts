@@ -342,6 +342,86 @@ describe('الأوجه والتصفية', () => {
   });
 });
 
+/**
+ * اللون والمقاس محوران في المتغيّرات لا خاصّيتان للمنتج — DISC-028، 31 أكتوبر 2026. كان الفهرس
+ * والقاعدة يقرآن خصائص المنتج وحدها، فلا وجه «اللون» لقميص بألوان: 442 قميصاً في قاعدة
+ * التطوير بلا وجه لون واحد.
+ */
+describe('محاور المتغيّرات أوجهٌ للتصفية', () => {
+  type Facets = { attributes: { nameAr: string; values: { id: string; count: number }[] }[] };
+  let productId = '';
+  let red = '';
+  let blue = '';
+  let absent = '';
+
+  beforeAll(async () => {
+    if (!dbUp) return;
+    const color = await prisma.attribute.findFirstOrThrow({
+      where: { code: 'color' },
+      include: { values: { orderBy: { sort: 'asc' }, take: 3 } },
+    });
+    [red, blue, absent] = color.values.map((v) => v.id) as [string, string, string];
+    const product = await prisma.product.create({
+      data: { vendorId, slug: `axis-${SUFFIX}`, nameAr: `كنزة محاور ${SUFFIX}`, status: 'active', publishedAt: new Date(), hasVariants: true },
+    });
+    productId = product.id;
+    productIds.push(product.id);
+    // متغيّران من المقاس نفسه بلونين، وثالث أحمر: «أحمر» يُعدّ المنتج مرّة لا مرّتين
+    for (const [i, valueId] of [red, blue, red].entries()) {
+      const variant = await prisma.productVariant.create({
+        data: {
+          productId: product.id,
+          vendorId,
+          sku: `AXIS-${i}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+          priceMinorUnits: 30_000n,
+          optionsKey: `${color.id}:${valueId}:${i}`,
+          isActive: true,
+          optionValues: { create: { attributeId: color.id, attributeValueId: valueId } },
+        },
+      });
+      await prisma.inventory.create({ data: { variantId: variant.id, onHand: 2, reserved: 0 } });
+      await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 2, reason: 'import', actorUserId: null } });
+    }
+    if (meiliUp) {
+      await storefront.syncIndex([product.id]);
+      expect(await search.idle(), 'طابور الفهرسة لم يفرغ خلال المهلة').toBe(true);
+    }
+  }, 60_000);
+
+  const valueCount = (facets: Facets, id: string): number | undefined =>
+    facets.attributes.flatMap((a) => a.values).find((v) => v.id === id)?.count;
+
+  const listed = async (query: string): Promise<{ ids: string[]; facets: Facets; engine: string }> => {
+    const res = await app.inject({ method: 'GET', ...api(`/storefront/products?vendorId=${vendorId}${query}`) });
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.json() as { items: { id: string }[]; facets: Facets; engine: string };
+    return { ids: body.items.map((i) => i.id), facets: body.facets, engine: body.engine };
+  };
+
+  it('من القاعدة (تصفّح بلا كلمة): «اللون» وجهٌ يعدّ المنتج مرّة، والتصفية بلون أحد متغيّراته', async () => {
+    if (!dbUp) return;
+    const all = await listed('&pageSize=48');
+    expect(all.engine).toBe('db');
+    expect(valueCount(all.facets, red)).toBe(1);
+    expect(valueCount(all.facets, blue)).toBe(1);
+
+    expect((await listed(`&attrs=${blue}&pageSize=48`)).ids).toContain(productId);
+    expect((await listed(`&attrs=${absent}&pageSize=48`)).ids).not.toContain(productId);
+  });
+
+  it('من المحرّك (بحث بكلمة): الوجه والتصفية نفسهما', async () => {
+    if (!dbUp || !meiliUp) return;
+    const q = `&q=${encodeURIComponent(`كنزة محاور ${SUFFIX}`)}`;
+    const found = await listed(q);
+    expect(found.engine).toBe('meili');
+    expect(found.ids).toContain(productId);
+    expect(valueCount(found.facets, red)).toBe(1);
+
+    expect((await listed(`${q}&attrs=${red}`)).ids).toContain(productId);
+    expect((await listed(`${q}&attrs=${absent}`)).ids).not.toContain(productId);
+  });
+});
+
 describe('دليل المتاجر — الاسم كما يُكتب', () => {
   /**
    * DISC-038، 26 أكتوبر 2026: كان البحث في الدليل مطابقة حرفية، فمن كتب «اخفاء» لم يجد
