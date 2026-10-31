@@ -784,6 +784,29 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
     expect(await statusOf(a.id)).toBe('completed');
   });
 
+  // خمس مسافات كانت تحسم النزاع بسبب فارغ، ورسالة من مسافات تُحفظ فارغة (ADM-073، 31 أكتوبر 2026)
+  it('سبب الحسم ورسالة النزاع يُقاسان بلا مسافات طرفيهما', async () => {
+    if (!dbUp) return;
+    const { a } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'damaged', message: 'وصل الكوب مكسوراً' });
+    expect(opened.statusCode, opened.body).toBe(201);
+    const id = opened.json().id as string;
+
+    expect((await call('POST', `/vendor/disputes/${id}/messages`, vendors[0]!.token, { body: '   ' })).statusCode).toBe(400);
+    const spaces = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: '     ' });
+    expect(spaces.statusCode, spaces.body).toBe(400);
+    expect(spaces.json().message).toBe('سبب القرار يظهر للطرفين — 5 أحرف على الأقل.');
+    expect((await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: '  مكسو  ' })).statusCode).toBe(400);
+    const held = await prisma.dispute.findUniqueOrThrow({ where: { id }, select: { status: true, messages: { select: { body: true } } } });
+    expect(held.status).toBe('open');
+    expect(held.messages.some((m) => m.body.trim() === '')).toBe(false);
+
+    const ok = await call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'vendor', resolution: '  الصور لا تُظهر كسراً  ' });
+    expect(ok.statusCode, ok.body).toBe(204);
+    expect((await prisma.dispute.findUniqueOrThrow({ where: { id } })).resolution).toBe('الصور لا تُظهر كسراً');
+  });
+
   it('الإكمال على موعد التسليم المحفوظ لا على فترة التعليق اليوم (ACFG-025)', async () => {
     if (!dbUp) return;
     const { a, b } = await placeOrder([1, 1]);

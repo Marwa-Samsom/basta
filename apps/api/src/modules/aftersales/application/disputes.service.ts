@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma, Role } from '@prisma/client';
-import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
+import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { NotificationsService } from '../../notifications/public';
@@ -211,10 +211,13 @@ export class DisputesService {
   }
 
   async message(party: Party, id: string, body: string): Promise<void> {
+    // تُقاس بعد إزالة المسافات: رسالة من مسافات كانت تُحفظ فارغة في مجرى الطرفين (ADM-073، 31 أكتوبر 2026)
+    const text = body.trim();
+    if (!text) throw new InvalidInputError('الرسالة فارغة — اكتب ما يقرؤه الطرف الآخر.');
     const d = await this.get(party, id);
     if (!OPEN.includes(d.status)) throw new ConflictError('النزاع مغلق.');
     await this.prisma.disputeMessage.create({
-      data: { disputeId: id, senderUserId: party.userId, senderRole: ROLE[party.kind], body: body.trim(), attachments: [] },
+      data: { disputeId: id, senderUserId: party.userId, senderRole: ROLE[party.kind], body: text, attachments: [] },
     });
     // الطرف الآخر يُبلَّغ: رسالة لا يراها صاحبها لا تحلّ نزاعاً
     const s = await this.prisma.subOrder.findUniqueOrThrow({
@@ -324,6 +327,8 @@ export class DisputesService {
    */
   async resolve(adminUserId: string, id: string, input: { outcome: 'customer' | 'vendor'; resolution: string }): Promise<void> {
     const resolution = input.resolution.trim();
+    // يُقاس بعد إزالة المسافات: خمس مسافات كانت تحسم النزاع بسبب فارغ يراه الطرفان (ADM-073، 31 أكتوبر 2026)
+    if (resolution.length < 5) throw new InvalidInputError('سبب القرار يظهر للطرفين — 5 أحرف على الأقل.');
     const close = (customerOutcome: string) => async (db: Db) => {
       const { count } = await db.dispute.updateMany({
         where: { id, status: { in: OPEN } },
@@ -336,7 +341,7 @@ export class DisputesService {
       });
       if (count === 0) throw new ConflictError('النزاع مغلق أو غير موجود.');
       await db.auditLog.create({
-        data: { actorUserId: adminUserId, actorRole: 'admin', action: 'dispute.resolve', entityType: 'Dispute', entityId: id, afterJson: input },
+        data: { actorUserId: adminUserId, actorRole: 'admin', action: 'dispute.resolve', entityType: 'Dispute', entityId: id, afterJson: { ...input, resolution } },
       });
       // كان القرار لا يصل أحداً: يراه من يفتح الصفحة وحده (J-06 — ADM-069، BUY-061)
       await this.notifyParties(db, id, {
