@@ -87,9 +87,10 @@ export class AdminCampaignsController {
 
   @Get('coupon-options')
   @RequirePermission('content.manage')
-  @ApiOperation({ summary: 'كوبونات مفعّلة غير منتهية لإعلانها مع حملة' })
-  couponOptions() {
-    return this.campaigns.couponOptions();
+  @ApiOperation({ summary: 'كوبونات مفعّلة غير منتهية لإعلانها مع حملة — بحث برمزها وأوّل عشرين' })
+  couponOptions(@Query('q') q?: string) {
+    const term = typeof q === 'string' ? q.trim().slice(0, 40) : '';
+    return this.campaigns.couponOptions(term || undefined);
   }
 
   @Get(':id')

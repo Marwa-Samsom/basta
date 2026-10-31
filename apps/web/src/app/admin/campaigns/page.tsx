@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { ClearableInput, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -21,6 +21,8 @@ interface Campaign {
   productCount: number;
   couponId: string | null;
   couponCode: string | null;
+  /** المربوط مفعّل وغير منتهٍ — null بلا كوبون */
+  couponUsable: boolean | null;
   scope: { shops: number };
 }
 
@@ -98,11 +100,15 @@ const EMPTY = { nameAr: '', placement: 'home_top' as Campaign['placement'], star
  */
 export default function AdminCampaignsPage() {
   const { data, error, forbidden, reload } = useAdminData<Campaign[]>('/admin/campaigns');
-  const coupons = useAdminData<CouponOption[]>('/admin/campaigns/coupon-options');
   const act = useAction();
   const [filter, setFilter] = useState<'all' | Status>('all');
   const [q, setQ] = useState('');
-  const [form, setForm] = useState<{ id: string | null; couponId: string | null; v: typeof EMPTY } | null>(null);
+  // picked: رمز المختار ليبقى ظاهراً ولو خرج من نتائج البحث، وusable=false إن لم يعد صالحاً
+  const [form, setForm] = useState<{ id: string | null; couponId: string | null; picked: { code: string; usable: boolean } | null; v: typeof EMPTY } | null>(null);
+  // «كوبون يُعلَن» بحثاً برمزه وأوّل عشرين — كانت كل الكوبونات المفعّلة قائمة واحدة (ACFG-039، 31 أكتوبر 2026)
+  const [couponSearch, setCouponSearch] = useState('');
+  const cq = new URLSearchParams(couponSearch.trim() ? { q: couponSearch.trim() } : {});
+  const coupons = useAdminData<{ items: CouponOption[]; total: number }>(form ? `/admin/campaigns/coupon-options?${cq}` : null);
   const [ordering, setOrdering] = useState<string | null>(null);
 
   if (!data) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
@@ -110,10 +116,16 @@ export default function AdminCampaignsPage() {
   const term = q.trim();
   const shown = data.filter((c) => filter === 'all' || c.status === filter).filter((c) => !term || c.nameAr.includes(term));
 
-  const openNew = () => (setOrdering(null), setForm({ id: null, couponId: null, v: EMPTY }));
+  const openNew = () => (setOrdering(null), setCouponSearch(''), setForm({ id: null, couponId: null, picked: null, v: EMPTY }));
   const openEdit = (c: Campaign) => (
     setOrdering(null),
-    setForm({ id: c.id, couponId: c.couponId, v: { nameAr: c.nameAr, placement: c.placement, startsAt: toLocalInput(c.startsAt), endsAt: toLocalInput(c.endsAt), couponId: c.couponId ?? '' } })
+    setCouponSearch(''),
+    setForm({
+      id: c.id,
+      couponId: c.couponId,
+      picked: c.couponId && c.couponCode ? { code: c.couponCode, usable: c.couponUsable !== false } : null,
+      v: { nameAr: c.nameAr, placement: c.placement, startsAt: toLocalInput(c.startsAt), endsAt: toLocalInput(c.endsAt), couponId: c.couponId ?? '' },
+    })
   );
 
   const save = () => {
@@ -203,21 +215,42 @@ export default function AdminCampaignsPage() {
               <span className="field__label">تنتهي</span>
               <input type="datetime-local" className="field__control" value={form.v.endsAt} onChange={(e) => setForm({ ...form, v: { ...form.v, endsAt: e.target.value } })} />
             </label>
-            <label className="field">
-              <span className="field__label">كوبون يُعلَن (اختياري)</span>
-              <select className="field__control" value={form.v.couponId} onChange={(e) => setForm({ ...form, v: { ...form.v, couponId: e.target.value } })}>
-                <option value="">بلا كوبون</option>
-                {/* كوبون الحملة الحالي قد يكون أُوقف بعد ربطه — يبقى ظاهراً ليُفهم الاختيار */}
-                {form.couponId && !(coupons.data ?? []).some((c) => c.id === form.couponId) ? (
-                  <option value={form.couponId}>{data.find((c) => c.id === form.id)?.couponCode ?? 'الكوبون الحالي'} (غير صالح الآن)</option>
-                ) : null}
-                {(coupons.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="field ac2-form__wide">
+              <span className="field__label" id="campaign-coupon">
+                كوبون يُعلَن (اختياري)
+              </span>
+              <div className="ac2-pick">
+                <SearchBox value={couponSearch} onChange={setCouponSearch} placeholder="ابحث برمز الكوبون" label="ابحث عن كوبون" className="ac2-search" />
+                <select
+                  className="field__control"
+                  aria-labelledby="campaign-coupon"
+                  value={form.v.couponId}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      picked: e.target.value ? { code: e.target.selectedOptions[0]?.text ?? '', usable: true } : null,
+                      v: { ...form.v, couponId: e.target.value },
+                    })
+                  }
+                >
+                  <option value="">بلا كوبون</option>
+                  {!coupons.data ? null : coupons.data.total === 0 ? (
+                    <option disabled>لا كوبون مفعّل بهذا الرمز</option>
+                  ) : coupons.data.total > coupons.data.items.length ? (
+                    <option disabled>{`أوّل ${coupons.data.items.length} من ${coupons.data.total} — ضيّق بالبحث`}</option>
+                  ) : null}
+                  {/* المختار يبقى ظاهراً ولو خرج من نتائج البحث — وكوبون أُوقف بعد ربطه يُعلَّم ليُفهم الاختيار */}
+                  {form.v.couponId && form.picked && !(coupons.data?.items ?? []).some((c) => c.id === form.v.couponId) ? (
+                    <option value={form.v.couponId}>{form.picked.usable ? form.picked.code : `${form.picked.code} (غير صالح الآن)`}</option>
+                  ) : null}
+                  {(coupons.data?.items ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
           {form.v.startsAt && form.v.endsAt && new Date(form.v.endsAt) <= new Date(form.v.startsAt) ? (
             <p className="field__error" role="alert">
