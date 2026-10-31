@@ -41,6 +41,7 @@ test('«كوبون يُعلَن»: بحث برمز الكوبون، والمخت
   await expect(pick).toHaveValue(all[27]!.id);
   await expect(pick.locator('option:checked')).toHaveText('E2E-PICK-27');
 
+  // بلا نتائج: المختار قبل «لا كوبون مفعّل…» لا بعده، فلا يُقرأ السطر نفياً لما تحته
   await search.fill('لا-مطابق');
-  await expect(pick.locator('option', { hasText: 'لا كوبون مفعّل بهذا الرمز' })).toHaveCount(1);
+  await expect(pick.locator('option')).toHaveText(['بلا كوبون', 'E2E-PICK-27', 'لا كوبون مفعّل بهذا الرمز']);
 });

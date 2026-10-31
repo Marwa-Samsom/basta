@@ -234,14 +234,14 @@ export default function AdminCampaignsPage() {
                   }
                 >
                   <option value="">بلا كوبون</option>
+                  {/* المختار يبقى ظاهراً ولو خرج من نتائج البحث — وكوبون أُوقف بعد ربطه يُعلَّم ليُفهم الاختيار — قبل سطر النتائج كي لا يُقرأ «لا كوبون» فوقه */}
+                  {form.v.couponId && form.picked && !(coupons.data?.items ?? []).some((c) => c.id === form.v.couponId) ? (
+                    <option value={form.v.couponId}>{form.picked.usable ? form.picked.code : `${form.picked.code} (غير صالح الآن)`}</option>
+                  ) : null}
                   {!coupons.data ? null : coupons.data.total === 0 ? (
                     <option disabled>لا كوبون مفعّل بهذا الرمز</option>
                   ) : coupons.data.total > coupons.data.items.length ? (
                     <option disabled>{`أوّل ${coupons.data.items.length} من ${coupons.data.total} — ضيّق بالبحث`}</option>
-                  ) : null}
-                  {/* المختار يبقى ظاهراً ولو خرج من نتائج البحث — وكوبون أُوقف بعد ربطه يُعلَّم ليُفهم الاختيار */}
-                  {form.v.couponId && form.picked && !(coupons.data?.items ?? []).some((c) => c.id === form.v.couponId) ? (
-                    <option value={form.v.couponId}>{form.picked.usable ? form.picked.code : `${form.picked.code} (غير صالح الآن)`}</option>
                   ) : null}
                   {(coupons.data?.items ?? []).map((c) => (
                     <option key={c.id} value={c.id}>
