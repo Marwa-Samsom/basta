@@ -697,6 +697,49 @@ describe('النشر بلا مراجعة — قرار صاحب المشروع 15
 });
 
 // ============================================================================
+// خصيصة يراها كل بائع كانت تُنشأ وتُزاد قيمها بلا أثر في السجل (ACFG-086، 31 أكتوبر 2026)
+describe('الخصائص في سجل التدقيق', () => {
+  dbIt('إنشاء خصيصة وإضافة قيمة لها: سطر لكل منهما بالمدير وما أُضيف', async () => {
+    const admin = await prisma.user.create({
+      data: {
+        email: `attr.admin.${SUFFIX}@basta.test`,
+        fullName: 'مدير الخصائص',
+        passwordHash: await hashPassword(randomUUID()),
+        roles: { create: { role: 'admin' } },
+        permissions: { create: { permission: 'catalog.manage' } },
+        totpEnabledAt: new Date(),
+      },
+    });
+    let attributeId: string | null = null;
+    try {
+      const { accessToken } = await app.get(TokenService).issue({ sub: admin.id, roles: ['admin'], permissions: ['catalog.manage'] }, {});
+      const post = (url: string, payload: object) =>
+        app.inject({ method: 'POST', url: `/api/v1${url}`, headers: { authorization: `Bearer ${accessToken}`, 'user-agent': 'audit-spec/1' }, payload });
+      const code = `audit_${SUFFIX}`;
+
+      const created = await post('/admin/attributes', { code, nameAr: 'خامة الاختبار', inputType: 'select', values: [{ valueAr: 'قطن' }] });
+      expect(created.statusCode, created.body).toBe(201);
+      attributeId = created.json().id as string;
+      const added = await post(`/admin/attributes/${attributeId}/values`, { valueAr: 'كتان' });
+      expect(added.statusCode, added.body).toBe(201);
+
+      const lines = await prisma.auditLog.findMany({ where: { entityType: 'Attribute', entityId: attributeId }, orderBy: { createdAt: 'asc' } });
+      expect(lines.map((l) => l.action)).toEqual(['attribute.create', 'attribute.value_add']);
+      for (const l of lines) expect(l).toMatchObject({ actorUserId: admin.id, actorRole: 'admin', userAgent: 'audit-spec/1' });
+      expect(lines[0]!.afterJson).toMatchObject({ code, nameAr: 'خامة الاختبار', inputType: 'select', values: ['قطن'] });
+      expect(lines[1]!.afterJson).toMatchObject({ attribute: 'خامة الاختبار', valueAr: 'كتان' });
+    } finally {
+      // لا يبقى مدير اختبار ولا خصيصة اختبار يراها البائعون على قاعدة التطوير
+      await prisma.user.update({ where: { id: admin.id }, data: { status: 'suspended' } });
+      if (attributeId) {
+        await prisma.attributeValue.deleteMany({ where: { attributeId } });
+        await prisma.attribute.delete({ where: { id: attributeId } });
+      }
+    }
+  });
+});
+
+// ============================================================================
 describe('بوابة 05 · البند الثالث — الاستيراد الجماعي', () => {
   const HEADER = ['رمز_المنتج', 'SKU', 'الاسم_عربي', 'الفئة', 'السعر', 'السعر_قبل_الخصم', 'الكمية', 'الخيار_1', 'قيمة_الخيار_1', 'الخيار_2', 'قيمة_الخيار_2'];
 

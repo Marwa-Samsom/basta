@@ -22,7 +22,35 @@ interface Entry {
   actor: { email: string | null; fullName: string | null } | null;
 }
 
-const ENTITY_TYPES = ['SubOrder', 'Vendor', 'Product', 'PayoutRequest', 'CommissionRule', 'Setting', 'TaxRate', 'ExchangeRate', 'Coupon', 'User', 'Dispute', 'NotificationTemplate', 'CmsPage', 'Banner', 'Review'];
+/**
+ * أنواع الكيان بأسمائها العربية — الرمز يبقى قيمة التصفية. كانت القائمة رموزاً إنجليزية خاماً
+ * وناقصة ستة أنواع يكتبها الخادم (ACFG-086، 31 أكتوبر 2026). كل نوع جديد يُكتب في السجل
+ * يُضاف هنا، واختبار audit-labels.spec.ts يفشل إن نُسي.
+ */
+const ENTITY_LABELS: Record<string, string> = {
+  Order: 'طلب',
+  SubOrder: 'طلب فرعي',
+  Refund: 'استرداد',
+  Dispute: 'نزاع',
+  Vendor: 'متجر',
+  VendorDocument: 'وثيقة متجر',
+  VendorBankAccount: 'حساب بنكي لمتجر',
+  PayoutRequest: 'طلب سحب',
+  Product: 'منتج',
+  Attribute: 'خصيصة',
+  Review: 'تقييم',
+  Coupon: 'كوبون',
+  Campaign: 'حملة',
+  Banner: 'لافتة',
+  CmsPage: 'صفحة محتوى',
+  NotificationTemplate: 'قالب إشعار',
+  CommissionRule: 'قاعدة عمولة',
+  TaxRate: 'ضريبة',
+  ExchangeRate: 'سعر صرف',
+  ShippingZone: 'منطقة شحن',
+  Setting: 'إعداد',
+  User: 'مستخدم',
+};
 
 /**
  * AD-24 — سجل التدقيق. للقراءة وحدها: لا زرّ تعديل ولا حذف في أي مكان،
@@ -56,8 +84,10 @@ function AuditInner() {
         <ClearableInput className="field__control num ac2-search" placeholder="الإجراء، مثل payout." dir="ltr" value={action} onChange={(e) => setAction(e.target.value)} aria-label="الإجراء" />
         <select className="field__control" value={entityType} onChange={(e) => setEntityType(e.target.value)} aria-label="نوع الكيان">
           <option value="">كل الأنواع</option>
-          {ENTITY_TYPES.map((t) => (
-            <option key={t}>{t}</option>
+          {Object.entries(ENTITY_LABELS).map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
           ))}
         </select>
         <SortButton value={sort} onChange={setSort} />
@@ -111,7 +141,7 @@ function AuditInner() {
                     </td>
                     <td data-label="الكيان">
                       <span className="ac2-cell">
-                        <span className="small">{e.entityType}</span>
+                        <span className="small">{ENTITY_LABELS[e.entityType] ?? e.entityType}</span>
                         {e.entityId ? <span className="ac2-cell__sub num">{e.entityId.slice(0, 12)}</span> : null}
                       </span>
                     </td>

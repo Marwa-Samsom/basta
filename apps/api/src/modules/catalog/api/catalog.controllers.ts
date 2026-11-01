@@ -115,14 +115,51 @@ export class AdminCatalogController {
     private readonly audit: AuditService,
   ) {}
 
+  // خصيصة يراها كل بائع كانت تُنشأ وتُزاد قيمها بلا أثر في السجل (ACFG-086، 31 أكتوبر 2026)
   @Post('attributes')
-  createAttribute(@Body() dto: CreateAttributeDto) {
-    return this.attributes.createAttribute(dto);
+  async createAttribute(@CurrentActor() actor: Actor, @Body() dto: CreateAttributeDto, @Req() req: FastifyRequest) {
+    const a = await this.attributes.createAttribute(dto);
+    await this.audit.record({
+      actorUserId: actor.userId,
+      actorRole: 'admin',
+      action: 'attribute.create',
+      entityType: 'Attribute',
+      entityId: a.id,
+      after: {
+        code: a.code,
+        nameAr: a.nameAr,
+        inputType: a.inputType,
+        unit: a.unit,
+        isFilterable: a.isFilterable,
+        isVariantAxis: a.isVariantAxis,
+        values: a.values.map((v) => v.valueAr),
+      },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return a;
   }
 
   @Post('attributes/:id/values')
-  addAttributeValue(@Param('id', uuidParam) id: string, @Body() dto: AttributeValueCreateDto) {
-    return this.attributes.addAttributeValue(id, dto);
+  async addAttributeValue(
+    @CurrentActor() actor: Actor,
+    @Param('id', uuidParam) id: string,
+    @Body() dto: AttributeValueCreateDto,
+    @Req() req: FastifyRequest,
+  ) {
+    const v = await this.attributes.addAttributeValue(id, dto);
+    const a = await this.prisma.attribute.findUnique({ where: { id }, select: { nameAr: true } });
+    await this.audit.record({
+      actorUserId: actor.userId,
+      actorRole: 'admin',
+      action: 'attribute.value_add',
+      entityType: 'Attribute',
+      entityId: id,
+      after: { attribute: a?.nameAr ?? null, valueAr: v.valueAr, valueEn: v.valueEn, hexColor: v.hexColor },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    return v;
   }
 
   @Get('attributes')
