@@ -730,10 +730,18 @@ export class ProductService {
    * إيقاف منشور مخالف بسبب يراه البائع — بعد النشر لا قبله (لا مراجعة منذ 15 أكتوبر
    * 2026). يختفي من المتجر فوراً، والبائع يعدّله وينشره من جديد. المسودة لم تُنشر فلا تُوقف.
    */
-  async reject(id: string, reason: string): Promise<void> {
+  /**
+   * يعيد السبب كما حُفظ — يُقاس بعد إزالة المسافات من طرفيه: خمس مسافات كانت تمرّ بحدّ
+   * الطول فيصل البائع سبب فارغ (ADM-051، 30 أكتوبر 2026).
+   */
+  async reject(id: string, reason: string): Promise<string> {
+    const trimmed = reason.trim();
+    if (trimmed.length < 5 || trimmed.length > 500) {
+      throw new InvalidInputError('سبب الإيقاف من 5 أحرف إلى 500 — البائع يصلح بناءً عليه.');
+    }
     const { count } = await this.prisma.product.updateMany({
       where: { id, deletedAt: null, status: 'active' },
-      data: { status: 'rejected', rejectReason: reason },
+      data: { status: 'rejected', rejectReason: trimmed },
     });
     if (count === 0) {
       const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null }, select: { status: true } });
@@ -741,6 +749,7 @@ export class ProductService {
       throw new InvalidStateTransitionError(product.status, 'rejected');
     }
     this.reindex(id);
+    return trimmed;
   }
 
   /** تفاصيل المنتج كما يراها البائع، للإدارة — بنطاق بائعه صراحةً. */
