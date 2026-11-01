@@ -41,7 +41,15 @@ const KINDS: Record<string, { title: string; icon: IconName; tone: Tone }> = {
   order_awaiting_transfer: { title: 'طلبك بانتظار تحويلك', icon: 'clock', tone: 'warning' },
   transfer_expired: { title: 'أُلغي طلب لم يصل تحويله', icon: 'alert', tone: 'danger' },
   dispute_message: { title: 'رسالة جديدة في نزاعك', icon: 'shield', tone: 'info' },
+  dispute_escalated: { title: 'صُعِّد نزاعك للإدارة', icon: 'shield', tone: 'warning' },
+  dispute_resolved: { title: 'حُسم نزاعك', icon: 'shield', tone: 'info' },
+  late_payment_refunded: { title: 'رددنا دفعاً وصل متأخراً', icon: 'wallet', tone: 'info' },
   vendor_new_order: { title: 'طلب جديد لمتجرك', icon: 'package', tone: 'brand' },
+  vendor_order_canceled: { title: 'أُلغي طلب لمتجرك', icon: 'alert', tone: 'danger' },
+  vendor_dispute_opened: { title: 'نزاع جديد على طلب لمتجرك', icon: 'alert', tone: 'danger' },
+  vendor_dispute_escalated: { title: 'صُعِّد نزاع على متجرك للإدارة', icon: 'shield', tone: 'warning' },
+  vendor_dispute_resolved: { title: 'حُسم نزاع على متجرك', icon: 'shield', tone: 'info' },
+  vendor_dispute_withdrawn: { title: 'سحب المشتري نزاعه', icon: 'check-circle', tone: 'success' },
   return_requested: { title: 'طلب إرجاع جديد', icon: 'return', tone: 'warning' },
   payout_paid: { title: 'نُفّذ تحويل رصيدك', icon: 'wallet', tone: 'success' },
   payout_rejected: { title: 'رُفض طلب السحب', icon: 'alert', tone: 'danger' },
@@ -56,6 +64,7 @@ const KINDS: Record<string, { title: string; icon: IconName; tone: Tone }> = {
   bank_account_verified: { title: 'وُثّق حساب بنكي', icon: 'check-circle', tone: 'success' },
   recovery_code_used: { title: 'استُعمل رمز استعادة', icon: 'shield', tone: 'warning' },
   totp_reset_by_admin: { title: 'أُعيد ضبط التحقّق بخطوتين', icon: 'shield', tone: 'danger' },
+  totp_rotated: { title: 'رُبط التحقّق بخطوتين بجهاز جديد', icon: 'shield', tone: 'warning' },
 };
 const FALLBACK = { title: '', icon: 'bell' as IconName, tone: 'neutral' as Tone };
 
