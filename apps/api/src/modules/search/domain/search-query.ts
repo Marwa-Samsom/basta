@@ -45,8 +45,11 @@ export interface SearchDocument {
   readonly brandId: string | null;
   readonly storeCategoryId: string | null;
   readonly storeCategoryNameAr: string | null;
+  /** قيم خصائص المنتج وقيم محاور متغيّراته معاً (اللون والمقاس) — منها الأوجه والتصفية */
   readonly attributeValueIds: readonly string[];
   readonly attributeValuesAr: readonly string[];
+  /** قيم محاور المتغيّرات وحدها — وجودها في الوثيقة علامة أنها بُنيت بعد ضمّ المحاور (31 أكتوبر 2026) */
+  readonly variantValueIds: readonly string[];
   readonly priceMinor: number;
   readonly currency: string;
   /** أرخص متغيّر بالدولار بلا هامش — مفتاح ترتيب واحد بين متاجر بعملات مختلفة. يغيب بلا سعر صرف */
@@ -150,6 +153,7 @@ export const INDEX_SETTINGS = Object.freeze({
     'brandId',
     'storeCategoryId',
     'attributeValueIds',
+    'variantValueIds',
     'priceMinor',
     'priceUsd',
     'available',
