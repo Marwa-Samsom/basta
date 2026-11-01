@@ -10,9 +10,12 @@
  * المدير الأول **مالك المنصة** إن لم يكن لها مالك: لا يغيّر صلاحياته ولا يسحب
  * إدارته مدير آخر، وهو وحده يمنح ما لا يحمله المانح. تشغيل الأمر لحساب ثانٍ
  * يعطيه الإدارة والصلاحيات ولا يجعله مالكاً.
+ *
+ * الحساب غير النشط (معلَّق أو محذوف) يُرفض برمز 1 ولا يتغيّر شيء. المنطق في
+ * grantAdmin (owner-recovery.ts) داخل معاملة واحدة، ويُختبر هناك مع admin:recover.
  */
 import { PrismaClient } from '@prisma/client';
-import { PERMISSION_CODES } from '../src/modules/admin/domain/permissions';
+import { grantAdmin } from '../src/modules/admin/application/owner-recovery';
 
 async function main(): Promise<void> {
   const email = process.argv[2]?.trim().toLowerCase();
@@ -22,23 +25,8 @@ async function main(): Promise<void> {
   }
   const prisma = new PrismaClient();
   try {
-    const user = await prisma.user.findUnique({ where: { email }, select: { id: true, status: true } });
-    if (!user) throw new Error(`لا حساب بالبريد ${email} — أنشئه من /register أولاً.`);
-    await prisma.userRole.upsert({
-      where: { userId_role: { userId: user.id, role: 'admin' } },
-      create: { userId: user.id, role: 'admin' },
-      update: {},
-    });
-    await prisma.adminPermission.createMany({
-      data: PERMISSION_CODES.map((permission) => ({ userId: user.id, permission })),
-      skipDuplicates: true,
-    });
-    const owner = await prisma.user.findFirst({ where: { isPlatformOwner: true }, select: { id: true } });
-    if (!owner) await prisma.user.update({ where: { id: user.id }, data: { isPlatformOwner: true } });
-    await prisma.auditLog.create({
-      data: { actorUserId: null, action: 'admin.bootstrap', entityType: 'User', entityId: user.id, afterJson: { permissions: [...PERMISSION_CODES] } },
-    });
-    console.log(`✓ ${email} مدير بكل الصلاحيات${owner ? '' : ' ومالك المنصة'}. التحقق الثنائي يُطلب عند أول دخول.`);
+    const r = await prisma.$transaction((tx) => grantAdmin(tx, { email }));
+    console.log(`✓ ${r.email} مدير بكل الصلاحيات${r.madeOwner ? ' ومالك المنصة' : ''}. التحقق الثنائي يُطلب عند أول دخول.`);
   } finally {
     await prisma.$disconnect();
   }

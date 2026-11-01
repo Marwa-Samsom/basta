@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
+import { PERMISSION_CODES } from '../domain/permissions';
 
 /**
  * طريق الخروج من قفل الإدارة — من خارج اللوحة، بمن يملك اتصال القاعدة.
@@ -12,6 +13,8 @@ import { NotificationsService } from '../../notifications/public';
  *
  * الدالتان تعملان داخل معاملة يمرّرها المستدعي: الأمر يلتزمها، والاختبار يتراجع عنها
  * (الملكية واحدة في القاعدة كلها). وكلتاهما تكتب سطراً في التدقيق بسبب إلزامي.
+ *
+ * ومعهما grantAdmin — المدير الأول (admin:grant): الباب نفسه قبل أن يوجد مدير يمنح من اللوحة.
  */
 
 export class RecoveryRefused extends Error {}
@@ -131,4 +134,47 @@ export async function transferOwnership(
     },
   });
   return { from: current?.email ?? null, to: email };
+}
+
+export interface AdminGrant {
+  readonly userId: string;
+  readonly email: string;
+  readonly madeOwner: boolean;
+}
+
+/**
+ * يمنح حساباً موجوداً دور الإدارة وكل الصلاحيات، ومالكَ المنصة إن لم يكن لها مالك. الإعادة
+ * لا تكرّر الصلاحيات وتكتب سطراً في التدقيق. صاحب الحساب أنشأه بنفسه من /register فلا كلمة
+ * مرور تمرّ بيد أحد، والتحقق الثنائي يُفرض عند أول دخول.
+ *
+ * الحساب غير النشط يُرفض قبل أي كتابة: كان الأمر يقرأ الحالة ولا يفحصها، فيُمنح الموقوف كل
+ * الصلاحيات — ويصير مالكاً إن لم يوجد — ويعمل بها لحظة يُعاد تفعيله دون أن يقصد ذلك أحد
+ * (ACFG-101، 1 نوفمبر 2026).
+ */
+export async function grantAdmin(tx: Prisma.TransactionClient, input: { email: string }): Promise<AdminGrant> {
+  const email = normalized(input.email);
+  const user = await tx.user.findUnique({ where: { email }, select: { id: true, status: true, deletedAt: true } });
+  if (!user) throw new RecoveryRefused(`لا حساب بالبريد ${email} — أنشئه من /register أولاً.`);
+  if (user.deletedAt || user.status === 'deleted') {
+    throw new RecoveryRefused('الحساب غير نشط (محذوف) — لا تُمنح الإدارة لحساب محذوف. لم يتغيّر شيء.');
+  }
+  if (user.status !== 'active') {
+    throw new RecoveryRefused('الحساب غير نشط (معلَّق) — أعِد تفعيله أولاً ثم أعد الأمر. لم يتغيّر شيء.');
+  }
+
+  await tx.userRole.upsert({
+    where: { userId_role: { userId: user.id, role: 'admin' } },
+    create: { userId: user.id, role: 'admin' },
+    update: {},
+  });
+  await tx.adminPermission.createMany({
+    data: PERMISSION_CODES.map((permission) => ({ userId: user.id, permission })),
+    skipDuplicates: true,
+  });
+  const owner = await tx.user.findFirst({ where: { isPlatformOwner: true }, select: { id: true } });
+  if (!owner) await tx.user.update({ where: { id: user.id }, data: { isPlatformOwner: true } });
+  await tx.auditLog.create({
+    data: { actorUserId: null, action: 'admin.bootstrap', entityType: 'User', entityId: user.id, afterJson: { permissions: [...PERMISSION_CODES] } },
+  });
+  return { userId: user.id, email, madeOwner: !owner };
 }
