@@ -192,6 +192,8 @@ function DisputeDetail({ id, onChange }: { id: string; onChange: () => void }) {
                     await api(`/admin/disputes/${id}/messages`, { method: 'POST', body: { body } });
                     setBody('');
                     reload();
+                    // وعدّاد رسائله في القائمة — كان يبقى «2 رسالة» حتى تحديث الصفحة (ADM-066، 31 أكتوبر 2026)
+                    onChange();
                   })
                 }
               >
