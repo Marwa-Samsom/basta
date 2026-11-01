@@ -72,6 +72,10 @@
   border-color: var(--border-strong);
   white-space: nowrap;
 }
+/* هدف لمس 44 على الجوال وبالإصبع (SYS-081) — هنا لا في globals لأن هذه القاعدة أخصّ */
+@media (pointer: coarse), (max-width: 640px) {
+  .vm-tabs .tabs__tab { min-height: var(--touch-min); }
+}
 .vm-tabs .tabs__tab[aria-selected='true'] {
   background: var(--brand);
   border-color: var(--brand);
