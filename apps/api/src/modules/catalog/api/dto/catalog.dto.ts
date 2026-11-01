@@ -62,6 +62,31 @@ export class AttributeValueCreateDto {
   hexColor?: string;
 }
 
+/** تصحيح خصيصة — الرمز والنوع والمحور ثابتة (ACFG-099) */
+export class AttributeUpdateDto {
+  @ApiPropertyOptional({ example: 'الخامة' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  nameAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  unit?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isFilterable?: boolean;
+}
+
+export class AttributeValueUpdateDto {
+  @ApiProperty({ example: 'بيج' })
+  @IsString()
+  @Length(1, 80)
+  valueAr!: string;
+}
+
 export class CreateAttributeDto {
   @ApiProperty({ example: 'size' })
   @Matches(/^[a-z][a-z0-9_]{1,40}$/, { message: 'رمز السمة حروف لاتينية صغيرة وأرقام و _ ويبدأ بحرف.' })

@@ -61,11 +61,12 @@ const NEW_CATEGORY = '__new__';
 /** قائمة الخيارات تصير حبوباً ما دامت قصيرة؛ الطويلة تبقى قائمة منسدلة */
 const PILL_LIMIT = 12;
 
+/** نوع الخصيصة بجانب اسمها — كانت LIST و TEXT بالإنجليزية في محرّر عربي (ACFG-099) */
 const KIND: Record<Attribute['inputType'], string> = {
-  select: 'LIST',
-  text: 'TEXT',
-  number: 'NUMBER',
-  boolean: 'BOOL',
+  select: 'قائمة',
+  text: 'نص',
+  number: 'رقم',
+  boolean: 'نعم/لا',
 };
 
 /**
@@ -127,7 +128,12 @@ export function ProductEditor({ productId }: { productId?: string }) {
         ]);
         if (!alive) return;
 
-        setAttributes(library);
+        // المؤرشفة لا تُعرض لمنتج لا يستعملها، وتبقى في منتج يستعملها فلا تضيع قيمته (ACFG-099)
+        const used = new Set([
+          ...(detail?.attributes.map((a) => a.attributeId) ?? []),
+          ...(detail?.variants[0]?.options.map((o) => o.attributeId) ?? []),
+        ]);
+        setAttributes(library.filter((a) => !a.archived || used.has(a.attributeId)));
         setCategories(own);
         if (detail) {
           setProduct(detail);

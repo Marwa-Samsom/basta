@@ -38,6 +38,8 @@ import { IMPORT_MAX_BYTES, ImportFileRejectedError } from '../domain/import-plan
 import { IMAGE_MAX_BYTES, ImageRejectedError } from '../infrastructure/product-images';
 import {
   AdjustStockDto,
+  AttributeUpdateDto,
+  AttributeValueUpdateDto,
   CreateAttributeDto,
   CreateProductDto,
   ListProductsQueryDto,
@@ -115,16 +117,25 @@ export class AdminCatalogController {
     private readonly audit: AuditService,
   ) {}
 
+  /** سطر تدقيق لقرار إداري على خصيصة — الفاعل والعنوان والمتصفّح من الطلب نفسه */
+  private recordAttribute(actor: Actor, req: FastifyRequest, action: string, attributeId: string, change: { before?: unknown; after?: unknown }) {
+    return this.audit.record({
+      actorUserId: actor.userId,
+      actorRole: 'admin',
+      action,
+      entityType: 'Attribute',
+      entityId: attributeId,
+      ...change,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+  }
+
   // خصيصة يراها كل بائع كانت تُنشأ وتُزاد قيمها بلا أثر في السجل (ACFG-086، 31 أكتوبر 2026)
   @Post('attributes')
   async createAttribute(@CurrentActor() actor: Actor, @Body() dto: CreateAttributeDto, @Req() req: FastifyRequest) {
     const a = await this.attributes.createAttribute(dto);
-    await this.audit.record({
-      actorUserId: actor.userId,
-      actorRole: 'admin',
-      action: 'attribute.create',
-      entityType: 'Attribute',
-      entityId: a.id,
+    await this.recordAttribute(actor, req, 'attribute.create', a.id, {
       after: {
         code: a.code,
         nameAr: a.nameAr,
@@ -134,8 +145,6 @@ export class AdminCatalogController {
         isVariantAxis: a.isVariantAxis,
         values: a.values.map((v) => v.valueAr),
       },
-      ip: req.ip,
-      userAgent: req.headers['user-agent'] ?? null,
     });
     return a;
   }
@@ -149,26 +158,96 @@ export class AdminCatalogController {
   ) {
     const v = await this.attributes.addAttributeValue(id, dto);
     const a = await this.prisma.attribute.findUnique({ where: { id }, select: { nameAr: true } });
-    await this.audit.record({
-      actorUserId: actor.userId,
-      actorRole: 'admin',
-      action: 'attribute.value_add',
-      entityType: 'Attribute',
-      entityId: id,
+    await this.recordAttribute(actor, req, 'attribute.value_add', id, {
       after: { attribute: a?.nameAr ?? null, valueAr: v.valueAr, valueEn: v.valueEn, hexColor: v.hexColor },
-      ip: req.ip,
-      userAgent: req.headers['user-agent'] ?? null,
     });
     return v;
   }
 
+  // التصحيح والحذف والأرشفة — كانت الإدارة تُنشئ فقط (ACFG-099، 1 نوفمبر 2026)
+  @Patch('attributes/:id')
+  @ApiOperation({ summary: 'تصحيح اسم الخصيصة أو وحدتها أو تصفيتها — الرمز والنوع والمحور ثابتة' })
+  async updateAttribute(
+    @CurrentActor() actor: Actor,
+    @Param('id', uuidParam) id: string,
+    @Body() dto: AttributeUpdateDto,
+    @Req() req: FastifyRequest,
+  ) {
+    const change = await this.attributes.updateAttribute(id, dto);
+    await this.recordAttribute(actor, req, 'attribute.update', id, change);
+    return change.after;
+  }
+
+  @Patch('attributes/:id/values/:valueId')
+  @ApiOperation({ summary: 'تصحيح اسم قيمة — يصل كل منتج يستعملها' })
+  async updateAttributeValue(
+    @CurrentActor() actor: Actor,
+    @Param('id', uuidParam) id: string,
+    @Param('valueId', uuidParam) valueId: string,
+    @Body() dto: AttributeValueUpdateDto,
+    @Req() req: FastifyRequest,
+  ) {
+    const v = await this.attributes.updateValue(id, valueId, dto.valueAr);
+    await this.recordAttribute(actor, req, 'attribute.value_update', id, {
+      before: { attribute: v.attribute, valueAr: v.before },
+      after: { attribute: v.attribute, valueAr: v.after },
+    });
+    return { valueAr: v.after };
+  }
+
+  @Delete('attributes/:id/values/:valueId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'حذف قيمة لا يستعملها منتج ولا متغيّر ولا صورة' })
+  async deleteAttributeValue(
+    @CurrentActor() actor: Actor,
+    @Param('id', uuidParam) id: string,
+    @Param('valueId', uuidParam) valueId: string,
+    @Req() req: FastifyRequest,
+  ): Promise<void> {
+    const v = await this.attributes.deleteValue(id, valueId);
+    await this.recordAttribute(actor, req, 'attribute.value_delete', id, { before: v });
+  }
+
+  @Delete('attributes/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'حذف خصيصة لا يستعملها منتج — المستعملة تُؤرشف' })
+  async deleteAttribute(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string, @Req() req: FastifyRequest): Promise<void> {
+    const before = await this.attributes.deleteAttribute(id);
+    await this.recordAttribute(actor, req, 'attribute.delete', id, { before });
+  }
+
+  @Post('attributes/:id/archive')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'أرشفة خصيصة: تختفي من خيارات البائع لمنتج جديد وتبقى عند منتجاتها' })
+  async archiveAttribute(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string, @Req() req: FastifyRequest): Promise<void> {
+    const a = await this.attributes.setArchived(id, true);
+    await this.recordAttribute(actor, req, 'attribute.archive', id, { before: { archived: false }, after: a });
+  }
+
+  @Post('attributes/:id/restore')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'استرجاع خصيصة مؤرشفة إلى خيارات البائعين' })
+  async restoreAttribute(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string, @Req() req: FastifyRequest): Promise<void> {
+    const a = await this.attributes.setArchived(id, false);
+    await this.recordAttribute(actor, req, 'attribute.restore', id, { before: { archived: true }, after: a });
+  }
+
   @Get('attributes')
-  @ApiOperation({ summary: 'كل السمات بقيمها وعدد المنتجات التي تستعملها — AD-09' })
+  @ApiOperation({ summary: 'كل السمات بقيمها، وكم منتجاً ومتغيّراً يستعمل كلاً منها وكل قيمة — AD-09' })
   listAttributes() {
     return this.prisma.attribute.findMany({
       orderBy: [{ sort: 'asc' }, { code: 'asc' }],
       include: {
-        values: { orderBy: { sort: 'asc' }, select: { id: true, valueAr: true, valueEn: true, hexColor: true } },
+        values: {
+          orderBy: { sort: 'asc' },
+          select: {
+            id: true,
+            valueAr: true,
+            valueEn: true,
+            hexColor: true,
+            _count: { select: { productValues: true, variantOptions: true, productImages: true } },
+          },
+        },
         _count: { select: { productValues: true, variantOptions: true } },
       },
     });

@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { ClearableInput, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -15,8 +16,30 @@ interface Attr {
   unit: string | null;
   isFilterable: boolean;
   isVariantAxis: boolean;
-  values: { id: string; valueAr: string; hexColor: string | null }[];
+  archivedAt: string | null;
+  values: { id: string; valueAr: string; hexColor: string | null; _count: Usage & { productImages: number } }[];
+  _count: Usage;
 }
+
+/** كم منتجاً (بمواصفاته) وكم متغيّراً يستعمل الخصيصة أو القيمة */
+interface Usage {
+  productValues: number;
+  variantOptions: number;
+}
+
+const num = (n: number) => n.toLocaleString('ar-u-nu-latn');
+
+/** «مستعملة في 12 منتجاً و95,017 متغيّراً» — أو «غير مستعملة» */
+function usageText(u: Usage & { productImages?: number }): string {
+  const parts = [
+    u.productValues ? `${num(u.productValues)} منتجاً` : null,
+    u.variantOptions ? `${num(u.variantOptions)} متغيّراً` : null,
+    u.productImages ? `${num(u.productImages)} صورة` : null,
+  ].filter(Boolean);
+  return parts.length ? `مستعملة في ${parts.join(' و')}` : 'غير مستعملة';
+}
+
+const usedCount = (u: Usage & { productImages?: number }) => u.productValues + u.variantOptions + (u.productImages ?? 0);
 
 const TYPES: Record<string, string> = { select: 'قائمة', multiselect: 'قائمة متعددة', number: 'رقم', text: 'نص', boolean: 'نعم/لا' };
 
@@ -48,7 +71,6 @@ function Attributes() {
   const { data, error, forbidden, reload } = useAdminData<Attr[]>('/admin/attributes');
   const act = useAction();
   const [draft, setDraft] = useState({ code: '', nameAr: '', inputType: 'select', unit: '', values: '', isFilterable: true, isVariantAxis: false });
-  const [newValue, setNewValue] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState('all');
   const [q, setQ] = useState('');
   const [showNew, setShowNew] = useState(false);
@@ -195,7 +217,10 @@ function Attributes() {
                   <Fragment key={a.id}>
                   <tr>
                     <td>
-                      <strong>{a.nameAr}</strong>
+                      <span className="ac2-inline">
+                        <strong>{a.nameAr}</strong>
+                        {a.archivedAt ? <span className="badge badge--pending">مؤرشفة</span> : null}
+                      </span>
                     </td>
                     <td className="num" data-label="الرمز">
                       {a.code}
@@ -217,43 +242,7 @@ function Attributes() {
                   {isOpen ? (
                     <tr className="ac2-expand">
                       <td colSpan={7} data-label="">
-                        <div className="ac2-expand__grid">
-                          <div className="stack stack--tight">
-                            <span className="field__label">القيم</span>
-                            {a.values.length ? (
-                              <div className="ac2-values">
-                                {a.values.map((v) => (
-                                  <span key={v.id} className="badge">
-                                    {v.hexColor ? <span className="ac2-swatch" style={{ background: v.hexColor }} aria-hidden /> : null}
-                                    {v.valueAr}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="ac2-fine">لا قيم.</span>
-                            )}
-                            {a.inputType === 'select' || a.inputType === 'multiselect' ? (
-                              <div className="ac2-inline">
-                                <ClearableInput className="field__control" placeholder="قيمة جديدة" aria-label={`قيمة جديدة لـ ${a.nameAr}`} value={newValue[a.id] ?? ''} onChange={(e) => setNewValue({ ...newValue, [a.id]: e.target.value })} />
-                                <button
-                                  type="button"
-                                  className="btn btn--secondary btn--sm"
-                                  disabled={!newValue[a.id]?.trim()}
-                                  onClick={() =>
-                                    void act.run(async () => {
-                                      await api(`/admin/attributes/${a.id}/values`, { method: 'POST', body: { valueAr: newValue[a.id]!.trim() } });
-                                      setNewValue({ ...newValue, [a.id]: '' });
-                                      reload();
-                                    }, 'أُضيفت القيمة.')
-                                  }
-                                >
-                                  <Icon name="plus" size={14} />
-                                  أضف قيمة
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
+                        <AttrEditor key={a.id} attr={a} onChanged={reload} onDeleted={() => (setOpen(null), reload())} />
                       </td>
                     </tr>
                   ) : null}
@@ -264,6 +253,213 @@ function Attributes() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * «حرّر» خصيصة: تصحيح اسمها وأسماء قيمها، وحذف غير المستعمل، وأرشفة المستعمل، وكم يستعملها.
+ * كانت تعرض القيم و«أضف قيمة» وحدهما — الخطأ الإملائي لا يُصحَّح إلا من القاعدة، ولا حذف ولا
+ * أرشفة (ACFG-099، 1 نوفمبر 2026). الرمز والنوع والمحور ثابتة: المنتجات تشير إليها.
+ */
+function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: () => void; onDeleted: () => void }) {
+  const act = useAction();
+  const confirm = useConfirm();
+  const [name, setName] = useState(a.nameAr);
+  const [newValue, setNewValue] = useState('');
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const used = usedCount(a._count) > 0;
+  const hasValues = a.inputType === 'select' || a.inputType === 'multiselect';
+  const base = `/admin/attributes/${a.id}`;
+
+  return (
+    <div className="ac2-expand__grid">
+      <div className="stack stack--tight">
+        <Feedback error={act.error} notice={act.notice} />
+        <span className="ac2-fine">
+          {usageText(a._count)}
+          {a.archivedAt ? ' — مؤرشفة: لا تظهر لمنتج جديد، وتبقى عند المنتجات التي تستعملها.' : '.'}
+        </span>
+
+        <label className="field__label" htmlFor={`attr-name-${a.id}`}>
+          الاسم
+        </label>
+        <div className="ac2-inline">
+          <ClearableInput id={`attr-name-${a.id}`} className="field__control" value={name} onChange={(e) => setName(e.target.value)} />
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm"
+            disabled={act.busy || name.trim().length < 2 || name.trim() === a.nameAr}
+            onClick={() =>
+              void act.run(async () => {
+                await api(base, { method: 'PATCH', body: { nameAr: name.trim() } });
+                onChanged();
+              }, 'حُفظ الاسم.')
+            }
+          >
+            احفظ الاسم
+          </button>
+        </div>
+        <span className="ac2-fine">الرمز والنوع والمحور ثابتة — المنتجات تشير إليها.</span>
+
+        {hasValues ? (
+          <>
+            <span className="field__label">القيم</span>
+            {a.values.length ? (
+              <div className="stack stack--tight" role="list" aria-label={`قيم ${a.nameAr}`}>
+                {a.values.map((v) => {
+                  const vUsed = usedCount(v._count) > 0;
+                  const draft = editing?.id === v.id ? editing.text : null;
+                  return (
+                    <div key={v.id} className="ac2-inline" role="listitem">
+                      {draft !== null ? (
+                        <>
+                          <ClearableInput
+                            className="field__control"
+                            aria-label={`الاسم الصحيح لـ «${v.valueAr}»`}
+                            value={draft}
+                            onChange={(e) => setEditing({ id: v.id, text: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn--secondary btn--sm"
+                            disabled={act.busy || !draft.trim() || draft.trim() === v.valueAr}
+                            onClick={() =>
+                              void act.run(async () => {
+                                await api(`${base}/values/${v.id}`, { method: 'PATCH', body: { valueAr: draft.trim() } });
+                                setEditing(null);
+                                onChanged();
+                              }, 'صُحّحت القيمة — يراها كل منتج يستعملها.')
+                            }
+                          >
+                            احفظ
+                          </button>
+                          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(null)}>
+                            تراجع
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="badge">
+                            {v.hexColor ? <span className="ac2-swatch" style={{ background: v.hexColor }} aria-hidden /> : null}
+                            {v.valueAr}
+                          </span>
+                          <span className="ac2-fine">{usageText(v._count)}</span>
+                          <button type="button" className="btn btn--ghost btn--sm" aria-label={`صحّح «${v.valueAr}»`} onClick={() => setEditing({ id: v.id, text: v.valueAr })}>
+                            صحّح
+                          </button>
+                          {vUsed ? null : (
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              aria-label={`احذف «${v.valueAr}»`}
+                              disabled={act.busy}
+                              onClick={async () => {
+                                const sure = await confirm({
+                                  title: `تحذف «${v.valueAr}»؟`,
+                                  body: 'لا يستعملها منتج ولا متغيّر — تختفي من خيارات البائعين.',
+                                  confirmLabel: 'احذف القيمة',
+                                  danger: true,
+                                });
+                                if (!sure) return;
+                                void act.run(async () => {
+                                  await api(`${base}/values/${v.id}`, { method: 'DELETE' });
+                                  onChanged();
+                                }, 'حُذفت القيمة.');
+                              }}
+                            >
+                              احذف
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <span className="ac2-fine">لا قيم.</span>
+            )}
+            <div className="ac2-inline">
+              <ClearableInput className="field__control" placeholder="قيمة جديدة" aria-label={`قيمة جديدة لـ ${a.nameAr}`} value={newValue} onChange={(e) => setNewValue(e.target.value)} />
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                disabled={act.busy || !newValue.trim()}
+                onClick={() =>
+                  void act.run(async () => {
+                    await api(`${base}/values`, { method: 'POST', body: { valueAr: newValue.trim() } });
+                    setNewValue('');
+                    onChanged();
+                  }, 'أُضيفت القيمة.')
+                }
+              >
+                <Icon name="plus" size={14} />
+                أضف قيمة
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        <div className="ac2-inline">
+          {!used ? (
+            <button
+              type="button"
+              className="btn btn--danger btn--sm"
+              disabled={act.busy}
+              onClick={async () => {
+                const sure = await confirm({
+                  title: `تحذف «${a.nameAr}»؟`,
+                  body: 'لا يستعملها منتج — تُحذف هي وقيمها، ويبقى أثرها في سجل التدقيق.',
+                  confirmLabel: 'احذف الخصيصة',
+                  danger: true,
+                });
+                if (!sure) return;
+                void act.run(async () => {
+                  await api(base, { method: 'DELETE' });
+                  onDeleted();
+                }, 'حُذفت الخصيصة.');
+              }}
+            >
+              احذف الخصيصة
+            </button>
+          ) : a.archivedAt ? (
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              disabled={act.busy}
+              onClick={() =>
+                void act.run(async () => {
+                  await api(`${base}/restore`, { method: 'POST' });
+                  onChanged();
+                }, 'استُرجعت الخصيصة — عادت إلى خيارات البائعين.')
+              }
+            >
+              استرجع الخصيصة
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              disabled={act.busy}
+              onClick={async () => {
+                const sure = await confirm({
+                  title: `تؤرشف «${a.nameAr}»؟`,
+                  body: 'مستعملة فلا تُحذف. تختفي من خيارات البائعين لمنتج جديد، وتبقى عند المنتجات التي تستعملها — ويمكن استرجاعها.',
+                  confirmLabel: 'أرشف الخصيصة',
+                });
+                if (!sure) return;
+                void act.run(async () => {
+                  await api(`${base}/archive`, { method: 'POST' });
+                  onChanged();
+                }, 'أُرشفت الخصيصة.');
+              }}
+            >
+              أرشف الخصيصة
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
