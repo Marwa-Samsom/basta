@@ -861,6 +861,10 @@
   .ao-search { inline-size: 100%; }
 
   .ao-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* بطاقتان في السطر أضيق من مبلغ بخاناته: الخطّ يصغر مع البطاقة فلا ينكسر الرقم نفسه —
+     كان «263,461.1» في سطر و«07 د.أ.» في آخر (ADM-019، 30 أكتوبر 2026) */
+  .ao-metric { container-type: inline-size; }
+  .ao-metric__value { font-size: min(var(--text-lg), 12cqi); }
   .ao-queues { grid-template-columns: minmax(0, 1fr); }
   .ao-cur { margin-inline-start: 0; max-inline-size: 100%; overflow-x: auto; }
 

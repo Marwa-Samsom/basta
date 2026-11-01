@@ -153,7 +153,7 @@ export default function AdminUsersPage() {
         </EmptyState>
       ) : (
         <div className="table-wrap">
-          <table className="table">
+          <table className="table ac2-users">
             <thead>
               <tr>
                 <th scope="col">المدير</th>
