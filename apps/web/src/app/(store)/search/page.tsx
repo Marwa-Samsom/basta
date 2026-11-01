@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/icons';
 import { Crumbs, Listing, hasFilters } from '@/components/listing';
 import { EmptyState } from '@/components/ui';
-import { requestCurrency } from '@/lib/currency-server';
+import { pageCurrency } from '@/lib/currency-server';
 import { getShops, listParams, listProducts } from '@/lib/storefront';
 
 type Props = { searchParams: Promise<Record<string, string | undefined>> };
@@ -35,7 +35,7 @@ export default async function SearchPage({ searchParams }: Props) {
   }
 
   const [result, shops] = await Promise.all([
-    listProducts(query, await requestCurrency()),
+    listProducts(query, await pageCurrency()),
     getShops().then((r) => r.items.slice(0, 6)).catch(() => []),
   ]);
   const filtered = hasFilters(query);

@@ -1,8 +1,7 @@
 import '@/styles/screens/storefront-discovery.css';
 import '@/styles/screens/storefront-purchase.css';
 import '@/styles/screens/account-area.css';
-import { requestCurrency } from '@/lib/currency-server';
-import { getCurrencies } from '@/lib/storefront';
+import { pageCurrency } from '@/lib/currency-server';
 import { AccountShell } from './account-nav';
 
 /**
@@ -16,8 +15,7 @@ import { AccountShell } from './account-nav';
  * مكوّن خادم لا يعرف الجلسة: كل صفحة تحته تحوّل غير الداخل إلى الدخول بنفسها.
  */
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
-  const [money, chosen] = await Promise.all([getCurrencies(), requestCurrency()]);
-  const currency = chosen && money.currencies.some((c) => c.code === chosen) ? chosen : money.defaultCurrency;
+  const currency = await pageCurrency();
 
   return (
     <div className="aa-root" data-currency={currency}>

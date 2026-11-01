@@ -8,7 +8,7 @@ import { RecordView } from '@/components/recent';
 import { Crumbs } from '@/components/listing';
 import { ProductGrid } from '@/components/product-card';
 import { ProductReviews } from '@/components/product-reviews';
-import { requestCurrency } from '@/lib/currency-server';
+import { pageCurrency } from '@/lib/currency-server';
 import { getProduct, getProductReviews, getShop, imageUrl, num } from '@/lib/storefront';
 import { ProductGallery, ProductSelection, VariantPicker, type GalleryImage } from '@/components/variant-picker';
 import { WishHeart } from '@/components/wish-heart';
@@ -22,7 +22,7 @@ const MORE_FROM_SHOP = 4;
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   // بعملة الصفحة نفسها: الطلب واحد يخدم البيانات الوصفية والصفحة
-  const product = await getProduct(slug, await requestCurrency());
+  const product = await getProduct(slug, await pageCurrency());
   return {
     title: product.nameAr,
     description: product.descriptionAr?.slice(0, 160) ?? `${product.nameAr} من ${product.vendor.nameAr}`,
@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  */
 export default async function ProductPage({ params }: Params) {
   const { slug } = await params;
-  const currency = await requestCurrency();
+  const currency = await pageCurrency();
   const product = await getProduct(slug, currency);
 
   // منتجات أخرى من المتجر نفسه، ومراجعات المنتج — تحسين لا شرط: تعذّر جلبهما لا يُسقط الصفحة

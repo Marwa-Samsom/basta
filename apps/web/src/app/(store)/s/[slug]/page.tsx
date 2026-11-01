@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/icons';
 import { ProductGrid } from '@/components/product-card';
 import { EmptyState } from '@/components/ui';
-import { requestCurrency } from '@/lib/currency-server';
+import { pageCurrency } from '@/lib/currency-server';
 import { getShop, num } from '@/lib/storefront';
 import { JsonLd, SITE_URL, shopJsonLd } from '@/lib/seo';
 
@@ -15,7 +15,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
-  const shop = await getShop(slug, { currency: await requestCurrency() });
+  const shop = await getShop(slug, { currency: await pageCurrency() });
   return {
     title: shop.vendor.nameAr,
     description: shop.vendor.descriptionAr?.slice(0, 160) ?? `متجر ${shop.vendor.nameAr} على بسطة`,
@@ -34,7 +34,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
   const query = await searchParams;
   const category = query['category'] && UUID.test(query['category']) ? query['category'] : undefined;
   const page = Math.max(1, Number(query['page']) || 1);
-  const shop = await getShop(slug, { category, page, currency: await requestCurrency() });
+  const shop = await getShop(slug, { category, page, currency: await pageCurrency() });
   const { vendor, products, total, categories } = shop;
   const selected = categories.find((c) => c.id === category) ?? null;
   const base = `/s/${encodeURIComponent(vendor.slug)}`;

@@ -230,8 +230,12 @@ export interface CurrencyOption {
 }
 
 /** العملات التي يختار منها المشتري وعملة الزائر الجديد — الخطأ لا يُسقط الرأس */
+/**
+ * العملات المتاحة وافتراضية الإدارة. نسخة 15 ثانية لا خمس دقائق: تغيير «عملة العرض
+ * الافتراضية» من الإعدادات كان لا يبلغ الزائر الجديد إلا بعدها (ACFG-107).
+ */
 export const getCurrencies = (): Promise<{ defaultCurrency: string; currencies: CurrencyOption[] }> =>
-  get<{ defaultCurrency: string; currencies: CurrencyOption[] }>('/storefront/currencies', 300).catch(() => ({
+  get<{ defaultCurrency: string; currencies: CurrencyOption[] }>('/storefront/currencies', 15).catch(() => ({
     defaultCurrency: 'JOD',
     currencies: [],
   }));
