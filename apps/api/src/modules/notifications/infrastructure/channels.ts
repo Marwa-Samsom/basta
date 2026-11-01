@@ -8,7 +8,8 @@ import type { Channel } from '../domain/templates';
  *
  * **البريد** يُرسل عبر SMTP حين يُضبط `SMTP_URL` — أي مزوّد (Brevo، Gmail بكلمة
  * مرور تطبيق، …) بمُرسِل موثَّق ولا يلزمه دومين. بدونه، وفي التطوير والاختبار،
- * يُسلَّم إلى **صندوق بريد محلي**: ملف .eml بصيغة MIME يفتحه أي برنامج بريد.
+ * يُسلَّم إلى **صندوق بريد محلي**: ملف .eml بالرسالة نفسها التي كانت ستصل الخادم
+ * (النص ونسخة HTML باتجاه عربي)، يفتحه أي برنامج بريد.
  * النصية وواتساب والمتصفّح بلا مزوّد بعد: ملفات JSON بما كان سيُرسل حرفياً.
  * استبدال المحوّل لا يمسّ القوالب ولا الصندوق الصادر.
  */
@@ -62,25 +63,22 @@ export interface Delivery {
   readonly body: string;
 }
 
-const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
+/** الرسالة نفسها للطريقين: ما يُحفظ في الصندوق المحلي هو ما كان سيصل خادم البريد */
+const message = (d: Delivery) => ({
+  from: mailFrom(),
+  to: d.recipient,
+  subject: d.subject ?? '',
+  text: d.body,
+  html: rtlHtml(d.body),
+  messageId: `<${d.id}@${fromDomain()}>`,
+  headers: { 'Content-Language': 'ar' },
+});
 
-function eml(d: Delivery): string {
-  const from = mailFrom();
-  const body = b64(d.body).replace(/.{1,76}/g, '$&\r\n');
-  return [
-    `From: ${from}`,
-    `To: ${d.recipient}`,
-    `Subject: =?UTF-8?B?${b64(d.subject ?? '')}?=`,
-    `Message-ID: <${d.id}@basta.local>`,
-    `Date: ${new Date().toUTCString()}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
-    'Content-Language: ar',
-    '',
-    body,
-  ].join('\r\n');
-}
+/**
+ * يبني ملف .eml بلا إرسال. كان الملف نصاً مجرّداً وحده فيعرضه برنامج البريد يساراً،
+ * والمرسَل فعلاً فيه نسخة HTML باتجاه عربي (ACFG-068، 31 أكتوبر 2026).
+ */
+const composer = createTransport({ streamTransport: true, buffer: true, newline: 'windows' });
 
 /**
  * يسلّم ويعيد مرجع التسليم: `smtp:<معرّف الرسالة>` لما قبله خادم البريد، أو مسار
@@ -89,15 +87,7 @@ function eml(d: Delivery): string {
 export async function deliver(d: Delivery): Promise<string> {
   const transport = d.channel === 'email' ? smtp() : null;
   if (transport) {
-    const info = await transport.sendMail({
-      from: mailFrom(),
-      to: d.recipient,
-      subject: d.subject ?? '',
-      text: d.body,
-      html: rtlHtml(d.body),
-      messageId: `<${d.id}@${fromDomain()}>`,
-      headers: { 'Content-Language': 'ar' },
-    });
+    const info = await transport.sendMail(message(d));
     return `smtp:${info.messageId}`;
   }
 
@@ -105,7 +95,7 @@ export async function deliver(d: Delivery): Promise<string> {
   await mkdir(dir, { recursive: true });
   if (d.channel === 'email') {
     const path = join(dir, `${d.id}.eml`);
-    await writeFile(path, eml(d), 'utf8');
+    await writeFile(path, (await composer.sendMail(message(d))).message as Buffer);
     return path;
   }
   const path = join(dir, `${d.id}.json`);

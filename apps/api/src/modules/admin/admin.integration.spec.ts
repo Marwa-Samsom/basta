@@ -9,6 +9,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import ExcelJS from 'exceljs';
+import { simpleParser } from 'mailparser';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { NobleCryptoPlugin, ScureBase32Plugin, generateSecret, generateSync } from 'otplib';
@@ -194,9 +195,11 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
           delivered = delivered.replaceAll(REDACTED, ev.sample[s]!);
         }
         if (t.channel === 'email') {
-          expect(file).toContain(`Message-ID: <${n.id}@basta.local>`);
-          const b64 = file.split('\r\n\r\n')[1]!.replace(/\r\n/g, '');
-          expect(Buffer.from(b64, 'base64').toString('utf8')).toBe(delivered);
+          // يُقرأ كما يقرؤه برنامج البريد: الملف نصّ ونسخة HTML، لا جسم واحد بعد الرأس
+          const mail = await simpleParser(file);
+          expect(mail.messageId).toBe(`<${n.id}@basta.local>`);
+          expect(mail.text?.trim()).toBe(delivered);
+          expect(mail.html).toContain('dir="rtl"');
         } else {
           expect(JSON.parse(file).text).toBe(delivered);
         }
@@ -286,8 +289,7 @@ describe('بوابة 11 · البند 3 — كل إشعار: قالب عربي �
     const sent = rows[0]!;
     expect(sent.status).toBe('sent');
     // الرمز وصل صاحبه — في بريده
-    const mail = await readFile(sent.deliveryRef!, 'utf8');
-    const mailBody = Buffer.from(mail.split('\r\n\r\n')[1]!.replace(/\r\n/g, ''), 'base64').toString('utf8');
+    const mailBody = (await simpleParser(await readFile(sent.deliveryRef!))).text ?? '';
     const code = /\d{6}/.exec(mailBody)![0];
     // ولم يبقَ في الصف ولا في عنوانه ولا في السجل الذي يقرؤه المدير
     expect((sent.payloadJson as Record<string, string>)['code']).toBe(REDACTED);
