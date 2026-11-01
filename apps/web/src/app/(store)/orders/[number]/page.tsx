@@ -57,6 +57,14 @@ const FAIL_TIPS = [
 ];
 
 /**
+ * «معلّق» يُسأل عنه كل 3 ثوانٍ في الدقيقة الأولى، ثم كل 15 ثانية ما دامت الصفحة مفتوحة —
+ * المصالحة الدورية قد تحسمه بعد دقائق. كانت تسكت بعد الدقيقة والمؤشّر يدور للأبد (CHK-072)
+ */
+const FAST_POLLS = 20;
+const FAST_MS = 3_000;
+const SLOW_MS = 15_000;
+
+/**
  * ST-17 نجح الطلب، و ST-16 فشل الدفع، والحالة الثالثة التي لا تُخفى: «نتحقّق».
  *
  * «معلّق» يُسأل عنه كل بضع ثوانٍ، وكل سؤال يطلق المصالحة في الخادم — فالمشتري
@@ -70,6 +78,8 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
   const [copied, setCopied] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** مضت الدقيقة الأولى ولم يُحسم الدفع — يُقال للمشتري ما يحدث */
+  const [late, setLate] = useState(false);
   const signedIn = useSyncExternalStore(
     () => () => undefined,
     () => session.read() !== null,
@@ -79,19 +89,27 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = (attempt: number) => {
+      const slow = attempt >= FAST_POLLS;
+      if (slow) setLate(true);
+      timer = setTimeout(() => void poll(attempt + 1), slow ? SLOW_MS : FAST_MS);
+    };
     const poll = async (attempt: number): Promise<void> => {
+      const plain = decodeURIComponent(number);
+      let next: OrderResult;
       try {
-        const plain = decodeURIComponent(number);
         // طلب الضيف بمفتاحه المحفوظ هنا عند الدفع؛ صاحب الحساب بجلسته
-        const next = await api<OrderResult>(`/checkout/orders/${encodeURIComponent(plain)}`, { headers: orderKeyHeaders(plain) });
-        if (!alive) return;
-        setOrder(next);
-        if (next.outcome === 'pending' && attempt < 20) {
-          timer = setTimeout(() => void poll(attempt + 1), 3000);
-        }
+        next = await api<OrderResult>(`/checkout/orders/${encodeURIComponent(plain)}`, { headers: orderKeyHeaders(plain) });
       } catch (err) {
-        if (alive) setError(err instanceof Error ? err.message : 'تعذّر تحميل الطلب.');
+        if (!alive) return;
+        // التحميل الأول يعرض خطأه؛ أثناء «نتحقّق» لا يمحو انقطاعٌ عابر الصفحة، ويُعاد السؤال في موعده
+        if (attempt === 0) setError(err instanceof Error ? err.message : 'تعذّر تحميل الطلب.');
+        else schedule(attempt);
+        return;
       }
+      if (!alive) return;
+      setOrder(next);
+      if (next.outcome === 'pending') schedule(attempt);
     };
     void poll(0);
     return () => {
@@ -293,6 +311,19 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
         </p>
         {orderNo}
         <Spinner label="بانتظار ردّ البوابة…" />
+        {late ? (
+          <>
+            <p className="sp-hero__text" role="status">
+              يطول التحقّق أكثر من المعتاد. ما زلنا نسأل البوابة وتتحدّث الصفحة حين تصل النتيجة، ولك أن تغلقها: إن تمّ
+              الدفع يصلك تأكيد الطلب، وإن لم يتمّ فلا شيء عليك.
+            </p>
+            <div className="sp-hero__actions">
+              <Link className="btn btn--secondary" href="/">
+                تابع التسوّق
+              </Link>
+            </div>
+          </>
+        ) : null}
       </section>
     </div>
   );
