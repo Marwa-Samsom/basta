@@ -36,6 +36,8 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [coupon, setCoupon] = useState('');
+  /** رفض الكوبون تحت خانته — في رأس الصفحة لا يراه من ضغط «طبّق» أسفلها على الجوال (CHK-018) */
+  const [couponError, setCouponError] = useState<string | null>(null);
   const couponInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -57,13 +59,14 @@ export default function CartPage() {
     };
   }, []);
 
-  async function run(action: () => Promise<CartView>): Promise<void> {
+  async function run(action: () => Promise<CartView>, fail: (message: string) => void = setError): Promise<void> {
     setBusy(true);
     setError(null);
+    setCouponError(null);
     try {
       setCart(await action());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر تحديث السلة.');
+      fail(err instanceof Error ? err.message : 'تعذّر تحديث السلة.');
     } finally {
       setBusy(false);
     }
@@ -155,7 +158,7 @@ export default function CartPage() {
             className="card sp-coupon"
             onSubmit={(e) => {
               e.preventDefault();
-              void run(() => cartApi.coupon(coupon || null));
+              void run(() => cartApi.coupon(coupon || null), setCouponError);
             }}
           >
             <label className="sp-coupon__label" htmlFor="coupon">
@@ -170,7 +173,12 @@ export default function CartPage() {
                   className="field__control"
                   placeholder="رمز الكوبون"
                   value={coupon}
-                  onChange={(e) => setCoupon(e.target.value.toUpperCase())}
+                  aria-invalid={couponError ? true : undefined}
+                  aria-describedby={couponError ? 'coupon-error' : undefined}
+                  onChange={(e) => {
+                    setCoupon(e.target.value.toUpperCase());
+                    setCouponError(null);
+                  }}
                 />
                 {/* يمحو المكتوب ويُبقي المؤشّر في الخانة (27 أكتوبر 2026، بطلب صاحبة المشروع) */}
                 {coupon ? (
@@ -181,6 +189,7 @@ export default function CartPage() {
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       setCoupon('');
+                      setCouponError(null);
                       couponInput.current?.focus();
                     }}
                   >
@@ -192,6 +201,11 @@ export default function CartPage() {
                 طبّق
               </button>
             </div>
+            {couponError ? (
+              <p id="coupon-error" className="field__error" role="alert">
+                {couponError}
+              </p>
+            ) : null}
             {cart.couponCode ? (
               <p className="sp-coupon__ok">
                 <Icon name="check-circle" size={14} />
@@ -204,7 +218,7 @@ export default function CartPage() {
                   disabled={busy}
                   onClick={() => {
                     setCoupon('');
-                    void run(() => cartApi.coupon(null));
+                    void run(() => cartApi.coupon(null), setCouponError);
                   }}
                 >
                   أزل
