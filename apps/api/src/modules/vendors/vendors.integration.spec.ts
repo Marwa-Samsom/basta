@@ -625,6 +625,86 @@ describe('بوابة 06 · البند الثاني — المعلَّق لا ي�
   });
 });
 
+/**
+ * وثيقة تُرفض والطلب قيد المراجعة (ADM-030 و ADM-034، 30 أكتوبر 2026): كانت رسالة المراجع
+ * تقول «أُبلغ البائع» ولا يصله شيء، وبطاقته تقول «ارفعها من جديد» وزرّها مقفل، والاعتماد
+ * يمرّ فوق الوثيقة المرفوضة فيصير المتجر معتمداً بها.
+ */
+describe('وثيقة مرفوضة والطلب قيد المراجعة', () => {
+  it('البائع يُبلَّغ ويستبدلها وحدها، والاعتماد ممنوع حتى تُقبل', async () => {
+    if (!dbUp) return;
+    const email = `docs.${SUFFIX}@basta.test`;
+    const userId = await registerUser(email, ['customer']);
+    const apply = await app.inject({
+      method: 'POST',
+      ...api('/vendor/onboarding/apply', await login(email)),
+      payload: { nameAr: 'دار الوثائق', nameEn: `Docs ${SUFFIX}`, country: 'JO', businessType: 'company' },
+    });
+    expect(apply.statusCode, apply.body).toBe(201);
+    const id: string = apply.json().vendor.id;
+    createdVendorIds.push(id);
+    const token: string = apply.json().tokens.accessToken;
+    const upload = (type: string, label: string) => {
+      const file = multipart(`${type}.pdf`, pdf(label));
+      return app.inject({
+        method: 'POST',
+        ...api(`/vendor/onboarding/documents/${type}`, token),
+        headers: { authorization: `Bearer ${token}`, ...file.headers },
+        payload: file.payload,
+      });
+    };
+
+    try {
+      const currency = await app.inject({ method: 'PUT', ...api('/vendor/onboarding/settlement-currency', token), payload: { currency: 'JOD' } });
+      expect(currency.statusCode, currency.body).toBe(200);
+      for (const type of DOCUMENT_TYPES) expect((await upload(type, type)).statusCode).toBe(201);
+      const bank = await app.inject({
+        method: 'PUT',
+        ...api('/vendor/onboarding/bank', token),
+        payload: { holderName: 'دار الوثائق', iban: IBAN, bankName: 'البنك العربي' },
+      });
+      expect(bank.statusCode, bank.body).toBe(200);
+      const submit = await app.inject({ method: 'POST', ...api('/vendor/onboarding/submit', token) });
+      expect(submit.json().status, submit.body).toBe('in_review');
+
+      const taxCard = await prisma.vendorDocument.findUniqueOrThrow({ where: { vendorId_type: { vendorId: id, type: 'tax_card' } } });
+      const reason = 'الختم غير ظاهر في الصورة';
+      const reject = await app.inject({
+        method: 'POST',
+        ...api(`/admin/vendors/${id}/documents/${taxCard.id}/decision`, adminToken),
+        payload: { accept: false, reason },
+      });
+      expect(reject.statusCode, reject.body).toBe(204);
+
+      // يصل صاحب المتجر باسم الوثيقة وسببها ورابط صفحتها
+      const told = await prisma.notification.findFirst({ where: { userId, templateCode: 'vendor_document_rejected', channel: 'in_app' } });
+      expect(told?.payloadJson).toMatchObject({ document: 'الشهادة الضريبية', reason, link: '/vendor/onboarding/documents' });
+
+      // الاعتماد ممنوع باسم الوثيقة، والطلب باقٍ قيد المراجعة والمعلّق معلّق
+      const blocked = await app.inject({ method: 'POST', ...api(`/admin/vendors/${id}/approve`, adminToken) });
+      expect(blocked.statusCode, blocked.body).toBe(409);
+      expect(blocked.json().message).toContain('الشهادة الضريبية');
+      const still = await prisma.vendor.findUniqueOrThrow({ where: { id } });
+      expect(still.status).toBe('in_review');
+      expect(still.settlementCurrencyLockedAt).toBeNull();
+      expect(await prisma.vendorDocument.count({ where: { vendorId: id, status: 'pending' } })).toBe(3);
+
+      // غير المرفوضة مقفلة كما كانت، والمرفوضة تُستبدل وحدها فتعود إلى المراجعة
+      expect((await upload('national_id', 'بديل')).statusCode).toBe(409);
+      const replaced = await upload('tax_card', 'نسخة واضحة');
+      expect(replaced.statusCode, replaced.body).toBe(201);
+      expect(replaced.json().status).toBe('in_review');
+      expect(replaced.json().documents.find((d: { type: string }) => d.type === 'tax_card')).toMatchObject({ status: 'pending', rejectReason: null });
+
+      const approve = await app.inject({ method: 'POST', ...api(`/admin/vendors/${id}/approve`, adminToken) });
+      expect(approve.statusCode, approve.body).toBe(204);
+    } finally {
+      // قاعدة التطوير مشتركة: متجر الاختبار لا يبقى في دليل المتاجر
+      await prisma.vendor.update({ where: { id }, data: { status: 'suspended', suspendedAt: new Date() } });
+    }
+  });
+});
+
 describe('عزل البيانات — بائع لا يرى طلب بائع آخر', () => {
   it('بائع آخر لا يصل إلى وثائق غيره', async () => {
     if (!dbUp) return;

@@ -47,6 +47,7 @@ const KINDS: Record<string, { title: string; icon: IconName; tone: Tone }> = {
   payout_rejected: { title: 'رُفض طلب السحب', icon: 'alert', tone: 'danger' },
   vendor_approved: { title: 'قُبل متجرك', icon: 'store', tone: 'success' },
   vendor_rejected: { title: 'لم يُقبل متجرك', icon: 'store', tone: 'danger' },
+  vendor_document_rejected: { title: 'رُفضت وثيقة من طلب متجرك', icon: 'file', tone: 'warning' },
   product_rejected: { title: 'أُعيد منتج إليك للتعديل', icon: 'alert', tone: 'warning' },
   low_stock: { title: 'مخزون منخفض', icon: 'boxes', tone: 'warning' },
   message_to_customer: { title: 'ردّ من متجر', icon: 'msg', tone: 'brand' },

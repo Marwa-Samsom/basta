@@ -325,6 +325,13 @@ export const EVENTS: readonly EventDef[] = [
     sample: { store_name: 'متجر الورد', reason: 'صورة السجل التجاري غير واضحة', link: '/vendor/onboarding/status' },
   },
   {
+    code: 'vendor_document_rejected',
+    labelAr: 'رفض وثيقة من طلب المتجر',
+    audience: 'vendor',
+    variables: ['store_name', 'document', 'reason', 'link'],
+    sample: { store_name: 'متجر الورد', document: 'السجل التجاري', reason: 'الصورة غير واضحة', link: '/vendor/onboarding/documents' },
+  },
+  {
     code: 'product_rejected',
     labelAr: 'إيقاف منتج',
     audience: 'vendor',
@@ -678,6 +685,13 @@ export const DEFAULT_TEMPLATES: readonly TemplateSeed[] = [
     'فريق {{store_name}}،\n\nراجعنا طلب انضمامكم ولم نعتمده بعد. السبب: {{reason}}.\n\nصحّحوا المطلوب وأعيدوا الإرسال من هنا: {{link}}\n\nبسطة',
     'طلب انضمامكم يحتاج تعديلاً'),
   t('vendor_rejected', 'in_app', 'طلب انضمامكم يحتاج تعديلاً: {{reason}}.'),
+
+  // وثيقة واحدة والطلب باقٍ في الطابور: تُستبدل وحدها وتعود إلى المراجعة (ADM-030)
+  // «وثيقة» قبل الاسم: «السجل» مذكّر و«الشهادة» مؤنّثة، والفعل واحد للجميع
+  t('vendor_document_rejected', 'email',
+    'فريق {{store_name}}،\n\nراجعنا وثيقة {{document}} في طلب انضمامكم ولم نقبلها. السبب: {{reason}}.\n\nارفعوها من جديد من هنا فتعود إلى المراجعة، وطلبكم باقٍ في مكانه: {{link}}\n\nبسطة',
+    'رُفضت وثيقة {{document}} في طلب انضمامكم'),
+  t('vendor_document_rejected', 'in_app', 'رُفضت وثيقة {{document}}: {{reason}}. ارفعها من جديد.'),
 
   // لا مراجعة قبل النشر (15 أكتوبر 2026): الإدارة توقف المنشور المخالف. المهاجرة
   // 20261015120000 تستبدل النصّ القديم في القاعدة إن لم تحرّره الإدارة

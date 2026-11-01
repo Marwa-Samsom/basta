@@ -18,6 +18,7 @@ const EVENTS: Record<string, InboxEvent> = {
   payout_rejected: { title: 'رُفض طلب سحب', icon: 'wallet', tone: 'danger', kind: 'payout' },
   vendor_approved: { title: 'اعتُمد متجرك', icon: 'check-circle', tone: 'success', kind: 'store' },
   vendor_rejected: { title: 'طلب انضمامك يحتاج تعديلاً', icon: 'store', tone: 'warning', kind: 'store' },
+  vendor_document_rejected: { title: 'رُفضت وثيقة من طلبك', icon: 'file', tone: 'warning', kind: 'store' },
   message_to_vendor: { title: 'رسالة من مشترٍ', icon: 'msg', tone: 'brand', kind: 'order' },
   bank_account_added: { title: 'أُضيف حساب بنكي', icon: 'shield', tone: 'warning', kind: 'payout' },
   bank_account_verified: { title: 'وُثّق حسابك البنكي', icon: 'check-circle', tone: 'success', kind: 'payout' },
