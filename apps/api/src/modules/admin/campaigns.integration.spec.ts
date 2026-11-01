@@ -164,6 +164,27 @@ describe('AD-17 · الحملات — الصلاحية', () => {
   });
 });
 
+// كانت كل الكوبونات المفعّلة قائمةً واحدة (779 على قاعدة التطوير) يُمرَّر فيها بحثاً عن رمز (ACFG-039، 31 أكتوبر 2026)
+describe('«كوبون يُعلَن» — بحث برمز الكوبون وأوّل عشرين', () => {
+  it('البحث بجزء الرمز وبأي حالة أحرف، وأوّل عشرين بالترتيب والإجمالي معها', async () => {
+    if (!dbUp) return;
+    const stem = `PICK${SUFFIX}`.toUpperCase().slice(0, 24);
+    const codes = Array.from({ length: 25 }, (_, i) => `${stem}-${String(i).padStart(2, '0')}`);
+    await prisma.coupon.createMany({ data: codes.map((code) => ({ code, scope: 'platform', type: 'percent', valueBps: 500, fundedBy: 'platform' })) });
+    try {
+      const res = await call('GET', `/admin/campaigns/coupon-options?q=${encodeURIComponent(stem.toLowerCase())}`, content);
+      expect(res.statusCode, res.body).toBe(200);
+      const page = res.json() as { items: { code: string }[]; total: number };
+      expect(page.total).toBe(25);
+      expect(page.items.map((c) => c.code)).toEqual(codes.slice(0, 20));
+      expect((await call('GET', `/admin/campaigns/coupon-options?q=${encodeURIComponent(`${stem}-24`)}`, content)).json()).toMatchObject({ total: 1, items: [{ code: `${stem}-24` }] });
+    } finally {
+      // لا تبقى خمسة وعشرون كوبوناً مفعّلاً في قوائم قاعدة التطوير
+      await prisma.coupon.updateMany({ where: { code: { in: codes } }, data: { isActive: false } });
+    }
+  });
+});
+
 describe('AD-17 · الحملات — التحقق', () => {
   it('الاسم والموضع والمدة والكوبون تُرفض بسببها', async () => {
     if (!dbUp) return;
@@ -181,10 +202,11 @@ describe('AD-17 · الحملات — التحقق', () => {
     await bad({ endsAt: iso(-2 * HOUR) }, /بعد بدايتها/);
     await bad({ couponId: '00000000-0000-4000-8000-000000000000' }, /غير موجود/);
     await bad({ couponId: offCoupon.id }, /موقوف/);
-    // قائمة الاختيار في النموذج لا تعرض الموقوف أصلاً
-    const codes = ((await call('GET', '/admin/campaigns/coupon-options', content)).json() as { code: string }[]).map((c) => c.code);
-    expect(codes).toContain(coupon.code);
-    expect(codes).not.toContain(offCoupon.code);
+    // قائمة الاختيار في النموذج لا تعرض الموقوف أصلاً — والبحث برمزه يصل إليه بين المئات
+    const options = async (q: string) =>
+      (await call('GET', `/admin/campaigns/coupon-options?q=${encodeURIComponent(q)}`, content)).json() as { items: { code: string }[]; total: number };
+    expect((await options(coupon.code)).items.map((c) => c.code)).toContain(coupon.code);
+    expect(await options(offCoupon.code)).toMatchObject({ items: [], total: 0 });
 
     // التعديل الجزئي يُتحقَّق منه بعد الدمج: نهاية قبل البداية المحفوظة
     const id = await createCampaign({ ...ok, isActive: false });

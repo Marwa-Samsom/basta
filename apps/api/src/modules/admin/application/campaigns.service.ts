@@ -52,6 +52,9 @@ function couponLiveNow(c: { isActive: boolean; startsAt: Date | null; endsAt: Da
   );
 }
 
+/** خيارات «كوبون يُعلَن» في الصفحة الواحدة — والبحث يضيّق ما بعدها */
+export const COUPON_PICK = 20;
+
 /**
  * AD-17 — الحملات: مدة وموضع ومنتجات مرتّبة يدوياً وكوبون يُعلَن معها.
  *
@@ -74,7 +77,7 @@ export class CampaignsService {
     const rows = await this.prisma.campaign.findMany({
       orderBy: [{ startsAt: 'desc' }],
       include: {
-        coupon: { select: { code: true } },
+        coupon: { select: { code: true, isActive: true, endsAt: true } },
         items: { select: { product: { select: { vendorId: true } } } },
       },
     });
@@ -91,6 +94,8 @@ export class CampaignsService {
         productCount: r.items.length,
         couponId: r.couponId,
         couponCode: r.coupon?.code ?? null,
+        // المربوط يبقى ظاهراً في النموذج ولو خرج من نتائج البحث — ويُعلَّم إن لم يعد صالحاً
+        couponUsable: r.coupon ? r.coupon.isActive && (!r.coupon.endsAt || r.coupon.endsAt > now) : null,
         scope: {
           shops: new Set(r.items.map((i) => i.product.vendorId)).size,
         },
@@ -178,12 +183,21 @@ export class CampaignsService {
   }
 
   /** كوبونات يمكن إعلانها مع حملة: مفعّلة ولم تنتهِ — دون حاجة إلى coupons.manage */
-  couponOptions(now = new Date()) {
-    return this.prisma.coupon.findMany({
-      where: { isActive: true, OR: [{ endsAt: null }, { endsAt: { gt: now } }] },
-      orderBy: { code: 'asc' },
-      select: { id: true, code: true, endsAt: true },
-    });
+  /**
+   * بحث برمز الكوبون وأوّل عشرين — كانت كل الكوبونات المفعّلة قائمةً واحدة (779 على قاعدة التطوير)
+   * يُمرَّر فيها بحثاً عن رمز (ACFG-039، 31 أكتوبر 2026). والإجمالي ليقول النموذج «أوّل 20 من N».
+   */
+  async couponOptions(q?: string, now = new Date()) {
+    const where: Prisma.CouponWhereInput = {
+      isActive: true,
+      OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+      ...(q ? { code: { contains: q, mode: 'insensitive' } } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.coupon.findMany({ where, orderBy: { code: 'asc' }, take: COUPON_PICK, select: { id: true, code: true, endsAt: true } }),
+      this.prisma.coupon.count({ where }),
+    ]);
+    return { items, total };
   }
 
   // -------------------------------------------------------------- الكتابة
