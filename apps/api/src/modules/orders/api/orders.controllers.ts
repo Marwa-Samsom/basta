@@ -38,6 +38,7 @@ import { InvalidInputError } from '../../../common/errors/domain-error';
 import { pageOf, SORT_ORDERS, sortOf, termOf, type SortOrder } from '../../../common/paging';
 import { OrderLifecycleService } from '../application/order-lifecycle.service';
 import { OrderQueryService } from '../application/order-query.service';
+import { missingAdminPermission } from '../domain/admin-permission';
 import type { SubOrderStatus } from '../domain/state-machine';
 import { SubOrderStatus as SubOrderStatuses } from '@prisma/client';
 
@@ -316,8 +317,8 @@ export class AdminOrdersController {
    */
   @Get(':number')
   @RequirePermission('orders.manage')
-  detail(@Param('number') number: string) {
-    return this.query.adminDetail(number);
+  detail(@CurrentActor() actor: Actor, @Param('number') number: string) {
+    return this.query.adminDetail(number, actor.permissions);
   }
 
   @Post('stores/:subOrderId/cancel')
@@ -338,6 +339,9 @@ export class AdminOrdersController {
     @Param('subOrderId', uuidParam) subOrderId: string,
     @Body() dto: TransitionDto,
   ) {
+    // الانتقال العام بـ orders.manage كان يقبل «canceled_by_admin» فيلغي ويردّ المال من لا يحمل orders.cancel
+    const missing = missingAdminPermission(dto.to as SubOrderStatus, actor.permissions);
+    if (missing) throw new ForbiddenException(`تحتاج صلاحية «${missing}» لهذا الإجراء.`);
     await this.lifecycle.transition(subOrderId, dto.to as SubOrderStatus, { kind: 'admin', userId: actor.userId }, {
       reason: dto.reason ?? null,
       returnRequestId: dto.returnRequestId ?? null,

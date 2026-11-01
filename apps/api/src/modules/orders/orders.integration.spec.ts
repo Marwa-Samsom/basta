@@ -609,6 +609,33 @@ describe('بوابة 09 · البند 3 — إلغاء فرعي لا يمسّ إ
     expect(await statusOf(b.id)).toBe('awaiting_vendor');
   });
 
+  // من يفتح الطلب بلا orders.cancel كان يرى زرّ الإلغاء، ويلغي ويردّ المال من الانتقال العام (ADM-062، 31 أكتوبر 2026)
+  it('الإلغاء بصلاحيته من كل مسار، وزرّه لمن يحملها وحده', async () => {
+    if (!dbUp) return;
+    const { order, a } = await placeOrder([1, 1]);
+    expect((await vendorMove(0, a.id, 'accepted')).statusCode).toBe(200);
+    const v = await user('viewer', 'admin', ['orders.manage']);
+    try {
+      const viewer = await login(v.email, generateSync({ strategy: 'totp', secret: adminTotpSecret, crypto: totpCrypto, base32: totpBase32 }));
+      const actionsOf = async (token: string) => {
+        const res = await call('GET', `/admin/orders/${order.orderNumber}`, token);
+        expect(res.statusCode, res.body).toBe(200);
+        return (res.json().stores as { id: string; actions: string[] }[]).find((s) => s.id === a.id)!.actions;
+      };
+      expect(await actionsOf(viewer)).not.toContain('canceled_by_admin');
+      expect(await actionsOf(admin.token)).toContain('canceled_by_admin');
+
+      expect((await call('POST', `/admin/orders/stores/${a.id}/cancel`, viewer, { reason: 'احتيال مشتبه' })).statusCode).toBe(403);
+      const sneak = await call('POST', `/admin/orders/stores/${a.id}/transition`, viewer, { to: 'canceled_by_admin', reason: 'احتيال مشتبه' });
+      expect(sneak.statusCode, sneak.body).toBe(403);
+      expect(sneak.json().message).toBe('تحتاج صلاحية «orders.cancel» لهذا الإجراء.');
+      expect(await statusOf(a.id)).toBe('accepted');
+    } finally {
+      // لا يبقى مدير اختبار يتلقّى تنبيهات الطلبات على قاعدة التطوير
+      await prisma.user.update({ where: { id: v.id }, data: { status: 'suspended' } });
+    }
+  });
+
   it('المهمة الآلية تلغي ما لم يقبله البائع خلال 48 ساعة — وتترك المقبول', async () => {
     if (!dbUp) return;
     const { a, b } = await placeOrder([1, 1]);
