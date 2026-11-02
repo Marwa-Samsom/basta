@@ -7,7 +7,7 @@ import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { toLatinDigits } from '@/lib/digits';
-import { when } from '@/lib/orders';
+import { daysAr, when } from '@/lib/orders';
 import { ClearableInput } from '@/components/ui';
 
 interface Setting {
@@ -48,6 +48,19 @@ function intValue(s: Setting, raw: string): number | null {
 }
 
 /**
+ * التعليق أقصر من مهلة الإرجاع: مال البائع يتحرّر والمشتري ما زال يستطيع الإرجاع، والصفر
+ * يحرّره عند التسليم. كانت النافذة تعرض الجملة العامة وحدها، فيُحفظ الصفر ولا شيء يقول
+ * ما يعنيه (SYS-022، 2 نوفمبر 2026).
+ */
+function holdWarning(days: number, returnDays: number): string | null {
+  if (days >= returnDays) return null;
+  const returns = `مهلة الإرجاع (${daysAr(returnDays)})`;
+  return days === 0
+    ? `صفر: مال البائع يتحرّر عند تأكيد التسليم، بأول دورة تحرير، قبل أن تنتهي ${returns} — فقد يُطلب ردّ مالٍ صُرف.`
+    : `أقصر من ${returns}: مال البائع يتحرّر والمشتري ما زال يستطيع الإرجاع — فقد يُطلب ردّ مالٍ صُرف.`;
+}
+
+/**
  * AD-26 — الإعدادات والضرائب. الإعداد المالي يعرض أثره قبل الحفظ، والحفظ
  * يعيد ذكره في التأكيد. كل تغيير في السجل بقيمته قبل وبعد.
  */
@@ -63,6 +76,8 @@ export default function AdminSettingsPage() {
     const raw = draft[s.key] ?? '';
     const value = s.kind === 'int' ? intValue(s, raw) : raw;
     if (value === null) return;
+    const returnDays = Number(data.settings.find((x) => x.key === 'return_window_days')?.value ?? 0);
+    const warning = s.key === 'hold_period_days' && typeof value === 'number' ? holdWarning(value, returnDays) : null;
     const sure = await ask({
       title: `تغيّر «${s.labelAr}»؟`,
       body: (
@@ -71,6 +86,11 @@ export default function AdminSettingsPage() {
             <bdi className="num">{String(s.value ?? '—')}</bdi> ← <bdi className="num">{String(value) || '—'}</bdi>
           </p>
           {s.financial ? <p>{s.financial}</p> : null}
+          {warning ? (
+            <p>
+              <strong>{warning}</strong>
+            </p>
+          ) : null}
         </>
       ),
       confirmLabel: 'احفظ الإعداد',
