@@ -7,7 +7,7 @@ import { NotificationBell } from '@/components/notification-bell';
 import { SearchBox } from '@/components/search-box';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { CartButton, ShopStrip } from '@/components/store-chrome';
-import { requestCurrency } from '@/lib/currency-server';
+import { pageCurrency } from '@/lib/currency-server';
 import { getCurrencies, getShops } from '@/lib/storefront';
 
 /** المتاجر الظاهرة في شريط الرأس — البقية في «كل المتاجر» */
@@ -48,16 +48,14 @@ const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
  * الرأس بلا رقائقها: سقوط شريط لا يُسقط الصفحة.
  */
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
-  const [top, money, chosen] = await Promise.all([
+  const [top, money, currency] = await Promise.all([
     getShops()
       .then((r) => r.items.slice(0, TOP_SHOPS))
       .catch(() => []),
     getCurrencies(),
-    requestCurrency(),
+    // ما تُطلب به أسعار الصفحة بالضبط — data-currency منه تقرأ السلة والمفضّلة
+    pageCurrency(),
   ]);
-  // ما يعرضه الخادم بالضبط: المختارة إن كانت متاحة، وإلا افتراضية الإدارة.
-  // data-currency منه تقرأ السلة والمفضّلة — فلا تختلف عملة صفحة عن سلّتها
-  const currency = chosen && money.currencies.some((c) => c.code === chosen) ? chosen : money.defaultCurrency;
 
   return (
     <div className="store" data-density="comfortable" data-currency={currency}>
