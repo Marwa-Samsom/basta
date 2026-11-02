@@ -643,6 +643,31 @@ describe('دفع بعد انتهاء الحجز — إشعاران متزامن�
   });
 });
 
+/**
+ * موجة «يُؤتمت» الثالثة (2 نوفمبر 2026): رمز السلة سرّ لا معرّف — CHK-003. 24 بايتاً عشوائياً
+ * بـ base64url، ورمز مخمَّن أو معدَّل بمحرف واحد لا يكشف شيئاً من سلة أحد.
+ */
+describe('رمز السلة لا يُخمَّن', () => {
+  it('رمز مخمَّن أو معدَّل بمحرف واحد: 404 «السلة غير موجودة أو انتهت.» بلا بيانات، والحقيقي يفتحها', async () => {
+    if (!dbUp) return;
+    const token = await cartWith([{ variantId: variantIds[0]!, qty: 1 }]);
+    expect(token).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    const last = token.at(-1)!;
+    const flipped = `${token.slice(0, -1)}${last === 'A' ? 'B' : 'A'}`;
+
+    for (const guess of ['abc123', flipped]) {
+      const res = await call('GET', '/cart', { headers: { 'x-cart-token': guess } });
+      expect(res.statusCode, guess).toBe(404);
+      expect(res.json().message).toBe('السلة غير موجودة أو انتهت.');
+      expect(res.body).not.toContain(variantIds[0]!);
+      expect(res.json()).not.toHaveProperty('groups');
+    }
+    const real = await call('GET', '/cart', { headers: { 'x-cart-token': token } });
+    expect(real.statusCode).toBe(200);
+    expect(real.body).toContain(variantIds[0]!);
+  });
+});
+
 describe('الشراء بحساب — محسوم 13 أكتوبر 2026', () => {
   it('سلة الضيف: «ادفع» بلا دخول يُردّ 401 بلا طلب ولا حجز، والسلة نفسها تُدفع بعد الدخول', async () => {
     if (!dbUp) return;
