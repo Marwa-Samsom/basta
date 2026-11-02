@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, MoreButton } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
-import { pct, useAction, useAdminData } from '@/lib/admin';
+import { pct, useAction, useAdminData, useAdminList } from '@/lib/admin';
+import { counted, type Counted } from '@/lib/arabic-count';
 import { money, when } from '@/lib/orders';
 import { CURRENCIES } from '@/lib/vendor';
 import { ClearableInput } from '@/components/ui';
@@ -13,8 +14,19 @@ import { ClearableInput } from '@/components/ui';
 interface Data {
   spreadBps: number;
   currencies: { code: string; nameAr: string; symbol: string; minorUnitDigits: number; minPayoutMinorUnits: string; isActive: boolean; isBase: boolean; currentRate: string | null }[];
-  history: { id: string; quoteCode: string; rate: string; source: string; effectiveAt: string }[];
 }
+
+/** سطر في سجلّ الأسعار — «الساري» يعلّمه الخادم: الأحدث قبل اللحظة لكل عملة، كما يسعّر الدفع */
+interface RateRow {
+  id: string;
+  quoteCode: string;
+  rate: string;
+  source: string;
+  effectiveAt: string;
+  current: boolean;
+}
+
+const ROWS: Counted = { one: 'سطر واحد', two: 'سطران', plural: '# أسطر', accusative: '# سطراً', genitive: '# سطر' };
 
 /**
  * AD-11 — العملات وأسعار الصرف. السعر يُضاف ولا يُعدَّل ولا يُحذف: الجدول
@@ -24,6 +36,8 @@ export default function AdminCurrenciesPage() {
   const t = useT();
   const locale = useLocale();
   const { data, error, forbidden, reload } = useAdminData<Data>('/admin/currencies');
+  // السجلّ بصفحات من الخادم — كانت الصفحة تقصّه على أحدث 50 بلا «المزيد» ولا عدّ (ACFG-016، 2 نوفمبر 2026)
+  const history = useAdminList<RateRow>('/admin/fx-rates', (h) => h.id);
   const act = useAction();
   const [quote, setQuote] = useState('');
   const [rate, setRate] = useState('');
@@ -32,13 +46,6 @@ export default function AdminCurrenciesPage() {
 
   const base = data.currencies.find((c) => c.isBase)?.code ?? 'USD';
   const rateOk = /^\d+(\.\d{1,10})?$/.test(rate);
-  // السجلّ مرتّب من الأحدث: أول سطر لكل عملة هو السعر الساري
-  const seen = new Set<string>();
-  const history = data.history.slice(0, 50).map((h) => {
-    const current = !seen.has(h.quoteCode);
-    seen.add(h.quoteCode);
-    return { ...h, current };
-  });
   const nameOf = (c: Data['currencies'][number]) => (locale === 'en' ? (CURRENCIES.find((x) => x.code === c.code)?.nameEn ?? c.nameAr) : c.nameAr);
 
   return (
@@ -116,11 +123,16 @@ export default function AdminCurrenciesPage() {
           <header className="card__head">
             <h2 className="ac2-title">{t('سجلّ أسعار الصرف', 'Exchange rate history')}</h2>
             <span className="badge badge--info">{t('إضافة فقط', 'Add-only')}</span>
+            {history.data ? (
+              <span className="ac2-hint">{t(counted(history.total, ROWS), `${history.total} ${history.total === 1 ? 'row' : 'rows'}`)}</span>
+            ) : null}
             <span className="ac2-end ac2-hint">
               {t('هامش فرق الصرف', 'Exchange spread')} <span className="num ac2-code">{pct(data.spreadBps, locale)}</span>
             </span>
           </header>
-          {history.length === 0 ? (
+          {!history.data ? (
+            <Loading error={history.error} forbidden={history.forbidden} />
+          ) : history.items.length === 0 ? (
             <p className="ac2-section-empty">{t('لم يُسجَّل أي سعر بعد.', 'No rate has been recorded yet.')}</p>
           ) : (
             <div className="table-wrap">
@@ -136,7 +148,7 @@ export default function AdminCurrenciesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((h) => (
+                  {history.items.map((h) => (
                     <tr key={h.id} data-tone={h.current ? 'success' : undefined}>
                       <td className="num">USD → {h.quoteCode}</td>
                       <td className="num ac2-rate" data-label={t('السعر', 'Rate')}>
@@ -152,6 +164,7 @@ export default function AdminCurrenciesPage() {
                   ))}
                 </tbody>
               </table>
+              <MoreButton list={history} />
             </div>
           )}
         </section>
@@ -186,6 +199,7 @@ export default function AdminCurrenciesPage() {
                 await api('/admin/fx-rates', { method: 'POST', body: { quote, rate, source } });
                 setRate('');
                 reload();
+                history.reload();
               }, t('أُضيف السعر. يسري على الطلبات من الآن.', 'Rate added. It applies to orders from now on.'))
             }
           >

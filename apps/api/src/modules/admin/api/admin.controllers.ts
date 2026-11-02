@@ -422,6 +422,12 @@ export class AdminOperationsController {
     return this.ops.currencies();
   }
 
+  @Get('fx-rates')
+  @RequirePermission('settings.edit')
+  rateHistory(@Query('page') page?: string) {
+    return this.ops.rateHistory(pageOf(page));
+  }
+
   @Post('fx-rates')
   @RequirePermission('settings.edit')
   addRate(@CurrentActor() a: Actor, @Body() dto: RateDto) {
