@@ -3,7 +3,7 @@
  * JSON لا يحمل BigInt، و Number يفقد الدقة فوق 2^53 — والمبلغ المُقرَّب بصمت
  * أسوأ من الخطأ الصاخب (ADR-001).
  */
-import { format, money } from '../../../common/money/money';
+import { formatIn } from '../../../common/money/money';
 import type { DisplayFx } from '../../pricing/public';
 
 export interface PriceView {
@@ -16,7 +16,7 @@ export interface PriceView {
 export const priceView = (minorUnits: bigint, currency: string): PriceView => ({
   minorUnits: minorUnits.toString(),
   currency,
-  formatted: format(money(minorUnits, currency)),
+  formatted: formatIn(minorUnits, currency),
 });
 
 /**

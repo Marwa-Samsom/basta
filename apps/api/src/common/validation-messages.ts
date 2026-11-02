@@ -1,4 +1,5 @@
 import { BadRequestException, ValidationPipe, type ValidationError } from '@nestjs/common';
+import { toEnglish } from './i18n/translate';
 
 /**
  * رسائل التحقق بالعربية — المشتري كان يقرأ `address.recipientName must be longer than or
@@ -61,11 +62,120 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   status: 'الحالة',
 };
 
+/** الأسماء نفسها حين يكون الموقع بالإنجليزية (زرّ اللغة، 2 نوفمبر 2026) */
+const FIELD_LABELS_EN: Readonly<Record<string, string>> = {
+  recipientName: 'Recipient name',
+  phone: 'Phone',
+  guestPhone: 'Phone',
+  country: 'Country',
+  region: 'Governorate or region',
+  city: 'City',
+  area: 'Area',
+  street: 'Street and building number',
+  building: 'Building',
+  floor: 'Floor',
+  landmark: 'Landmark',
+  label: 'Address name',
+  email: 'Email',
+  guestEmail: 'Email',
+  password: 'Password',
+  currentPassword: 'Current password',
+  newPassword: 'New password',
+  fullName: 'Name',
+  code: 'Code',
+  totp: 'Verification code',
+  reason: 'Reason',
+  description: 'Description',
+  note: 'Note',
+  reference: 'Reference',
+  transferReference: 'Transfer reference',
+  tracking: 'Tracking number',
+  qty: 'Quantity',
+  quantity: 'Quantity',
+  items: 'Items',
+  rating: 'Rating',
+  body: 'Text',
+  bodyAr: 'Text',
+  title: 'Title',
+  titleAr: 'Title',
+  nameAr: 'Arabic name',
+  nameEn: 'English name',
+  descriptionAr: 'Description',
+  sku: 'Product code (SKU)',
+  price: 'Price',
+  priceMinorUnits: 'Price',
+  stock: 'Stock',
+  iban: 'Account number (IBAN)',
+  holderName: 'Account holder name',
+  bankName: 'Bank name',
+  value: 'Value',
+  page: 'Page number',
+  search: 'Search',
+  status: 'Status',
+};
+
 const ARABIC = /[؀-ۿ]/;
 const num = (message: string): string | null => /(-?\d+(?:\.\d+)?)/.exec(message)?.[1] ?? null;
 
 function labelOf(property: string): string {
   return FIELD_LABELS[property] ?? 'أحد الحقول';
+}
+
+/**
+ * القيد نفسه بالإنجليزية — يُبنى مع العربي لا يُترجم منه: نوع القيد واسم الحقل معروفان
+ * هنا. الرسالة العربية المكتوبة في الـ DTO تُترجم من القاموس (common/i18n/en.ts).
+ */
+export function englishConstraint(constraint: string, property: string, message: string): string {
+  if (ARABIC.test(message)) return toEnglish(message);
+  const label = FIELD_LABELS_EN[property] ?? 'A field';
+  const n = num(message);
+  switch (constraint) {
+    case 'whitelistValidation':
+      return 'The request has an unknown field — refresh the page and try again.';
+    case 'isDefined':
+    case 'isNotEmpty':
+      return `${label}: required.`;
+    case 'isString':
+      return `${label}: text required.`;
+    case 'isEmail':
+      return 'Invalid email format.';
+    case 'isLength':
+    case 'length':
+    case 'minLength':
+    case 'maxLength':
+      if (/longer than or equal to/.test(message) && n) return `${label}: at least ${n} characters.`;
+      if (/shorter than or equal to/.test(message) && n) return `${label}: at most ${n} characters.`;
+      return `${label}: length not accepted.`;
+    case 'isInt':
+    case 'isNumber':
+    case 'isNumberString':
+    case 'isNumeric':
+      return `${label}: a whole number is required.`;
+    case 'min':
+      return n ? `${label}: must be at least ${n}.` : `${label}: below the allowed minimum.`;
+    case 'max':
+      return n ? `${label}: must be at most ${n}.` : `${label}: above the allowed maximum.`;
+    case 'arrayMinSize':
+      return n ? `${label}: at least ${n}.` : `${label}: not enough.`;
+    case 'arrayMaxSize':
+      return n ? `${label}: at most ${n}.` : `${label}: more than allowed.`;
+    case 'isUuid':
+    case 'isUUID':
+      return `${label}: invalid identifier.`;
+    case 'isIn':
+    case 'isEnum':
+      return `${label}: value not allowed.`;
+    case 'isBoolean':
+      return `${label}: yes or no.`;
+    case 'isArray':
+      return `${label}: a list is required.`;
+    case 'matches':
+      return `${label}: invalid format.`;
+    case 'nestedValidation':
+      return `${label}: invalid data.`;
+    default:
+      return `${label}: invalid value.`;
+  }
 }
 
 /** رسالة قيد واحد بالعربية — من نوعه ونصّه الإنجليزي الافتراضي */
@@ -123,12 +233,15 @@ export function arabicConstraint(constraint: string, property: string, message: 
 }
 
 /** كل رسائل الأخطاء، والمتداخلة منها (address.recipientName)، بلا تكرار */
-export function arabicMessages(errors: readonly ValidationError[]): string[] {
+function messagesBy(
+  errors: readonly ValidationError[],
+  phrase: (constraint: string, property: string, message: string) => string,
+): string[] {
   const out: string[] = [];
   const walk = (list: readonly ValidationError[]) => {
     for (const e of list) {
       for (const [constraint, message] of Object.entries(e.constraints ?? {})) {
-        out.push(arabicConstraint(constraint, e.property, message));
+        out.push(phrase(constraint, e.property, message));
       }
       if (e.children?.length) walk(e.children);
     }
@@ -137,11 +250,29 @@ export function arabicMessages(errors: readonly ValidationError[]): string[] {
   return [...new Set(out)];
 }
 
+export function arabicMessages(errors: readonly ValidationError[]): string[] {
+  return messagesBy(errors, arabicConstraint);
+}
+
+export function englishMessages(errors: readonly ValidationError[]): string[] {
+  return messagesBy(errors, englishConstraint);
+}
+
+/**
+ * الردّ يحمل اللغتين: `message` بالعربية كما كان، و `messageEn` يأخذ مكانه معالجُ الأخطاء
+ * حين يطلب الموقع الإنجليزية — ولا يخرج `messageEn` للعميل أبداً (all-exceptions.filter).
+ */
 export function arabicValidationPipe(): ValidationPipe {
   return new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
-    exceptionFactory: (errors) => new BadRequestException(arabicMessages(errors)),
+    exceptionFactory: (errors) =>
+      new BadRequestException({
+        message: arabicMessages(errors),
+        messageEn: englishMessages(errors),
+        error: 'Bad Request',
+        statusCode: 400,
+      }),
   });
 }

@@ -7,6 +7,7 @@
  * ADR-001  المال أعداد صحيحة بأصغر وحدة عملة
  * ADR-013  الخانات العشرية تختلف: الدينار 3 والدولار 2 والين 0
  */
+import { currentLocale } from '../i18n/request-locale';
 
 /** خانات كل عملة. المصدر النهائي جدول currencies — هذا احتياطي للتشغيل بلا اتصال. */
 const MINOR_UNIT_DIGITS: Readonly<Record<string, number>> = Object.freeze({
@@ -210,6 +211,14 @@ export function format(
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(value);
+}
+
+/**
+ * مبلغ منسّق بلغة الطلب الجاري — لما يُعرض في ردّ: «23.000 د.أ.» بالعربية و«JOD 23.000»
+ * بالإنجليزية (زرّ اللغة). متغيّرات الإشعارات تبقى على format بالعربية حتى تُرسل بلغة صاحبها.
+ */
+export function formatIn(minorUnits: bigint | number, currency: CurrencyCode): string {
+  return format(money(minorUnits, currency), currentLocale());
 }
 
 /** للسجلات والاختبارات — بلا رمز عملة ولا محارف اتجاهية. */

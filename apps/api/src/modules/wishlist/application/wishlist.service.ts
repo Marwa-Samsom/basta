@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
-import { format, money } from '../../../common/money/money';
+import { formatIn } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
 import { DisplayCurrencyService, type DisplayFx } from '../../pricing/public';
@@ -57,7 +57,7 @@ export interface WishlistView {
 const view = (minor: bigint, currency: string): WishlistMoney => ({
   minorUnits: minor.toString(),
   currency,
-  formatted: format(money(minor, currency)),
+  formatted: formatIn(minor, currency),
 });
 
 /** بعملة العرض، أو بعملته إن تعذّر الصرف — المقارنة تبقى بعملة المتجر */
