@@ -420,12 +420,11 @@ a.vp-prod__name:hover { color: var(--brand-text); }
 
 .vp-attr { gap: 6px; }
 .vp-attr__head { display: flex; align-items: center; gap: 7px; }
+/* عربي: لا خط ثابت العرض ولا تباعد أحرف — يفصلان الحروف المتصلة */
 .vp-attr__kind {
   margin-inline-start: auto;
-  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--text-faint);
-  letter-spacing: var(--tracking-label);
 }
 
 /* المحاور — يختارها البائع من مكتبة السمات (حتى ثلاثة): المختار بلون العلامة */

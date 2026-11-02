@@ -133,6 +133,8 @@ export interface Attribute {
   nameAr: string;
   inputType: 'select' | 'text' | 'number' | 'boolean';
   isVariantAxis: boolean;
+  /** أرشفتها الإدارة: لا تُعرض لمنتج لا يستعملها */
+  archived: boolean;
   values: { id: string; valueAr: string; hexColor: string | null }[];
 }
 

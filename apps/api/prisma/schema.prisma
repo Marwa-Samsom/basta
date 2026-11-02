@@ -396,6 +396,9 @@ model Attribute {
   isFilterable  Boolean @default(true)
   isVariantAxis Boolean @default(false)
   sort          Int     @default(0)
+  /// مؤرشفة: تختفي من خيارات البائع لمنتج جديد، وتبقى عند المنتجات التي تستعملها —
+  /// المستعملة لا تُحذف فتنكسر متغيّراتها وصورها المربوطة بقيمها (ACFG-099)
+  archivedAt    DateTime? @db.Timestamptz
 
   values         AttributeValue[]
   variantOptions VariantOptionValue[]

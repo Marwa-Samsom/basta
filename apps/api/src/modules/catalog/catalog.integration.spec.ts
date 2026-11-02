@@ -739,6 +739,119 @@ describe('الخصائص في سجل التدقيق', () => {
   });
 });
 
+// كانت الإدارة تُنشئ الخصيصة فقط: الخطأ الإملائي لا يُصحَّح إلا من القاعدة، ولا حذف ولا
+// أرشفة، ولا يُرى من يستعملها (ACFG-099، 1 نوفمبر 2026)
+describe('الخصائص: تصحيح، وحذف غير المستعمل، وأرشفة المستعمل', () => {
+  dbIt('تُصحَّح وتُحذف غير المستعملة، والمستعملة تُؤرشف فلا تُختار لمنتج جديد وتبقى لمنتجها', async () => {
+    const admin = await prisma.user.create({
+      data: {
+        email: `attr.edit.${SUFFIX}@basta.test`,
+        fullName: 'محرّر الخصائص',
+        passwordHash: await hashPassword(randomUUID()),
+        roles: { create: { role: 'admin' } },
+        permissions: { create: { permission: 'catalog.manage' } },
+        totpEnabledAt: new Date(),
+      },
+    });
+    const created: string[] = [];
+    try {
+      const { accessToken } = await app.get(TokenService).issue({ sub: admin.id, roles: ['admin'], permissions: ['catalog.manage'] }, {});
+      const call = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, payload?: object) =>
+        app.inject({ method, url: `/api/v1${url}`, headers: { authorization: `Bearer ${accessToken}` }, ...(payload ? { payload } : {}) });
+      const A = as('a');
+      const product = (sku: string, axisId: string, valueId: string) => ({
+        vendorCategoryId: firstCategory.get('a'),
+        nameAr: 'منتج بمحور',
+        variants: [{ sku, price: '10.00', stock: 2, options: [{ attributeId: axisId, valueId }] }],
+      });
+      await catOf('a');
+
+      const res = await call('POST', '/admin/attributes', {
+        code: `edit_axis_${SUFFIX}`,
+        nameAr: 'قصة الاختبار',
+        inputType: 'select',
+        isVariantAxis: true,
+        values: [{ valueAr: 'ضيق' }, { valueAr: 'واسع' }, { valueAr: 'زائدة' }],
+      });
+      expect(res.statusCode, res.body).toBe(201);
+      const axis = res.json() as { id: string; values: { id: string; valueAr: string }[] };
+      created.push(axis.id);
+      const [narrow, wide, extra] = axis.values;
+
+      // التصحيح: اسم الخصيصة واسم القيمة، ولا تكرار
+      expect((await call('PATCH', `/admin/attributes/${axis.id}`, { nameAr: 'القصّة' })).statusCode).toBe(200);
+      expect((await call('PATCH', `/admin/attributes/${axis.id}/values/${narrow!.id}`, { valueAr: 'ضيّق' })).statusCode).toBe(200);
+      expect((await call('PATCH', `/admin/attributes/${axis.id}/values/${narrow!.id}`, { valueAr: 'واسع' })).statusCode).toBe(409);
+
+      const made = await A.post('/vendor/products', product(`AXE-${SUFFIX}`, axis.id, narrow!.id));
+      expect(made.statusCode, made.body).toBe(201);
+      const used = made.json() as { id: string; variants: VariantJson[] };
+      expect(used.variants[0]!.options[0]!.valueAr).toBe('ضيّق');
+
+      // الحذف: غير المستعملة تُحذف، والمستعملة يُقال ما العمل بها
+      expect((await call('DELETE', `/admin/attributes/${axis.id}/values/${extra!.id}`)).statusCode).toBe(204);
+      const valueRefused = await call('DELETE', `/admin/attributes/${axis.id}/values/${narrow!.id}`);
+      expect(valueRefused.statusCode).toBe(409);
+      expect(valueRefused.json().message).toContain('صحّح اسمها');
+      const attrRefused = await call('DELETE', `/admin/attributes/${axis.id}`);
+      expect(attrRefused.statusCode).toBe(409);
+      expect(attrRefused.json().message).toContain('أرشفها');
+
+      // الأرشفة: القائمة تعرض الاستعمال والأرشفة، والمكتبة العامة تحمل العلامة
+      expect((await call('POST', `/admin/attributes/${axis.id}/archive`)).statusCode).toBe(204);
+      const listed = ((await call('GET', '/admin/attributes')).json() as {
+        id: string;
+        nameAr: string;
+        archivedAt: string | null;
+        _count: { variantOptions: number };
+        values: { valueAr: string; _count: { variantOptions: number } }[];
+      }[]).find((x) => x.id === axis.id)!;
+      expect(listed).toMatchObject({ nameAr: 'القصّة', _count: { variantOptions: 1 } });
+      expect(listed.archivedAt).not.toBeNull();
+      expect(listed.values.map((v) => [v.valueAr, v._count.variantOptions])).toEqual([['ضيّق', 1], ['واسع', 0]]);
+      const library = (await app.inject({ method: 'GET', url: '/api/v1/attributes' })).json() as { attributeId: string; archived: boolean }[];
+      expect(library.find((x) => x.attributeId === axis.id)?.archived).toBe(true);
+
+      // منتج جديد لا يختار المؤرشفة، والمنتج الذي يستعملها يُحفظ كما هو
+      const fresh = await A.post('/vendor/products', product(`AXE2-${SUFFIX}`, axis.id, wide!.id));
+      expect(fresh.statusCode).toBe(400);
+      expect(fresh.json().message).toContain('مؤرشفة');
+      const kept = await A.patch(`/vendor/products/${used.id}`, {
+        nameAr: 'منتج بمحور معدَّل',
+        variants: [{ id: used.variants[0]!.id, sku: `AXE-${SUFFIX}`, price: '11.00', options: [{ attributeId: axis.id, valueId: narrow!.id }] }],
+      });
+      expect(kept.statusCode, kept.body).toBe(200);
+
+      // الاسترجاع يعيدها إلى الخيارات
+      expect((await call('POST', `/admin/attributes/${axis.id}/restore`)).statusCode).toBe(204);
+      expect((await A.post('/vendor/products', product(`AXE3-${SUFFIX}`, axis.id, wide!.id))).statusCode).toBe(201);
+
+      // غير المستعملة تُحذف هي وقيمها
+      const spare = (await call('POST', '/admin/attributes', { code: `edit_spare_${SUFFIX}`, nameAr: 'خصيصة زائدة', inputType: 'select', values: [{ valueAr: 'أ' }] })).json() as { id: string };
+      created.push(spare.id);
+      expect((await call('DELETE', `/admin/attributes/${spare.id}`)).statusCode).toBe(204);
+      expect(await prisma.attribute.count({ where: { id: spare.id } })).toBe(0);
+      expect(await prisma.attributeValue.count({ where: { attributeId: spare.id } })).toBe(0);
+
+      const actions = await prisma.auditLog.findMany({
+        where: { entityType: 'Attribute', entityId: { in: [axis.id, spare.id] }, actorUserId: admin.id },
+        select: { action: true },
+      });
+      expect(new Set(actions.map((l) => l.action))).toEqual(
+        new Set(['attribute.create', 'attribute.update', 'attribute.value_update', 'attribute.value_delete', 'attribute.archive', 'attribute.restore', 'attribute.delete']),
+      );
+    } finally {
+      // لا يبقى مدير اختبار ولا خصيصة اختبار يراها البائعون على قاعدة التطوير
+      await prisma.user.update({ where: { id: admin.id }, data: { status: 'suspended' } });
+      for (const id of created) {
+        await prisma.variantOptionValue.deleteMany({ where: { attributeId: id } });
+        await prisma.attributeValue.deleteMany({ where: { attributeId: id } });
+        await prisma.attribute.deleteMany({ where: { id } });
+      }
+    }
+  });
+});
+
 // ============================================================================
 describe('بوابة 05 · البند الثالث — الاستيراد الجماعي', () => {
   const HEADER = ['رمز_المنتج', 'SKU', 'الاسم_عربي', 'الفئة', 'السعر', 'السعر_قبل_الخصم', 'الكمية', 'الخيار_1', 'قيمة_الخيار_1', 'الخيار_2', 'قيمة_الخيار_2'];

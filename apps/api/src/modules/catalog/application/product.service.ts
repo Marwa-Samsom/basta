@@ -375,6 +375,7 @@ export class ProductService {
   async create(scope: VendorScope, actor: Actor, input: CreateProductInput): Promise<ProductDetailView> {
     const vendor = await this.vendors.get(scope.vendorId);
     const effective = await this.attributes.all();
+    assertNotArchived(effective, new Set(), input);
     await this.assertBrand(input.brandId);
     // لا يُضاف منتج بلا فئة — قرار صاحبة المشروع 18 أكتوبر 2026، والمتجر يبدأ بثماني فئات
     if (!input.vendorCategoryId) {
@@ -448,6 +449,11 @@ export class ProductService {
 
     const currency = current.vendor.settlementCurrency;
     const effective = await this.attributes.all();
+    assertNotArchived(
+      effective,
+      new Set([...current.attrValues.map((v) => v.attributeId), ...current.variants.flatMap((v) => v.optionValues.map((o) => o.attributeId))]),
+      input,
+    );
     if (input.brandId !== undefined) await this.assertBrand(input.brandId);
     // الفئة بعد الحفظ إلزامية: منتج قديم بلا فئة يبقى ظاهراً، ويُصنَّف عند أوّل تعديل
     const category = input.vendorCategoryId !== undefined ? input.vendorCategoryId : current.vendorCategoryId;
@@ -1150,3 +1156,22 @@ export class ProductService {
 
 const hasVariants = (variants: readonly { options: readonly OptionChoice[] }[]): boolean =>
   variants.length > 1 || (variants[0]?.options.length ?? 0) > 0;
+
+/**
+ * الخصيصة المؤرشفة لا تُختار لمنتج لم يستعملها، وتبقى لمنتج يستعملها من قبل — فحفظه لا
+ * ينكسر بأرشفتها (ACFG-099، 1 نوفمبر 2026). `used`: خصائص المنتج قبل التعديل.
+ */
+function assertNotArchived(
+  all: readonly AttributeView[],
+  used: ReadonlySet<string>,
+  input: { readonly attributes?: readonly AttributeInput[] | undefined; readonly variants?: readonly VariantInput[] | undefined },
+): void {
+  const sent = new Set([
+    ...(input.attributes ?? []).map((a) => a.attributeId),
+    ...(input.variants ?? []).flatMap((v) => (v.options ?? []).map((o) => o.attributeId)),
+  ]);
+  const archived = all.find((a) => a.archived && sent.has(a.attributeId) && !used.has(a.attributeId));
+  if (archived) {
+    throw new InvalidInputError(`«${archived.nameAr}» مؤرشفة — لا تُختار لمنتج جديد.`, { attributeId: archived.attributeId });
+  }
+}
