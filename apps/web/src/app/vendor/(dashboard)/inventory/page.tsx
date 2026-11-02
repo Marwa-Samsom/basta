@@ -455,7 +455,7 @@ function AdjustDialog({
             optional
             dir="ltr"
             inputMode="numeric"
-            hint={t('يظهر «منخفض» حين ينزل المتاح إلى هذا الحد.', '“Low” shows when available stock drops to this level.')}
+            hint={t('يظهر «منخفض» حين ينزل الموجود إلى هذا الحد — كالتنبيه وقائمة المنتجات.', '“Low” shows when stock on hand drops to this level — like the alert and the product list.')}
             value={threshold}
             onChange={(e) => setThreshold(digitsOnly(e.target.value))}
           />

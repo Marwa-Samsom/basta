@@ -2,8 +2,9 @@ import { expect, test } from '@playwright/test';
 import { makeVendor, PASSWORD, prisma, tag } from './fixtures';
 
 /**
- * رأس «المخزون» وشارة المتاح في «المنتجات» — VCAT-086، 2 نوفمبر 2026. رأت صاحبة المشروع «4 متغيّراً
- * · 3 يحتاج انتباهاً»، و«قفازات صوف» بمتاح 0 «نفد» في المخزون و«منخفض» في قائمة المنتجات.
+ * رأس «المخزون» وتلميح العتبة وشارة المتاح في «المنتجات» — VCAT-086، 2 نوفمبر 2026. رأت صاحبة المشروع
+ * «4 متغيّراً · 3 يحتاج انتباهاً»، وتلميح العتبة «حين ينزل المتاح» والقاعدة على الموجود، و«قفازات صوف»
+ * بمتاح 0 «نفد» في المخزون و«منخفض» في قائمة المنتجات.
  */
 test('المخزون «متغيّران · اثنان يحتاجان انتباهاً»، والمنتجات «نفد» للصفر و«منخفض» للقليل', async ({ page }) => {
   const t = tag();
@@ -32,6 +33,12 @@ test('المخزون «متغيّران · اثنان يحتاجان انتبا�
 
   await expect(page.getByText('متغيّران · اثنان يحتاجان انتباهاً')).toBeVisible();
   await expect(page.getByText(/متغيّراً ·/)).toHaveCount(0);
+
+  // تلميح العتبة يسمّي ما تحكم به القاعدة فعلاً: الموجود — كان «حين ينزل المتاح» والقاعدة على الموجود
+  await page.getByRole('button', { name: 'عدّل' }).first().click();
+  await expect(page.getByText('يظهر «منخفض» حين ينزل الموجود إلى هذا الحد', { exact: false })).toBeVisible();
+  await expect(page.getByText('حين ينزل المتاح')).toHaveCount(0);
+  await page.getByRole('button', { name: 'إلغاء' }).click();
 
   await page.goto('/vendor/products');
   const outRow = page.locator('tr', { hasText: v.productName });
