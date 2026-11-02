@@ -5,7 +5,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { StorefrontService } from '../../catalog/public';
 import { NotificationsService } from '../../notifications/public';
-import { DisplayCurrencyService } from '../../pricing/public';
+import { DisplayCurrencyService, fxSpreadBps } from '../../pricing/public';
 import { acceptBy, acceptanceDueSince } from '../domain/acceptance';
 import { PERMISSION_CODES, SETTINGS_SPEC } from '../domain/permissions';
 
@@ -343,7 +343,8 @@ export class OperationsService {
     ]);
     const history = await this.prisma.exchangeRate.findMany({ where: { baseCode: 'USD' }, orderBy: { effectiveAt: 'desc' }, take: 200 });
     return {
-      spreadBps: Number(spread?.valueJson ?? 0),
+      // ما يُطبَّق فعلاً — كان الغائب يُعرض 0 والدفع يحسبه 200، والتالف «NaN%»
+      spreadBps: fxSpreadBps(spread?.valueJson),
       currencies: currencies.map((c) => ({
         ...c,
         minPayoutMinorUnits: c.minPayoutMinorUnits.toString(),

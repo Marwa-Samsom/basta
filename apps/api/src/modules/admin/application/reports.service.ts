@@ -54,12 +54,13 @@ export class ReportsService {
         SELECT "currency", SUM("amountMinorUnits")::bigint AS paid FROM "payout_requests"
         WHERE "status" = 'paid' AND "paidAt" >= ${r.from} AND "paidAt" < ${r.to} GROUP BY "currency"`,
       // هامش الصرف: الفرق بين ما دُفع وما كان سيُدفع بلا هامش، للفرعيات بعملة مختلفة — على
-      // هامش لحظة التسعير المحفوظ معه، لا الإعداد اليوم (ACFG-093). الإعداد لما لم تحمله لقطته وحده
+      // هامش لحظة التسعير المحفوظ معه، لا الإعداد اليوم (ACFG-093). الإعداد لما لم تحمله لقطته وحده،
+      // ورقمه وحده يُحوَّل: ::int على نصٍّ تالف كان يُسقط التقرير كله (2 نوفمبر 2026)
       this.prisma.$queryRaw<{ currency: string; spread: bigint }[]>`
         SELECT o."currency",
                SUM(s."chargeTotalMinorUnits" - ROUND(s."chargeTotalMinorUnits" * 10000.0 /
                    (10000 + COALESCE(s."fxSpreadBpsSnapshot",
-                     (SELECT ("valueJson" #>> '{}')::int FROM "settings" WHERE "key" = 'fx_spread_bps'), 0))))::bigint AS spread
+                     (SELECT CASE WHEN ("valueJson" #>> '{}') ~ '^[0-9]+$' THEN ("valueJson" #>> '{}')::int END FROM "settings" WHERE "key" = 'fx_spread_bps'), 0))))::bigint AS spread
         FROM "sub_orders" s JOIN "orders" o ON o."id" = s."orderId"
         WHERE o."paidAt" >= ${r.from} AND o."paidAt" < ${r.to} AND s."settlementCurrency" <> o."currency"
         GROUP BY o."currency"`,
