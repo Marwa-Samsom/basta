@@ -15,7 +15,7 @@ export interface StorefrontProductCard {
   readonly nameEn: string | null;
   readonly price: PriceView;
   readonly compareAtPrice: PriceView | null;
-  readonly vendor: { readonly id: string; readonly slug: string; readonly nameAr: string };
+  readonly vendor: { readonly id: string; readonly slug: string; readonly nameAr: string; readonly nameEn: string | null };
   readonly thumbnail: string | null;
   readonly available: number;
   readonly isSoldOut: boolean;
@@ -26,12 +26,16 @@ export interface StorefrontShopCard {
   readonly id: string;
   readonly slug: string;
   readonly nameAr: string;
+  readonly nameEn: string | null;
   readonly descriptionAr: string | null;
+  readonly descriptionEn: string | null;
   readonly ratingAvg: number;
   readonly ratingCount: number;
   readonly productCount: number;
   /** أوائل فئات المتجر بترتيبه — لمحة عمّا يبيع */
   readonly categories: readonly string[];
+  /** الفئات نفسها بأسمائها الإنجليزية، والعربي لفئة بلا اسم إنجليزي */
+  readonly categoriesEn: readonly string[];
 }
 
 export interface StorefrontShopsPage extends Page<StorefrontShopCard> {
@@ -78,7 +82,7 @@ const VISIBLE: Prisma.ProductWhereInput = {
 };
 
 const CARD_INCLUDE = {
-  vendor: { select: { id: true, slug: true, nameAr: true, settlementCurrency: true } },
+  vendor: { select: { id: true, slug: true, nameAr: true, nameEn: true, settlementCurrency: true } },
   variants: {
     where: { archivedAt: null, isActive: true },
     select: { id: true, priceMinorUnits: true, compareAtPriceMinorUnits: true },
@@ -109,7 +113,9 @@ const SHOP_CARD_SELECT = {
   id: true,
   slug: true,
   nameAr: true,
+  nameEn: true,
   descriptionAr: true,
+  descriptionEn: true,
   ratingAvg: true,
   ratingCount: true,
   _count: { select: { products: { where: VISIBLE } } },
@@ -118,7 +124,7 @@ const SHOP_CARD_SELECT = {
     where: { products: { some: VISIBLE } },
     orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
     take: 4,
-    select: { nameAr: true },
+    select: { nameAr: true, nameEn: true },
   },
 } satisfies Prisma.VendorSelect;
 
@@ -126,11 +132,14 @@ const shopCard = (v: Prisma.VendorGetPayload<{ select: typeof SHOP_CARD_SELECT }
   id: v.id,
   slug: v.slug,
   nameAr: v.nameAr,
+  nameEn: v.nameEn,
   descriptionAr: v.descriptionAr,
+  descriptionEn: v.descriptionEn,
   ratingAvg: Number(v.ratingAvg),
   ratingCount: v.ratingCount,
   productCount: v._count.products,
   categories: v.categories.map((c) => c.nameAr),
+  categoriesEn: v.categories.map((c) => c.nameEn ?? c.nameAr),
 });
 
 @Injectable()
@@ -451,7 +460,7 @@ export class StorefrontService implements OnModuleInit {
         compareAtPrice: cheapest?.compareAtPriceMinorUnits
           ? displayedPrice(fx, cheapest.compareAtPriceMinorUnits, currency).price
           : null,
-        vendor: { id: r.vendor.id, slug: r.vendor.slug, nameAr: r.vendor.nameAr },
+        vendor: { id: r.vendor.id, slug: r.vendor.slug, nameAr: r.vendor.nameAr, nameEn: r.vendor.nameEn },
         thumbnail: r.images[0] ? `/uploads/${r.images[0].fileKey}/thumb.webp` : null,
         available,
         isSoldOut: available <= 0,
@@ -632,6 +641,7 @@ export class StorefrontService implements OnModuleInit {
             id: true,
             slug: true,
             nameAr: true,
+            nameEn: true,
             status: true,
             settlementCurrency: true,
             shippingPolicyAr: true,
@@ -640,7 +650,7 @@ export class StorefrontService implements OnModuleInit {
             ratingCount: true,
           },
         },
-        vendorCategory: { select: { id: true, nameAr: true } },
+        vendorCategory: { select: { id: true, nameAr: true, nameEn: true } },
         brand: { select: { id: true, nameAr: true } },
         images: { orderBy: { sort: 'asc' }, select: { id: true, fileKey: true, altAr: true, variantId: true, optionValueId: true } },
         attrValues: {
@@ -715,6 +725,7 @@ export class StorefrontService implements OnModuleInit {
       nameAr: product.nameAr,
       nameEn: product.nameEn,
       descriptionAr: product.descriptionAr,
+      descriptionEn: product.descriptionEn,
       /** عملة الأسعار المعروضة — عملة المشتري، أو عملة المتجر إن تعذّر الصرف */
       currency,
       storeCurrency,
@@ -725,6 +736,7 @@ export class StorefrontService implements OnModuleInit {
         id: product.vendor.id,
         slug: product.vendor.slug,
         nameAr: product.vendor.nameAr,
+        nameEn: product.vendor.nameEn,
         shippingPolicyAr: product.vendor.shippingPolicyAr,
         returnPolicyAr: product.vendor.returnPolicyAr,
         ratingAvg: Number(product.vendor.ratingAvg),
@@ -776,6 +788,7 @@ export class StorefrontService implements OnModuleInit {
         nameEn: true,
         status: true,
         descriptionAr: true,
+        descriptionEn: true,
         shippingPolicyAr: true,
         returnPolicyAr: true,
         ratingAvg: true,
@@ -802,7 +815,7 @@ export class StorefrontService implements OnModuleInit {
           this.prisma.vendorCategory.findMany({
             where: { vendorId: vendor.id },
             orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }],
-            select: { id: true, nameAr: true, _count: { select: { products: { where: VISIBLE } } } },
+            select: { id: true, nameAr: true, nameEn: true, _count: { select: { products: { where: VISIBLE } } } },
           }),
         ]);
 
@@ -813,6 +826,7 @@ export class StorefrontService implements OnModuleInit {
         nameAr: vendor.nameAr,
         nameEn: vendor.nameEn,
         descriptionAr: vendor.descriptionAr,
+        descriptionEn: vendor.descriptionEn,
         shippingPolicyAr: vendor.shippingPolicyAr,
         returnPolicyAr: vendor.returnPolicyAr,
         ratingAvg: Number(vendor.ratingAvg),
@@ -822,7 +836,7 @@ export class StorefrontService implements OnModuleInit {
       },
       categories: categories
         .filter((c) => c._count.products > 0)
-        .map((c) => ({ id: c.id, nameAr: c.nameAr, count: c._count.products })),
+        .map((c) => ({ id: c.id, nameAr: c.nameAr, nameEn: c.nameEn, count: c._count.products })),
       products: products.items,
       page: products.page,
       pageSize: products.pageSize,

@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { BelowMinimumPayoutError, ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
-import { format as formatMoney, money } from '../../../common/money/money';
+import { format as formatMoney, formatIn, money } from '../../../common/money/money';
 import { LedgerService } from './ledger.service';
 import { csvCell } from '../../../common/csv';
 import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
@@ -281,7 +281,7 @@ export class FinanceService {
        */
       const currency = await tx.currency.findUnique({ where: { code: input.currency }, select: { minPayoutMinorUnits: true } });
       if (currency && input.amountMinorUnits < currency.minPayoutMinorUnits) {
-        throw new BelowMinimumPayoutError(formatMoney(money(currency.minPayoutMinorUnits, input.currency)));
+        throw new BelowMinimumPayoutError(formatIn(currency.minPayoutMinorUnits, input.currency));
       }
       const [entryId] = await this.ledger.appendVendor(
         tx,

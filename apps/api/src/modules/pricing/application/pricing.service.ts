@@ -72,6 +72,7 @@ export class PricingService {
           select: {
             id: true,
             nameAr: true,
+            nameEn: true,
             vendorId: true,
             // كل الصور (عشر على الأكثر) لا الأولى: صورة اللون المختار تسبق الرئيسية في السلة والطلب
             images: { orderBy: { sort: 'asc' }, select: { fileKey: true, variantId: true, optionValueId: true } },
@@ -90,7 +91,7 @@ export class PricingService {
     const [vendorRows, rates, settings, levels, commissions] = await Promise.all([
       this.prisma.vendor.findMany({
         where: { id: { in: vendorIds } },
-        select: { id: true, nameAr: true, settlementCurrency: true },
+        select: { id: true, nameAr: true, nameEn: true, settlementCurrency: true },
       }),
       // المصدر نفسه الذي يُعرض منه السعر في المتجر — ما يُرى هو ما يُخصم
       this.display.usdRates(input.now ?? new Date()),
@@ -105,6 +106,7 @@ export class PricingService {
         {
           vendorId: v.id,
           nameAr: v.nameAr,
+          nameEn: v.nameEn,
           currency: v.settlementCurrency,
           currencyDigits: minorUnitDigits(v.settlementCurrency),
         },
@@ -117,6 +119,7 @@ export class PricingService {
       productId: v.product.id,
       vendorId: v.vendorId,
       nameAr: v.product.nameAr,
+      nameEn: v.product.nameEn,
       variantLabel: v.optionValues.map((o) => o.attributeValue.valueAr).join(' / ') || null,
       sku: v.sku,
       imageKey: imageFor(v)?.fileKey ?? null,

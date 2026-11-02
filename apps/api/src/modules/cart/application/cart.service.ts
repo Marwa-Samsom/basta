@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
-import { format, money } from '../../../common/money/money';
+import { formatIn } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { DisplayCurrencyService, PricingService, type Quote, type QuoteAddress } from '../../pricing/public';
 
@@ -11,6 +11,8 @@ export interface CartLineView {
   readonly variantId: string;
   readonly productId: string;
   readonly nameAr: string;
+  /** حين يكون الموقع بالإنجليزية — بلا قيمة يُعرض العربي */
+  readonly nameEn: string | null;
   readonly variantLabel: string | null;
   readonly imageKey: string | null;
   readonly qty: number;
@@ -34,6 +36,7 @@ export interface CartView {
   readonly groups: readonly {
     vendorId: string;
     vendorNameAr: string;
+    vendorNameEn: string | null;
     /** عملة المتجر — مبالغ المجموعة نفسها بعملة السلة */
     storeCurrency: string;
     lines: readonly CartLineView[];
@@ -50,7 +53,7 @@ export interface CartView {
 const view = (minor: bigint, currency: string) => ({
   minorUnits: minor.toString(),
   currency,
-  formatted: format(money(minor, currency)),
+  formatted: formatIn(minor, currency),
 });
 
 /**
@@ -203,7 +206,7 @@ export class CartService {
     });
 
     if (items.length === 0) {
-      const zero = { minorUnits: '0', formatted: format(money(0n, cart.currency)) };
+      const zero = { minorUnits: '0', formatted: formatIn(0n, cart.currency) };
       return {
         token,
         currency: cart.currency,
@@ -264,6 +267,7 @@ export class CartService {
       return {
         vendorId: s.vendorId,
         vendorNameAr: s.vendorNameAr,
+        vendorNameEn: s.vendorNameEn ?? null,
         storeCurrency: s.currency,
         lines: s.lines.map((l) => {
           const available = priced!.availability.get(l.variantId) ?? 0;
@@ -278,6 +282,7 @@ export class CartService {
             variantId: l.variantId,
             productId: l.productId,
             nameAr: l.nameAr,
+            nameEn: l.nameEn ?? null,
             variantLabel: l.variantLabel,
             imageKey: l.imageKey,
             qty: l.qty,
@@ -304,8 +309,9 @@ export class CartService {
           product: {
             select: {
               nameAr: true,
+              nameEn: true,
               images: { orderBy: { sort: 'asc' }, take: 1, select: { fileKey: true } },
-              vendor: { select: { id: true, nameAr: true, settlementCurrency: true } },
+              vendor: { select: { id: true, nameAr: true, nameEn: true, settlementCurrency: true } },
             },
           },
           optionValues: { select: { attributeValue: { select: { valueAr: true } } } },
@@ -318,6 +324,7 @@ export class CartService {
           variantId: r.id,
           productId: r.productId,
           nameAr: r.product.nameAr,
+          nameEn: r.product.nameEn,
           variantLabel: r.optionValues.map((o) => o.attributeValue.valueAr).join(' / ') || null,
           imageKey: r.product.images[0]?.fileKey ?? null,
           qty: item.qty,
@@ -332,11 +339,11 @@ export class CartService {
         const vendor = r.product.vendor;
         const at = groups.findIndex((g) => g.vendorId === vendor.id);
         if (at >= 0) groups[at] = { ...groups[at]!, lines: [...groups[at]!.lines, line] };
-        else groups.push({ vendorId: vendor.id, vendorNameAr: vendor.nameAr, storeCurrency: vendor.settlementCurrency, lines: [line], subtotal: zero, shipping: null });
+        else groups.push({ vendorId: vendor.id, vendorNameAr: vendor.nameAr, vendorNameEn: vendor.nameEn, storeCurrency: vendor.settlementCurrency, lines: [line], subtotal: zero, shipping: null });
       }
     }
 
-    const totalView = (minor: bigint) => ({ minorUnits: minor.toString(), formatted: format(money(minor, cart.currency)) });
+    const totalView = (minor: bigint) => ({ minorUnits: minor.toString(), formatted: formatIn(minor, cart.currency) });
 
     return {
       token,
@@ -376,8 +383,8 @@ export class CartService {
    */
   private async require(token: string, userId: string | null = null) {
     const cart = await this.prisma.cart.findUnique({ where: { sessionToken: token } });
-    if (!cart || cart.expiresAt < new Date()) throw new NotFoundError('السلة غير موجودة أو انتهت.', {});
-    if (userId && cart.userId && cart.userId !== userId) throw new NotFoundError('السلة غير موجودة أو انتهت.', {});
+    if (!cart || cart.expiresAt < new Date()) throw new NotFoundError('السلة غير موجودة أو انتهت.', { resource: 'cart' });
+    if (userId && cart.userId && cart.userId !== userId) throw new NotFoundError('السلة غير موجودة أو انتهت.', { resource: 'cart' });
     if (userId && !cart.userId) return this.prisma.cart.update({ where: { id: cart.id }, data: { userId } });
     return cart;
   }

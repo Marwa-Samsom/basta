@@ -8,6 +8,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import { DomainError } from '../errors/domain-error';
+import type { Locale } from '../i18n/locale';
+import { currentLocale, requestLocale } from '../i18n/request-locale';
+import { localize } from '../i18n/translate';
 import { captureError } from '../observability/sentry';
 import { writeErrorLog } from '../observability/error-log';
 
@@ -25,7 +28,8 @@ const UNREADABLE: Record<number, { code: string; message: string }> = {
  * المترجم الوحيد بين أخطاء المجال والاستجابة.
  *
  * قاعدتان:
- *  1. خطأ المجال يصل للمستخدم برسالته العربية — هي مكتوبة له أصلاً.
+ *  1. خطأ المجال يصل للمستخدم برسالته العربية — هي مكتوبة له أصلاً. وبالإنجليزية حين
+ *     يطلبها الموقع (accept-language، زرّ اللغة) — من قاموس common/i18n/en.ts.
  *  2. أي خطأ غير متوقّع يُسجَّل كاملاً ويصل للمستخدم مجرّداً: لا مسار ملف
  *     ولا استعلام ولا اسم عمود. رسالة الخطأ ليست مكاناً لكشف البنية.
  */
@@ -42,12 +46,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
      * CSV فيرفضه Fastify — ويصل 500 بدل الرسالة.
      */
     const res = { status: (c: number) => ({ send: (b: unknown) => reply.status(c).header('content-type', 'application/json; charset=utf-8').send(b) }) };
-    const req = ctx.getRequest<{ url?: string; method?: string; id?: string }>();
+    const req = ctx.getRequest<{ url?: string; method?: string; id?: string; headers?: Record<string, string | string[] | undefined> }>();
+    // لغة الطلب من سياقه (معامل lang نُزع منه بعد قراءته)، والرأس لخطأ وقع قبل أن يُضبط السياق
+    const locale: Locale = currentLocale() === 'en' ? 'en' : requestLocale({ headers: req.headers ?? {}, query: (req as { query?: unknown }).query });
+    const say = (message: string) => localize(message, locale);
 
     if (exception instanceof DomainError) {
       res.status(exception.httpStatus).send({
         code: exception.code,
-        message: exception.message,
+        message: say(exception.message),
         ...(exception.details ? { details: exception.details } : {}),
       });
       return;
@@ -69,10 +76,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
        */
       if (typeof body === 'string' && exception.constructor === HttpException) {
         this.logger.warn(`${req.method} ${req.url} [${req.id ?? '—'}] ${status} ${body}`);
-        res.status(status).send(UNREADABLE[status] ?? UNREADABLE_BODY);
+        const unreadable = UNREADABLE[status] ?? UNREADABLE_BODY;
+        res.status(status).send({ ...unreadable, message: say(unreadable.message) });
         return;
       }
-      res.status(status).send(typeof body === 'string' ? { message: body } : body);
+      res.status(status).send(typeof body === 'string' ? { message: say(body) } : localizedBody(body as Record<string, unknown>, locale));
       return;
     }
 
@@ -86,7 +94,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const conflict = exception.code === 'P2002';
       res.status(conflict ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST).send({
         code: conflict ? 'CONFLICT' : 'INVALID_INPUT',
-        message: conflict ? 'القيمة مستعملة من قبل. غيّرها وأعد المحاولة.' : 'قيمة غير صالحة في الطلب. راجع المدخلات وأعد المحاولة.',
+        message: say(conflict ? 'القيمة مستعملة من قبل. غيّرها وأعد المحاولة.' : 'قيمة غير صالحة في الطلب. راجع المدخلات وأعد المحاولة.'),
       });
       return;
     }
@@ -115,8 +123,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
       code: 'INTERNAL_ERROR',
       // الرقم يربط شكوى المستخدم بالسجل بلا كشف أي تفصيل عن البنية
-      message: `حدث خلل غير متوقّع ولم يكتمل طلبك. أعد المحاولة، وإن تكرّر أبلغنا بالرقم ${requestId}.`,
+      message: say(`حدث خلل غير متوقّع ولم يكتمل طلبك. أعد المحاولة، وإن تكرّر أبلغنا بالرقم ${requestId}.`),
       requestId,
     });
   }
+}
+
+/**
+ * جسم HttpException كائناً: رسائل التحقق تحمل اللغتين (`message` و `messageEn`، validation-messages)،
+ * وغيرها رسالة نصّاً أو مصفوفة. `messageEn` لا يخرج للعميل في أيّ لغة.
+ */
+function localizedBody(body: Record<string, unknown>, locale: Locale): Record<string, unknown> {
+  const { messageEn, ...rest } = body;
+  if (locale === 'en' && Array.isArray(messageEn)) return { ...rest, message: messageEn };
+  const message = rest['message'];
+  if (typeof message === 'string') return { ...rest, message: localize(message, locale) };
+  if (Array.isArray(message)) return { ...rest, message: message.map((m) => (typeof m === 'string' ? localize(m, locale) : m)) };
+  return rest;
 }
