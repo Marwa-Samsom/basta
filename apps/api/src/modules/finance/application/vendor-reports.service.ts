@@ -62,19 +62,24 @@ export class VendorReportsService {
 
   async report(vendorId: string, r: ReportRange) {
     const [ledger, daily, statuses, delivered, top] = await Promise.all([
-      this.prisma.$queryRaw<{ currency: string; entryType: string; direction: string; amount: bigint; orders: bigint }[]>`
+      this.prisma.$queryRaw<{ currency: string; entryType: string; direction: string; amount: bigint }[]>`
         SELECT "currency", "entryType"::text AS "entryType", "direction",
-               SUM("amountMinorUnits")::bigint AS amount,
-               COUNT(DISTINCT "refId")::bigint AS orders
+               SUM("amountMinorUnits")::bigint AS amount
         FROM "ledger_entries"
         WHERE "vendorId" = ${vendorId}::uuid AND "createdAt" >= ${r.from} AND "createdAt" < ${r.to}
         GROUP BY "currency", "entryType", "direction"`,
+      /**
+       * الطلب المدفوع = قيد بيع أو شحن عند الدفع. كان العدّ بقيد البيع وحده: كوبون يموّله البائع
+       * بقيمة القطعة كلها يجعله صفراً فلا يُكتب، فيسقط الطلب من «طلبات مدفوعة» والرسم ويرتفع
+       * المتوسط (CHK-029، 2 نوفمبر 2026). وعكس القيد يوم الإرجاع ليس طلباً جديداً في يومه.
+       */
       this.prisma.$queryRaw<{ currency: string; day: string; sales: bigint; orders: bigint }[]>`
         SELECT "currency", to_char(("createdAt" AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
-               SUM(CASE WHEN "direction" = 'credit' THEN "amountMinorUnits" ELSE -"amountMinorUnits" END)::bigint AS sales,
-               COUNT(DISTINCT "refId")::bigint AS orders
+               SUM(CASE WHEN "entryType" <> 'sale_credit' THEN 0
+                        WHEN "direction" = 'credit' THEN "amountMinorUnits" ELSE -"amountMinorUnits" END)::bigint AS sales,
+               COUNT(DISTINCT "refId") FILTER (WHERE "direction" = 'credit' AND "reversesEntryId" IS NULL)::bigint AS orders
         FROM "ledger_entries"
-        WHERE "vendorId" = ${vendorId}::uuid AND "entryType" = 'sale_credit'
+        WHERE "vendorId" = ${vendorId}::uuid AND "entryType" IN ('sale_credit', 'shipping_credit')
           AND "createdAt" >= ${r.from} AND "createdAt" < ${r.to}
         GROUP BY "currency", day`,
       this.prisma.$queryRaw<{ status: string; n: bigint }[]>`
@@ -112,8 +117,10 @@ export class VendorReportsService {
       const net = (...types: string[]) =>
         rows.filter((x) => types.includes(x.entryType)).reduce((a, x) => a + signed(x.direction, x.amount), 0n);
       const sales = net('sale_credit');
-      const paidOrders = rows.find((x) => x.entryType === 'sale_credit' && x.direction === 'credit')?.orders ?? 0n;
-      const series = new Map(daily.filter((x) => x.currency === currency).map((x) => [x.day, x]));
+      const perDay = daily.filter((x) => x.currency === currency);
+      // قيدا البيع والشحن لطلب يُكتبان معاً لحظة الدفع، فيُعدّ الطلب في يوم واحد: مجموع الأيام = عدد الطلبات
+      const paidOrders = perDay.reduce((a, x) => a + x.orders, 0n);
+      const series = new Map(perDay.map((x) => [x.day, x]));
       return {
         currency,
         salesMinorUnits: s(sales),
