@@ -149,6 +149,8 @@ async function raw(path: string, options: RequestOptions, token: string | null):
   }
 
   if (token) headers['authorization'] = `Bearer ${token}`;
+  // لغة الصفحة لا لغة المتصفّح: رسائل الخادم بلغة زرّ اللغة (lib/i18n)
+  if (typeof document !== 'undefined') headers['accept-language'] ??= document.documentElement.lang || 'ar';
 
   // same-origin: الطلب إلى نطاق الواجهة نفسه، فيذهب كوكي التحديث ويُحفظ ما يضعه الردّ
   try {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { chooseCurrency } from '@/lib/currency';
 import type { CurrencyOption } from '@/lib/storefront';
 
@@ -11,17 +12,20 @@ import type { CurrencyOption } from '@/lib/storefront';
  * وقارئ الشاشة وقائمة الجوال الأصلية تعمل كما هي بلا قائمة مصنوعة.
  */
 export function CurrencyPicker({ current, options }: { current: string; options: CurrencyOption[] }) {
+  const t = useT();
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   if (options.length < 2) return null;
+  const label = t('عملة العرض والدفع', 'Display and payment currency');
   return (
-    <label className="cur-pick" data-busy={busy || undefined} title="عملة العرض والدفع">
+    <label className="cur-pick" data-busy={busy || undefined} title={label}>
       <span className="cur-pick__code num" aria-hidden="true">
         {current}
       </span>
       <Icon name="chev-down" size={14} />
       <select
         className="cur-pick__select"
-        aria-label="عملة العرض والدفع"
+        aria-label={label}
         value={current}
         disabled={busy}
         onChange={(e) => {
@@ -31,7 +35,7 @@ export function CurrencyPicker({ current, options }: { current: string; options:
       >
         {options.map((c) => (
           <option key={c.code} value={c.code}>
-            {c.nameAr} ({c.code})
+            {locale === 'en' ? c.nameEn : c.nameAr} ({c.code})
           </option>
         ))}
       </select>

@@ -226,6 +226,7 @@ export function getShop(
 export interface CurrencyOption {
   code: string;
   nameAr: string;
+  nameEn: string;
   symbol: string;
 }
 

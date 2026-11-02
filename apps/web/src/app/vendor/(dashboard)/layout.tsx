@@ -13,6 +13,7 @@ import { NotificationBell } from '@/components/notification-bell';
 import { LogoutButton } from '@/components/logout-button';
 import { DashIdent, DashShell, type DashNavGroup } from '@/components/dash-shell';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 
 /**
  * أقسام اللوحة بترتيب ملف التصميم. الاستيراد الجماعي يُفتح من صفحة المنتجات
@@ -21,29 +22,29 @@ import { Icon } from '@/components/icons';
 const NAV: DashNavGroup[] = [
   {
     items: [
-      { href: '/vendor', label: 'الرئيسية', icon: 'chart', exact: true },
-      { href: '/vendor/products', label: 'المنتجات', icon: 'package' },
+      { href: '/vendor', label: 'الرئيسية', en: 'Home', icon: 'chart', exact: true },
+      { href: '/vendor/products', label: 'المنتجات', en: 'Products', icon: 'package' },
       // فئات المتجر تحت المنتجات — يديرها البائع وحده (14 أكتوبر 2026)
-      { href: '/vendor/categories', label: 'الفئات', icon: 'list' },
-      { href: '/vendor/inventory', label: 'المخزون', icon: 'boxes' },
-      { href: '/vendor/orders', label: 'الطلبات', icon: 'truck' },
-      { href: '/vendor/messages', label: 'الرسائل', icon: 'msg' },
-      { href: '/vendor/disputes', label: 'المرتجعات والنزاعات', icon: 'return' },
-      { href: '/vendor/shipping', label: 'الشحن', icon: 'truck' },
-      { href: '/vendor/finance', label: 'المحفظة', icon: 'wallet' },
-      { href: '/vendor/reports', label: 'التقارير', icon: 'chart' },
-      { href: '/vendor/store', label: 'ملف المتجر', icon: 'store' },
-      { href: '/vendor/notifications', label: 'الإشعارات', icon: 'bell' },
-      { href: '/vendor/settings', label: 'الإعدادات', icon: 'gear' },
+      { href: '/vendor/categories', label: 'الفئات', en: 'Categories', icon: 'list' },
+      { href: '/vendor/inventory', label: 'المخزون', en: 'Inventory', icon: 'boxes' },
+      { href: '/vendor/orders', label: 'الطلبات', en: 'Orders', icon: 'truck' },
+      { href: '/vendor/messages', label: 'الرسائل', en: 'Messages', icon: 'msg' },
+      { href: '/vendor/disputes', label: 'المرتجعات والنزاعات', en: 'Returns & disputes', icon: 'return' },
+      { href: '/vendor/shipping', label: 'الشحن', en: 'Shipping', icon: 'truck' },
+      { href: '/vendor/finance', label: 'المحفظة', en: 'Wallet', icon: 'wallet' },
+      { href: '/vendor/reports', label: 'التقارير', en: 'Reports', icon: 'chart' },
+      { href: '/vendor/store', label: 'ملف المتجر', en: 'Shop profile', icon: 'store' },
+      { href: '/vendor/notifications', label: 'الإشعارات', en: 'Notifications', icon: 'bell' },
+      { href: '/vendor/settings', label: 'الإعدادات', en: 'Settings', icon: 'gear' },
     ],
   },
 ];
 
-const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
-  approved: { label: 'معتمد', tone: 'success' },
-  in_review: { label: 'قيد المراجعة', tone: 'warning' },
-  suspended: { label: 'معلَّق', tone: 'warning' },
-  banned: { label: 'محظور', tone: 'danger' },
+const STATUS: Record<string, { label: string; en: string; tone: 'success' | 'warning' | 'danger' }> = {
+  approved: { label: 'معتمد', en: 'Approved', tone: 'success' },
+  in_review: { label: 'قيد المراجعة', en: 'Under review', tone: 'warning' },
+  suspended: { label: 'معلَّق', en: 'Suspended', tone: 'warning' },
+  banned: { label: 'محظور', en: 'Banned', tone: 'danger' },
 };
 
 /**
@@ -56,6 +57,7 @@ const STATUS: Record<string, { label: string; tone: 'success' | 'warning' | 'dan
  * ورصيده ومنتجاته. الشريط أعلى الصفحة يقول الحال، والإجراءات تُمنع في مكانها.
  */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const router = useRouter();
   const { data, loading, missing, error } = useOnboarding();
   const unsent = data?.status === 'pending' || data?.status === 'rejected';
@@ -71,7 +73,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading && !data) {
     return (
       <main className="shell">
-        <Spinner label="جارٍ فتح لوحتك…" />
+        <Spinner label={t('جارٍ فتح لوحتك…', 'Opening your dashboard…')} />
       </main>
     );
   }
@@ -79,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (error || !data) {
     return (
       <main className="shell">
-        <Alert tone="danger">{error ?? 'تعذّر فتح اللوحة.'}</Alert>
+        <Alert tone="danger">{error ?? t('تعذّر فتح اللوحة.', "Couldn't open the dashboard.")}</Alert>
       </main>
     );
   }
@@ -100,7 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DashIdent
           href="/vendor/store"
           name={data.nameAr}
-          sub={status?.label ?? data.status}
+          sub={status ? t(status.label, status.en) : data.status}
           tone={status?.tone}
           mark={
             <span className="tile-icon" aria-hidden>
@@ -114,18 +116,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       exitHref="/account"
       sideFoot={
         <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/login">
-          خروج
+          {t('خروج', 'Sign out')}
         </LogoutButton>
       }
       banner={
         data.status === 'in_review' ? (
-          <Alert tone="info" title="متجرك قيد المراجعة">
-            أضف منتجاتك وانشرها الآن — تظهر للمشترين تلقائياً لحظة اعتماد متجرك.{' '}
-            <Link href="/vendor/onboarding/status">تابع حالة طلبك</Link>
+          <Alert tone="info" title={t('متجرك قيد المراجعة', 'Your shop is under review')}>
+            {t(
+              'أضف منتجاتك وانشرها الآن — تظهر للمشترين تلقائياً لحظة اعتماد متجرك.',
+              'Add and publish your products now — buyers see them the moment your shop is approved.',
+            )}{' '}
+            <Link href="/vendor/onboarding/status">{t('تابع حالة طلبك', 'Track your application')}</Link>
           </Alert>
         ) : data.status === 'suspended' ? (
-          <Alert tone="danger" title="متجرك معلَّق مؤقتاً — منتجاتك مخفية عن المشترين">
-            لا تستطيع نشر منتج جديد، وطلباتك القائمة تُكمَل كما هي. راسل الدعم لمعرفة السبب ورفع التعليق.
+          <Alert tone="danger" title={t('متجرك معلَّق مؤقتاً — منتجاتك مخفية عن المشترين', 'Your shop is temporarily suspended — your products are hidden from buyers')}>
+            {t(
+              'لا تستطيع نشر منتج جديد، وطلباتك القائمة تُكمَل كما هي. راسل الدعم لمعرفة السبب ورفع التعليق.',
+              "You can't publish new products; open orders continue as usual. Contact support to learn why and lift the suspension.",
+            )}
           </Alert>
         ) : null
       }

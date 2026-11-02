@@ -19,22 +19,29 @@ import './globals.css';
 import '@/styles/screens/account-shared.css';
 import { ConfirmProvider } from '@/components/confirm';
 import { IconSprite } from '@/components/icons';
+import { LocaleProvider } from '@/components/locale';
 import { SessionExpiredRedirect } from '@/components/session-expired';
 import { ServiceWorkerRegister } from '@/components/sw-register';
+import { dirOf } from '@/lib/i18n';
+import { pageLocale, serverT } from '@/lib/i18n-server';
 import { SITE_URL } from '@/lib/seo';
 import { THEME_BOOT } from '@/lib/theme';
 import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from '@/lib/theme-colors';
 
-export const metadata: Metadata = {
-  title: { default: 'بسطة', template: '%s · بسطة' },
-  description: 'سوق إلكتروني يجمع متاجر مستقلة في مكان واحد',
-  formatDetection: { telephone: false },
-  metadataBase: new URL(SITE_URL),
-  applicationName: 'بسطة',
-  appleWebApp: { capable: true, title: 'بسطة', statusBarStyle: 'default' },
-  icons: { icon: '/icons/icon-192.png', apple: '/icons/apple-touch-icon.png' },
-  openGraph: { siteName: 'بسطة', locale: 'ar', type: 'website' },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const [locale, t] = await Promise.all([pageLocale(), serverT()]);
+  const name = t('بسطة', 'Basta');
+  return {
+    title: { default: name, template: `%s · ${name}` },
+    description: t('سوق إلكتروني يجمع متاجر مستقلة في مكان واحد', 'An online marketplace that brings independent shops together'),
+    formatDetection: { telephone: false },
+    metadataBase: new URL(SITE_URL),
+    applicationName: name,
+    appleWebApp: { capable: true, title: name, statusBarStyle: 'default' },
+    icons: { icon: '/icons/icon-192.png', apple: '/icons/apple-touch-icon.png' },
+    openGraph: { siteName: name, locale, type: 'website' },
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -49,20 +56,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // كل صفحة تُصيَّر عند الطلب: سياسة المحتوى تحمل nonce جديداً لكل طلب
   // (src/proxy.ts)، وصفحة مبنية سلفاً لا تعرفه فتُحجب سكربتاتها كلها
   await connection();
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
-  // lang و dir على عنصر html — أساس RTL لا خاصية CSS. و data-theme يضعه سكربت
-  // الوضع قبل الترطيب، فيختلف عن مصدر الخادم عمداً (lib/theme)
+  const [nonce, locale] = await Promise.all([headers().then((h) => h.get('x-nonce') ?? undefined), pageLocale()]);
+  // lang و dir على عنصر html — أساس RTL لا خاصية CSS، ومن كوكي زرّ اللغة (lib/i18n).
+  // و data-theme يضعه سكربت الوضع قبل الترطيب، فيختلف عن مصدر الخادم عمداً (lib/theme)
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang={locale} dir={dirOf(locale)} suppressHydrationWarning>
       <head>
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
       <body>
         <IconSprite />
-        {/* نافذة تأكيد واحدة للموقع كله بلغة الصفحة — بدل window.confirm (components/confirm) */}
-        <ConfirmProvider>{children}</ConfirmProvider>
-        <SessionExpiredRedirect />
-        <ServiceWorkerRegister />
+        <LocaleProvider locale={locale}>
+          {/* نافذة تأكيد واحدة للموقع كله بلغة الصفحة — بدل window.confirm (components/confirm) */}
+          <ConfirmProvider>{children}</ConfirmProvider>
+          <SessionExpiredRedirect />
+          <ServiceWorkerRegister />
+        </LocaleProvider>
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { apiBase } from '@/lib/api';
 import { SEARCH_MAX } from '@/lib/storefront';
 
@@ -14,6 +15,7 @@ import { SEARCH_MAX } from '@/lib/storefront';
  * الخادم، وبعد التوقّف يصل متأخّراً فلا يفيد.
  */
 function SearchBoxInner() {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const [value, setValue] = useState(params.get('q') ?? '');
@@ -74,7 +76,7 @@ function SearchBoxInner() {
       }}
     >
       <label htmlFor={`${listId}-input`} className="visually-hidden">
-        ابحث في بسطة
+        {t('ابحث في بسطة', 'Search Basta')}
       </label>
       <Icon name="search" size={18} className="search__icon" />
       <input
@@ -83,7 +85,7 @@ function SearchBoxInner() {
         name="q"
         type="search"
         className="search__input"
-        placeholder="ابحث عن منتج أو متجر"
+        placeholder={t('ابحث عن منتج أو متجر', 'Search for a product or shop')}
         autoComplete="off"
         maxLength={SEARCH_MAX}
         role="combobox"
@@ -115,7 +117,7 @@ function SearchBoxInner() {
         <button
           type="button"
           className="search__clear"
-          aria-label="امسح ما كتبته"
+          aria-label={t('امسح ما كتبته', 'Clear search')}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             setValue('');
@@ -128,7 +130,7 @@ function SearchBoxInner() {
         </button>
       ) : null}
       <button type="submit" className="search__go">
-        ابحث
+        {t('ابحث', 'Search')}
       </button>
 
       {open && suggestions.length > 0 ? (

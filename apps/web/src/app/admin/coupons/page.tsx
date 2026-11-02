@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { ClearableInput, EmptyState } from '@/components/ui';
+import { DateField } from '@/components/date-field';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { minorUnitDigits } from '@/lib/money';
@@ -190,14 +191,14 @@ export default function AdminCouponsPage() {
               <span className="field__label">لكل مستخدم</span>
               <ClearableInput className="field__control num" dir="ltr" inputMode="numeric" value={f.limitPerUser} onChange={(e) => setF({ ...f, limitPerUser: e.target.value })} />
             </label>
-            <label className="field">
+            <div className="field">
               <span className="field__label">يبدأ</span>
-              <input type="datetime-local" className="field__control" value={f.startsAt} onChange={(e) => setF({ ...f, startsAt: e.target.value })} />
-            </label>
-            <label className="field">
+              <DateField withTime clearable label="يبدأ" value={f.startsAt} onChange={(v) => setF({ ...f, startsAt: v })} />
+            </div>
+            <div className="field">
               <span className="field__label">ينتهي</span>
-              <input type="datetime-local" className="field__control" value={f.endsAt} onChange={(e) => setF({ ...f, endsAt: e.target.value })} />
-            </label>
+              <DateField withTime clearable label="ينتهي" value={f.endsAt} onChange={(v) => setF({ ...f, endsAt: v })} />
+            </div>
           </div>
           {example ? (
             <div className="alert alert--info ac2-callout ac2-callout--sm">
