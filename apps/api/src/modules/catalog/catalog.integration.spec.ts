@@ -983,6 +983,35 @@ describe('بوابة 05 · البند الثالث — الاستيراد الج
     await expectNoDrift(variants.map((v) => v.id));
   }, 120_000);
 
+  // موجة «يُؤتمت» الثالثة (2 نوفمبر 2026): مطابقة SKU في متجر البائع وحده — VCAT-083
+  dbIt('SKU موجود في متجر آخر: الاستيراد ينشئ منتجاً جديداً هنا، ومتغيّر الآخر لا يُمسّ', async () => {
+    const sku = `SHARED-${SUFFIX}`;
+    const created = await as('b').post('/vendor/products', {
+      vendorCategoryId: await catOf('b'),
+      nameAr: 'منتج المتجر الآخر',
+      attributes: [{ attributeId: attr('material').attributeId, text: 'قطن' }],
+      variants: [{ sku, price: '10.00', stock: 7 }],
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const theirs = await prisma.productVariant.findFirstOrThrow({ where: { vendorId: vendors.b.vendorId, sku }, include: { inventory: true } });
+    const movements = () => prisma.inventoryMovement.count({ where: { variantId: theirs.id } });
+    const movesBefore = await movements();
+
+    const csv = `﻿رمز_المنتج,SKU,الاسم_عربي,الفئة,السعر,الكمية\r\nSH-${SUFFIX},${sku},منتج بالرمز نفسه,قمصان مستوردة,1.00,0\r\n`;
+    const res = await as('a').upload('/vendor/catalog/import', { name: 'shared.csv', type: 'text/csv', data: Buffer.from(csv, 'utf8') });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({ imported: 1, productsCreated: 1, variantsCreated: 1, variantsUpdated: 0, rejectedCount: 0 });
+
+    const mine = await prisma.productVariant.findFirstOrThrow({ where: { vendorId: vendors.a.vendorId, sku }, include: { product: true } });
+    expect(mine.id).not.toBe(theirs.id);
+    expect(mine.product.status).toBe('draft');
+    const after = await prisma.productVariant.findUniqueOrThrow({ where: { id: theirs.id }, include: { inventory: true } });
+    expect(after.priceMinorUnits).toBe(theirs.priceMinorUnits);
+    expect(after.productId).toBe(theirs.productId);
+    expect(after.inventory?.onHand).toBe(7);
+    expect(await movements()).toBe(movesBefore);
+  });
+
   dbIt('الملف الفاسد يُرفض كله ولا يترك بيانات جزئية', async () => {
     const A = as('a');
     const count = () => prisma.productVariant.count({ where: { vendorId: vendors.a.vendorId } });
