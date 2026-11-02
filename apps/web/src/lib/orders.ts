@@ -101,6 +101,14 @@ export function hoursAr(n: number): string {
   return `${n} ساعة`;
 }
 
+/** عدد الأيام بتمييزه العربي: «يوم واحد»، «يومين»، «7 أيام»، «14 يوماً» */
+export function daysAr(n: number): string {
+  if (n === 1) return 'يوم واحد';
+  if (n === 2) return 'يومين';
+  if (n >= 3 && n <= 10) return `${n} أيام`;
+  return `${n} يوماً`;
+}
+
 export const when = (iso: string | null | undefined): string =>
   iso
     ? new Intl.DateTimeFormat('ar-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))

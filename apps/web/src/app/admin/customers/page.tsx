@@ -6,6 +6,7 @@ import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { PARENT_STATUS, TONE, useAction, useAdminData, useAdminList } from '@/lib/admin';
+import { CUSTOMERS, counted } from '@/lib/arabic-count';
 import { money, when } from '@/lib/orders';
 
 interface Row {
@@ -39,7 +40,7 @@ export default function AdminCustomersPage() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="العملاء" count={data ? `${data.total} عميل` : undefined} />
+      <AdminHeader title="العملاء" count={data ? counted(data.total, CUSTOMERS) : undefined} />
       <div className="toolbar">
         <div className="toolbar__end">
           <SearchBox value={search} onChange={setSearch} placeholder="الاسم أو البريد أو الهاتف" label="بحث في العملاء" />

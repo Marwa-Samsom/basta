@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { writeErrorLog } from '../../../common/observability/error-log';
+import { everyAfterBoot } from '../../../common/periodic';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService, availableOf } from '../../inventory/public';
 import { NotificationsService } from '../../notifications/public';
@@ -22,7 +23,7 @@ const MAX_LISTED = 5;
 @Injectable()
 export class LowStockNotifier implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger('LowStockNotifier');
-  private timer: NodeJS.Timeout | null = null;
+  private stop: (() => void) | null = null;
   private running = false;
 
   constructor(
@@ -33,12 +34,11 @@ export class LowStockNotifier implements OnApplicationBootstrap, OnModuleDestroy
 
   onApplicationBootstrap(): void {
     if (process.env['VITEST'] || process.env['DISABLE_SCHEDULERS'] === 'true') return;
-    this.timer = setInterval(() => void this.tick(), EVERY_TEN_MINUTES);
-    this.timer.unref();
+    this.stop = everyAfterBoot(() => void this.tick(), EVERY_TEN_MINUTES);
   }
 
   onModuleDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
+    this.stop?.();
   }
 
   async tick(): Promise<{ alerts: number; silenced: number }> {
