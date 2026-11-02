@@ -60,7 +60,7 @@ const TABS: readonly { key: TabKey; label: string; en: string }[] = [
   { key: 'archived', label: 'مؤرشف', en: 'Archived' },
 ];
 
-/** العدد ومعدوده بالعربية (#179)، وبالإنجليزية جمعها */
+/** العدد ومعدوده بالعربية (طلب الدمج 179)، وبالإنجليزية جمعها */
 const productCount = (n: number, locale: Locale): string =>
   locale === 'en' ? `${num(n, locale)} ${n === 1 ? 'product' : 'products'}` : counted(n, PRODUCTS);
 
