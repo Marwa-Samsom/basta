@@ -679,3 +679,99 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     expect(d.json().alerts).toEqual([]);
   });
 });
+
+// ============================================================== مدخلات اللوحة الخاطئة
+
+describe('مدخلات خاطئة في اللوحة تُرفض برسالة تقول ما الخطأ — لا 500 ولا «أحد الحقول»', () => {
+  const upload = (file: Buffer, name: string, type: string) => {
+    const up = multipart(file, name, type);
+    return app.inject({ method: 'POST', url: '/api/v1/admin/banners/image', headers: { authorization: `Bearer ${limited.token}`, ...up.headers }, payload: up.payload });
+  };
+  const image = (width: number) =>
+    sharp({ create: { width, height: 300, channels: 3, background: { r: 120, g: 30, b: 40 } } }).png().toBuffer();
+
+  it('صورة البانر: بلا ملف، ليست صورة، أضيق من 600، أكبر من 8 م.ب (ACFG-049)', async () => {
+    if (!dbUp) return;
+    const none = await call('POST', '/admin/banners/image', limited.token, {});
+    expect(none.statusCode).toBe(400);
+    expect(none.json().message).toBe('أرفق الصورة في الحقل file.');
+
+    const text = await upload(Buffer.from('ليست صورة'), 'fake.png', 'image/png');
+    expect(text.statusCode).toBe(400);
+    expect(text.json().message).toBe('الملف ليس صورة صالحة.');
+
+    const narrow = await upload(await image(599), 'narrow.png', 'image/png');
+    expect(narrow.statusCode).toBe(400);
+    expect(narrow.json().message).toBe('عرض صورة البانر 600 بكسل على الأقل.');
+    expect((await upload(await image(600), 'ok.png', 'image/png')).statusCode).toBe(201);
+
+    // كان 500 «حدث خلل غير متوقّع»: الحدّ يُرمى أثناء القراءة خارج أي ترجمة
+    const huge = await upload(randomBytes(9 * 1024 * 1024), 'huge.png', 'image/png');
+    expect(huge.statusCode, huge.body).toBe(400);
+    expect(huge.json().message).toBe('حجم صورة البانر أكبر من 8 م.ب.');
+  });
+
+  it('صفحة المحتوى: المسار والعنوان والنص بأسمائها وحدودها، والمكرّر والمجهول (ACFG-056)', async () => {
+    if (!dbUp) return;
+    const page = (body: Record<string, unknown>) =>
+      call('POST', '/admin/pages', limited.token, { titleAr: 'صفحة اختبار', bodyAr: 'نص', isPublished: false, ...body });
+    const SLUG_RULE = 'المسار من 2 إلى 60 حرفاً: أحرف لاتينية صغيرة وأرقام وشرطات.';
+    for (const slug of ['a', 'about us', 'من-نحن', 'x'.repeat(61), 'About']) {
+      const res = await page({ slug });
+      expect(res.statusCode, slug).toBe(400);
+      expect(res.json().message, slug).toEqual([SLUG_RULE]);
+    }
+    const sixty = `t${SUFFIX}`.padEnd(60, '-');
+    const created = await page({ slug: sixty });
+    expect(created.statusCode, created.body).toBe(201);
+    const taken = await page({ slug: sixty });
+    expect(taken.statusCode).toBe(409);
+    expect(taken.json().message).toBe('المسار مستعمل.');
+
+    const longTitle = await page({ slug: `t2${SUFFIX}`, titleAr: 'ع'.repeat(121) });
+    expect(longTitle.statusCode).toBe(400);
+    expect(longTitle.json().message).toEqual(['العنوان: 120 حرفاً على الأكثر.']);
+    const longBody = await page({ slug: `t3${SUFFIX}`, bodyAr: 'ن'.repeat(50_001) });
+    expect(longBody.statusCode).toBe(400);
+    expect(longBody.json().message).toEqual(['النص: 50000 حرفاً على الأكثر.']);
+    expect((await page({ slug: `t4${SUFFIX}`, bodyAr: '' })).statusCode).toBe(201);
+
+    const missing = await call('PUT', `/admin/pages/${randomUUID()}`, limited.token, { slug: `t5${SUFFIX}`, titleAr: 'صفحة', bodyAr: '', isPublished: false });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json().message).toBe('الصفحة غير موجودة.');
+    // صفحات الاختبار غير منشورة أصلاً — لا تظهر لزائر
+    expect(await prisma.cmsPage.count({ where: { slug: { contains: SUFFIX }, isPublished: true, titleAr: 'صفحة اختبار' } })).toBe(0);
+  });
+
+  it('فترة التقرير: البداية بعد النهاية، 366 يوماً و367، وتاريخ ليس تاريخاً — في الجدول والتصدير (ACFG-090)', async () => {
+    if (!dbUp) return;
+    const report = (path: string, q: string) => call('GET', `/admin/reports/${path}?${q}`, admin.token);
+    for (const path of ['financial', 'financial.csv', 'financial.xlsx']) {
+      const reversed = await report(path, 'from=2026-10-10&to=2026-10-01');
+      expect(reversed.statusCode, path).toBe(400);
+      expect(reversed.json().message).toBe('بداية الفترة قبل نهايتها.');
+
+      // 2024 سنة كبيسة: من أولها لآخرها 366 يوماً تمرّ، ويوم قبلها يجعلها 367. ولا بيع فيها:
+      // تصدير Excel لفترة بلا سطور كان 500 — الورقة بلا أعمدة — وCSV بلا عناوين
+      const year = await report(path, 'from=2024-01-01&to=2024-12-31');
+      expect(year.statusCode, `${path} ${year.body.slice(0, 200)}`).toBe(200);
+      if (path === 'financial.csv') expect(year.body).toContain('"العملة","الطلبات","المقبوض"');
+      if (path === 'financial.xlsx') {
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(year.rawPayload as unknown as ArrayBuffer);
+        expect((wb.getWorksheet('المبيعات')!.getRow(1).values as string[]).slice(1, 4)).toEqual(['العملة', 'الطلبات', 'المقبوض']);
+      }
+      const long = await report(path, 'from=2023-12-31&to=2024-12-31');
+      expect(long.statusCode, path).toBe(400);
+      // الرفض JSON برسالته لا ملف — الواجهة تعرضه تنبيهاً
+      expect(long.headers['content-type'], path).toMatch(/application\/json/);
+      expect(long.json().message).toBe('الفترة 366 يوماً على الأكثر — للأطول صدّر سنة بسنة.');
+
+      for (const q of ['from=2026-13-01', 'from=2026/10/01', 'to=2026-02-30']) {
+        const bad = await report(path, q);
+        expect(bad.statusCode, `${path} ${q}`).toBe(400);
+        expect(bad.json().message).toBe('التاريخ بصيغة YYYY-MM-DD.');
+      }
+    }
+  });
+});

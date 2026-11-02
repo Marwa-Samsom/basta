@@ -114,6 +114,14 @@ interface ResolvedAttribute {
   readonly valueBoolean: boolean | null;
 }
 
+/** حالة المنتج كما يقرؤها المدير في رسالة الرفض — كانت «draft» و«rejected» برموزها (ADM-052) */
+const STATUS_LABELS: Readonly<Record<ProductStatus, string>> = Object.freeze({
+  draft: 'مسوّدة',
+  active: 'منشور',
+  rejected: 'موقوف',
+  archived: 'مؤرشف',
+});
+
 const ATTRIBUTE_SELECT = { id: true, code: true, nameAr: true, nameEn: true } as const;
 const VALUE_SELECT = { id: true, valueAr: true, valueEn: true, hexColor: true } as const;
 
@@ -752,7 +760,7 @@ export class ProductService {
     if (count === 0) {
       const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null }, select: { status: true } });
       if (!product) throw new NotFoundError('المنتج غير موجود.', { id });
-      throw new InvalidStateTransitionError(product.status, 'rejected');
+      throw new InvalidStateTransitionError(STATUS_LABELS[product.status], STATUS_LABELS.rejected);
     }
     this.reindex(id);
     return trimmed;

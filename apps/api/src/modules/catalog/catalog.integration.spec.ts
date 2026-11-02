@@ -651,6 +651,57 @@ describe('النشر بلا مراجعة — قرار صاحب المشروع 15
     }
   });
 
+  dbIt('لا يُوقف إلا المنشور برسالة بأسماء الحالات العربية، والمجهول غير موجود — ولا إشعار للبائع (ADM-052)', async () => {
+    const A = as('a');
+    const draft = await simpleProduct('a', `NOSTOP-D-${SUFFIX}`);
+    const stopped = await simpleProduct('a', `NOSTOP-R-${SUFFIX}`);
+    await withImage('a', stopped.id);
+    expect((await A.post(`/vendor/products/${stopped.id}/publish`)).json().status).toBe('active');
+    await app.get(ProductService).reject(stopped.id, 'إيقاف أول للاختبار');
+
+    const admin = await prisma.user.create({
+      data: {
+        email: `catalog.nostop.${SUFFIX}@basta.test`,
+        fullName: 'مدير الكتالوج',
+        passwordHash: await hashPassword(randomUUID()),
+        roles: { create: { role: 'admin' } },
+        permissions: { create: { permission: 'catalog.manage' } },
+        totpEnabledAt: new Date(),
+      },
+    });
+    try {
+      const { accessToken } = await app.get(TokenService).issue({ sub: admin.id, roles: ['admin'], permissions: ['catalog.manage'] }, {});
+      const stop = (id: string) =>
+        app.inject({
+          method: 'POST',
+          url: `/api/v1/admin/products/${id}/reject`,
+          headers: { authorization: `Bearer ${accessToken}` },
+          payload: { reason: 'سبب صالح للإيقاف' },
+        });
+      const notices = () => prisma.notification.count({ where: { userId: vendors.a.userId, templateCode: 'product_rejected' } });
+      const before = await notices();
+
+      const fromDraft = await stop(draft.id);
+      expect(fromDraft.statusCode, fromDraft.body).toBe(409);
+      expect(fromDraft.json().message).toBe('الانتقال من «مسوّدة» إلى «موقوف» غير مسموح.');
+      const twice = await stop(stopped.id);
+      expect(twice.statusCode, twice.body).toBe(409);
+      expect(twice.json().message).toBe('الانتقال من «موقوف» إلى «موقوف» غير مسموح.');
+      const unknown = await stop(randomUUID());
+      expect(unknown.statusCode).toBe(404);
+      expect(unknown.json().message).toBe('المنتج غير موجود.');
+      const notUuid = await stop('not-a-uuid');
+      expect(notUuid.statusCode).toBe(404);
+      expect(notUuid.json().message).toBe('المورد غير موجود.');
+
+      expect(await notices()).toBe(before);
+      expect((await A.get(`/vendor/products/${draft.id}`)).json().status).toBe('draft');
+      expect((await A.get(`/vendor/products/${stopped.id}`)).json().rejectReason).toBe('إيقاف أول للاختبار');
+    } finally {
+      await prisma.user.update({ where: { id: admin.id }, data: { status: 'suspended' } });
+    }
+  });
+
   dbIt('متجر قيد المراجعة ينشر فيُحفظ منشوراً مخفياً، ويظهر للمشترين لحظة اعتماد متجره', async () => {
     const R = as('review');
     const product = await simpleProduct('review', `PRE-${SUFFIX}`);

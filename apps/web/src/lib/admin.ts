@@ -11,16 +11,18 @@ export interface Me {
 
 /**
  * يجلب بيانات صفحة إدارية ويعيد تحميلها عند الطلب. الخطأ نصّ جاهز للعرض،
- * و403 يُميَّز: الصفحة تقول «تحتاج صلاحية كذا» لا «حدث خطأ».
+ * و403 يُميَّز: الصفحة تقول «تحتاج صلاحية كذا» لا «حدث خطأ». و400 مدخل رفضه الخادم
+ * (فترة مقلوبة مثلاً): رسالته وحدها تكفي، لا «حدث خلل غير متوقّع» فوقها (ACFG-090).
  */
 export function useAdminData<T>(path: string | null): {
   data: T | null;
   error: string | null;
   forbidden: boolean;
+  invalid: boolean;
   reload: () => void;
 } {
   const [data, setData] = useState<T | null>(null);
-  const [failure, setFailure] = useState<{ path: string; message: string; forbidden: boolean } | null>(null);
+  const [failure, setFailure] = useState<{ path: string; message: string; forbidden: boolean; invalid: boolean } | null>(null);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -35,7 +37,12 @@ export function useAdminData<T>(path: string | null): {
         }
       } catch (e) {
         if (!alive) return;
-        setFailure({ path, message: (e as Error).message, forbidden: e instanceof ApiError && e.status === 403 });
+        setFailure({
+          path,
+          message: (e as Error).message,
+          forbidden: e instanceof ApiError && e.status === 403,
+          invalid: e instanceof ApiError && e.status === 400,
+        });
       }
     })();
     return () => {
@@ -50,7 +57,13 @@ export function useAdminData<T>(path: string | null): {
    * وأثناء التحميل تبقى السابقة حتى تصل التالية، فلا ترمش القائمة مع كل حرف.
    */
   const failed = failure?.path === path ? failure : null;
-  return { data: failed ? null : data, error: failed?.message ?? null, forbidden: failed?.forbidden ?? false, reload };
+  return {
+    data: failed ? null : data,
+    error: failed?.message ?? null,
+    forbidden: failed?.forbidden ?? false,
+    invalid: failed?.invalid ?? false,
+    reload,
+  };
 }
 
 /**

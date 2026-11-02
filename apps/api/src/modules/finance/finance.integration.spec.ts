@@ -315,6 +315,41 @@ describe('بوابة 10 · البند 2 — لقطة العمولة', () => {
     expect(byCategory.statusCode).toBe(400);
     expect(await viewCount('audit_money_conservation')).toBe(0);
   });
+
+  /**
+   * بنطاق متجر الاختبار لا بالعامة: العامة في قاعدة التطوير نسبة صاحبة المشروع، والسباق نفسه
+   * على أي نطاق — والقفل لكل نطاق، فنسبة متجر لا تنتظر العامة.
+   */
+  it('خمسة اعتمادات معاً لنطاق واحد، ثلاث جولات: قاعدة سارية واحدة، والباقي منتهٍ (ACFG-015)', async () => {
+    if (!dbUp) return;
+    const jod = vendors[1]!.vendorId;
+    const live = async () => prisma.commissionRule.findMany({ where: { scope: 'vendor', vendorId: jod, effectiveTo: null } });
+    try {
+      // جولة واحدة بلا قفل تمرّ أحياناً بالصدفة (جُرّب: مرّت واحدة من ثلاث) — ثلاث جولات لا تمرّ
+      for (const [round, rates] of [
+        [1, [1200, 1210, 1220, 1230, 1240]],
+        [2, [1300, 1310, 1320, 1330, 1340]],
+        [3, [1400, 1410, 1420, 1430, 1440]],
+      ] as const) {
+        const results = await Promise.all(
+          rates.map((rateBps) => call('POST', '/admin/finance/commissions', admin.token, { scope: 'vendor', vendorId: jod, rateBps })),
+        );
+        expect(results.map((r) => r.statusCode)).toEqual(rates.map(() => 201));
+        expect(await live(), `الجولة ${round}`).toHaveLength(1);
+      }
+      const [current] = await live();
+      // القائمة والتسعير يقولان الشيء نفسه
+      const listed = (await call('GET', '/admin/finance/commissions', admin.token)).json() as { scope: string; vendorId: string | null; rateBps: number }[];
+      expect(listed.filter((r) => r.scope === 'vendor' && r.vendorId === jod).map((r) => r.rateBps)).toEqual([current!.rateBps]);
+      expect((await placeOrder([0, 1])).sub(1).items[0]!.commissionBpsSnapshot).toBe(current!.rateBps);
+
+      expect((await call('DELETE', `/admin/finance/commissions/vendor/${jod}`, admin.token)).statusCode).toBe(200);
+      expect(await live()).toHaveLength(0);
+    } finally {
+      // فشلٌ في منتصفه لا يترك متجر الاختبار بقواعد مفتوحة
+      await prisma.commissionRule.updateMany({ where: { scope: 'vendor', vendorId: jod, effectiveTo: null }, data: { effectiveTo: new Date() } });
+    }
+  });
 });
 
 describe('بوابة 10 · البند 3 — الإرجاع بعد التحرير', () => {

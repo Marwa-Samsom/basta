@@ -284,6 +284,21 @@ describe('بوابة 08 · البند 2 — الفشل لا يستهلك مخز�
     expect(res.statusCode).toBe(409);
     expect(await mine()).toBe(count);
   });
+
+  it('رمز دفع لا يعرفه المزوّد: 400 برسالته، بلا طلب ولا حجز — لا «نتحقّق من الدفع» (CHK-065)', async () => {
+    if (!dbUp) return;
+    const mine = () => prisma.order.count({ where: { customerUserId: buyerId } });
+    const count = await mine();
+    const before = await stockOf(variantIds[0]!);
+    const token = await cartWith([{ variantId: variantIds[0]!, qty: 1 }]);
+    const res = await pay(token, 'tok_unknown');
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.json().message).toBe('وسيلة دفع غير معروفة.');
+    expect(await mine()).toBe(count);
+    expect(await stockOf(variantIds[0]!)).toEqual(before);
+    // السلة باقية كما هي: يعيد المحاولة برمز صحيح
+    expect(await cartLines(token)).toEqual([{ variantId: variantIds[0]!, qty: 1 }]);
+  });
 });
 
 describe('بوابة 08 · البند 3 — عدم التكرار', () => {

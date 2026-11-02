@@ -458,6 +458,7 @@ export class FinanceService {
     if (input.scope === 'vendor' && !target.vendorId) throw new InvalidInputError('اختر المتجر.');
     const now = new Date();
     return this.prisma.$transaction(async (tx) => {
+      await lockCommissionScope(tx, target.scope, target.vendorId);
       const ended = await tx.commissionRule.updateMany({
         where: { ...target, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
         data: { effectiveTo: now },
@@ -479,6 +480,7 @@ export class FinanceService {
   async endVendorCommission(adminId: string, vendorId: string): Promise<{ ended: number }> {
     const now = new Date();
     return this.prisma.$transaction(async (tx) => {
+      await lockCommissionScope(tx, 'vendor', vendorId);
       const ended = await tx.commissionRule.updateMany({
         where: { scope: 'vendor', vendorId, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
         data: { effectiveTo: now },
@@ -501,6 +503,15 @@ export class FinanceService {
       FROM "platform_ledger_entries" GROUP BY "currency", "entryType" ORDER BY "currency", "entryType"`;
     return rows.map((r) => ({ ...r, net: r.net.toString() }));
   }
+}
+
+/**
+ * قاعدة سارية واحدة لكل نطاق: اعتمادان متزامنان كانا يُنهيان القديمة معاً — كلٌّ لا يرى قاعدة
+ * الآخر قبل التزامها — فتبقى قاعدتان «مفتوحة» (ACFG-015). القفل حتى نهاية المعاملة يرتّبهما،
+ * فالثاني يرى قاعدة الأول ويُنهيها. نطاق المتجر لا يوقف العامة ولا متجراً آخر.
+ */
+async function lockCommissionScope(tx: Prisma.TransactionClient, scope: string, vendorId: string | null): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('commission_rules'), hashtext(${`${scope}:${vendorId ?? ''}`}))`;
 }
 
 function present(p: {

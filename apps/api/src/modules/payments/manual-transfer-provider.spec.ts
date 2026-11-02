@@ -33,6 +33,9 @@ describe('مزوّد التحويل اليدوي', () => {
 
   it('يرفض رمز بطاقة — صفحة قديمة لا تُنشئ طلباً بوسيلة غير موجودة', async () => {
     await expect(new ManualTransferProvider().charge(req('tok_success'))).rejects.toThrow(/التحويل البنكي/);
+    // والفحص نفسه يُسأل قبل الحجز والطلب (CHK-065)
+    expect(() => new ManualTransferProvider().assertToken('tok_success')).toThrow(/التحويل البنكي/);
+    expect(() => new ManualTransferProvider().assertToken(BANK_TRANSFER_TOKEN)).not.toThrow();
   });
 
   it('الردّ «يدوي» لا «تمّ»: لا معرّف ردّ مزعوم، والإدارة تسجّل مرجع تحويلها', async () => {

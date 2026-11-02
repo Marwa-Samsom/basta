@@ -45,10 +45,12 @@ export default function AdminReportsPage() {
   const [preset, setPreset] = useState<number | null>(30);
   const [view, setView] = useState<string | null>(null);
   const q = `from=${from}&to=${to}`;
-  const { data, error, forbidden } = useAdminData<Report>(`/admin/reports/financial?${q}`);
+  const { data, error, forbidden, invalid } = useAdminData<Report>(`/admin/reports/financial?${q}`);
   const [dlError, setDlError] = useState<string | null>(null);
 
   const download = async (ext: 'csv' | 'xlsx') => {
+    // رفض تصدير سابق لا يبقى فوق تصدير نجح بعد تصحيح الفترة
+    setDlError(null);
     try {
       const blob = await apiBlob(`/admin/reports/financial.${ext}?${q}`);
       const a = document.createElement('a');
@@ -149,7 +151,7 @@ export default function AdminReportsPage() {
       {dlError ? <Alert tone="danger">{dlError}</Alert> : null}
 
       {!data ? (
-        <Loading error={error} forbidden={forbidden} />
+        <Loading error={error} forbidden={forbidden} inline={invalid} />
       ) : (
         <>
           <div className="stats">
