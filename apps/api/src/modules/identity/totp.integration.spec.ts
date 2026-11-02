@@ -386,3 +386,33 @@ describe('سرّ التحقق الثنائي لا يُقرأ من القاعدة
     expect(stored).not.toContain(secret);
   });
 });
+
+/**
+ * موجة «يُؤتمت» الثالثة (2 نوفمبر 2026): المنع على الخادم لا في الواجهة وحدها — طلب مباشر
+ * بكلمة المرور ورمز صحيحين من مدير لا يعطّل تحققه (ADM-007، والشقّ الخادمي من AUTH-063).
+ */
+describe('المدير لا يعطّل تحققه الثنائي (ADM-007، AUTH-063)', () => {
+  it('بكلمة المرور ورمز صحيحين: 409 برسالته، والسرّ والرموز والدخول بالرمز كما هي', async () => {
+    if (!dbUp) return;
+    const id = await register('admoff');
+    const { secret } = await enable('admoff', id);
+    await prisma.userRole.create({ data: { userId: id, role: 'admin' } });
+    const token = await login('admoff', totpOf(secret));
+    await freshStep(id);
+    const before = await prisma.user.findUniqueOrThrow({ where: { id } });
+    const codesBefore = await prisma.totpRecoveryCode.findMany({ where: { userId: id }, orderBy: { id: 'asc' } });
+    expect(codesBefore).toHaveLength(10);
+
+    const res = await call('POST', '/auth/totp/disable', { token, body: { password: PASSWORD, code: totpOf(secret) } });
+    expect(res.statusCode, res.body).toBe(409);
+    expect(res.json().message).toBe('التحقق الثنائي إلزامي على الحسابات الإدارية ولا يمكن تعطيله. لإيقافه أزل الدور الإداري أولاً.');
+
+    const after = await prisma.user.findUniqueOrThrow({ where: { id } });
+    expect(after.totpEnabledAt).toEqual(before.totpEnabledAt);
+    expect(after.totpSecretEnc).toBe(before.totpSecretEnc);
+    expect(await prisma.totpRecoveryCode.findMany({ where: { userId: id }, orderBy: { id: 'asc' } })).toEqual(codesBefore);
+    expect(await prisma.auditLog.count({ where: { entityId: id, action: 'auth.totp_disabled' } })).toBe(0);
+    // ما زال الدخول يطلب الرمز
+    expect((await loginRaw('admoff')).statusCode).toBe(401);
+  });
+});

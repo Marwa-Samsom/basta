@@ -467,6 +467,26 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     expect(await login(email)).not.toBe('');
   });
 
+  // موجة «يُؤتمت» الثالثة (2 نوفمبر 2026): شاشة العملاء لا تصل حساب مدير ولو بمعرّفه — ADM-101
+  it('لا يُعلَّق حساب مدير من شاشة العملاء، ولا معرّف غير موجود: 404 والمدير نشط بجلساته', async () => {
+    if (!dbUp) return;
+    const target = await makeAdmin('suspvictim', ['reports.view']);
+    expect(target.token).not.toBe('');
+    const live = () => prisma.refreshToken.count({ where: { userId: target.userId, revokedAt: null } });
+    const sessions = await live();
+    expect(sessions).toBeGreaterThan(0);
+
+    for (const id of [target.userId, randomUUID()]) {
+      const res = await call('POST', `/admin/customers/${id}/suspend`, admin.token, { reason: 'احتيال مشتبه في الدفع' });
+      expect(res.statusCode, res.body).toBe(404);
+      expect(res.json().message).toBe('العميل غير موجود.');
+    }
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: target.userId } })).status).toBe('active');
+    expect(await live()).toBe(sessions);
+    expect((await call('GET', '/admin/reports/financial?from=2026-10-01&to=2026-10-02', target.token)).statusCode).toBe(200);
+    expect(await prisma.auditLog.count({ where: { entityId: target.userId, action: 'customer.suspend' } })).toBe(0);
+  });
+
   it('مستخدمو الإدارة: منح لحساب قائم، وتعديل الصلاحيات، ولا يسحب أحد من نفسه', async () => {
     if (!dbUp) return;
     const email = `newadmin.${SUFFIX}@basta.test`;

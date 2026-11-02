@@ -10,7 +10,7 @@ initSentry();
 import { NestFactory } from '@nestjs/core';
 import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { bootLine, setupApiDocs } from './api-docs';
 import { AppModule } from './app.module';
 import { configureApp, createHttpAdapter } from './app.setup';
 
@@ -36,22 +36,15 @@ async function bootstrap() {
 
   await configureApp(app);
 
-  const config = new DocumentBuilder()
-    .setTitle('Basta API')
-    .setDescription('سوق إلكتروني متعدد البائعين')
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .build();
-  // خريطة كل المسارات هدية للمهاجم في الإنتاج — تُفتح هناك صراحةً فقط (المرحلة 12)
-  const docs = process.env['NODE_ENV'] !== 'production' || process.env['API_DOCS'] === 'true';
-  if (docs) SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
+  // مغلق في الإنتاج إلا بـ API_DOCS=true — api-docs.ts
+  const docs = setupApiDocs(app);
 
   const port = Number(process.env.PORT ?? 4000);
   // التطوير على «::» — IPv4 و IPv6 معاً: الواجهة تنادي الـ API باسم المضيف الذي
   // فُتحت به (localhost أو 127.0.0.1) ليكون كوكي الجلسة من «الموقع» نفسه، و
   // localhost يُترجم ::1 أولاً. الإنتاج باقٍ على IPv4: حاوية بلا IPv6 ترفض «::»
   await app.listen({ port, host: process.env['NODE_ENV'] === 'production' ? '0.0.0.0' : '::' });
-  Logger.log(`API على http://localhost:${port}/api/v1${docs ? ' · التوثيق /api/docs' : ''}`, 'Bootstrap');
+  Logger.log(bootLine(port, docs), 'Bootstrap');
 }
 
 void bootstrap();

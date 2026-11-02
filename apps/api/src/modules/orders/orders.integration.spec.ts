@@ -274,6 +274,56 @@ describe('بوابة 09 · البند 1 — الانتقال غير المسمو
     expect(await statusOf(a.id)).toBe('awaiting_vendor');
   });
 
+  // موجة «يُؤتمت» الثالثة (2 نوفمبر 2026): المالك شرط في الإرجاع نفسه لا في الواجهة — BUY-048
+  it('طلب إرجاع على فرعي مسلَّم لمشترٍ آخر: 404، ولا طلب إرجاع ولا تغيّر حالة ولا إشعار للبائع', async () => {
+    if (!dbUp) return;
+    const { a, order } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const vendorNotices = () => prisma.notification.count({ where: { userId: vendors[0]!.userId } });
+    const noticesBefore = await vendorNotices();
+
+    const res = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, stranger.token, {
+      items: [{ orderItemId: a.items[0]!.id, qty: 1 }],
+      reasonCode: 'damaged',
+      description: 'وصلت قطعة مكسورة',
+    });
+    expect(res.statusCode, res.body).toBe(404);
+    expect(res.json().message).toBe('الطلب غير موجود.');
+    expect(await prisma.returnRequest.count({ where: { subOrderId: a.id } })).toBe(0);
+    expect(await statusOf(a.id)).toBe('delivered');
+    expect(await vendorNotices()).toBe(noticesBefore);
+  });
+
+  // BUY-009: محاولة البطاقة المرفوضة ليست طلباً، وشرط المالك في الاستعلام نفسه
+  it('«طلباتي»: المحاولة المرفوضة بالبطاقة غائبة عن القائمة وعددها، ولا يرى أحد طلبات غيره', async () => {
+    if (!dbUp) return;
+    const mine = async (token: string) => (await call('GET', '/me/orders', token)).json() as { items: { number: string }[]; total: number };
+    const { order: paid } = await placeOrder([1, 1]);
+    const totalBefore = (await mine(buyer.token)).total;
+
+    const cart = (await call('POST', '/cart', undefined, { currency: 'JOD' })).json().token as string;
+    expect((await call('POST', '/cart/items', undefined, { variantId: vendors[0]!.variantId, qty: 1 }, { 'x-cart-token': cart })).statusCode).toBe(201);
+    const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, { 'x-cart-token': cart })).json();
+    const declined = await call('POST', '/checkout', buyer.token, { address: ADDRESS, paymentToken: 'tok_decline', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
+      'x-cart-token': cart,
+      'idempotency-key': randomUUID(),
+    });
+    expect(declined.statusCode, declined.body).toBe(200);
+    expect(declined.json().outcome).toBe('failed');
+    const failed = await prisma.order.findFirstOrThrow({ where: { customerUserId: buyer.userId, status: 'payment_failed' }, orderBy: { placedAt: 'desc' } });
+
+    const list = await mine(buyer.token);
+    const numbers = list.items.map((o) => o.number);
+    expect(numbers).toContain(paid.orderNumber);
+    expect(numbers).not.toContain(failed.orderNumber);
+    expect(list.total).toBe(totalBefore);
+
+    const theirs = await mine(stranger.token);
+    const buyerNumbers = new Set((await prisma.order.findMany({ where: { customerUserId: buyer.userId }, select: { orderNumber: true } })).map((o) => o.orderNumber));
+    expect(theirs.items.filter((o) => buyerNumbers.has(o.number))).toEqual([]);
+    expect(theirs.total).toBe(await prisma.order.count({ where: { customerUserId: stranger.userId, status: { notIn: ['pending_payment', 'payment_failed'] } } }));
+  });
+
   /**
    * الخادم يقبل «قيد التجهيز» أيضاً، والواجهة تعرض الزرّ عند «جاهز للشحن» وحده — الخادم أوسع
    * من الواجهة ولا ضرر: لا تتغيّر الحالة بإصدار البوليصة
