@@ -9,6 +9,7 @@ import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
 import { useAdminList } from '@/lib/admin';
 import { num } from '@/lib/catalog';
+import { useLocale, useT } from '@/components/locale';
 
 interface Row {
   productId: string;
@@ -31,16 +32,16 @@ type Filter = 'all' | 'low' | 'out';
 const isOut = (r: Row): boolean => r.available <= 0;
 
 /** التصفية في الخادم — «المنخفض» بعلامة التنبيه، و«النافد» ما لا متاح منه */
-const FILTERS: readonly { key: Filter; label: string }[] = [
-  { key: 'all', label: 'الكل' },
-  { key: 'low', label: 'المنخفض فقط' },
-  { key: 'out', label: 'النافد' },
+const FILTERS: readonly { key: Filter; label: string; en: string }[] = [
+  { key: 'all', label: 'الكل', en: 'All' },
+  { key: 'low', label: 'المنخفض فقط', en: 'Low only' },
+  { key: 'out', label: 'النافد', en: 'Out of stock' },
 ];
 
 const REASONS = [
-  ['manual_adjust', 'تعديل يدوي'],
-  ['damage', 'تلف'],
-  ['return', 'مرتجع'],
+  ['manual_adjust', 'تعديل يدوي', 'Manual adjustment'],
+  ['damage', 'تلف', 'Damage'],
+  ['return', 'مرتجع', 'Return'],
 ] as const;
 
 /**
@@ -51,6 +52,8 @@ const REASONS = [
  * وتعديل الكمية إلى ما دون المحجوز مرفوض — والتحذير يظهر قبل الحفظ لا بعده.
  */
 export default function InventoryPage() {
+  const t = useT();
+  const locale = useLocale();
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Row | null>(null);
@@ -66,12 +69,15 @@ export default function InventoryPage() {
   return (
     <div className="vp-page">
       <PageHead
-        title="المخزون"
+        title={t('المخزون', 'Inventory')}
         count={
           counts
             ? counts.all === 0
-              ? 'لا متغيّرات بعد'
-              : `${num(counts.all)} متغيّراً · ${num(counts.attention)} يحتاج انتباهاً`
+              ? t('لا متغيّرات بعد', 'No variants yet')
+              : t(
+                  `${num(counts.all)} متغيّراً · ${num(counts.attention)} يحتاج انتباهاً`,
+                  `${num(counts.all, locale)} ${counts.all === 1 ? 'variant' : 'variants'} · ${num(counts.attention, locale)} ${counts.attention === 1 ? 'needs' : 'need'} attention`,
+                )
             : undefined
         }
         actions={
@@ -81,8 +87,8 @@ export default function InventoryPage() {
               <input
                 type="search"
                 className="field__control"
-                aria-label="بحث في المخزون باسم المنتج أو SKU"
-                placeholder="ابحث بالمنتج أو الرمز"
+                aria-label={t('بحث في المخزون باسم المنتج أو SKU', 'Search inventory by product name or SKU')}
+                placeholder={t('ابحث بالمنتج أو الرمز', 'Search by product or SKU')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -92,27 +98,27 @@ export default function InventoryPage() {
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {!data && !error ? <Spinner label="جارٍ تحميل المخزون…" /> : null}
+      {!data && !error ? <Spinner label={t('جارٍ تحميل المخزون…', 'Loading inventory…')} /> : null}
 
       {counts && counts.all === 0 ? (
         <EmptyState
           icon="boxes"
-          title="لا مخزون بعد"
+          title={t('لا مخزون بعد', 'No stock yet')}
           actions={
             <Link className="btn btn--primary" href="/vendor/products/new">
               <Icon name="plus" size={16} />
-              أضف منتجاً
+              {t('أضف منتجاً', 'Add product')}
             </Link>
           }
         >
-          أضف منتجاً بمتغيّراته ليظهر مخزونه هنا.
+          {t('أضف منتجاً بمتغيّراته ليظهر مخزونه هنا.', 'Add a product with its variants to see its stock here.')}
         </EmptyState>
       ) : null}
 
       {data && counts && counts.all > 0 ? (
         <section className="card card--flush">
           <div className="card__head vp-toolbar">
-            <div className="tabs vp-filter" role="group" aria-label="تصفية المخزون">
+            <div className="tabs vp-filter" role="group" aria-label={t('تصفية المخزون', 'Filter inventory')}>
               {FILTERS.map((f) => (
                 <button
                   key={f.key}
@@ -121,14 +127,14 @@ export default function InventoryPage() {
                   aria-pressed={filter === f.key}
                   onClick={() => setFilter(f.key)}
                 >
-                  {f.label}
-                  <span className="tabs__count">{num(counts[f.key])}</span>
+                  {t(f.label, f.en)}
+                  <span className="tabs__count">{num(counts[f.key], locale)}</span>
                 </button>
               ))}
             </div>
             <span className="vp-toolbar__note">
               <Icon name="info" size={13} />
-              المتاح = الموجود − المحجوز
+              {t('المتاح = الموجود − المحجوز', 'Available = On hand − Reserved')}
             </span>
           </div>
 
@@ -139,12 +145,12 @@ export default function InventoryPage() {
               </span>
               <p className="vp-nomatch__title">
                 {term
-                  ? `لا نتائج تطابق «${term}»`
+                  ? t(`لا نتائج تطابق «${term}»`, `No results match “${term}”`)
                   : filter === 'low'
-                    ? 'لا متغيّر تحت حدّ التنبيه — مخزونك بخير.'
-                    : 'لا متغيّر نافد — مخزونك بخير.'}
+                    ? t('لا متغيّر تحت حدّ التنبيه — مخزونك بخير.', 'No variant is below the alert level — your stock is fine.')
+                    : t('لا متغيّر نافد — مخزونك بخير.', 'No variant is out of stock — your stock is fine.')}
               </p>
-              <p className="small muted">جرّب تصفية أخرى أو ابحث برمز مختلف.</p>
+              <p className="small muted">{t('جرّب تصفية أخرى أو ابحث برمز مختلف.', 'Try another filter or search for a different SKU.')}</p>
               <button
                 type="button"
                 className="btn btn--secondary btn--sm"
@@ -153,7 +159,7 @@ export default function InventoryPage() {
                   setSearch('');
                 }}
               >
-                أزل التصفية
+                {t('أزل التصفية', 'Clear filters')}
               </button>
             </div>
           ) : (
@@ -161,15 +167,15 @@ export default function InventoryPage() {
               <table className="table vp-inv">
                 <thead>
                   <tr>
-                    <th scope="col">المنتج</th>
-                    <th scope="col">المتغيّر</th>
+                    <th scope="col">{t('المنتج', 'Product')}</th>
+                    <th scope="col">{t('المتغيّر', 'Variant')}</th>
                     <th scope="col">SKU</th>
-                    <th scope="col" className="end">الموجود</th>
-                    <th scope="col" className="end">المحجوز</th>
-                    <th scope="col" className="end">المتاح</th>
-                    <th scope="col" className="end">حدّ التنبيه</th>
+                    <th scope="col" className="end">{t('الموجود', 'On hand')}</th>
+                    <th scope="col" className="end">{t('المحجوز', 'Reserved')}</th>
+                    <th scope="col" className="end">{t('المتاح', 'Available')}</th>
+                    <th scope="col" className="end">{t('حدّ التنبيه', 'Alert level')}</th>
                     <th scope="col" className="end">
-                      <span className="visually-hidden">إجراءات</span>
+                      <span className="visually-hidden">{t('إجراءات', 'Actions')}</span>
                     </th>
                   </tr>
                 </thead>
@@ -187,39 +193,39 @@ export default function InventoryPage() {
                                 {r.productNameAr}
                               </Link>
                               {out ? (
-                                <span className="badge badge--danger">نفد</span>
+                                <span className="badge badge--danger">{t('نفد', 'Out of stock')}</span>
                               ) : low ? (
-                                <span className="badge badge--warning">منخفض</span>
+                                <span className="badge badge--warning">{t('منخفض', 'Low')}</span>
                               ) : null}
                             </span>
                           </span>
                         </td>
-                        <td data-label="المتغيّر">{r.variant || '—'}</td>
+                        <td data-label={t('المتغيّر', 'Variant')}>{r.variant || '—'}</td>
                         <td className="num" data-label="SKU">
                           {r.sku}
                         </td>
-                        <td className="end num vp-strong" data-label="الموجود">
-                          {num(r.onHand)}
+                        <td className="end num vp-strong" data-label={t('الموجود', 'On hand')}>
+                          {num(r.onHand, locale)}
                         </td>
-                        <td className="end num" data-label="المحجوز">
-                          {r.reserved > 0 ? num(r.reserved) : '—'}
+                        <td className="end num" data-label={t('المحجوز', 'Reserved')}>
+                          {r.reserved > 0 ? num(r.reserved, locale) : '—'}
                         </td>
-                        <td className="end" data-label="المتاح">
+                        <td className="end" data-label={t('المتاح', 'Available')}>
                           <span className="num vp-avail" data-tone={out ? 'out' : low ? 'low' : 'ok'}>
-                            {num(r.available)}
+                            {num(r.available, locale)}
                           </span>
                         </td>
-                        <td className="end num" data-label="حدّ التنبيه">
-                          {r.lowStockThreshold > 0 ? num(r.lowStockThreshold) : '—'}
+                        <td className="end num" data-label={t('حدّ التنبيه', 'Alert level')}>
+                          {r.lowStockThreshold > 0 ? num(r.lowStockThreshold, locale) : '—'}
                         </td>
                         <td className="end" data-label="">
                           <button
                             type="button"
                             className="btn btn--secondary btn--sm"
-                            aria-label={`عدّل مخزون ${r.sku}`}
+                            aria-label={t(`عدّل مخزون ${r.sku}`, `Edit stock for ${r.sku}`)}
                             onClick={() => setEditing(r)}
                           >
-                            عدّل
+                            {t('عدّل', 'Edit')}
                           </button>
                         </td>
                       </tr>
@@ -256,6 +262,8 @@ function AdjustDialog({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [mode, setMode] = useState<'count' | 'event'>('count');
@@ -298,7 +306,7 @@ function AdjustDialog({
       });
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر تعديل الكمية.');
+      setError(err instanceof Error ? err.message : t('تعذّر تعديل الكمية.', 'Could not update the quantity.'));
     } finally {
       setBusy(false);
     }
@@ -321,13 +329,13 @@ function AdjustDialog({
       <div className="vp-dialog__panel">
         <header className="vp-dialog__head">
           <span className="vp-dialog__heading">
-            <h2 id={titleId}>عدّل المخزون</h2>
+            <h2 id={titleId}>{t('عدّل المخزون', 'Edit stock')}</h2>
             <span className="vp-dialog__sub">
               {row.productNameAr}
               {row.variant ? ` — ${row.variant}` : ''} · <span className="num">{row.sku}</span>
             </span>
           </span>
-          <button type="button" className="icon-btn icon-btn--sm" aria-label="إغلاق" onClick={onClose}>
+          <button type="button" className="icon-btn icon-btn--sm" aria-label={t('إغلاق', 'Close')} onClick={onClose}>
             <Icon name="x" size={17} />
           </button>
         </header>
@@ -335,22 +343,22 @@ function AdjustDialog({
         <div className="vp-dialog__body">
           <dl className="vp-adj-now">
             <div>
-              <dt>الموجود</dt>
-              <dd className="num">{num(row.onHand)}</dd>
+              <dt>{t('الموجود', 'On hand')}</dt>
+              <dd className="num">{num(row.onHand, locale)}</dd>
             </div>
             <div>
-              <dt>المحجوز</dt>
-              <dd className="num vp-adj-now__reserved">{num(row.reserved)}</dd>
+              <dt>{t('المحجوز', 'Reserved')}</dt>
+              <dd className="num vp-adj-now__reserved">{num(row.reserved, locale)}</dd>
             </div>
             <div>
-              <dt>المتاح</dt>
-              <dd className="num">{num(row.available)}</dd>
+              <dt>{t('المتاح', 'Available')}</dt>
+              <dd className="num">{num(row.available, locale)}</dd>
             </div>
           </dl>
 
           <div className="field">
-            <span className="field__label">طريقة التعديل</span>
-            <div className="seg vp-seg vp-seg--block" role="group" aria-label="طريقة التعديل">
+            <span className="field__label">{t('طريقة التعديل', 'Adjustment method')}</span>
+            <div className="seg vp-seg vp-seg--block" role="group" aria-label={t('طريقة التعديل', 'Adjustment method')}>
               <button
                 type="button"
                 className="seg__opt"
@@ -360,7 +368,7 @@ function AdjustDialog({
                   setValue(String(row.onHand));
                 }}
               >
-                جرد: الكمية الموجودة الآن
+                {t('جرد: الكمية الموجودة الآن', 'Count: the quantity on hand now')}
               </button>
               <button
                 type="button"
@@ -371,19 +379,26 @@ function AdjustDialog({
                   setValue('0');
                 }}
               >
-                حركة: زيادة أو نقص
+                {t('حركة: زيادة أو نقص', 'Movement: increase or decrease')}
               </button>
             </div>
           </div>
 
           <Field
-            label={mode === 'count' ? 'الكمية الموجودة' : 'التغيير (+ أو −)'}
+            label={mode === 'count' ? t('الكمية الموجودة', 'Quantity on hand') : t('التغيير (+ أو −)', 'Change (+ or −)')}
             hint={
               mode === 'count'
-                ? 'نستبدل الرقم الحالي بما تُدخله — استخدمها بعد الجرد.'
-                : 'رقم موجب للإضافة، وسالب (بإشارة −) للنقص.'
+                ? t('نستبدل الرقم الحالي بما تُدخله — استخدمها بعد الجرد.', 'We replace the current number with what you enter — use this after a stock count.')
+                : t('رقم موجب للإضافة، وسالب (بإشارة −) للنقص.', 'A positive number to add, a negative one (with −) to subtract.')
             }
-            error={belowReserved ? 'الكمية أقل من المحجوز لمشترين في الدفع — حرّر الحجز أو ارفع الكمية.' : null}
+            error={
+              belowReserved
+                ? t(
+                    'الكمية أقل من المحجوز لمشترين في الدفع — حرّر الحجز أو ارفع الكمية.',
+                    'The quantity is below what is reserved for buyers at checkout — release the reservation or raise the quantity.',
+                  )
+                : null
+            }
           >
             {(props) => (
               <ClearableInput
@@ -399,10 +414,10 @@ function AdjustDialog({
 
           <div className="field">
             <span className="field__label" id={`${titleId}-reason`}>
-              السبب
+              {t('السبب', 'Reason')}
             </span>
             <div className="vp-pills" role="group" aria-labelledby={`${titleId}-reason`}>
-              {REASONS.map(([key, text]) => (
+              {REASONS.map(([key, text, en]) => (
                 <button
                   key={key}
                   type="button"
@@ -410,15 +425,15 @@ function AdjustDialog({
                   aria-pressed={reason === key}
                   onClick={() => setReason(key)}
                 >
-                  {text}
+                  {t(text, en)}
                 </button>
               ))}
             </div>
-            <p className="field__hint">يُقيَّد مع الحركة في سجل لا يُعدَّل.</p>
+            <p className="field__hint">{t('يُقيَّد مع الحركة في سجل لا يُعدَّل.', 'Recorded with the movement in a log that cannot be edited.')}</p>
           </div>
 
           <TextArea
-            label="ملاحظة"
+            label={t('ملاحظة', 'Note')}
             optional
             rows={2}
             value={note}
@@ -426,11 +441,11 @@ function AdjustDialog({
           />
 
           <TextInput
-            label="حدّ التنبيه"
+            label={t('حدّ التنبيه', 'Alert level')}
             optional
             dir="ltr"
             inputMode="numeric"
-            hint="يظهر «منخفض» حين ينزل المتاح إلى هذا الحد."
+            hint={t('يظهر «منخفض» حين ينزل المتاح إلى هذا الحد.', '“Low” shows when available stock drops to this level.')}
             value={threshold}
             onChange={(e) => setThreshold(digitsOnly(e.target.value))}
           />
@@ -439,19 +454,19 @@ function AdjustDialog({
 
           <dl className="vp-adj-after" data-invalid={belowReserved || undefined}>
             <div>
-              <dt>الموجود بعد التعديل</dt>
-              <dd className="num">{num(Math.max(target, 0))}</dd>
+              <dt>{t('الموجود بعد التعديل', 'On hand after the change')}</dt>
+              <dd className="num">{num(Math.max(target, 0), locale)}</dd>
             </div>
             <div>
-              <dt>المتاح</dt>
-              <dd className="num">{num(Math.max(target - row.reserved, 0))}</dd>
+              <dt>{t('المتاح', 'Available')}</dt>
+              <dd className="num">{num(Math.max(target - row.reserved, 0), locale)}</dd>
             </div>
           </dl>
         </div>
 
         <footer className="vp-dialog__foot">
           <button className="btn btn--secondary" type="button" onClick={onClose}>
-            إلغاء
+            {t('إلغاء', 'Cancel')}
           </button>
           <button
             className="btn btn--primary"
@@ -459,7 +474,7 @@ function AdjustDialog({
             disabled={busy || belowReserved}
             onClick={() => void submit()}
           >
-            {busy ? 'جارٍ الحفظ…' : 'احفظ التعديل'}
+            {busy ? t('جارٍ الحفظ…', 'Saving…') : t('احفظ التعديل', 'Save change')}
           </button>
         </footer>
       </div>

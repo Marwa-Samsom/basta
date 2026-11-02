@@ -6,15 +6,20 @@ import { use, useCallback, useEffect, useState } from 'react';
 import { AskShop } from '@/components/ask-shop';
 import { useConfirm } from '@/components/confirm';
 import { Icon, type IconName } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
 import { countryName } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
+import { localized, type Locale, type Translate } from '@/lib/i18n';
 import {
   DISPUTE_REASONS,
+  DISPUTE_REASONS_EN,
   REFUND_DISPUTE_DAYS,
   REFUND_DISPUTE_REASONS,
+  REFUND_DISPUTE_REASONS_EN,
   RETURN_REASONS,
+  RETURN_REASONS_EN,
   carrierName,
   labelOf,
   money,
@@ -24,6 +29,7 @@ import {
   type OrderItemView,
   type SubOrderView,
 } from '@/lib/orders';
+import { regionName } from '@/lib/places';
 import { imageUrl } from '@/lib/storefront';
 
 interface Item extends OrderItemView {
@@ -50,15 +56,17 @@ interface DeliveryAddress {
 }
 
 /** وسيلة الدفع بالعربية وأيقونتها — رأس الطلب (ST-19) */
-const PAYMENT_METHODS: Record<string, { label: string; icon: IconName }> = {
-  card: { label: 'بطاقة', icon: 'card' },
-  bank_transfer: { label: 'تحويل بنكي', icon: 'cash' },
-  wallet: { label: 'محفظة', icon: 'wallet' },
-  cod: { label: 'الدفع عند الاستلام', icon: 'cash' },
+const PAYMENT_METHODS: Record<string, { label: string; en: string; icon: IconName }> = {
+  card: { label: 'بطاقة', en: 'Card', icon: 'card' },
+  bank_transfer: { label: 'تحويل بنكي', en: 'Bank transfer', icon: 'cash' },
+  wallet: { label: 'محفظة', en: 'Wallet', icon: 'wallet' },
+  cod: { label: 'الدفع عند الاستلام', en: 'Cash on delivery', icon: 'cash' },
 };
 
-const deliveredTo = (a: DeliveryAddress): string =>
-  [countryName(a.country), a.region, a.city, a.area, a.street, a.building].filter(Boolean).join(' · ');
+const deliveredTo = (a: DeliveryAddress, locale: Locale): string =>
+  [countryName(a.country, locale), a.region ? regionName(a.country, a.region, locale) : null, a.city, a.area, a.street, a.building]
+    .filter(Boolean)
+    .join(' · ');
 
 interface OrderView {
   number: string;
@@ -87,11 +95,11 @@ interface OrderView {
 
 /** مسار التتبّع بالترتيب الذي يراه المشتري — ST-19 */
 const TRACK = [
-  { key: 'awaiting_vendor', label: 'استُلم الطلب' },
-  { key: 'accepted', label: 'قبله البائع' },
-  { key: 'preparing', label: 'قيد التجهيز' },
-  { key: 'shipped', label: 'تم الشحن' },
-  { key: 'delivered', label: 'تم التسليم' },
+  { key: 'awaiting_vendor', label: 'استُلم الطلب', en: 'Order received' },
+  { key: 'accepted', label: 'قبله البائع', en: 'Accepted by seller' },
+  { key: 'preparing', label: 'قيد التجهيز', en: 'Preparing' },
+  { key: 'shipped', label: 'تم الشحن', en: 'Shipped' },
+  { key: 'delivered', label: 'تم التسليم', en: 'Delivered' },
 ] as const;
 
 const ORDER_OF: Record<string, number> = {
@@ -119,6 +127,8 @@ const thumbOf = (key: string | null | undefined): string | null =>
  */
 export default function MyOrderPage({ params }: { params: Promise<{ number: string }> }) {
   const { number } = use(params);
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const ask = useConfirm();
   const [order, setOrder] = useState<OrderView | null>(null);
@@ -167,7 +177,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
   const back = (
     <Link href="/account/orders" className="sp-back">
       <Icon name="back" size={16} mirror />
-      طلباتي
+      {t('طلباتي', 'My orders')}
     </Link>
   );
 
@@ -175,22 +185,24 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
     return (
       <div className="sp-page">
         {back}
-        {error ? <Alert tone="danger">{error}</Alert> : <Spinner label="جارٍ فتح طلبك…" />}
+        {error ? <Alert tone="danger">{error}</Alert> : <Spinner label={t('جارٍ فتح طلبك…', 'Opening your order…')} />}
       </div>
     );
   }
 
-  const storeCount =
-    order.stores.length === 1 ? 'متجر واحد' : order.stores.length === 2 ? 'متجران' : `${order.stores.length} متاجر`;
+  const storeCount = t(
+    order.stores.length === 1 ? 'متجر واحد' : order.stores.length === 2 ? 'متجران' : `${order.stores.length} متاجر`,
+    order.stores.length === 1 ? '1 shop' : `${order.stores.length} shops`,
+  );
   const unsplit = order.stores.length === 0;
   const method = order.paymentMethod ? PAYMENT_METHODS[order.paymentMethod] : undefined;
   const refunded = refundTotals(order.stores);
 
   const cancelTransfer = async () => {
     const sure = await ask({
-      title: 'تلغي الطلب؟',
-      body: 'تعود القطع للمتاجر ولا يُؤخذ منك شيء.',
-      confirmLabel: 'ألغِ الطلب',
+      title: t('تلغي الطلب؟', 'Cancel the order?'),
+      body: t('تعود القطع للمتاجر ولا يُؤخذ منك شيء.', "The items go back to the shops and you won't be charged."),
+      confirmLabel: t('ألغِ الطلب', 'Cancel order'),
       danger: true,
     });
     if (!sure) return;
@@ -198,7 +210,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
     try {
       await api(`/checkout/orders/${encodeURIComponent(order.number)}/cancel`, { method: 'POST' });
       await load();
-      setNotice('ألغيت الطلب، وعادت القطع للمتاجر.');
+      setNotice(t('ألغيت الطلب، وعادت القطع للمتاجر.', 'You canceled the order, and the items went back to the shops.'));
     } catch (e) {
       fail(e);
     }
@@ -209,7 +221,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
       {back}
       <PageHead
         title={<span className="num">{order.number}</span>}
-        meta={unsplit ? when(order.placedAt) : `${when(order.placedAt)} · ${storeCount}`}
+        meta={unsplit ? when(order.placedAt, locale) : `${when(order.placedAt, locale)} · ${storeCount}`}
       />
       {/* إلى أين وبماذا دفع — ST-19، أُضيفا بطلب صاحبة المشروع في BUY-011 (27 أكتوبر 2026) */}
       {order.shippingAddress || method ? (
@@ -218,11 +230,11 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
             <div>
               <dt>
                 <Icon name="pin" size={15} />
-                التوصيل إلى
+                {t('التوصيل إلى', 'Deliver to')}
               </dt>
               <dd>
                 {order.shippingAddress.recipientName ? `${order.shippingAddress.recipientName} — ` : ''}
-                {deliveredTo(order.shippingAddress)}
+                {deliveredTo(order.shippingAddress, locale)}
               </dd>
             </div>
           ) : null}
@@ -230,9 +242,9 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
             <div>
               <dt>
                 <Icon name={method.icon} size={15} />
-                الدفع
+                {t('الدفع', 'Payment')}
               </dt>
-              <dd>{method.label}</dd>
+              <dd>{t(method.label, method.en)}</dd>
             </div>
           ) : null}
         </dl>
@@ -245,31 +257,44 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
         <div className="sp-detail__main">
           {order.transfer ? (
             <>
-              <Alert tone="warning" title="بانتظار تحويلك">
-                حجزنا القطع لك، ولم نأخذ شيئاً بعد. حين يصلنا التحويل نؤكّده ونرسل طلبك إلى المتاجر، ونبلغك حينها.
+              <Alert tone="warning" title={t('بانتظار تحويلك', 'Awaiting your transfer')}>
+                {t(
+                  'حجزنا القطع لك، ولم نأخذ شيئاً بعد. حين يصلنا التحويل نؤكّده ونرسل طلبك إلى المتاجر، ونبلغك حينها.',
+                  "We've reserved the items for you and haven't charged anything yet. Once your transfer arrives, we'll confirm it, send your order to the shops, and let you know.",
+                )}
               </Alert>
               <TransferInstructions
                 transfer={order.transfer}
-                amount={money(order.grandTotalMinorUnits, order.currency)}
+                amount={money(order.grandTotalMinorUnits, order.currency, locale)}
                 amountMinor={plainAmount(order.grandTotalMinorUnits, order.currency)}
               />
               <div>
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => void cancelTransfer()}>
-                  ألغِ الطلب
+                  {t('ألغِ الطلب', 'Cancel order')}
                 </button>
               </div>
             </>
           ) : null}
           {order.paymentFailure ? (
-            <Alert tone="danger" title={order.paymentFailure.code === 'canceled_by_customer' ? 'ألغيت الطلب' : 'أُلغي الطلب'}>
+            <Alert
+              tone="danger"
+              title={
+                order.paymentFailure.code === 'canceled_by_customer'
+                  ? t('ألغيت الطلب', 'You canceled the order')
+                  : t('أُلغي الطلب', 'Order canceled')
+              }
+            >
               {order.paymentFailure.code === 'transfer_expired'
-                ? 'لم يصلنا تحويلك خلال المهلة، فأُلغي الطلب وعادت القطع للمتاجر. إن كنت حوّلت فعلاً فراسلنا بمرجع التحويل لنردّه لك.'
-                : order.paymentFailure.message || 'لم يُدفع الطلب، ولم يصل إلى المتاجر.'}
+                ? t(
+                    'لم يصلنا تحويلك خلال المهلة، فأُلغي الطلب وعادت القطع للمتاجر. إن كنت حوّلت فعلاً فراسلنا بمرجع التحويل لنردّه لك.',
+                    "Your transfer didn't reach us in time, so the order was canceled and the items went back to the shops. If you did transfer, message us with the transfer reference and we'll return it to you.",
+                  )
+                : order.paymentFailure.message || t('لم يُدفع الطلب، ولم يصل إلى المتاجر.', "The order wasn't paid and didn't reach the shops.")}
             </Alert>
           ) : null}
           {unsplit && order.lines?.length ? (
-            <section className="card sp-reasons" aria-label="ما طلبته">
-              <h2 className="sp-reasons__title">ما طلبته</h2>
+            <section className="card sp-reasons" aria-label={t('ما طلبته', 'What you ordered')}>
+              <h2 className="sp-reasons__title">{t('ما طلبته', 'What you ordered')}</h2>
               <ul>
                 {order.lines.map((l, i) => (
                   <li key={i}>
@@ -301,53 +326,54 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
           ))}
         </div>
 
-        <aside className="sp-detail__aside" aria-label="ملخّص الدفع">
+        <aside className="sp-detail__aside" aria-label={t('ملخّص الدفع', 'Payment summary')}>
           <div className="sp-sum">
-            <h2 className="sp-sum__title">ملخّص الدفع</h2>
+            <h2 className="sp-sum__title">{t('ملخّص الدفع', 'Payment summary')}</h2>
             <dl className="sp-sum__rows">
               <div>
-                <dt>قيمة المنتجات</dt>
-                <dd className="num">{money(order.itemsSubtotalMinorUnits, order.currency)}</dd>
+                <dt>{t('قيمة المنتجات', 'Items subtotal')}</dt>
+                <dd className="num">{money(order.itemsSubtotalMinorUnits, order.currency, locale)}</dd>
               </div>
               <div>
-                <dt>الشحن</dt>
-                <dd className="num">{money(order.shippingTotalMinorUnits, order.currency)}</dd>
+                <dt>{t('الشحن', 'Shipping')}</dt>
+                <dd className="num">{money(order.shippingTotalMinorUnits, order.currency, locale)}</dd>
               </div>
               {order.discountTotalMinorUnits !== '0' ? (
                 <div>
                   <dt>
-                    الخصم{order.couponCode ? <> (<bdi>{order.couponCode}</bdi>)</> : null}
+                    {t('الخصم', 'Discount')}
+                    {order.couponCode ? <> (<bdi>{order.couponCode}</bdi>)</> : null}
                   </dt>
-                  <dd className="num sp-sum__saving">− {money(order.discountTotalMinorUnits, order.currency)}</dd>
+                  <dd className="num sp-sum__saving">− {money(order.discountTotalMinorUnits, order.currency, locale)}</dd>
                 </div>
               ) : null}
               {order.taxTotalMinorUnits && order.taxTotalMinorUnits !== '0' ? (
                 <div>
-                  <dt>{order.taxInclusive ? 'الضريبة (مشمولة)' : 'الضريبة'}</dt>
-                  <dd className="num">{money(order.taxTotalMinorUnits, order.currency)}</dd>
+                  <dt>{order.taxInclusive ? t('الضريبة (مشمولة)', 'Tax (included)') : t('الضريبة', 'Tax')}</dt>
+                  <dd className="num">{money(order.taxTotalMinorUnits, order.currency, locale)}</dd>
                 </div>
               ) : null}
               <div className="sp-sum__total">
-                <dt>الإجمالي</dt>
-                <dd className="money num">{money(order.grandTotalMinorUnits, order.currency)}</dd>
+                <dt>{t('الإجمالي', 'Total')}</dt>
+                <dd className="money num">{money(order.grandTotalMinorUnits, order.currency, locale)}</dd>
               </div>
               {refunded.done > 0n || refunded.pending > 0n ? (
                 <>
                   {refunded.done > 0n ? (
                     <div>
-                      <dt>المُسترَد</dt>
-                      <dd className="num sp-sum__saving">− {money(refunded.done, order.currency)}</dd>
+                      <dt>{t('المُسترَد', 'Refunded')}</dt>
+                      <dd className="num sp-sum__saving">− {money(refunded.done, order.currency, locale)}</dd>
                     </div>
                   ) : null}
                   {refunded.pending > 0n ? (
                     <div>
-                      <dt>استرداد قيد التنفيذ</dt>
-                      <dd className="num">{money(refunded.pending, order.currency)}</dd>
+                      <dt>{t('استرداد قيد التنفيذ', 'Refund in progress')}</dt>
+                      <dd className="num">{money(refunded.pending, order.currency, locale)}</dd>
                     </div>
                   ) : null}
                   <div className="sp-sum__total">
-                    <dt>صافي ما دفعته</dt>
-                    <dd className="money num">{money(BigInt(order.grandTotalMinorUnits) - refunded.done, order.currency)}</dd>
+                    <dt>{t('صافي ما دفعته', 'Net amount paid')}</dt>
+                    <dd className="money num">{money(BigInt(order.grandTotalMinorUnits) - refunded.done, order.currency, locale)}</dd>
                   </div>
                 </>
               ) : null}
@@ -372,6 +398,8 @@ function StoreCard({
   onChange: (o: OrderView | null, msg: string) => void;
   onError: (e: unknown) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const ask = useConfirm();
   const [mode, setMode] = useState<'return' | 'dispute' | null>(null);
   const [busy, setBusy] = useState(false);
@@ -410,14 +438,23 @@ function StoreCard({
   const cancel = () =>
     run(async () => {
       const sure = await ask({
-        title: `تلغي ما طلبته من ${s.vendor.nameAr}؟`,
-        body: 'يُردّ مبلغه كاملاً إلى وسيلة دفعك، وباقي الطلب يكمل كما هو.',
-        confirmLabel: 'ألغِ هذا المتجر',
+        title: t(`تلغي ما طلبته من ${s.vendor.nameAr}؟`, `Cancel what you ordered from ${s.vendor.nameAr}?`),
+        body: t(
+          'يُردّ مبلغه كاملاً إلى وسيلة دفعك، وباقي الطلب يكمل كما هو.',
+          'Its full amount is refunded to your payment method, and the rest of the order continues as is.',
+        ),
+        confirmLabel: t('ألغِ هذا المتجر', 'Cancel this shop'),
         danger: true,
       });
       if (!sure) return;
       const o = await api<OrderView>(`/me/orders/${orderNumber}/stores/${s.id}/cancel`, { method: 'POST', body: {} });
-      onChange(o, `أُلغي طلبك من ${s.vendor.nameAr} ويُردّ مبلغه إلى وسيلة دفعك.`);
+      onChange(
+        o,
+        t(
+          `أُلغي طلبك من ${s.vendor.nameAr} ويُردّ مبلغه إلى وسيلة دفعك.`,
+          `Your order from ${s.vendor.nameAr} was canceled, and its amount will be refunded to your payment method.`,
+        ),
+      );
     });
 
   const submitReturn = () =>
@@ -430,7 +467,13 @@ function StoreCard({
         body: { items, reasonCode: reason, ...(text.trim() ? { description: text.trim() } : {}) },
       });
       setMode(null);
-      onChange(res.order, 'أُرسل طلب الإرجاع للبائع. يُردّ المبلغ فور استلامه القطع.');
+      onChange(
+        res.order,
+        t(
+          'أُرسل طلب الإرجاع للبائع. يُردّ المبلغ فور استلامه القطع.',
+          'Your return request was sent to the seller. The amount is refunded as soon as they receive the items.',
+        ),
+      );
     });
 
   const submitDispute = () =>
@@ -441,8 +484,11 @@ function StoreCard({
         null,
         // نزاع الاسترداد يُفتح مصعَّداً: لا بائع يردّ ولا تصعيد ينتظر
         refundDisputable
-          ? 'فُتح النزاع ووصل الإدارة مباشرة — تتابع استردادك وتردّ عليك هنا.'
-          : 'فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.',
+          ? t(
+              'فُتح النزاع ووصل الإدارة مباشرة — تتابع استردادك وتردّ عليك هنا.',
+              "The dispute is open and went straight to admin — they'll follow up on your refund and reply to you here.",
+            )
+          : t('فُتح النزاع. يردّ البائع هنا، ويمكنك تصعيده للإدارة.', 'The dispute is open. The seller replies here, and you can escalate it to admin.'),
       );
     });
 
@@ -451,7 +497,7 @@ function StoreCard({
     run(async () => {
       await api(`/me/reviews`, { method: 'POST', body: { orderItemId, rating, ...(body.trim() ? { body: body.trim() } : {}) } });
       setDraft(null);
-      onChange(null, 'شكراً — نُشرت مراجعتك بشارة «شراء موثّق».');
+      onChange(null, t('شكراً — نُشرت مراجعتك بشارة «شراء موثّق».', 'Thanks — your review was published with a “Verified purchase” badge.'));
     });
 
   return (
@@ -464,34 +510,34 @@ function StoreCard({
           {s.vendor.nameAr}
         </h2>
         <span className="sp-store__no num">{s.number}</span>
-        <span className={`badge ${toneOf(s.status)}`}>{labelOf(s.status)}</span>
+        <span className={`badge ${toneOf(s.status)}`}>{labelOf(s.status, locale)}</span>
       </header>
 
       <div className="sp-store__body">
         {canceled ? (
           <Alert tone="info">
-            {labelOf(s.status)}
-            {s.cancelReason ? ` — «${s.cancelReason}»` : ''}
+            {labelOf(s.status, locale)}
+            {s.cancelReason ? t(` — «${s.cancelReason}»`, ` — “${s.cancelReason}”`) : ''}
             {s.refunds.length
               ? ` · ${
                   s.refunds.every((r) => r.status === 'succeeded')
-                    ? 'رُدّ المبلغ'
+                    ? t('رُدّ المبلغ', 'Amount refunded')
                     : s.refunds.some((r) => r.status === 'awaiting_transfer')
-                      ? 'نحوّل لك المبلغ'
-                      : 'الردّ قيد التنفيذ'
+                      ? t('نحوّل لك المبلغ', "We're transferring the amount to you")
+                      : t('الردّ قيد التنفيذ', 'Refund in progress')
                 }`
               : ''}
           </Alert>
         ) : (
-          <ol className="sp-track" aria-label="مسار الطلب">
-            {TRACK.map((t, i) => {
+          <ol className="sp-track" aria-label={t('مسار الطلب', 'Order progress')}>
+            {TRACK.map((stage, i) => {
               // آخر المسار إن بُلغ فقد تمّ — «تم التسليم» بساعة الانتظار يُقرأ «لم يُسلَّم بعد»
               const last = i === TRACK.length - 1;
               const state = i < step || (last && i === step) ? 'done' : i === step ? 'current' : 'todo';
-              const at = i <= step ? reachedAt(t.key, i) : null;
+              const at = i <= step ? reachedAt(stage.key, i) : null;
               return (
                 <li
-                  key={t.key}
+                  key={stage.key}
                   className="sp-track__step"
                   data-state={state}
                   {...(i === step ? { 'aria-current': 'step' as const } : {})}
@@ -499,8 +545,8 @@ function StoreCard({
                   <span className="sp-track__dot" aria-hidden>
                     <Icon name={state === 'done' ? 'check' : state === 'current' ? 'clock' : 'minus'} size={15} />
                   </span>
-                  <span className="sp-track__label">{t.label}</span>
-                  <span className="sp-track__date">{at ? when(at) : '—'}</span>
+                  <span className="sp-track__label">{t(stage.label, stage.en)}</span>
+                  <span className="sp-track__date">{at ? when(at, locale) : '—'}</span>
                 </li>
               );
             })}
@@ -511,8 +557,8 @@ function StoreCard({
           <div className="sp-ship">
             <p className="sp-ship__head">
               <Icon name="truck" size={17} />
-              {trackingLabel(s.shipment.carrierCode)} <span className="sp-ship__no num">{s.shipment.trackingNumber}</span>
-              <span className="sp-ship__carrier">{carrierName(s.shipment.carrierCode)}</span>
+              {trackingLabel(s.shipment.carrierCode, locale)} <span className="sp-ship__no num">{s.shipment.trackingNumber}</span>
+              <span className="sp-ship__carrier">{carrierName(s.shipment.carrierCode, locale)}</span>
             </p>
             {s.shipment.events.length ? (
               <ul className="sp-events">
@@ -522,7 +568,7 @@ function StoreCard({
                       {e.descriptionAr}
                       {e.location ? ` · ${e.location}` : ''}
                     </span>
-                    <span className="sp-events__when">{when(e.occurredAt)}</span>
+                    <span className="sp-events__when">{when(e.occurredAt, locale)}</span>
                   </li>
                 ))}
               </ul>
@@ -536,7 +582,10 @@ function StoreCard({
             const rating = i.review?.rating ?? null;
             // المسترَدّ نوعان: قطع عادت بإرجاع، وقطع أُلغيت (رفض المتجر أو إلغاء) — «أُرجع» للأولى وحدها
             const returned = Math.min(i.refundedQty, returnedQtyOf(s, i.id));
-            const refundNote = [returned ? `أُرجع ${returned}` : '', i.refundedQty > returned ? `أُلغي ${i.refundedQty - returned}` : '']
+            const refundNote = [
+              returned ? t(`أُرجع ${returned}`, `${returned} returned`) : '',
+              i.refundedQty > returned ? t(`أُلغي ${i.refundedQty - returned}`, `${i.refundedQty - returned} canceled`) : '',
+            ]
               .filter(Boolean)
               .join(' · ');
             return (
@@ -565,10 +614,11 @@ function StoreCard({
                  * كان بعملة المتجر شاملاً الضريبة (23.00 ر.س) والملخّص بالدينار بلاها، فلا يُقارَنان.
                  */}
                 <span className="sp-items__total">
-                  <span className="money num">{money(i.chargeSubtotalMinorUnits, currency)}</span>
+                  <span className="money num">{money(i.chargeSubtotalMinorUnits, currency, locale)}</span>
                   {s.currency !== currency ? (
                     <span className="sp-items__store">
-                      <span className="num">{money(i.lineSubtotalMinorUnits, s.currency)}</span> بعملة المتجر
+                      <span className="num">{money(i.lineSubtotalMinorUnits, s.currency, locale)}</span>{' '}
+                      {t('بعملة المتجر', 'in shop currency')}
                     </span>
                   ) : null}
                 </span>
@@ -576,9 +626,9 @@ function StoreCard({
                 {s.reviewable && !i.review && i.refundedQty < i.qty ? (
                   <>
                     {/* النجمة تختار ولا تنشر: يكتب رأيه إن شاء ثم «انشر التقييم» */}
-                    <span className="sp-rate" role="group" aria-label="قيّم المنتج">
+                    <span className="sp-rate" role="group" aria-label={t('قيّم المنتج', 'Rate the product')}>
                       <span className="sp-rate__label" aria-hidden>
-                        قيّم المنتج
+                        {t('قيّم المنتج', 'Rate the product')}
                       </span>
                       {[1, 2, 3, 4, 5].map((n) => {
                         const on = draft?.itemId === i.id && n <= draft.rating;
@@ -590,7 +640,7 @@ function StoreCard({
                             disabled={busy}
                             aria-pressed={draft?.itemId === i.id && draft.rating === n}
                             onClick={() => setDraft({ itemId: i.id, rating: n, body: draft?.itemId === i.id ? draft.body : '' })}
-                            aria-label={`${n} من 5`}
+                            aria-label={t(`${n} من 5`, `${n} of 5`)}
                           >
                             <Icon name={on ? 'star-fill' : 'star'} size={18} />
                           </button>
@@ -600,11 +650,11 @@ function StoreCard({
                     {draft?.itemId === i.id ? (
                       <div className="sp-rate__form">
                         <TextArea
-                          label="رأيك"
+                          label={t('رأيك', 'Your review')}
                           optional
                           rows={2}
                           maxLength={2000}
-                          placeholder="مثلاً: القماش ناعم والمقاس مظبوط"
+                          placeholder={t('مثلاً: القماش ناعم والمقاس مظبوط', 'For example: the fabric is soft and the size is right')}
                           value={draft.body}
                           onChange={(e) => setDraft({ ...draft, body: e.target.value })}
                         />
@@ -615,22 +665,22 @@ function StoreCard({
                             disabled={busy}
                             onClick={() => void review(i.id, draft.rating, draft.body)}
                           >
-                            انشر التقييم
+                            {t('انشر التقييم', 'Publish review')}
                           </button>
                           <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setDraft(null)}>
-                            تراجع
+                            {t('تراجع', 'Cancel')}
                           </button>
                         </div>
                       </div>
                     ) : null}
                   </>
                 ) : rating !== null ? (
-                  <span className="sp-rated" role="img" aria-label={`قيّمته ${rating}/5`}>
+                  <span className="sp-rated" role="img" aria-label={t(`قيّمته ${rating}/5`, `You rated it ${rating}/5`)}>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <Icon key={n} name={n <= rating ? 'star-fill' : 'star'} size={14} />
                     ))}
                     <span className="sp-rated__text" aria-hidden>
-                      قيّمته {rating}/5
+                      {t(`قيّمته ${rating}/5`, `You rated it ${rating}/5`)}
                     </span>
                   </span>
                 ) : null}
@@ -640,21 +690,30 @@ function StoreCard({
         </ul>
         {/* رفض البائع آخر إرجاع: الرفض وسببه هنا — كانت الشارة ترجع «تم التسليم» بلا تفسير (BUY-047) */}
         {lastReturn?.status === 'rejected' ? (
-          <Alert tone="warning" title={`رفض المتجر طلب الإرجاع${lastReturn.resolvedAt ? ` · ${when(lastReturn.resolvedAt)}` : ''}`}>
-            {lastReturn.resolutionNote ? `السبب: «${lastReturn.resolutionNote}». ` : ''}
-            إن لم توافق على الرفض، افتح «لديّ مشكلة».
+          <Alert
+            tone="warning"
+            title={t(
+              `رفض المتجر طلب الإرجاع${lastReturn.resolvedAt ? ` · ${when(lastReturn.resolvedAt)}` : ''}`,
+              `The shop rejected the return request${lastReturn.resolvedAt ? ` · ${when(lastReturn.resolvedAt, locale)}` : ''}`,
+            )}
+          >
+            {lastReturn.resolutionNote ? t(`السبب: «${lastReturn.resolutionNote}». `, `Reason: “${lastReturn.resolutionNote}”. `) : ''}
+            {t('إن لم توافق على الرفض، افتح «لديّ مشكلة».', "If you don't agree with the rejection, open “I have a problem”.")}
           </Alert>
         ) : null}
       </div>
 
       <div className="sp-store__foot">
         <p className="sp-kv">
-          <span>حصّة هذا المتجر من دفعتك</span>
-          <span className="sp-kv__v money num">{money(s.chargeTotalMinorUnits, currency)}</span>
+          <span>{t('حصّة هذا المتجر من دفعتك', "This shop's share of your payment")}</span>
+          <span className="sp-kv__v money num">{money(s.chargeTotalMinorUnits, currency, locale)}</span>
         </p>
         {s.currency !== currency ? (
           <p className="sp-transfer__hint">
-            المبالغ بعملة دفعتك بسعر الصرف لحظة الطلب، وسعر المتجر بعملته تحت قطعته؛ الضريبة والشحن في ملخّص الدفع.
+            {t(
+              'المبالغ بعملة دفعتك بسعر الصرف لحظة الطلب، وسعر المتجر بعملته تحت قطعته؛ الضريبة والشحن في ملخّص الدفع.',
+              "Amounts are in your payment currency at the exchange rate when you ordered, with the shop's own-currency price under each item; tax and shipping are in the payment summary.",
+            )}
           </p>
         ) : null}
 
@@ -662,8 +721,8 @@ function StoreCard({
           <ul className="sp-refunds">
             {s.refunds.map((r) => (
               <li key={r.id}>
-                استرداد <span className="money num">{money(r.amountMinorUnits, currency)}</span> ({r.reason}) ·{' '}
-                {refundState(r)}
+                {t('استرداد', 'Refund')} <span className="money num">{money(r.amountMinorUnits, currency, locale)}</span> ({r.reason}) ·{' '}
+                {refundState(r, t)}
               </li>
             ))}
           </ul>
@@ -673,24 +732,24 @@ function StoreCard({
           {s.actions.includes('canceled_by_customer') ? (
             <button type="button" className="btn btn--danger btn--sm" disabled={busy} onClick={() => void cancel()}>
               <Icon name="x" size={14} />
-              إلغاء هذا المتجر
+              {t('إلغاء هذا المتجر', 'Cancel this shop')}
             </button>
           ) : null}
           {s.returnable ? (
             <button type="button" className="btn btn--secondary btn--sm" onClick={() => (setMode('return'), setReason('damaged'))}>
               <Icon name="return" size={14} />
-              طلب إرجاع
+              {t('طلب إرجاع', 'Request a return')}
             </button>
           ) : null}
           {openDispute ? (
             <Link href={`/account/disputes/${openDispute.id}`} className="btn btn--ghost btn--sm">
               <Icon name="msg" size={14} />
-              متابعة النزاع
+              {t('متابعة النزاع', 'View dispute')}
             </Link>
           ) : disputable || refundDisputable ? (
             <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setMode('dispute'), setReason(refundDisputable ? 'refund_missing' : 'not_received'))}>
               <Icon name="alert" size={14} />
-              لديّ مشكلة
+              {t('لديّ مشكلة', 'I have a problem')}
             </button>
           ) : null}
           {/* رسالة إلى المتجر عن شحنته من هذا الطلب — تُكمل المحادثة نفسها إن وُجدت */}
@@ -698,23 +757,26 @@ function StoreCard({
             context={{ orderNumber: s.number }}
             shopName={s.vendor.nameAr}
             subjectName={s.vendor.nameAr}
-            subjectSub={`طلب ${s.number}`}
-            triggerLabel="راسل المتجر"
+            subjectSub={t(`طلب ${s.number}`, `Order ${s.number}`)}
+            triggerLabel={t('راسل المتجر', 'Message the shop')}
             triggerClassName="btn btn--ghost btn--sm"
-            title="راسل المتجر"
-            fieldLabel="رسالتك"
+            title={t('راسل المتجر', 'Message the shop')}
+            fieldLabel={t('رسالتك', 'Your message')}
             iconSize={14}
-            placeholder="اكتب رسالتك للمتجر عن هذا الطلب…"
+            placeholder={t('اكتب رسالتك للمتجر عن هذا الطلب…', 'Write your message to the shop about this order…')}
           />
         </div>
 
         {mode === 'return' ? (
           <div className="sp-panel">
-            <p className="sp-panel__title">طلب إرجاع</p>
+            <p className="sp-panel__title">{t('طلب إرجاع', 'Request a return')}</p>
             <p className="sp-note sp-note--xs">
               <Icon name="info" size={14} />
               {/* الشحن لا يُردّ في أي إرجاع، كاملاً كان أو جزئياً — «الجزئي» كان يوحي بردّه في الكامل (BUY-040) */}
-              اختر القطع وكمياتها. يُردّ ثمنها فور استلام البائع لها — الشحن لا يُردّ لأن الشحنة وصلتك.
+              {t(
+                'اختر القطع وكمياتها. يُردّ ثمنها فور استلام البائع لها — الشحن لا يُردّ لأن الشحنة وصلتك.',
+                "Choose the items and quantities. Their price is refunded as soon as the seller receives them — shipping isn't refunded because the shipment reached you.",
+              )}
             </p>
             <div className="sp-panel__lines">
               {/* بعد إرجاع جزئي يبقى الطلب «تم التسليم»: ما رُدّ كله لا يُعرض بقائمة «0» وحدها */}
@@ -735,8 +797,8 @@ function StoreCard({
                 </label>
               ))}
             </div>
-            <ReasonSelect options={RETURN_REASONS} value={reason} onChange={setReason} />
-            <TextArea label="تفاصيل" optional value={text} onChange={(e) => setText(e.target.value)} rows={2} />
+            <ReasonSelect options={localized(locale, RETURN_REASONS, RETURN_REASONS_EN)} value={reason} onChange={setReason} />
+            <TextArea label={t('تفاصيل', 'Details')} optional value={text} onChange={(e) => setText(e.target.value)} rows={2} />
             <div className="sp-panel__actions">
               <button
                 type="button"
@@ -744,10 +806,10 @@ function StoreCard({
                 disabled={busy || !Object.values(qty).some((n) => n > 0)}
                 onClick={() => void submitReturn()}
               >
-                أرسل طلب الإرجاع
+                {t('أرسل طلب الإرجاع', 'Send return request')}
               </button>
               <button type="button" className="btn btn--ghost" onClick={() => setMode(null)}>
-                تراجع
+                {t('تراجع', 'Cancel')}
               </button>
             </div>
           </div>
@@ -755,26 +817,45 @@ function StoreCard({
 
         {mode === 'dispute' ? (
           <div className="sp-panel">
-            <p className="sp-panel__title">{refundDisputable ? 'لم يصلك المبلغ المسترَد؟' : `افتح نزاعاً مع ${s.vendor.nameAr}`}</p>
+            <p className="sp-panel__title">
+              {refundDisputable
+                ? t('لم يصلك المبلغ المسترَد؟', "Didn't receive your refund?")
+                : t(`افتح نزاعاً مع ${s.vendor.nameAr}`, `Open a dispute with ${s.vendor.nameAr}`)}
+            </p>
             {refundDisputable ? (
               <p className="sp-note sp-note--xs">
                 <Icon name="info" size={14} />
-                يصل الإدارة مباشرة: هي التي ترى ردّ المبلغ عند جهة الدفع وتتابعه معك.
+                {t(
+                  'يصل الإدارة مباشرة: هي التي ترى ردّ المبلغ عند جهة الدفع وتتابعه معك.',
+                  'This goes straight to admin: they can see the refund at the payment provider and follow it up with you.',
+                )}
               </p>
             ) : null}
-            <ReasonSelect options={refundDisputable ? REFUND_DISPUTE_REASONS : DISPUTE_REASONS} value={reason} onChange={setReason} />
+            <ReasonSelect
+              options={
+                refundDisputable
+                  ? localized(locale, REFUND_DISPUTE_REASONS, REFUND_DISPUTE_REASONS_EN)
+                  : localized(locale, DISPUTE_REASONS, DISPUTE_REASONS_EN)
+              }
+              value={reason}
+              onChange={setReason}
+            />
             <TextArea
-              label={refundDisputable ? 'اشرح للإدارة: متى رُدّ المبلغ، وأين تنتظره' : 'اشرح المشكلة للبائع'}
+              label={
+                refundDisputable
+                  ? t('اشرح للإدارة: متى رُدّ المبلغ، وأين تنتظره', 'Explain to admin: when the amount was refunded, and where you expect it')
+                  : t('اشرح المشكلة للبائع', 'Explain the problem to the seller')
+              }
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={3}
             />
             <div className="sp-panel__actions">
               <button type="button" className="btn btn--primary" disabled={busy || text.trim().length < 10} onClick={() => void submitDispute()}>
-                افتح النزاع
+                {t('افتح النزاع', 'Open dispute')}
               </button>
               <button type="button" className="btn btn--ghost" onClick={() => setMode(null)}>
-                تراجع
+                {t('تراجع', 'Cancel')}
               </button>
             </div>
           </div>
@@ -788,21 +869,25 @@ function StoreCard({
  * حال الردّ كما يقرؤه المشتري. «رُدّ» بعد أن يخرج المال وحده: من البوابة، أو بتحويل
  * سجّلت الإدارة مرجعه — وذلك المرجع يُعرض ليتتبّع ماله في بنكه.
  */
-function refundState(r: { status: string; transferReference?: string | null }) {
+function refundState(r: { status: string; transferReference?: string | null }, t: Translate) {
   if (r.status === 'succeeded') {
     return r.transferReference ? (
       <>
-        حوّلناه لك — مرجع التحويل{' '}
+        {t('حوّلناه لك — مرجع التحويل', 'We transferred it to you — transfer reference')}{' '}
         <bdi className="num" dir="ltr">
           {r.transferReference}
         </bdi>
       </>
     ) : (
-      'رُدّ إلى وسيلة دفعك'
+      t('رُدّ إلى وسيلة دفعك', 'Refunded to your payment method')
     );
   }
-  if (r.status === 'awaiting_transfer') return 'نحوّله لحسابك — نبلغك بمرجع التحويل حين يخرج';
-  return 'قيد التنفيذ';
+  if (r.status === 'awaiting_transfer')
+    return t(
+      'نحوّله لحسابك — نبلغك بمرجع التحويل حين يخرج',
+      "We're transferring it to your account — we'll send you the transfer reference when it goes out",
+    );
+  return t('قيد التنفيذ', 'In progress');
 }
 
 /** القطع التي عادت من هذا السطر بإرجاع لم يُرفض — ما زاد عليها من المسترَدّ أُلغي ولم يُرجَع */
@@ -826,9 +911,10 @@ function refundTotals(stores: Store[]): { done: bigint; pending: bigint } {
 }
 
 function ReasonSelect({ options, value, onChange }: { options: Record<string, string>; value: string; onChange: (v: string) => void }) {
+  const t = useT();
   return (
     <label className="field">
-      <span className="field__label">السبب</span>
+      <span className="field__label">{t('السبب', 'Reason')}</span>
       <select className="field__control" value={value} onChange={(e) => onChange(e.target.value)}>
         {Object.entries(options).map(([k, v]) => (
           <option key={k} value={k}>

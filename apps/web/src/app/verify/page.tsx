@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { digitsOnly } from '@/lib/digits';
 import { api, ApiError, session } from '@/lib/api';
 import { safeNext, withNext } from '@/lib/safe-path';
@@ -32,6 +33,7 @@ const clock = (secs: number): string => `${Math.floor(secs / 60)}:${String(secs 
  * هناك رمز حيّ — والعودة إلى الصفحة لا ترسل غيره قبل مهلة الدقيقة.
  */
 function VerifyForm() {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNext(params.get('next'), '/account');
@@ -128,7 +130,7 @@ function VerifyForm() {
     event.preventDefault();
     if (locked) return;
     if (code.length < CELLS) {
-      setMsg({ kind: 'error', text: 'أكمل الخانات الست.' });
+      setMsg({ kind: 'error', text: t('أكمل الخانات الست.', 'Fill in all six digits.') });
       return;
     }
     setBusy(true);
@@ -136,7 +138,7 @@ function VerifyForm() {
     try {
       const s = await api<Status>('/me/account/email-verification/confirm', { method: 'POST', body: { code } });
       setStatus(s);
-      setMsg({ kind: 'ok', text: 'تمّ تأكيد بريدك.' });
+      setMsg({ kind: 'ok', text: t('تمّ تأكيد بريدك.', 'Your email is confirmed.') });
     } catch (err) {
       const e = err as ApiError;
       const reason = String(e.details?.['reason'] ?? '');
@@ -156,27 +158,31 @@ function VerifyForm() {
       <div className="ac-auth__box">
         <header className="ac-auth__head">
           <Link href="/" className="ac-wordmark">
-            بسطة
+            {t('بسطة', 'Basta')}
           </Link>
-          <h1 className="ac-auth__title">{verified ? 'بريدك مؤكَّد' : 'أكّد بريدك الإلكتروني'}</h1>
+          <h1 className="ac-auth__title">
+            {verified ? t('بريدك مؤكَّد', 'Your email is confirmed') : t('أكّد بريدك الإلكتروني', 'Confirm your email')}
+          </h1>
           <p className="ac-auth__sub">
-            {verified ? 'يصلك على هذا البريد كل ما يخصّ طلباتك وحسابك.' : 'اكتب الرمز أو الصقه كاملاً في الخانة الأولى.'}
+            {verified
+              ? t('يصلك على هذا البريد كل ما يخصّ طلباتك وحسابك.', 'Everything about your orders and account is sent to this email.')
+              : t('اكتب الرمز أو الصقه كاملاً في الخانة الأولى.', 'Type the code, or paste it whole into the first box.')}
           </p>
         </header>
 
         {!status && !msg ? (
           <div className="ac-auth__card" role="status">
             <span className="id-skel skeleton" />
-            <span className="visually-hidden">جارٍ التحضير…</span>
+            <span className="visually-hidden">{t('جارٍ التحضير…', 'Getting ready…')}</span>
           </div>
         ) : verified ? (
           <section className="ac-auth__card">
             <div className="alert alert--success ac-note" role="status">
               <Icon name="check-circle" size={16} />
-              <span>تمّ تأكيد بريدك. لا حاجة لرمز آخر.</span>
+              <span>{t('تمّ تأكيد بريدك. لا حاجة لرمز آخر.', 'Your email is confirmed. No other code is needed.')}</span>
             </div>
             <Link href={next} className="btn btn--primary btn--block ac-auth__cta">
-              تابع
+              {t('تابع', 'Continue')}
             </Link>
           </section>
         ) : (
@@ -185,7 +191,7 @@ function VerifyForm() {
               <div className="alert alert--info ac-note" role="status">
                 <Icon name="info" size={16} />
                 <span>
-                  أرسلنا رمزاً من ست خانات إلى{' '}
+                  {t('أرسلنا رمزاً من ست خانات إلى', 'We sent a six-digit code to')}{' '}
                   <bdi dir="ltr" className="id-addr">
                     {status.email}
                   </bdi>
@@ -195,13 +201,13 @@ function VerifyForm() {
             {status && !status.email ? (
               <div className="alert alert--warning ac-note" role="status">
                 <Icon name="alert" size={16} />
-                <span>لا بريد في حسابك لنرسل إليه الرمز.</span>
+                <span>{t('لا بريد في حسابك لنرسل إليه الرمز.', "There's no email on your account to send the code to.")}</span>
               </div>
             ) : null}
 
             <div className="id-otp" role="group" aria-labelledby="otp-label">
               <span id="otp-label" className="field__label">
-                رمز التحقّق
+                {t('رمز التحقّق', 'Verification code')}
               </span>
               <div className="id-otp__cells" dir="ltr">
                 {digits.map((d, i) => (
@@ -216,7 +222,7 @@ function VerifyForm() {
                     type="text"
                     inputMode="numeric"
                     autoComplete={i === 0 ? 'one-time-code' : 'off'}
-                    aria-label={`الخانة ${i + 1} من ${CELLS}`}
+                    aria-label={t(`الخانة ${i + 1} من ${CELLS}`, `Digit ${i + 1} of ${CELLS}`)}
                     maxLength={CELLS}
                     value={d}
                     disabled={locked || busy}
@@ -244,10 +250,10 @@ function VerifyForm() {
                 <span className="id-expiry" data-urgent={expiresIn < 60 ? 'true' : undefined}>
                   <Icon name="clock" size={15} />
                   {expired ? (
-                    'انتهت صلاحية الرمز'
+                    t('انتهت صلاحية الرمز', 'The code has expired')
                   ) : (
                     <>
-                      ينتهي بعد{' '}
+                      {t('ينتهي بعد', 'Expires in')}{' '}
                       <bdi dir="ltr" className="num">
                         {clock(expiresIn)}
                       </bdi>
@@ -262,15 +268,16 @@ function VerifyForm() {
                 disabled={resendIn > 0 || sending || !status?.email}
               >
                 {sending ? (
-                  'جارٍ الإرسال…'
+                  t('جارٍ الإرسال…', 'Sending…')
                 ) : resendIn > 0 ? (
                   <>
-                    أعد الإرسال بعد <span className="num">{resendIn}</span> ث
+                    {t('أعد الإرسال بعد', 'Resend in')} <span className="num">{resendIn}</span>
+                    {t(' ث', 's')}
                   </>
                 ) : status?.pending ? (
-                  'أعد إرسال الرمز'
+                  t('أعد إرسال الرمز', 'Resend code')
                 ) : (
-                  'أرسل الرمز'
+                  t('أرسل الرمز', 'Send code')
                 )}
               </button>
             </div>
@@ -285,15 +292,15 @@ function VerifyForm() {
             </div>
 
             <button className="btn btn--primary btn--block ac-auth__cta" type="submit" disabled={locked || busy}>
-              {busy ? 'جارٍ التحقّق…' : 'تحقّق'}
+              {busy ? t('جارٍ التحقّق…', 'Verifying…') : t('تحقّق', 'Verify')}
             </button>
           </form>
         )}
 
         {verified ? null : (
           <p className="ac-auth__foot">
-            <span>التأكيد لا يوقف تسوّقك.</span>
-            <Link href={next}>تخطَّ الآن</Link>
+            <span>{t('التأكيد لا يوقف تسوّقك.', "Confirming doesn't hold up your shopping.")}</span>
+            <Link href={next}>{t('تخطَّ الآن', 'Skip for now')}</Link>
           </p>
         )}
       </div>

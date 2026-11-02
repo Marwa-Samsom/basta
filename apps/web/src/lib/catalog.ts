@@ -1,5 +1,7 @@
 'use client';
 
+import { intlLocale, type Locale } from './i18n';
+
 /** أشكال الكتالوج كما يعيدها الخادم — المال نصّ لا رقم (ADR-001). */
 
 export interface Price {
@@ -122,6 +124,8 @@ export interface LowStockRow {
 export interface VendorCategory {
   id: string;
   nameAr: string;
+  /** يراه المشتري حين يكون الموقع بالإنجليزية */
+  nameEn: string | null;
   sort: number;
   productCount: number;
 }
@@ -148,6 +152,16 @@ export const PRODUCT_STATUS: Readonly<
   archived: { label: 'مؤرشف', tone: 'badge--pending', hint: 'لا يظهر ولا يُباع.' },
 });
 
+/** الحالات نفسها بالإنجليزية — النبرة كما هي */
+export const PRODUCT_STATUS_EN: Readonly<
+  Record<ProductStatus, { label: string; tone: string; hint: string }>
+> = Object.freeze({
+  draft: { label: 'Draft', tone: 'badge--pending', hint: 'Not published yet — only you can see it.' },
+  active: { label: 'Published', tone: 'badge--approved', hint: 'Visible to buyers.' },
+  rejected: { label: 'Taken down', tone: 'badge--rejected', hint: 'Taken down by admin — read the reason, fix it, then publish again.' },
+  archived: { label: 'Archived', tone: 'badge--pending', hint: 'Not shown and not for sale.' },
+});
+
 /** عدد بأرقام لاتينية دائماً — DESIGN-SYSTEM §7 */
-export const num = (value: number): string =>
-  new Intl.NumberFormat('ar-JO-u-nu-latn').format(value);
+export const num = (value: number, locale: Locale = 'ar'): string =>
+  new Intl.NumberFormat(locale === 'en' ? intlLocale(locale) : 'ar-JO-u-nu-latn').format(value);

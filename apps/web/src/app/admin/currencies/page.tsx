@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { money, when } from '@/lib/orders';
+import { CURRENCIES } from '@/lib/vendor';
 import { ClearableInput } from '@/components/ui';
 
 interface Data {
@@ -19,6 +21,8 @@ interface Data {
  * للإضافة فقط، وكل طلب سابق على لقطته.
  */
 export default function AdminCurrenciesPage() {
+  const t = useT();
+  const locale = useLocale();
   const { data, error, forbidden, reload } = useAdminData<Data>('/admin/currencies');
   const act = useAction();
   const [quote, setQuote] = useState('');
@@ -35,35 +39,44 @@ export default function AdminCurrenciesPage() {
     seen.add(h.quoteCode);
     return { ...h, current };
   });
+  const nameOf = (c: Data['currencies'][number]) => (locale === 'en' ? (CURRENCIES.find((x) => x.code === c.code)?.nameEn ?? c.nameAr) : c.nameAr);
 
   return (
     <div className="ac2-page">
-      <AdminHeader title="العملات وأسعار الصرف" hint={`هامش فرق الصرف ${pct(data.spreadBps)} — يُحرَّر من الإعدادات.`} />
+      <AdminHeader
+        title={t('العملات وأسعار الصرف', 'Currencies and exchange rates')}
+        hint={t(`هامش فرق الصرف ${pct(data.spreadBps)} — يُحرَّر من الإعدادات.`, `Exchange spread ${pct(data.spreadBps, locale)} — edited in Settings.`)}
+      />
       <div className="alert alert--warning ac2-callout">
         <Icon name="alert" size={16} />
-        <span>تحديث سعر الصرف لا يغيّر أرباح أي طلب سابق — الطلب يحمل سعره الملقوط لحظة الشراء. الأسعار تُضاف ولا تُعدَّل ولا تُحذف.</span>
+        <span>
+          {t(
+            'تحديث سعر الصرف لا يغيّر أرباح أي طلب سابق — الطلب يحمل سعره الملقوط لحظة الشراء. الأسعار تُضاف ولا تُعدَّل ولا تُحذف.',
+            'Updating an exchange rate does not change the earnings of any past order — each order keeps the rate captured at the moment of purchase. Rates are only added, never edited or deleted.',
+          )}
+        </span>
       </div>
       <Feedback error={act.error} notice={act.notice} />
 
-      <section className="card card--flush" aria-label="العملات">
+      <section className="card card--flush" aria-label={t('العملات', 'Currencies')}>
         <header className="card__head">
-          <h2 className="ac2-title">العملات</h2>
+          <h2 className="ac2-title">{t('العملات', 'Currencies')}</h2>
           <span className="ac2-end ac2-hint">
-            عملة المحاسبة: <span className="num ac2-code">{base}</span>
+            {t('عملة المحاسبة:', 'Accounting currency:')} <span className="num ac2-code">{base}</span>
           </span>
         </header>
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th scope="col">الرمز</th>
-                <th scope="col">الاسم</th>
-                <th scope="col">العلامة</th>
-                <th scope="col">الخانات</th>
-                <th scope="col">حدّ السحب الأدنى</th>
-                <th scope="col">الحالة</th>
+                <th scope="col">{t('الرمز', 'Code')}</th>
+                <th scope="col">{t('الاسم', 'Name')}</th>
+                <th scope="col">{t('العلامة', 'Symbol')}</th>
+                <th scope="col">{t('الخانات', 'Decimals')}</th>
+                <th scope="col">{t('حدّ السحب الأدنى', 'Minimum payout')}</th>
+                <th scope="col">{t('الحالة', 'Status')}</th>
                 <th scope="col" className="end">
-                  السعر مقابل الدولار
+                  {t('السعر مقابل الدولار', 'Rate against USD')}
                 </th>
               </tr>
             </thead>
@@ -73,20 +86,22 @@ export default function AdminCurrenciesPage() {
                   <td>
                     <span className="num ac2-code">{c.code}</span>
                   </td>
-                  <td data-label="الاسم">
-                    {c.nameAr} {c.isBase ? <span className="badge badge--info">المحاسبة</span> : null}
+                  <td data-label={t('الاسم', 'Name')}>
+                    {nameOf(c)} {c.isBase ? <span className="badge badge--info">{t('المحاسبة', 'Accounting')}</span> : null}
                   </td>
-                  <td className="ac2-symbol" data-label="العلامة">
+                  <td className="ac2-symbol" data-label={t('العلامة', 'Symbol')}>
                     {c.symbol}
                   </td>
-                  <td className="num ac2-dec" data-three={c.minorUnitDigits === 3} data-label="الخانات">
+                  <td className="num ac2-dec" data-three={c.minorUnitDigits === 3} data-label={t('الخانات', 'Decimals')}>
                     {c.minorUnitDigits}
                   </td>
-                  <td className="money num" data-label="حدّ السحب الأدنى">
-                    {money(c.minPayoutMinorUnits, c.code)}
+                  <td className="money num" data-label={t('حدّ السحب الأدنى', 'Minimum payout')}>
+                    {money(c.minPayoutMinorUnits, c.code, locale)}
                   </td>
-                  <td data-label="الحالة">{c.isActive ? <span className="badge badge--success">مفعّلة</span> : <span className="badge badge--pending">موقوفة</span>}</td>
-                  <td className="num end" data-label="السعر مقابل الدولار">
+                  <td data-label={t('الحالة', 'Status')}>
+                    {c.isActive ? <span className="badge badge--success">{t('مفعّلة', 'Active')}</span> : <span className="badge badge--pending">{t('موقوفة', 'Inactive')}</span>}
+                  </td>
+                  <td className="num end" data-label={t('السعر مقابل الدولار', 'Rate against USD')}>
                     {c.currentRate ?? '—'}
                   </td>
                 </tr>
@@ -97,26 +112,26 @@ export default function AdminCurrenciesPage() {
       </section>
 
       <div className="ac2-split ac2-split--narrow">
-        <section className="card card--flush" aria-label="سجلّ أسعار الصرف">
+        <section className="card card--flush" aria-label={t('سجلّ أسعار الصرف', 'Exchange rate history')}>
           <header className="card__head">
-            <h2 className="ac2-title">سجلّ أسعار الصرف</h2>
-            <span className="badge badge--info">إضافة فقط</span>
+            <h2 className="ac2-title">{t('سجلّ أسعار الصرف', 'Exchange rate history')}</h2>
+            <span className="badge badge--info">{t('إضافة فقط', 'Add-only')}</span>
             <span className="ac2-end ac2-hint">
-              هامش فرق الصرف <span className="num ac2-code">{pct(data.spreadBps)}</span>
+              {t('هامش فرق الصرف', 'Exchange spread')} <span className="num ac2-code">{pct(data.spreadBps, locale)}</span>
             </span>
           </header>
           {history.length === 0 ? (
-            <p className="ac2-section-empty">لم يُسجَّل أي سعر بعد.</p>
+            <p className="ac2-section-empty">{t('لم يُسجَّل أي سعر بعد.', 'No rate has been recorded yet.')}</p>
           ) : (
             <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
-                    <th scope="col">الزوج</th>
-                    <th scope="col">السعر</th>
-                    <th scope="col">المصدر</th>
+                    <th scope="col">{t('الزوج', 'Pair')}</th>
+                    <th scope="col">{t('السعر', 'Rate')}</th>
+                    <th scope="col">{t('المصدر', 'Source')}</th>
                     <th scope="col" className="end">
-                      السريان
+                      {t('السريان', 'Effective')}
                     </th>
                   </tr>
                 </thead>
@@ -124,14 +139,14 @@ export default function AdminCurrenciesPage() {
                   {history.map((h) => (
                     <tr key={h.id} data-tone={h.current ? 'success' : undefined}>
                       <td className="num">USD → {h.quoteCode}</td>
-                      <td className="num ac2-rate" data-label="السعر">
+                      <td className="num ac2-rate" data-label={t('السعر', 'Rate')}>
                         {h.rate}
                       </td>
-                      <td className="ac2-muted-cell" data-label="المصدر">
+                      <td className="ac2-muted-cell" data-label={t('المصدر', 'Source')}>
                         {h.source}
                       </td>
-                      <td className="end" data-label="السريان">
-                        <span className="ac2-muted-cell">{when(h.effectiveAt)}</span> {h.current ? <span className="badge badge--success">الساري</span> : null}
+                      <td className="end" data-label={t('السريان', 'Effective')}>
+                        <span className="ac2-muted-cell">{when(h.effectiveAt, locale)}</span> {h.current ? <span className="badge badge--success">{t('الساري', 'Current')}</span> : null}
                       </td>
                     </tr>
                   ))}
@@ -141,12 +156,12 @@ export default function AdminCurrenciesPage() {
           )}
         </section>
 
-        <section className="card ac2-sticky" aria-label="أضف سعراً">
-          <h2 className="ac2-title">أضف سعراً</h2>
+        <section className="card ac2-sticky" aria-label={t('أضف سعراً', 'Add a rate')}>
+          <h2 className="ac2-title">{t('أضف سعراً', 'Add a rate')}</h2>
           <label className="field">
-            <span className="field__label">الزوج</span>
+            <span className="field__label">{t('الزوج', 'Pair')}</span>
             <select className="field__control num" value={quote} onChange={(e) => setQuote(e.target.value)}>
-              <option value="">اختر العملة</option>
+              <option value="">{t('اختر العملة', 'Choose currency')}</option>
               {data.currencies.filter((c) => c.code !== 'USD').map((c) => (
                 <option key={c.code} value={c.code}>
                   USD → {c.code}
@@ -155,12 +170,12 @@ export default function AdminCurrenciesPage() {
             </select>
           </label>
           <label className="field">
-            <span className="field__label">السعر — وحدات لكل دولار</span>
+            <span className="field__label">{t('السعر — وحدات لكل دولار', 'Rate — units per US dollar')}</span>
             <ClearableInput className="field__control num" dir="ltr" inputMode="decimal" placeholder="3.7503" aria-invalid={rate !== '' && !rateOk} value={rate} onChange={(e) => setRate(e.target.value)} />
           </label>
           <label className="field">
-            <span className="field__label">المصدر</span>
-            <ClearableInput className="field__control" value={source} onChange={(e) => setSource(e.target.value)} placeholder="البنك المركزي" />
+            <span className="field__label">{t('المصدر', 'Source')}</span>
+            <ClearableInput className="field__control" value={source} onChange={(e) => setSource(e.target.value)} placeholder={t('البنك المركزي', 'Central bank')} />
           </label>
           <button
             type="button"
@@ -171,12 +186,12 @@ export default function AdminCurrenciesPage() {
                 await api('/admin/fx-rates', { method: 'POST', body: { quote, rate, source } });
                 setRate('');
                 reload();
-              }, 'أُضيف السعر. يسري على الطلبات من الآن.')
+              }, t('أُضيف السعر. يسري على الطلبات من الآن.', 'Rate added. It applies to orders from now on.'))
             }
           >
-            أضف السعر
+            {t('أضف السعر', 'Add rate')}
           </button>
-          <p className="ac2-fine">يُضاف السعر بتاريخ اليوم ويصبح الساري. الأسعار السابقة تبقى في السجلّ.</p>
+          <p className="ac2-fine">{t('يُضاف السعر بتاريخ اليوم ويصبح الساري. الأسعار السابقة تبقى في السجلّ.', 'The rate is added with today’s date and becomes current. Earlier rates stay in the history.')}</p>
         </section>
       </div>
     </div>

@@ -5,7 +5,9 @@ import { use, useState } from 'react';
 import { Feedback, Loading, ReasonButton, Tabs } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { api, apiBlob } from '@/lib/api';
-import { TONE, useAction, useAdminData, VENDOR_STATUS } from '@/lib/admin';
+import { useLocale, useT } from '@/components/locale';
+import { localized } from '@/lib/i18n';
+import { TONE, useAction, useAdminData, VENDOR_STATUS, VENDOR_STATUS_EN } from '@/lib/admin';
 import { when } from '@/lib/orders';
 
 interface Doc {
@@ -38,6 +40,14 @@ interface Vendor {
 }
 
 const DOC_STATUS: Record<string, string> = { missing: 'لم تُرفع', pending: 'بانتظار المراجعة', accepted: 'مقبولة', rejected: 'مرفوضة' };
+const DOC_STATUS_EN: Record<string, string> = { missing: 'Not uploaded', pending: 'Awaiting review', accepted: 'Accepted', rejected: 'Rejected' };
+/** أسماء الوثائق بالإنجليزية — الخادم يرسل الاسم بالعربية وحدها، فيُقرأ بالنوع */
+const DOC_LABEL_EN: Record<string, string> = {
+  commercial_register: 'Commercial register',
+  national_id: 'National ID',
+  tax_card: 'Tax certificate',
+  bank_proof: 'Bank account proof',
+};
 const DOC_TONE: Record<string, string> = { missing: 'badge--pending', pending: 'badge--warning', accepted: 'badge--success', rejected: 'badge--danger' };
 const docId = (d: Doc) => d.downloadPath?.split('/').pop() ?? null;
 
@@ -46,6 +56,8 @@ const docId = (d: Doc) => d.downloadPath?.split('/').pop() ?? null;
  * اعتماد، رفض بسبب، تعليق بسبب، أو إعادة. كل قرار في سجل التدقيق.
  */
 export default function AdminVendorPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = useT();
+  const locale = useLocale();
   const { id } = use(params);
   const { data: v, error, forbidden, reload } = useAdminData<Vendor>(`/admin/vendors/${id}`);
   const act = useAction();
@@ -66,7 +78,7 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
     act.run(async () => {
       await api(`/admin/vendors/${id}/documents/${docId(d)}/decision`, { method: 'POST', body: { accept, ...(reason ? { reason } : {}) } });
       reload();
-    }, accept ? 'قُبلت الوثيقة.' : 'رُفضت الوثيقة وأُبلغ البائع بالسبب.');
+    }, accept ? t('قُبلت الوثيقة.', 'Document accepted.') : t('رُفضت الوثيقة وأُبلغ البائع بالسبب.', 'Document rejected and the seller told the reason.'));
 
   const post = (path: string, body: unknown, msg: string) =>
     act.run(async () => {
@@ -78,7 +90,7 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
     <div className="ao-page">
       <Link href="/admin/vendors" className="ao-back">
         <Icon name="back" size={14} mirror />
-        المتاجر
+        {t('المتاجر', 'Shops')}
       </Link>
 
       <section className="ao-profile">
@@ -90,12 +102,12 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
             <h1 className="ao-profile__name">{v.nameAr}</h1>
             <span className={`badge ${TONE[v.status] ?? ''}`}>
               <span className="dot" aria-hidden />
-              {VENDOR_STATUS[v.status] ?? v.status}
+              {localized(locale, VENDOR_STATUS, VENDOR_STATUS_EN)[v.status] ?? v.status}
             </span>
           </div>
           <div className="ao-profile__meta">
             <span>
-              عملة التسوية <strong className="num">{v.settlementCurrency}</strong>
+              {t('عملة التسوية', 'Settlement currency')} <strong className="num">{v.settlementCurrency}</strong>
             </span>
             <span className="num">{v.country}</span>
             <span className="num">{v.slug}</span>
@@ -104,39 +116,46 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
         <div className="ao-profile__actions">
           {v.status === 'in_review' ? (
             <>
-              <button type="button" className="btn btn--primary" disabled={act.busy} onClick={() => void post('approve', {}, 'اعتُمد المتجر وأُبلغ صاحبه.')}>
+              <button type="button" className="btn btn--primary" disabled={act.busy} onClick={() => void post('approve', {}, t('اعتُمد المتجر وأُبلغ صاحبه.', 'Shop approved and its owner notified.'))}>
                 <Icon name="check" size={16} />
-                اعتمد المتجر
+                {t('اعتمد المتجر', 'Approve shop')}
               </button>
               <ReasonButton
-                label="اطلب تعديلاً"
+                label={t('اطلب تعديلاً', 'Request changes')}
                 min={10}
                 disabled={act.busy}
                 icon="return"
-                presets={['صورة السجل التجاري غير واضحة', 'اسم الحساب البنكي لا يطابق السجل التجاري', 'الوثائق منتهية الصلاحية']}
-                onSubmit={(r) => post('reject', { reason: r }, 'رُفض الطلب وأُبلغ البائع بالسبب.')}
+                presets={[
+                  t('صورة السجل التجاري غير واضحة', 'The commercial register image is unclear'),
+                  t('اسم الحساب البنكي لا يطابق السجل التجاري', 'The bank account name does not match the commercial register'),
+                  t('الوثائق منتهية الصلاحية', 'The documents have expired'),
+                ]}
+                onSubmit={(r) => post('reject', { reason: r }, t('رُفض الطلب وأُبلغ البائع بالسبب.', 'Request rejected and the seller told the reason.'))}
               />
             </>
           ) : null}
           {v.status === 'approved' ? (
             <ReasonButton
-              label="علّق المتجر"
+              label={t('علّق المتجر', 'Suspend shop')}
               min={10}
               icon="lock"
-              hint="تختفي منتجاته فوراً. الطلبات القائمة تكتمل، ورصيده يُسحب بعد حجز احترازي من التعليق (90 يوماً — من الإعدادات)."
+              hint={t(
+                'تختفي منتجاته فوراً. الطلبات القائمة تكتمل، ورصيده يُسحب بعد حجز احترازي من التعليق (90 يوماً — من الإعدادات).',
+                'Its products disappear at once. Open orders are completed, and its balance can be withdrawn after a precautionary hold from the suspension (90 days — from settings).',
+              )}
               disabled={act.busy}
-              onSubmit={(r) => post('suspend', { reason: r }, 'عُلِّق المتجر.')}
+              onSubmit={(r) => post('suspend', { reason: r }, t('عُلِّق المتجر.', 'Shop suspended.'))}
             />
           ) : null}
           {v.status === 'suspended' ? (
-            <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => void post('reinstate', {}, 'أُعيد المتجر.')}>
+            <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => void post('reinstate', {}, t('أُعيد المتجر.', 'Shop reinstated.'))}>
               <Icon name="refresh" size={14} />
-              إعادة التفعيل
+              {t('إعادة التفعيل', 'Reinstate')}
             </button>
           ) : null}
           <Link className="btn btn--ghost btn--sm" href={`/admin/audit?entityId=${v.id}`}>
             <Icon name="history" size={14} />
-            سجل هذا البائع
+            {t('سجل هذا البائع', "This seller's log")}
           </Link>
         </div>
       </section>
@@ -145,17 +164,21 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
       {v.rejectionReason ? (
         <div className="ao-note" data-tone="danger">
           <Icon name="alert" size={16} />
-          <span>سبب الرفض السابق: «{v.rejectionReason}»</span>
+          <span>
+            {t('سبب الرفض السابق: «', 'Previous rejection reason: “')}
+            {v.rejectionReason}
+            {t('»', '”')}
+          </span>
         </div>
       ) : null}
 
       <Tabs
         value={tab}
         onChange={setTab}
-        label="أقسام ملف المتجر"
+        label={t('أقسام ملف المتجر', 'Shop profile sections')}
         options={[
-          { key: 'docs', label: 'المستندات' },
-          { key: 'info', label: 'البيانات والبنك' },
+          { key: 'docs', label: t('المستندات', 'Documents') },
+          { key: 'info', label: t('البيانات والبنك', 'Details and bank') },
         ]}
       />
 
@@ -164,15 +187,15 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
           {v.documents.map((d) => (
             <article key={d.type} className="ao-doc" data-state={d.status}>
               <div className="ao-doc__head">
-                <h2 className="ao-doc__title">{d.label}</h2>
-                <span className={`badge ${DOC_TONE[d.status] ?? TONE[d.status] ?? ''}`}>{DOC_STATUS[d.status] ?? d.status}</span>
-                {d.uploadedAt ? <span className="ao-doc__file">{when(d.uploadedAt)}</span> : null}
+                <h2 className="ao-doc__title">{locale === 'en' ? (DOC_LABEL_EN[d.type] ?? d.label) : d.label}</h2>
+                <span className={`badge ${DOC_TONE[d.status] ?? TONE[d.status] ?? ''}`}>{localized(locale, DOC_STATUS, DOC_STATUS_EN)[d.status] ?? d.status}</span>
+                {d.uploadedAt ? <span className="ao-doc__file">{when(d.uploadedAt, locale)}</span> : null}
               </div>
               {d.uploaded ? (
                 <button type="button" className="ao-doc__preview" onClick={() => void open(d)}>
                   <Icon name="file" size={28} />
                   <span className="ao-doc__name">
-                    فتح <span className="num">{d.originalName}</span>
+                    {t('فتح', 'Open')} <span className="num">{d.originalName}</span>
                   </span>
                   <span className="ao-doc__zoom" aria-hidden>
                     <Icon name="zoom-in" size={15} />
@@ -181,22 +204,26 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <div className="ao-doc__preview" data-empty="true">
                   <Icon name="file" size={28} />
-                  <span className="ao-doc__name">لم تُرفع بعد</span>
+                  <span className="ao-doc__name">{t('لم تُرفع بعد', 'Not uploaded yet')}</span>
                 </div>
               )}
               {d.uploaded && d.status === 'pending' ? (
                 <div className="ao-doc__actions">
                   <button type="button" className="btn btn--sm ao-btn--success" disabled={act.busy} onClick={() => void decide(d, true)}>
                     <Icon name="check" size={14} />
-                    اقبل
+                    {t('اقبل', 'Accept')}
                   </button>
-                  <ReasonButton label="ارفض بسبب" disabled={act.busy} onSubmit={(r) => decide(d, false, r)} />
+                  <ReasonButton label={t('ارفض بسبب', 'Reject with a reason')} disabled={act.busy} onSubmit={(r) => decide(d, false, r)} />
                 </div>
               ) : null}
               {d.rejectReason ? (
                 <div className="ao-note" data-tone="danger">
                   <Icon name="alert" size={14} />
-                  <span>«{d.rejectReason}»</span>
+                  <span>
+                    {t('«', '“')}
+                    {d.rejectReason}
+                    {t('»', '”')}
+                  </span>
                 </div>
               ) : null}
             </article>
@@ -205,41 +232,41 @@ export default function AdminVendorPage({ params }: { params: Promise<{ id: stri
       ) : (
         <div className="ao-infogrid">
           <section className="card">
-            <h2 className="ao-card-title">بيانات النشاط</h2>
+            <h2 className="ao-card-title">{t('بيانات النشاط', 'Business details')}</h2>
             <dl className="ao-kv">
               <div>
-                <dt>الاسم التجاري</dt>
+                <dt>{t('الاسم التجاري', 'Trade name')}</dt>
                 <dd>{v.nameAr}</dd>
               </div>
               <div>
-                <dt>نوع النشاط</dt>
+                <dt>{t('نوع النشاط', 'Business type')}</dt>
                 <dd>{v.businessType ?? '—'}</dd>
               </div>
               <div>
-                <dt>البلد</dt>
+                <dt>{t('البلد', 'Country')}</dt>
                 <dd className="num">{v.country}</dd>
               </div>
               <div>
-                <dt>أُرسل للمراجعة</dt>
-                <dd>{when(v.submittedAt)}</dd>
+                <dt>{t('أُرسل للمراجعة', 'Submitted for review')}</dt>
+                <dd>{when(v.submittedAt, locale)}</dd>
               </div>
               <div>
-                <dt>اعتُمد</dt>
-                <dd>{when(v.approvedAt)}</dd>
+                <dt>{t('اعتُمد', 'Approved')}</dt>
+                <dd>{when(v.approvedAt, locale)}</dd>
               </div>
             </dl>
           </section>
           <BankAccounts vendorId={id} />
           <section className="card ao-infogrid__wide">
-            <h2 className="ao-card-title">السياسات</h2>
+            <h2 className="ao-card-title">{t('السياسات', 'Policies')}</h2>
             <p className="ao-prose">{v.descriptionAr ?? '—'}</p>
             <dl className="ao-kv">
               <div>
-                <dt>الشحن</dt>
+                <dt>{t('الشحن', 'Shipping')}</dt>
                 <dd className="ao-prose">{v.shippingPolicyAr ?? '—'}</dd>
               </div>
               <div>
-                <dt>الإرجاع</dt>
+                <dt>{t('الإرجاع', 'Returns')}</dt>
                 <dd className="ao-prose">{v.returnPolicyAr ?? '—'}</dd>
               </div>
             </dl>
@@ -267,33 +294,35 @@ interface Bank {
  * واسم صاحبه مقابل اسم النشاط.
  */
 function BankAccounts({ vendorId }: { vendorId: string }) {
+  const t = useT();
+  const locale = useLocale();
   const { data, error, reload } = useAdminData<{ items: Bank[] }>(`/admin/vendors/${vendorId}/bank-accounts`);
   const act = useAction();
   return (
     <section className="card">
-      <h2 className="ao-card-title">الحسابات البنكية</h2>
+      <h2 className="ao-card-title">{t('الحسابات البنكية', 'Bank accounts')}</h2>
       <Feedback error={act.error} notice={act.notice} />
       {!data ? (
         <Loading error={error} inline />
       ) : data.items.length === 0 ? (
-        <p className="muted small">لم يُضف بعد.</p>
+        <p className="muted small">{t('لم يُضف بعد.', 'None added yet.')}</p>
       ) : (
         data.items.map((b) => (
           <dl key={b.id} className="ao-kv">
             <div>
-              <dt>البنك</dt>
+              <dt>{t('البنك', 'Bank')}</dt>
               <dd>
                 {b.bankName}{' '}
-                {b.isDefault ? <span className="badge badge--brand">الافتراضي</span> : null}{' '}
-                <span className={`badge ${b.verified ? 'badge--success' : 'badge--warning'}`}>{b.verified ? 'موثّق' : 'قيد التوثيق'}</span>
+                {b.isDefault ? <span className="badge badge--brand">{t('الافتراضي', 'Default')}</span> : null}{' '}
+                <span className={`badge ${b.verified ? 'badge--success' : 'badge--warning'}`}>{b.verified ? t('موثّق', 'Verified') : t('قيد التوثيق', 'Pending verification')}</span>
               </dd>
             </div>
             <div>
-              <dt>صاحب الحساب</dt>
+              <dt>{t('صاحب الحساب', 'Account holder')}</dt>
               <dd>{b.holderName}</dd>
             </div>
             <div>
-              <dt>الآيبان</dt>
+              <dt>{t('الآيبان', 'IBAN')}</dt>
               <dd className="num" dir="ltr">
                 {b.iban}
               </dd>
@@ -306,9 +335,9 @@ function BankAccounts({ vendorId }: { vendorId: string }) {
             ) : null}
             {b.verified ? null : (
               <div>
-                <dt>أُضيف</dt>
+                <dt>{t('أُضيف', 'Added')}</dt>
                 <dd>
-                  {when(b.createdAt)}{' '}
+                  {when(b.createdAt, locale)}{' '}
                   <button
                     type="button"
                     className="btn btn--secondary btn--sm"
@@ -317,11 +346,11 @@ function BankAccounts({ vendorId }: { vendorId: string }) {
                       void act.run(async () => {
                         await api(`/admin/vendors/${vendorId}/bank-accounts/${b.id}/verify`, { method: 'POST' });
                         reload();
-                      }, 'وُثّق الحساب وأُبلغ البائع.')
+                      }, t('وُثّق الحساب وأُبلغ البائع.', 'Account verified and the seller notified.'))
                     }
                   >
                     <Icon name="check" size={14} />
-                    وثّق — الاسم يطابق النشاط
+                    {t('وثّق — الاسم يطابق النشاط', 'Verify — the name matches the business')}
                   </button>
                 </dd>
               </div>

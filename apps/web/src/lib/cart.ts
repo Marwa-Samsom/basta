@@ -27,6 +27,7 @@ export interface CartLine {
   variantId: string;
   productId: string;
   nameAr: string;
+  nameEn?: string | null;
   variantLabel: string | null;
   imageKey: string | null;
   qty: number;
@@ -49,6 +50,7 @@ export interface CartView {
   groups: {
     vendorId: string;
     vendorNameAr: string;
+    vendorNameEn?: string | null;
     storeCurrency: string;
     lines: CartLine[];
     subtotal: Money;
@@ -91,7 +93,7 @@ async function withCart<T>(run: (token: string) => Promise<T>): Promise<T> {
   try {
     return await run(token);
   } catch (err) {
-    if (err instanceof ApiError && err.status === 404 && /السلة/.test(err.message)) {
+    if (err instanceof ApiError && err.status === 404 && (err.details?.['resource'] === 'cart' || /السلة/.test(err.message))) {
       localStore.remove(TOKEN_KEY);
       return run(await ensureToken());
     }

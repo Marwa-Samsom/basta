@@ -1,3 +1,5 @@
+import type { Locale } from './i18n';
+
 /**
  * المحافظات والمناطق الإدارية لكل بلد تبيع فيه بسطة — قائمة واحدة يختار منها
  * البائع تغطيته والمشتري عنوانه، فيكتبان الاسم نفسه. كانت حقلاً حرّاً لكليهما
@@ -60,6 +62,75 @@ export const REGIONS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
+ * الأسماء نفسها بالإنجليزية للعرض وحده، بترتيب `REGIONS` نفسه (الموضع بالموضع).
+ * القيمة المحفوظة والمُرسلة للخادم تبقى الاسم العربي.
+ */
+export const REGIONS_EN: Readonly<Record<string, readonly string[]>> = {
+  JO: ['Amman', 'Irbid', 'Zarqa', 'Balqa', 'Mafraq', 'Jerash', 'Ajloun', 'Madaba', 'Karak', 'Tafilah', "Ma'an", 'Aqaba'],
+  SA: [
+    'Riyadh',
+    'Makkah',
+    'Madinah',
+    'Eastern Province',
+    'Qassim',
+    'Asir',
+    'Tabuk',
+    "Ha'il",
+    'Northern Borders',
+    'Jazan',
+    'Najran',
+    'Al Bahah',
+    'Al Jawf',
+  ],
+  AE: ['Abu Dhabi', 'Dubai', 'Sharjah', 'Ajman', 'Umm Al Quwain', 'Ras Al Khaimah', 'Fujairah'],
+  KW: ['Capital', 'Hawalli', 'Farwaniya', 'Ahmadi', 'Jahra', 'Mubarak Al-Kabeer'],
+  EG: [
+    'Cairo',
+    'Giza',
+    'Alexandria',
+    'Qalyubia',
+    'Dakahlia',
+    'Sharqia',
+    'Gharbia',
+    'Monufia',
+    'Beheira',
+    'Kafr El Sheikh',
+    'Damietta',
+    'Port Said',
+    'Ismailia',
+    'Suez',
+    'North Sinai',
+    'South Sinai',
+    'Faiyum',
+    'Beni Suef',
+    'Minya',
+    'Asyut',
+    'Sohag',
+    'Qena',
+    'Luxor',
+    'Aswan',
+    'Red Sea',
+    'New Valley',
+    'Matrouh',
+  ],
+  QA: ['Doha', 'Al Rayyan', 'Al Wakrah', 'Al Khor', 'Al Shamal', 'Umm Salal', 'Al Daayen', 'Al Shahaniya'],
+  BH: ['Capital', 'Muharraq', 'Northern', 'Southern'],
+  OM: [
+    'Muscat',
+    'Dhofar',
+    'Musandam',
+    'Al Buraimi',
+    'Ad Dakhiliyah',
+    'North Al Batinah',
+    'South Al Batinah',
+    'South Ash Sharqiyah',
+    'North Ash Sharqiyah',
+    'Ad Dhahirah',
+    'Al Wusta',
+  ],
+};
+
+/**
  * مفتاح مقارنة أسماء الأماكن — نسخة `api/src/common/places.ts` حرفاً بحرف:
  * معاينة الشحن تحسب هنا بالقاعدة التي يحسب بها الخادم.
  */
@@ -84,4 +155,14 @@ export const samePlace = (a: string | null | undefined, b: string | null | undef
 /** اسم القائمة الذي يطابق ما كُتب، أو ما كُتب نفسه إن لم يطابق شيئاً */
 export function canonicalRegion(country: string, value: string): string {
   return (REGIONS[country] ?? []).find((r) => samePlace(r, value)) ?? value;
+}
+
+/**
+ * اسم المنطقة للعرض بلغة الصفحة: بالإنجليزية إن طابق القائمة، وإلا ما كُتب كما هو.
+ * بالعربية يعود ما كُتب بلا تغيير.
+ */
+export function regionName(country: string, value: string, locale: Locale = 'ar'): string {
+  if (locale !== 'en') return value;
+  const at = (REGIONS[country] ?? []).findIndex((r) => samePlace(r, value));
+  return at >= 0 ? (REGIONS_EN[country]?.[at] ?? value) : value;
 }

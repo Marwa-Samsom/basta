@@ -1,7 +1,8 @@
 'use client';
 
+import { useLocale, useT } from '@/components/locale';
 import { ClearableInput, Field } from '@/components/ui';
-import { REGIONS, canonicalRegion } from '@/lib/places';
+import { REGIONS, canonicalRegion, regionName } from '@/lib/places';
 
 /**
  * المحافظة من قائمة البلد — في تغطية البائع وعنوان المشتري معاً، فيكتبان الاسم
@@ -12,7 +13,7 @@ export function RegionSelect({
   country,
   value,
   onChange,
-  label = 'المحافظة / المنطقة',
+  label,
   emptyLabel,
   optional,
   error,
@@ -28,20 +29,22 @@ export function RegionSelect({
   error?: string | null | undefined;
   onBlur?: () => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const list = REGIONS[country];
   const shown = value ? canonicalRegion(country, value) : '';
   const legacy = shown && list && !list.includes(shown) ? shown : null;
 
   return (
-    <Field label={label} optional={optional} error={error}>
+    <Field label={label ?? t('المحافظة / المنطقة', 'Governorate / region')} optional={optional} error={error}>
       {(props) =>
         list ? (
           <select className="field__control" {...props} value={shown} onChange={(e) => onChange(e.target.value)} onBlur={onBlur}>
-            {emptyLabel ? <option value="">{emptyLabel}</option> : <option value="" disabled>اختر المحافظة</option>}
+            {emptyLabel ? <option value="">{emptyLabel}</option> : <option value="" disabled>{t('اختر المحافظة', 'Choose a governorate')}</option>}
             {legacy ? <option value={legacy}>{legacy}</option> : null}
             {list.map((r) => (
               <option key={r} value={r}>
-                {r}
+                {regionName(country, r, locale)}
               </option>
             ))}
           </select>

@@ -1,3 +1,4 @@
+import { documentLocale } from './i18n';
 import { localStore } from './storage';
 
 /**
@@ -111,7 +112,7 @@ export class ApiError extends Error {
     try {
       body = await res.json();
     } catch {
-      return new ApiError(res.status, 'تعذّر الاتصال بالخادم. حاول مرة أخرى.');
+      return new ApiError(res.status, clientMessage('unreachable'));
     }
     const data = body as {
       message?: string | string[];
@@ -120,7 +121,7 @@ export class ApiError extends Error {
     };
     const message = Array.isArray(data.message)
       ? data.message.join(' · ')
-      : (data.message ?? 'تعذّر إتمام الطلب.');
+      : (data.message ?? clientMessage('failed'));
     return new ApiError(res.status, message, data.code ?? null, data.details ?? null);
   }
 }
@@ -163,11 +164,31 @@ async function raw(path: string, options: RequestOptions, token: string | null):
   } catch {
     // انقطاع الشبكة يرفض fetch بـ TypeError «Failed to fetch» — كانت تُعرض للمشتري كما هي.
     // الحالة 0 ليست رفضاً قاطعاً (checkout-attempt): «ادفع» ثانيةً يعيد الطلب نفسه
-    throw new ApiError(0, NETWORK_MESSAGE, 'NETWORK');
+    throw new ApiError(0, clientMessage('network'), 'NETWORK');
   }
 }
 
-const NETWORK_MESSAGE = 'لا اتصال بالخادم — تحقّق من الشبكة وأعد المحاولة.';
+/** رسائل العميل نفسه بلغة الصفحة (`<html lang>`) — رسالة الخادم تبقى كما كتبها */
+const CLIENT_MESSAGES = {
+  ar: {
+    unreachable: 'تعذّر الاتصال بالخادم. حاول مرة أخرى.',
+    failed: 'تعذّر إتمام الطلب.',
+    network: 'لا اتصال بالخادم — تحقّق من الشبكة وأعد المحاولة.',
+    expired: 'انتهت جلستك — ادخل من جديد لتكمل.',
+    logout: 'تعذّر الخروج — لا اتصال بالخادم. تحقّق من الشبكة وحاول مرة أخرى.',
+  },
+  en: {
+    unreachable: "Couldn't reach the server. Please try again.",
+    failed: "Couldn't complete the request.",
+    network: 'No connection to the server — check your network and try again.',
+    expired: 'Your session has ended — sign in again to continue.',
+    logout: "Couldn't sign out — no connection to the server. Check your network and try again.",
+  },
+} as const;
+
+function clientMessage(key: keyof (typeof CLIENT_MESSAGES)['ar']): string {
+  return CLIENT_MESSAGES[documentLocale()][key];
+}
 
 /**
  * الجلسة انتهت ولم يجدّدها رمز التحديث — يسمعه SessionExpiredRedirect في الجذر فيعيد
@@ -215,7 +236,7 @@ function refresh(seen: string | null): Promise<Tokens | null> {
     if (seen && current.accessToken !== seen) return current;
     // انقطاع الشبكة أثناء التجديد لا يمسّ الجلسة: يُرمى كخطأ اتصال لا «Failed to fetch»
     const res = await fetch(`${apiBase()}/auth/refresh`, { method: 'POST', credentials: 'same-origin' }).catch(() => {
-      throw new ApiError(0, NETWORK_MESSAGE, 'NETWORK');
+      throw new ApiError(0, clientMessage('network'), 'NETWORK');
     });
     if (res.status === 409) {
       // دوّره تبويب آخر في اللحظة نفسها — الجلسة سليمة، وخلفه يُكتب الآن
@@ -262,7 +283,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     } else if (before) {
       // كان داخلاً والتجديد فشل: الجلسة ماتت (refresh مسحها) — لا 401 من منطق الصفحة
       backToLogin();
-      throw new ApiError(401, 'انتهت جلستك — ادخل من جديد لتكمل.', 'SESSION_EXPIRED');
+      throw new ApiError(401, clientMessage('expired'), 'SESSION_EXPIRED');
     }
   }
 
@@ -284,7 +305,7 @@ export async function logout(): Promise<void> {
   try {
     res = await fetch(`${apiBase()}/auth/logout`, { method: 'POST', credentials: 'same-origin' });
   } catch {
-    throw new ApiError(0, 'تعذّر الخروج — لا اتصال بالخادم. تحقّق من الشبكة وحاول مرة أخرى.');
+    throw new ApiError(0, clientMessage('logout'));
   }
   if (!res.ok) throw await ApiError.from(res);
   session.clear();

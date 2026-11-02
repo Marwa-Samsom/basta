@@ -7,9 +7,12 @@ import { api } from '@/lib/api';
 import { Alert, EmptyState, MoreButton, PageHead, SortButton, Spinner, type SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
+import { useLocale, useT } from '@/components/locale';
+import { intlLocale, localized, translator, type Locale } from '@/lib/i18n';
 import {
   num,
   PRODUCT_STATUS,
+  PRODUCT_STATUS_EN,
   type Page,
   type ProductListItem,
   type ProductStatus,
@@ -23,30 +26,41 @@ type TabKey = ProductStatus | 'all';
  * اتجاه خفية، فإن وُضع في خلية `num` اللاتينية انقلب إلى «262026/9/».
  */
 const DAY = 86_400_000;
-const CLOCK = new Intl.DateTimeFormat('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-const DAY_MONTH = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long' });
-const DAY_MONTH_YEAR = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' });
+const formatsOf = (locale: Locale) => {
+  const loc = intlLocale(locale);
+  return {
+    clock: new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
+    dayMonth: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'long' }),
+    dayMonthYear: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'long', year: 'numeric' }),
+  };
+};
+const FORMATS: Readonly<Record<Locale, ReturnType<typeof formatsOf>>> = { ar: formatsOf('ar'), en: formatsOf('en') };
 const startOfDay = (d: Date): number => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
 /**
  * «آخر تعديل» كالتصميم (VD-06): «اليوم · 09:40»، «أمس · 18:20»، ثم «11 سبتمبر» — وبالسنة إن لم تكن
  * هذه. كان dateStyle: 'medium'، وهو في العربية أرقام وحدها «2026/10/28» (VCAT-001، 28 أكتوبر 2026).
  */
-function edited(iso: string, now = new Date()): string {
+function edited(iso: string, locale: Locale, now = new Date()): string {
+  const t = translator(locale);
+  const { clock, dayMonth, dayMonthYear } = FORMATS[locale];
   const at = new Date(iso);
   const days = Math.round((startOfDay(now) - startOfDay(at)) / DAY);
-  if (days <= 0) return `اليوم · ${CLOCK.format(at)}`;
-  if (days === 1) return `أمس · ${CLOCK.format(at)}`;
-  return (at.getFullYear() === now.getFullYear() ? DAY_MONTH : DAY_MONTH_YEAR).format(at);
+  if (days <= 0) return `${t('اليوم', 'Today')} · ${clock.format(at)}`;
+  if (days === 1) return `${t('أمس', 'Yesterday')} · ${clock.format(at)}`;
+  return (at.getFullYear() === now.getFullYear() ? dayMonth : dayMonthYear).format(at);
 }
 
-const TABS: readonly { key: TabKey; label: string }[] = [
-  { key: 'all', label: 'الكل' },
-  { key: 'draft', label: 'مسوّدة' },
-  { key: 'active', label: 'منشور' },
-  { key: 'rejected', label: 'موقوف' },
-  { key: 'archived', label: 'مؤرشف' },
+const TABS: readonly { key: TabKey; label: string; en: string }[] = [
+  { key: 'all', label: 'الكل', en: 'All' },
+  { key: 'draft', label: 'مسوّدة', en: 'Draft' },
+  { key: 'active', label: 'منشور', en: 'Published' },
+  { key: 'rejected', label: 'موقوف', en: 'Taken down' },
+  { key: 'archived', label: 'مؤرشف', en: 'Archived' },
 ];
+
+const productCount = (n: number, locale: Locale): string =>
+  locale === 'en' ? `${num(n, locale)} ${n === 1 ? 'product' : 'products'}` : `${num(n)} منتج`;
 
 /**
  * VD-07 — قائمة المنتجات.
@@ -68,6 +82,10 @@ export default function ProductsPage() {
 }
 
 function ProductsList() {
+  const t = useT();
+  const locale = useLocale();
+  const statuses = localized(locale, PRODUCT_STATUS, PRODUCT_STATUS_EN);
+  const nameOf = (p: ProductListItem): string => (locale === 'en' && p.nameEn ? p.nameEn : p.nameAr);
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -123,12 +141,12 @@ function ProductsList() {
         setExhausted(false);
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'تعذّر تحميل المنتجات.');
+        setError(err instanceof Error ? err.message : t('تعذّر تحميل المنتجات.', "Couldn't load products."));
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [t],
   );
 
   useEffect(() => {
@@ -187,7 +205,7 @@ function ProductsList() {
       setBatches((b) => [...b, next.items.length]);
       if (next.items.length === 0) setExhausted(true);
     } catch (err) {
-      if (listKey.current === key) setMoreError(err instanceof Error ? err.message : 'تعذّر تحميل المزيد.');
+      if (listKey.current === key) setMoreError(err instanceof Error ? err.message : t('تعذّر تحميل المزيد.', "Couldn't load more."));
     } finally {
       setLoadingMore(false);
     }
@@ -209,23 +227,23 @@ function ProductsList() {
   return (
     <div className="vp-page">
       <PageHead
-        title="المنتجات"
+        title={t('المنتجات', 'Products')}
         count={
           total !== undefined
             ? page && filtered
-              ? `${num(total)} منتج · ${num(page.total)} معروض`
-              : `${num(total)} منتج`
+              ? `${productCount(total, locale)} · ${num(page.total, locale)} ${t('معروض', 'shown')}`
+              : productCount(total, locale)
             : undefined
         }
         actions={
           <>
             <Link className="btn btn--secondary" href="/vendor/products/import">
               <Icon name="upload" size={16} />
-              استيراد
+              {t('استيراد', 'Import')}
             </Link>
             <Link className="btn btn--primary" href="/vendor/products/new">
               <Icon name="plus" size={16} />
-              أضف منتجاً
+              {t('أضف منتجاً', 'Add product')}
             </Link>
           </>
         }
@@ -236,42 +254,44 @@ function ProductsList() {
       {storeEmpty ? (
         <EmptyState
           icon="package"
-          title="لا منتجات بعد"
+          title={t('لا منتجات بعد', 'No products yet')}
           actions={
             <>
               <Link className="btn btn--primary" href="/vendor/products/new">
                 <Icon name="plus" size={16} />
-                أضف منتجاً يدوياً
+                {t('أضف منتجاً يدوياً', 'Add a product manually')}
               </Link>
               <Link className="btn btn--secondary" href="/vendor/products/import">
                 <Icon name="upload" size={16} />
-                استورد ملفاً
+                {t('استورد ملفاً', 'Import a file')}
               </Link>
             </>
           }
         >
-          ابدأ بمنتج واحد لتفهم الشكل، أو ارفع ملفاً إن كان عندك كتالوج جاهز. المسوّدات تُحفظ ولا
-          تظهر للمشترين.
+          {t(
+            'ابدأ بمنتج واحد لتفهم الشكل، أو ارفع ملفاً إن كان عندك كتالوج جاهز. المسوّدات تُحفظ ولا تظهر للمشترين.',
+            'Start with one product to get a feel for it, or upload a file if you already have a catalogue. Drafts are saved and hidden from buyers.',
+          )}
         </EmptyState>
       ) : (
         <section className="card card--flush">
           <div className="card__head vp-toolbar">
-            <div className="tabs" role="tablist" aria-label="حالة المنتج">
-              {TABS.map((t) => (
+            <div className="tabs" role="tablist" aria-label={t('حالة المنتج', 'Product status')}>
+              {TABS.map((item) => (
                 <button
-                  key={t.key}
+                  key={item.key}
                   type="button"
                   role="tab"
                   className="tabs__tab"
-                  aria-selected={tab === t.key}
+                  aria-selected={tab === item.key}
                   onClick={() => {
-                    setFilter({ tab: t.key });
+                    setFilter({ tab: item.key });
                     setLoading(true);
                   }}
                 >
-                  {t.label}
-                  {counts[t.key] !== undefined ? (
-                    <span className="tabs__count">{num(counts[t.key] ?? 0)}</span>
+                  {t(item.label, item.en)}
+                  {counts[item.key] !== undefined ? (
+                    <span className="tabs__count">{num(counts[item.key] ?? 0, locale)}</span>
                   ) : null}
                 </button>
               ))}
@@ -281,15 +301,15 @@ function ProductsList() {
                 // يُعاد تركيبه حين تصل الفئات: مُركَّباً قبلها تضيع قيمة ?category= لغياب خيارها
                 key={categories.length}
                 className="field__control vp-catfilter"
-                aria-label="تصفية بالفئة"
+                aria-label={t('تصفية بالفئة', 'Filter by category')}
                 value={category}
                 onChange={(e) => {
                   setFilter({ category: e.target.value });
                   setLoading(true);
                 }}
               >
-                <option value="">كل الفئات</option>
-                <option value="none">بلا فئة</option>
+                <option value="">{t('كل الفئات', 'All categories')}</option>
+                <option value="none">{t('بلا فئة', 'No category')}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nameAr}
@@ -302,8 +322,8 @@ function ProductsList() {
               <input
                 type="search"
                 className="field__control"
-                aria-label="بحث في المنتجات بالاسم أو رمز SKU"
-                placeholder="ابحث بالاسم أو الرمز"
+                aria-label={t('بحث في المنتجات بالاسم أو رمز SKU', 'Search products by name or SKU')}
+                placeholder={t('ابحث بالاسم أو الرمز', 'Search by name or SKU')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -313,16 +333,20 @@ function ProductsList() {
 
           {loading && !page ? (
             <div className="card__body">
-              <Spinner label="جارٍ تحميل المنتجات…" />
+              <Spinner label={t('جارٍ تحميل المنتجات…', 'Loading products…')} />
             </div>
           ) : null}
 
           {page && page.items.length === 0 ? (
             <div className="vp-nomatch">
               <p className="vp-nomatch__title">
-                {search.trim() ? `لا نتائج تطابق «${search.trim()}»` : 'لا منتجات تطابق هذا الفلتر.'}
+                {search.trim()
+                  ? t(`لا نتائج تطابق «${search.trim()}»`, `No results for “${search.trim()}”`)
+                  : t('لا منتجات تطابق هذا الفلتر.', 'No products match this filter.')}
               </p>
-              <p className="small muted">جرّب اسماً أو رمزاً أقصر، أو انتقل إلى تبويب آخر.</p>
+              <p className="small muted">
+                {t('جرّب اسماً أو رمزاً أقصر، أو انتقل إلى تبويب آخر.', 'Try a shorter name or SKU, or switch to another tab.')}
+              </p>
               {search || category ? (
                 <button
                   type="button"
@@ -332,7 +356,7 @@ function ProductsList() {
                     setFilter({ category: '' });
                   }}
                 >
-                  امسح البحث والتصفية
+                  {t('امسح البحث والتصفية', 'Clear search and filters')}
                 </button>
               ) : null}
             </div>
@@ -343,13 +367,13 @@ function ProductsList() {
               <table className="table vp-products">
                 <thead>
                   <tr>
-                    <th scope="col">المنتج</th>
-                    <th scope="col">السعر</th>
-                    <th scope="col" className="end">المتاح</th>
-                    <th scope="col">الحالة</th>
-                    <th scope="col">آخر تعديل</th>
+                    <th scope="col">{t('المنتج', 'Product')}</th>
+                    <th scope="col">{t('السعر', 'Price')}</th>
+                    <th scope="col" className="end">{t('المتاح', 'Available')}</th>
+                    <th scope="col">{t('الحالة', 'Status')}</th>
+                    <th scope="col">{t('آخر تعديل', 'Last edited')}</th>
                     <th scope="col" className="end">
-                      <span className="visually-hidden">إجراءات</span>
+                      <span className="visually-hidden">{t('إجراءات', 'Actions')}</span>
                     </th>
                   </tr>
                 </thead>
@@ -360,21 +384,21 @@ function ProductsList() {
                         <Link className="vp-prod" href={`/vendor/products/${p.id}`}>
                           <ProductThumb src={p.thumbnail} />
                           <span className="vp-prod__text">
-                            <span className="vp-prod__name">{p.nameAr}</span>
+                            <span className="vp-prod__name">{nameOf(p)}</span>
                             <span className="vp-prod__sub">
                               {p.vendorCategory ? `${p.vendorCategory.nameAr} · ` : ''}
                               {p.variantCount > 1 ? (
                                 <>
-                                  <span className="num">{num(p.variantCount)}</span> متغيّرات
+                                  <span className="num">{num(p.variantCount, locale)}</span> {t('متغيّرات', 'variants')}
                                 </>
                               ) : (
-                                'بلا متغيّرات'
+                                t('بلا متغيّرات', 'No variants')
                               )}
                             </span>
                           </span>
                         </Link>
                       </td>
-                      <td data-label="السعر">
+                      <td data-label={t('السعر', 'Price')}>
                         {p.priceFrom ? (
                           <span className="money num">
                             {p.priceTo && p.priceTo.minorUnits !== p.priceFrom.minorUnits
@@ -385,29 +409,29 @@ function ProductsList() {
                           '—'
                         )}
                       </td>
-                      <td className="end" data-label="المتاح">
+                      <td className="end" data-label={t('المتاح', 'Available')}>
                         <span
                           className="num vp-avail"
                           data-tone={p.available <= 0 ? 'out' : p.isLow ? 'low' : undefined}
                         >
-                          {num(p.available)}
+                          {num(p.available, locale)}
                         </span>
-                        {p.isLow ? <span className="badge badge--warning badge--after">منخفض</span> : null}
+                        {p.isLow ? <span className="badge badge--warning badge--after">{t('منخفض', 'Low')}</span> : null}
                       </td>
-                      <td data-label="الحالة">
-                        <span className={`badge ${PRODUCT_STATUS[p.status].tone}`} title={PRODUCT_STATUS[p.status].hint}>
+                      <td data-label={t('الحالة', 'Status')}>
+                        <span className={`badge ${statuses[p.status].tone}`} title={statuses[p.status].hint}>
                           {p.status === 'rejected' ? <Icon name="alert" size={11} /> : null}
-                          {PRODUCT_STATUS[p.status].label}
+                          {statuses[p.status].label}
                         </span>
                       </td>
-                      <td data-label="آخر تعديل">
-                        {edited(p.updatedAt)}
+                      <td data-label={t('آخر تعديل', 'Last edited')}>
+                        {edited(p.updatedAt, locale)}
                       </td>
                       <td className="end" data-label="">
                         <Link
                           className="icon-btn icon-btn--sm"
                           href={`/vendor/products/${p.id}`}
-                          aria-label={`حرّر ${p.nameAr}`}
+                          aria-label={t(`حرّر ${p.nameAr}`, `Edit ${nameOf(p)}`)}
                         >
                           <Icon name="file" size={14} />
                         </Link>
@@ -436,7 +460,8 @@ function ProductsList() {
             ) : (
               <div className="card__foot vp-foot">
                 <span className="small muted">
-                  <span className="num">{num(items.length)}</span> من <span className="num">{num(page.total)}</span> منتجاً
+                  <span className="num">{num(items.length, locale)}</span> {t('من', 'of')}{' '}
+                  <span className="num">{num(page.total, locale)}</span> {t('منتجاً', page.total === 1 ? 'product' : 'products')}
                 </span>
               </div>
             )

@@ -8,6 +8,8 @@ import { Alert, StatusBadge, TextInput, type Blocker } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { CURRENCIES, useOnboarding, type Onboarding, type OnboardingDocument } from '@/lib/vendor';
 import { OnboardingError, OnboardingFrame, OnboardingHead, OnboardingLoading } from '../onboarding-chrome';
+import { useLocale, useT } from '@/components/locale';
+import type { Locale } from '@/lib/i18n';
 
 /** ما يُطلب في كل مستند — تحت عنوانه وداخل منطقة الإسقاط */
 const DOC_HINT: Record<string, string> = {
@@ -16,6 +18,21 @@ const DOC_HINT: Record<string, string> = {
   tax_card: 'PDF أو صورة · حتى 10 ميغابايت',
   bank_proof: 'كشف حساب يُظهر الاسم والآيبان',
 };
+const DOC_HINT_EN: Record<string, string> = {
+  commercial_register: 'PDF or image · up to 10 MB',
+  national_id: 'A clear image of both sides · up to 10 MB',
+  tax_card: 'PDF or image · up to 10 MB',
+  bank_proof: 'A statement showing the name and IBAN',
+};
+/** أسماء المستندات بالإنجليزية — الخادم يرسل الاسم بالعربية وحدها، فيُقرأ بالنوع */
+const DOC_LABEL_EN: Record<string, string> = {
+  commercial_register: 'Commercial register',
+  national_id: 'National ID',
+  tax_card: 'Tax certificate',
+  bank_proof: 'Bank account proof',
+};
+const docLabel = (doc: Pick<OnboardingDocument, 'type' | 'label'>, locale: Locale): string =>
+  locale === 'en' ? (DOC_LABEL_EN[doc.type] ?? doc.label) : doc.label;
 
 /**
  * VD-02 — الوثائق والحساب البنكي.
@@ -25,6 +42,8 @@ const DOC_HINT: Record<string, string> = {
  * كل رفع يهجر التسجيل.
  */
 export default function DocumentsPage() {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const { data, loading, missing, error, set, reload } = useOnboarding();
   const [notice, setNotice] = useState<string | null>(null);
@@ -41,7 +60,7 @@ export default function DocumentsPage() {
   if (error || !data) {
     return (
       <OnboardingFrame step={4}>
-        <OnboardingError message={error ?? 'تعذّر تحميل حالة المتجر.'} onRetry={() => void reload()} />
+        <OnboardingError message={error ?? t('تعذّر تحميل حالة المتجر.', "Couldn't load your shop status.")} onRetry={() => void reload()} />
       </OnboardingFrame>
     );
   }
@@ -56,55 +75,73 @@ export default function DocumentsPage() {
   function targetLabel(field: string): string {
     if (field.startsWith('documents.')) {
       const type = field.slice('documents.'.length);
-      return data?.documents.find((d) => d.type === type)?.label ?? 'المستند';
+      const doc = data?.documents.find((d) => d.type === type);
+      return doc ? docLabel(doc, locale) : t('المستند', 'Document');
     }
-    if (field.startsWith('bank.')) return 'الحساب البنكي';
-    if (field === 'settlementCurrency') return 'عملة التسوية';
-    return 'بيانات المتجر';
+    if (field.startsWith('bank.')) return t('الحساب البنكي', 'Bank account');
+    if (field === 'settlementCurrency') return t('عملة التسوية', 'Settlement currency');
+    return t('بيانات المتجر', 'Shop details');
   }
 
   return (
     <OnboardingFrame step={4} status={data.status}>
       <OnboardingHead
-        title="ارفع مستندات المتجر"
-        lead="أربعة مستندات وحساب بنكي باسم النشاط. الصيغ المقبولة PDF أو صورة JPEG أو PNG، حتى 10 ميغابايت للملف."
+        title={t('ارفع مستندات المتجر', 'Upload your shop documents')}
+        lead={t(
+          'أربعة مستندات وحساب بنكي باسم النشاط. الصيغ المقبولة PDF أو صورة JPEG أو PNG، حتى 10 ميغابايت للملف.',
+          'Four documents and a bank account in the business name. Accepted formats are PDF or a JPEG or PNG image, up to 10 MB per file.',
+        )}
       />
       <p className="vo-ident">
-        {data.nameAr} · <span className="num">basta.com/s/{data.slug}</span> · عملة التسوية:{' '}
+        {locale === 'en' && data.nameEn ? data.nameEn : data.nameAr} · <span className="num">basta.com/s/{data.slug}</span> ·{' '}
+        {t('عملة التسوية:', 'Settlement currency:')}{' '}
         {data.settlementCurrencyChosen ? (
           <>
-            {CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameAr ?? data.settlementCurrency}
+            {(() => {
+              const c = CURRENCIES.find((x) => x.code === data.settlementCurrency);
+              return (locale === 'en' ? c?.nameEn : c?.nameAr) ?? data.settlementCurrency;
+            })()}
             {data.settlementCurrencyLocked ? null : (
               <>
                 {' '}
-                <Link href="/vendor/onboarding/currency">غيّرها</Link>
+                <Link href="/vendor/onboarding/currency">{t('غيّرها', 'Change it')}</Link>
               </>
             )}
           </>
         ) : (
-          <Link href="/vendor/onboarding/currency">لم تخترها بعد — اخترها</Link>
+          <Link href="/vendor/onboarding/currency">{t('لم تخترها بعد — اخترها', 'Not chosen yet — choose it')}</Link>
         )}
       </p>
 
       {data.status === 'in_review' ? (
-        <Alert tone="info" title="طلبك قيد المراجعة">
+        <Alert tone="info" title={t('طلبك قيد المراجعة', 'Your application is under review')}>
           {anyRejected
-            ? 'لا يقبل التعديل الآن إلا المستند المرفوض: ارفعه من جديد فيعود إلى المراجعة، وطلبك باقٍ في مكانه.'
-            : 'لا يقبل التعديل الآن. تصلك النتيجة على بريدك، وتستطيع متابعة الحالة في أي وقت.'}
+            ? t(
+                'لا يقبل التعديل الآن إلا المستند المرفوض: ارفعه من جديد فيعود إلى المراجعة، وطلبك باقٍ في مكانه.',
+                'Only the rejected document can be changed now: upload it again and it goes back to review, while your application keeps its place.',
+              )
+            : t(
+                'لا يقبل التعديل الآن. تصلك النتيجة على بريدك، وتستطيع متابعة الحالة في أي وقت.',
+                "It can't be edited now. You'll get the result by email, and you can check the status at any time.",
+              )}
         </Alert>
       ) : data.status === 'approved' ? (
-        <Alert tone="info" title="متجرك معتمد">
-          المستندات مثبّتة كما رُوجعت، ولتغييرها راسل الدعم. الحساب البنكي يُضاف من{' '}
-          <Link href="/vendor/settings">الإعدادات</Link> بتأكيد كلمة المرور وتوثيق من فريق بسطة.
+        <Alert tone="info" title={t('متجرك معتمد', 'Your shop is approved')}>
+          {t(
+            'المستندات مثبّتة كما رُوجعت، ولتغييرها راسل الدعم. الحساب البنكي يُضاف من',
+            'Documents are locked as reviewed; to change them, contact support. Bank accounts are added from',
+          )}{' '}
+          <Link href="/vendor/settings">{t('الإعدادات', 'Settings')}</Link>{' '}
+          {t('بتأكيد كلمة المرور وتوثيق من فريق بسطة.', 'with your password and verification by the Basta team.')}
         </Alert>
       ) : frozen ? (
-        <Alert tone="warning" title="حساب المتجر موقوف">
-          لا يقبل التعديل. راسل الدعم.
+        <Alert tone="warning" title={t('حساب المتجر موقوف', 'Shop account suspended')}>
+          {t('لا يقبل التعديل. راسل الدعم.', "It can't be edited. Contact support.")}
         </Alert>
       ) : null}
 
       {data.status === 'rejected' && data.rejectionReason ? (
-        <Alert tone="danger" title="طلبك مرفوض">
+        <Alert tone="danger" title={t('طلبك مرفوض', 'Your application was rejected')}>
           {data.rejectionReason}
         </Alert>
       ) : null}
@@ -119,7 +156,7 @@ export default function DocumentsPage() {
             disabled={!replaceable(doc)}
             onUploaded={(next) => {
               set(next);
-              setNotice(`رُفعت ${doc.label}.`);
+              setNotice(t(`رُفعت ${doc.label}.`, `${docLabel(doc, locale)} uploaded.`));
             }}
           />
         ))}
@@ -156,6 +193,9 @@ function DocumentCard({
   disabled: boolean;
   onUploaded: (next: Onboarding) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
+  const label = docLabel(doc, locale);
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [uploadingName, setUploadingName] = useState<string | null>(null);
@@ -171,14 +211,15 @@ function DocumentCard({
         await api<Onboarding>(`/vendor/onboarding/documents/${doc.type}`, { method: 'POST', file }),
       );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'تعذّر رفع الملف.');
+      setError(err instanceof ApiError ? err.message : t('تعذّر رفع الملف.', "Couldn't upload the file."));
     } finally {
       setBusy(false);
       setUploadingName(null);
     }
   }
 
-  const hint = DOC_HINT[doc.type] ?? 'PDF أو صورة · حتى 10 ميغابايت';
+  const hint =
+    (locale === 'en' ? DOC_HINT_EN[doc.type] : DOC_HINT[doc.type]) ?? t('PDF أو صورة · حتى 10 ميغابايت', 'PDF or image · up to 10 MB');
   const isPdf = (doc.originalName ?? '').toLowerCase().endsWith('.pdf');
 
   return (
@@ -186,7 +227,7 @@ function DocumentCard({
       className="card vo-doc"
       id={`documents-${doc.type}`}
       tabIndex={-1}
-      aria-label={doc.label}
+      aria-label={label}
       data-status={doc.status}
       data-dragging={dragging}
       onDragOver={(e) => {
@@ -206,7 +247,7 @@ function DocumentCard({
           <Icon name="file" size={18} />
         </span>
         <span className="vo-doc__titles">
-          <span className="vo-doc__title">{doc.label}</span>
+          <span className="vo-doc__title">{label}</span>
           <span className="vo-doc__hint">{hint}</span>
         </span>
         <StatusBadge status={doc.status} kind="document" />
@@ -218,7 +259,7 @@ function DocumentCard({
             <span className="vo-file__name">
               <bdi>{uploadingName}</bdi>
             </span>
-            <span>جارٍ الرفع…</span>
+            <span>{t('جارٍ الرفع…', 'Uploading…')}</span>
           </span>
           <span className="vo-bar" aria-hidden />
         </div>
@@ -229,11 +270,11 @@ function DocumentCard({
           </span>
           <span className="vo-file__text">
             <span className="vo-file__name">
-              <bdi>{doc.originalName ?? 'ملف مرفوع'}</bdi>
+              <bdi>{doc.originalName ?? t('ملف مرفوع', 'Uploaded file')}</bdi>
             </span>
             {doc.sizeBytes ? (
               <span className="vo-file__size">
-                <span className="num">{Math.ceil(doc.sizeBytes / 1024)}</span> كيلوبايت
+                <span className="num">{Math.ceil(doc.sizeBytes / 1024)}</span> {t('كيلوبايت', 'KB')}
               </span>
             ) : null}
           </span>
@@ -243,7 +284,7 @@ function DocumentCard({
             disabled={disabled || busy}
             onClick={() => input.current?.click()}
           >
-            استبدل
+            {t('استبدل', 'Replace')}
           </button>
         </div>
       ) : (
@@ -254,7 +295,7 @@ function DocumentCard({
           onClick={() => input.current?.click()}
         >
           <Icon name="upload" size={22} />
-          <span className="vo-drop__title">اسحب الملف هنا أو اختر ملفاً</span>
+          <span className="vo-drop__title">{t('اسحب الملف هنا أو اختر ملفاً', 'Drag the file here or choose a file')}</span>
           <span className="vo-drop__hint">{hint}</span>
         </button>
       )}
@@ -262,7 +303,9 @@ function DocumentCard({
       {doc.status === 'rejected' && doc.rejectReason ? (
         <p className="vo-reason">
           <Icon name="alert" size={15} />
-          <span>{doc.rejectReason} — ارفعها من جديد.</span>
+          <span>
+            {doc.rejectReason} {t('— ارفعها من جديد.', '— upload it again.')}
+          </span>
         </p>
       ) : null}
       {error ? (
@@ -271,7 +314,7 @@ function DocumentCard({
         </p>
       ) : null}
       {doc.downloadPath ? (
-        <p className="vo-doc__foot">تستطيع تنزيل الملف من صفحة الحالة.</p>
+        <p className="vo-doc__foot">{t('تستطيع تنزيل الملف من صفحة الحالة.', 'You can download the file from the status page.')}</p>
       ) : null}
 
       <input
@@ -279,7 +322,7 @@ function DocumentCard({
         type="file"
         className="visually-hidden"
         tabIndex={-1}
-        aria-label={`ملف ${doc.label}`}
+        aria-label={t(`ملف ${doc.label}`, `${label} file`)}
         accept="application/pdf,image/jpeg,image/png"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -300,6 +343,7 @@ function BankCard({
   disabled: boolean;
   onSaved: (next: Onboarding) => void;
 }) {
+  const t = useT();
   const [form, setForm] = useState({
     holderName: vendor.bank?.holderName ?? '',
     iban: vendor.bank?.iban ?? '',
@@ -328,7 +372,7 @@ function BankCard({
       );
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر حفظ الحساب البنكي.');
+      setError(err instanceof Error ? err.message : t('تعذّر حفظ الحساب البنكي.', "Couldn't save the bank account."));
     } finally {
       setBusy(false);
     }
@@ -338,21 +382,24 @@ function BankCard({
     <section className="card" id="bank" aria-labelledby="bank-title">
       <div className="vo-card-head">
         <h2 className="vo-card-title" id="bank-title">
-          الحساب البنكي
+          {t('الحساب البنكي', 'Bank account')}
         </h2>
         <p className="vo-card-sub">
-          يجب أن يكون الحساب باسم النشاط نفسه المذكور في السجل التجاري، وإليه يُحوَّل رصيدك بعد كل تسوية.
+          {t(
+            'يجب أن يكون الحساب باسم النشاط نفسه المذكور في السجل التجاري، وإليه يُحوَّل رصيدك بعد كل تسوية.',
+            'The account must be in the same business name as on the commercial register; your balance is paid out to it after each settlement.',
+          )}
         </p>
       </div>
       <form className="vo-form" onSubmit={save} noValidate>
         {error ? <Alert tone="danger">{error}</Alert> : null}
-        {saved && !error ? <Alert tone="success">حُفظ الحساب البنكي.</Alert> : null}
+        {saved && !error ? <Alert tone="success">{t('حُفظ الحساب البنكي.', 'Bank account saved.')}</Alert> : null}
 
         <div className="grid-2">
           <TextInput
-            label="اسم صاحب الحساب"
+            label={t('اسم صاحب الحساب', 'Account holder name')}
             id="bank-holderName"
-            hint="كما هو مكتوب لدى البنك."
+            hint={t('كما هو مكتوب لدى البنك.', 'As written at the bank.')}
             disabled={disabled}
             required
             value={form.holderName}
@@ -361,7 +408,7 @@ function BankCard({
 
           {/* الآيبان لاتيني داخل واجهة عربية — يُعزل وإلا انقلب ترتيب خاناته */}
           <TextInput
-            label="رقم الآيبان"
+            label={t('رقم الآيبان', 'IBAN')}
             id="bank-iban"
             dir="ltr"
             className="field__control num vo-iban"
@@ -372,7 +419,7 @@ function BankCard({
           />
 
           <TextInput
-            label="البنك"
+            label={t('البنك', 'Bank')}
             disabled={disabled}
             required
             value={form.bankName}
@@ -392,7 +439,7 @@ function BankCard({
         <div className="vo-actions">
           <button className="btn btn--secondary" type="submit" disabled={disabled || busy}>
             {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
-            {busy ? 'جارٍ الحفظ…' : 'حفظ الحساب'}
+            {busy ? t('جارٍ الحفظ…', 'Saving…') : t('حفظ الحساب', 'Save account')}
           </button>
         </div>
       </form>
@@ -417,6 +464,7 @@ function SubmitGate({
   onBack: () => void;
   targetLabel: (field: string) => string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -428,7 +476,7 @@ function SubmitGate({
       onSubmitted(await api<Onboarding>('/vendor/onboarding/submit', { method: 'POST' }));
       router.push('/vendor/onboarding/status');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر إرسال الطلب.');
+      setError(err instanceof Error ? err.message : t('تعذّر إرسال الطلب.', "Couldn't submit the application."));
     } finally {
       setBusy(false);
     }
@@ -438,11 +486,15 @@ function SubmitGate({
   const tone = blockers.length > 0 ? 'danger' : vendor.canSubmit ? 'success' : 'neutral';
 
   return (
-    <section className="vo-gate" data-tone={tone} aria-label="إرسال الطلب">
+    <section className="vo-gate" data-tone={tone} aria-label={t('إرسال الطلب', 'Submit application')}>
       {tone !== 'neutral' ? (
         <div className="vo-gate__head">
           <Icon name={tone === 'danger' ? 'alert' : 'check-circle'} size={18} />
-          <span>{tone === 'danger' ? 'لا يمكن الإرسال بعد' : 'كل المستندات جاهزة للإرسال'}</span>
+          <span>
+            {tone === 'danger'
+              ? t('لا يمكن الإرسال بعد', "Can't submit yet")
+              : t('كل المستندات جاهزة للإرسال', 'All documents are ready to submit')}
+          </span>
           {tone === 'danger' ? <span className="vo-gate__count num">{blockers.length}</span> : null}
         </div>
       ) : null}
@@ -472,19 +524,22 @@ function SubmitGate({
           type="button"
           disabled={!vendor.canSubmit || busy}
           onClick={() => void submit()}
-          title={vendor.canSubmit ? undefined : 'أكمل النواقص المعروضة أعلاه'}
+          title={vendor.canSubmit ? undefined : t('أكمل النواقص المعروضة أعلاه', 'Complete the missing items shown above')}
         >
           {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
-          {busy ? 'جارٍ الإرسال…' : 'أرسل للمراجعة'}
+          {busy ? t('جارٍ الإرسال…', 'Submitting…') : t('أرسل للمراجعة', 'Submit for review')}
         </button>
         <button className="btn btn--secondary" type="button" onClick={onBack}>
           <Icon name="back" size={16} mirror />
-          رجوع
+          {t('رجوع', 'Back')}
         </button>
         <span className="vo-gate__hint">
           {blockers.length > 0
-            ? 'أصلح العوائق كلها ليُفتح الإرسال.'
-            : 'المراجعة تستغرق يوم عمل إلى ثلاثة أيام، وتصلك النتيجة على بريدك.'}
+            ? t('أصلح العوائق كلها ليُفتح الإرسال.', 'Fix all the blockers to enable submitting.')
+            : t(
+                'المراجعة تستغرق يوم عمل إلى ثلاثة أيام، وتصلك النتيجة على بريدك.',
+                "Review takes one to three working days, and you'll get the result by email.",
+              )}
         </span>
         {error ? (
           <p className="field__error vo-gate__error" role="alert">

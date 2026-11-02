@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { useLocale, useT } from '@/components/locale';
 import { ProductGrid } from '@/components/product-card';
 import type { ListResult, ProductCard } from '@/lib/storefront';
 
@@ -11,6 +12,8 @@ import type { ListResult, ProductCard } from '@/lib/storefront';
  * دفعة أضافها «المزيد» فيعود ما قبلها كما كان.
  */
 export function LatestProducts({ first, currency }: { first: ListResult; currency: string | undefined }) {
+  const t = useT();
+  const locale = useLocale();
   const [items, setItems] = useState<ProductCard[]>(first.items);
   // كم أضافت كل ضغطة «المزيد» بعد إسقاط المكرّر — «السابق» يُزيل آخرها بقدرها
   const [batches, setBatches] = useState<number[]>([]);
@@ -35,7 +38,7 @@ export function LatestProducts({ first, currency }: { first: ListResult; currenc
       setPage(next.page);
       setTotal(next.total);
     } catch {
-      setMoreError('تعذّر تحميل المزيد.');
+      setMoreError(t('تعذّر تحميل المزيد.', "Couldn't load more."));
     } finally {
       setLoadingMore(false);
     }
@@ -54,11 +57,11 @@ export function LatestProducts({ first, currency }: { first: ListResult; currenc
 
   return (
     <>
-      <ProductGrid products={items} />
+      <ProductGrid products={items} locale={locale} />
       {hasMore || batches.length > 0 || moreError ? (
         <div className="list-more" ref={bar}>
           <span className="list-more__count num">
-            {items.length} من {total}
+            {t(`${items.length} من ${total}`, `${items.length} of ${total}`)}
           </span>
           {moreError ? (
             <span className="list-more__error" role="alert">
@@ -67,12 +70,12 @@ export function LatestProducts({ first, currency }: { first: ListResult; currenc
           ) : null}
           {batches.length > 0 ? (
             <button type="button" className="btn btn--ghost btn--sm" disabled={loadingMore} onClick={less}>
-              السابق
+              {t('السابق', 'Previous')}
             </button>
           ) : null}
           {hasMore || moreError ? (
             <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void more()}>
-              {loadingMore ? 'جارٍ التحميل…' : moreError ? 'أعد المحاولة' : 'المزيد'}
+              {loadingMore ? t('جارٍ التحميل…', 'Loading…') : moreError ? t('أعد المحاولة', 'Try again') : t('المزيد', 'Load more')}
             </button>
           ) : null}
         </div>

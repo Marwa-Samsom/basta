@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api, session } from '@/lib/api';
 import { when } from '@/lib/orders';
 import { Icon } from '@/components/icons';
-import { useT } from '@/components/locale';
+import { useLocale, useT } from '@/components/locale';
 
 interface Inbox {
   unread: number;
@@ -27,6 +27,7 @@ const subscribe = (cb: () => void) => {
  */
 export function NotificationBell({ allHref = '/account/notifications' }: { allHref?: string } = {}) {
   const t = useT();
+  const locale = useLocale();
   const signedIn = useSyncExternalStore(subscribe, () => !!session.read(), () => false);
   const [inbox, setInbox] = useState<Inbox | null>(null);
   const [open, setOpen] = useState(false);
@@ -108,7 +109,7 @@ export function NotificationBell({ allHref = '/account/notifications' }: { allHr
               ) : (
                 <span>{n.body}</span>
               )}
-              <span className="bell__when">{when(n.createdAt)}</span>
+              <span className="bell__when">{when(n.createdAt, locale)}</span>
             </div>
           ))}
           <div className="bell__head">

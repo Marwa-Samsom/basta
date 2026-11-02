@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
 import { internalPath, withNext } from '@/lib/safe-path';
@@ -18,6 +19,7 @@ import { RESET_EMAIL_KEY } from '../reset/new-password-field';
  * (`next`) تُحمل إلى صفحة التعيين، فيصلها بعد أن يدخل بكلمته الجديدة.
  */
 function ForgotForm() {
+  const t = useT();
   const next = internalPath(useSearchParams().get('next'));
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ function ForgotForm() {
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     if (!/.+@.+\..+/.test(email.trim())) {
-      setError('اكتب بريداً صحيحاً بالشكل name@example.com');
+      setError(t('اكتب بريداً صحيحاً بالشكل name@example.com', 'Enter a valid email like name@example.com'));
       return;
     }
     setBusy(true);
@@ -45,7 +47,7 @@ function ForgotForm() {
       }
       setSent(r.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر الإرسال. حاول مرة أخرى.');
+      setError(err instanceof Error ? err.message : t('تعذّر الإرسال. حاول مرة أخرى.', "Couldn't send. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -56,10 +58,15 @@ function ForgotForm() {
       <div className="ac-auth__box">
         <header className="ac-auth__head">
           <Link href="/" className="ac-wordmark">
-            بسطة
+            {t('بسطة', 'Basta')}
           </Link>
-          <h1 className="ac-auth__title">استعادة كلمة المرور</h1>
-          <p className="ac-auth__sub">نرسل لك رمزاً من ست خانات تعيّن به كلمة مرور جديدة.</p>
+          <h1 className="ac-auth__title">{t('استعادة كلمة المرور', 'Reset your password')}</h1>
+          <p className="ac-auth__sub">
+            {t(
+              'نرسل لك رمزاً من ست خانات تعيّن به كلمة مرور جديدة.',
+              "We'll send you a six-digit code to set a new password.",
+            )}
+          </p>
         </header>
 
         {sent ? (
@@ -67,18 +74,20 @@ function ForgotForm() {
             <span className="id-sent__icon" aria-hidden>
               <Icon name="msg" size={24} />
             </span>
-            <p className="id-sent__text">{sent} تحقّق من مجلّد البريد غير المرغوب أيضاً.</p>
+            <p className="id-sent__text">
+              {sent} {t('تحقّق من مجلّد البريد غير المرغوب أيضاً.', 'Check your spam folder too.')}
+            </p>
             <Link href={withNext('/reset', next)} className="btn btn--primary btn--block ac-auth__cta">
-              أدخل الرمز وكلمة جديدة
+              {t('أدخل الرمز وكلمة جديدة', 'Enter the code and a new password')}
             </Link>
             <button type="button" className="ac-link-btn" onClick={() => setSent(null)}>
-              جرّب بريداً آخر
+              {t('جرّب بريداً آخر', 'Try another email')}
             </button>
           </section>
         ) : (
           <form className="ac-auth__card" onSubmit={submit} noValidate>
             <TextInput
-              label="البريد الإلكتروني"
+              label={t('البريد الإلكتروني', 'Email')}
               type="email"
               autoComplete="email"
               inputMode="email"
@@ -92,17 +101,17 @@ function ForgotForm() {
               }}
             />
             <button className="btn btn--primary btn--block ac-auth__cta" type="submit" disabled={busy}>
-              {busy ? 'جارٍ الإرسال…' : 'أرسل رمز الاستعادة'}
+              {busy ? t('جارٍ الإرسال…', 'Sending…') : t('أرسل رمز الاستعادة', 'Send reset code')}
             </button>
             <Link href={withNext('/login', next)} className="ac-link-btn">
-              عُد إلى الدخول
+              {t('عُد إلى الدخول', 'Back to sign in')}
             </Link>
           </form>
         )}
 
         <p className="ac-auth__foot">
-          <span>معك الرمز من قبل؟</span>
-          <Link href={withNext('/reset', next)}>عيّن كلمة جديدة</Link>
+          <span>{t('معك الرمز من قبل؟', 'Already have a code?')}</span>
+          <Link href={withNext('/reset', next)}>{t('عيّن كلمة جديدة', 'Set a new password')}</Link>
         </p>
       </div>
     </main>

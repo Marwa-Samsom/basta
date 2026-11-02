@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { AdminHeader, Empty, Feedback, Loading, MoreButton, SearchBox, SortButton, Tabs } from '@/components/admin';
 import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { TextArea } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAction, useAdminData, useAdminList } from '@/lib/admin';
-import { DISPUTE_REASONS, DISPUTE_STATUS, ROLE_LABEL, labelOf, when } from '@/lib/orders';
+import { localized } from '@/lib/i18n';
+import { DISPUTE_REASONS, DISPUTE_REASONS_EN, DISPUTE_STATUS, DISPUTE_STATUS_EN, ROLE_LABEL, ROLE_LABEL_EN, labelOf, when } from '@/lib/orders';
 
 interface Row {
   id: string;
@@ -37,6 +39,10 @@ const SIDE: Record<string, string> = { customer: 'start', vendor_owner: 'end', v
  * و«المزيد» لما بعد الخمسين.
  */
 export default function AdminDisputesPage() {
+  const t = useT();
+  const locale = useLocale();
+  const disputeStatus = localized(locale, DISPUTE_STATUS, DISPUTE_STATUS_EN);
+  const disputeReasons = localized(locale, DISPUTE_REASONS, DISPUTE_REASONS_EN);
   const [status, setStatus] = useState('escalated');
   const [openId, setOpenId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -50,7 +56,11 @@ export default function AdminDisputesPage() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="النزاعات" count={data ? `${data.total} نزاع` : undefined} hint="الرصيد مجمَّد ما دام النزاع مفتوحاً." />
+      <AdminHeader
+        title={t('النزاعات', 'Disputes')}
+        count={data ? t(`${data.total} نزاع`, `${data.total} ${data.total === 1 ? 'dispute' : 'disputes'}`) : undefined}
+        hint={t('الرصيد مجمَّد ما دام النزاع مفتوحاً.', 'The balance stays frozen while the dispute is open.')}
+      />
       <div className="toolbar">
         <Tabs
           value={status}
@@ -58,11 +68,11 @@ export default function AdminDisputesPage() {
             setStatus(s);
             setOpenId(null);
           }}
-          label="حالة النزاع"
-          options={['escalated', 'open', 'resolved_customer', 'resolved_vendor', 'withdrawn'].map((k) => ({ key: k, label: DISPUTE_STATUS[k]! }))}
+          label={t('حالة النزاع', 'Dispute status')}
+          options={['escalated', 'open', 'resolved_customer', 'resolved_vendor', 'withdrawn'].map((k) => ({ key: k, label: disputeStatus[k]! }))}
         />
         <div className="toolbar__end">
-          <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو المتجر أو المشتري" label="بحث في النزاعات" />
+          <SearchBox value={search} onChange={setSearch} placeholder={t('رقم الطلب أو المتجر أو المشتري', 'Order number, shop or buyer')} label={t('بحث في النزاعات', 'Search disputes')} />
           <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
@@ -72,25 +82,25 @@ export default function AdminDisputesPage() {
         search.trim() ? (
           <Empty
             icon="search"
-            title="لا نزاعات بهذا البحث"
+            title={t('لا نزاعات بهذا البحث', 'No disputes match this search')}
             actions={
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
-                أزل التصفية
+                {t('أزل التصفية', 'Clear filter')}
               </button>
             }
           >
-            جرّب رقماً آخر أو حالة أخرى من الرقائق أعلاه.
+            {t('جرّب رقماً آخر أو حالة أخرى من الرقائق أعلاه.', 'Try another number or another status from the chips above.')}
           </Empty>
         ) : (
-          <Empty icon={live ? 'check-circle' : 'scale'} tone={live ? 'success' : undefined} title="لا نزاعات هنا">
-            {live ? 'لا نزاع ينتظر قراراً الآن.' : 'جرّب حالة أخرى من الرقائق أعلاه.'}
+          <Empty icon={live ? 'check-circle' : 'scale'} tone={live ? 'success' : undefined} title={t('لا نزاعات هنا', 'No disputes here')}>
+            {live ? t('لا نزاع ينتظر قراراً الآن.', 'No dispute is waiting for a decision right now.') : t('جرّب حالة أخرى من الرقائق أعلاه.', 'Try another status from the chips above.')}
           </Empty>
         )
       ) : (
         <div className="ao-split">
-          <nav className="ao-dlist" aria-label="قائمة النزاعات">
+          <nav className="ao-dlist" aria-label={t('قائمة النزاعات', 'Dispute list')}>
             <div className="ao-dlist__head">
-              <h2 className="ao-card-title">{DISPUTE_STATUS[status] ?? status}</h2>
+              <h2 className="ao-card-title">{disputeStatus[status] ?? status}</h2>
               <span className="ao-dlist__count num">{data.total}</span>
             </div>
             <ul>
@@ -98,15 +108,15 @@ export default function AdminDisputesPage() {
                 <li key={d.id}>
                   <button type="button" className="ao-ditem" aria-current={d.id === activeId ? 'true' : undefined} onClick={() => setOpenId(d.id)}>
                     <span className="ao-ditem__no num">{d.subOrder.subOrderNumber}</span>
-                    <span className="ao-ditem__reason">{DISPUTE_REASONS[d.reasonCode] ?? d.reasonCode}</span>
+                    <span className="ao-ditem__reason">{disputeReasons[d.reasonCode] ?? d.reasonCode}</span>
                     <span className="ao-ditem__meta">
-                      {live ? <span className="badge badge--danger">رصيد مجمَّد</span> : null}
+                      {live ? <span className="badge badge--danger">{t('رصيد مجمَّد', 'Balance frozen')}</span> : null}
                       <span>{d.subOrder.vendor.nameAr}</span>
                       <span>
-                        <span className="num">{d._count.messages}</span> رسالة
+                        <span className="num">{d._count.messages}</span> {t('رسالة', d._count.messages === 1 ? 'message' : 'messages')}
                       </span>
                     </span>
-                    <span className="ao-ditem__when">{when(d.createdAt)}</span>
+                    <span className="ao-ditem__when">{when(d.createdAt, locale)}</span>
                   </button>
                 </li>
               ))}
@@ -121,6 +131,11 @@ export default function AdminDisputesPage() {
 }
 
 function DisputeDetail({ id, onChange }: { id: string; onChange: () => void }) {
+  const t = useT();
+  const locale = useLocale();
+  const disputeStatus = localized(locale, DISPUTE_STATUS, DISPUTE_STATUS_EN);
+  const disputeReasons = localized(locale, DISPUTE_REASONS, DISPUTE_REASONS_EN);
+  const roleLabel = localized(locale, ROLE_LABEL, ROLE_LABEL_EN);
   const { data, error, reload } = useAdminData<Thread>(`/admin/disputes/${id}`);
   const act = useAction();
   const [body, setBody] = useState('');
@@ -134,29 +149,29 @@ function DisputeDetail({ id, onChange }: { id: string; onChange: () => void }) {
       await api(`/admin/disputes/${id}/resolve`, { method: 'POST', body: { outcome: to, resolution } });
       reload();
       onChange();
-    }, 'حُسم النزاع وفُكّ تجميد الرصيد.');
+    }, t('حُسم النزاع وفُكّ تجميد الرصيد.', 'Dispute resolved and the balance unfrozen.'));
 
   return (
     <div className="ao-dpane">
       <Feedback error={act.error} notice={act.notice} />
       <section className="card ao-dsum">
         <span className="ao-dsum__no num">{data.subOrder.subOrderNumber}</span>
-        <h2 className="ao-dsum__reason">{DISPUTE_REASONS[data.reasonCode] ?? data.reasonCode}</h2>
+        <h2 className="ao-dsum__reason">{disputeReasons[data.reasonCode] ?? data.reasonCode}</h2>
         <span className="ao-dsum__who">
-          ضدّ {data.subOrder.vendor.nameAr} · الطلب <span className="num">{data.subOrder.order.orderNumber}</span>
+          {t('ضدّ', 'Against')} {data.subOrder.vendor.nameAr} · {t('الطلب', 'Order')} <span className="num">{data.subOrder.order.orderNumber}</span>
         </span>
         <div className="ao-facts">
           <span className="ao-fact">
-            <span className="ao-fact__k">حالة الطلب الفرعي</span>
-            <span className="ao-fact__v">{labelOf(data.subOrder.status)}</span>
+            <span className="ao-fact__k">{t('حالة الطلب الفرعي', 'Shop order status')}</span>
+            <span className="ao-fact__v">{labelOf(data.subOrder.status, locale)}</span>
           </span>
           <span className="ao-fact">
-            <span className="ao-fact__k">حالة النزاع</span>
-            <span className="ao-fact__v">{DISPUTE_STATUS[data.status] ?? data.status}</span>
+            <span className="ao-fact__k">{t('حالة النزاع', 'Dispute status')}</span>
+            <span className="ao-fact__v">{disputeStatus[data.status] ?? data.status}</span>
           </span>
           <span className="ao-fact">
-            <span className="ao-fact__k">الرصيد</span>
-            <span className="ao-fact__v">{open ? 'مجمَّد حتى الحسم' : 'فُكّ تجميده'}</span>
+            <span className="ao-fact__k">{t('الرصيد', 'Balance')}</span>
+            <span className="ao-fact__v">{open ? t('مجمَّد حتى الحسم', 'Frozen until resolved') : t('فُكّ تجميده', 'Unfrozen')}</span>
           </span>
         </div>
       </section>
@@ -164,17 +179,17 @@ function DisputeDetail({ id, onChange }: { id: string; onChange: () => void }) {
       <div className="ao-dgrid">
         <section className="card card--flush">
           <header className="card__head">
-            <h2>مجرى النزاع</h2>
+            <h2>{t('مجرى النزاع', 'Dispute thread')}</h2>
           </header>
           <ol className="ao-thread">
-            {data.messages.length === 0 ? <li className="muted small">لا رسائل بعد.</li> : null}
+            {data.messages.length === 0 ? <li className="muted small">{t('لا رسائل بعد.', 'No messages yet.')}</li> : null}
             {data.messages.map((m) => (
               <li key={m.id} className="ao-msg" data-side={SIDE[m.senderRole] ?? 'start'}>
                 <span className="ao-msg__meta">
                   <span className="ao-msg__role" data-role={SIDE[m.senderRole] ?? 'start'}>
-                    {ROLE_LABEL[m.senderRole] ?? m.senderRole}
+                    {roleLabel[m.senderRole] ?? m.senderRole}
                   </span>
-                  <span className="ao-msg__when">{when(m.createdAt)}</span>
+                  <span className="ao-msg__when">{when(m.createdAt, locale)}</span>
                 </span>
                 <p className="ao-msg__body">{m.body}</p>
               </li>
@@ -182,7 +197,7 @@ function DisputeDetail({ id, onChange }: { id: string; onChange: () => void }) {
           </ol>
           {open ? (
             <div className="card__foot ao-reply">
-              <TextArea label="رسالة للطرفين" value={body} onChange={(e) => setBody(e.target.value)} rows={2} />
+              <TextArea label={t('رسالة للطرفين', 'Message to both parties')} value={body} onChange={(e) => setBody(e.target.value)} rows={2} />
               <button
                 type="button"
                 className="btn btn--secondary btn--sm"
@@ -198,48 +213,59 @@ function DisputeDetail({ id, onChange }: { id: string; onChange: () => void }) {
                 }
               >
                 <Icon name="send" size={14} />
-                إرسال
+                {t('إرسال', 'Send')}
               </button>
             </div>
           ) : null}
         </section>
 
         <section className="card ao-decision">
-          <h2 className="ao-card-title">القرار</h2>
+          <h2 className="ao-card-title">{t('القرار', 'Decision')}</h2>
           {data.resolution ? (
             <div className="ao-note" data-tone="info">
               <Icon name="scale" size={16} />
-              <span>القرار: «{data.resolution}»</span>
+              <span>{t(`القرار: «${data.resolution}»`, `Decision: “${data.resolution}”`)}</span>
             </div>
           ) : null}
           {open ? (
             <>
               <fieldset className="ao-options">
-                <legend className="visually-hidden">لصالح من</legend>
+                <legend className="visually-hidden">{t('لصالح من', 'In whose favor')}</legend>
                 <label className="ao-option">
                   <input type="radio" name={`outcome-${id}`} checked={outcome === 'customer'} onChange={() => setOutcome('customer')} />
                   <span className="ao-option__text">
-                    <span className="ao-option__label">لصالح المشتري</span>
+                    <span className="ao-option__label">{t('لصالح المشتري', 'For the buyer')}</span>
                     {/* الردّ آلي مع القرار (refundForDispute) — كان التلميح يدعو لردّ يدوي ثانٍ (J-06، ADM-070) */}
-                    <span className="ao-option__hint">يُردّ للمشتري ما بقي من مبلغ هذا المتجر تلقائياً مع القرار، بقيوده في الدفتر — لا إلغاء ولا إرجاع يدوي بعده.</span>
+                    <span className="ao-option__hint">
+                      {t(
+                        'يُردّ للمشتري ما بقي من مبلغ هذا المتجر تلقائياً مع القرار، بقيوده في الدفتر — لا إلغاء ولا إرجاع يدوي بعده.',
+                        'What remains of this shop’s amount is refunded to the buyer automatically with the decision, with its ledger entries — no manual cancel or return afterwards.',
+                      )}
+                    </span>
                   </span>
                 </label>
                 <label className="ao-option">
                   <input type="radio" name={`outcome-${id}`} checked={outcome === 'vendor'} onChange={() => setOutcome('vendor')} />
                   <span className="ao-option__text">
-                    <span className="ao-option__label">لصالح المتجر</span>
-                    <span className="ao-option__hint">يُفكّ تجميد الرصيد للمتجر.</span>
+                    <span className="ao-option__label">{t('لصالح المتجر', 'For the shop')}</span>
+                    <span className="ao-option__hint">{t('يُفكّ تجميد الرصيد للمتجر.', 'The balance is unfrozen for the shop.')}</span>
                   </span>
                 </label>
               </fieldset>
-              <TextArea label="سبب القرار — يظهر للطرفين" placeholder="اكتب سبباً واضحاً يفهمه الطرفان." value={resolution} onChange={(e) => setResolution(e.target.value)} rows={3} />
+              <TextArea
+                label={t('سبب القرار — يظهر للطرفين', 'Reason for the decision — shown to both parties')}
+                placeholder={t('اكتب سبباً واضحاً يفهمه الطرفان.', 'Write a clear reason both parties can understand.')}
+                value={resolution}
+                onChange={(e) => setResolution(e.target.value)}
+                rows={3}
+              />
               <button
                 type="button"
                 className="btn btn--primary"
                 disabled={act.busy || !outcome || resolution.trim().length < 5}
                 onClick={() => outcome && void resolve(outcome)}
               >
-                أصدر القرار
+                {t('أصدر القرار', 'Issue decision')}
               </button>
             </>
           ) : null}

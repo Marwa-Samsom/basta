@@ -5,7 +5,9 @@ import { useState } from 'react';
 import { AdminHeader, Empty, Loading, MoreButton, SearchBox, SortButton, Tabs } from '@/components/admin';
 import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
-import { TONE, useAdminList, VENDOR_STATUS } from '@/lib/admin';
+import { useLocale, useT } from '@/components/locale';
+import { localized, type Locale } from '@/lib/i18n';
+import { TONE, useAdminList, VENDOR_STATUS, VENDOR_STATUS_EN } from '@/lib/admin';
 import { when } from '@/lib/orders';
 
 interface Item {
@@ -21,7 +23,12 @@ interface Item {
 }
 
 /** مدّة الانتظار بالساعات حتى يوم، ثم بالأيام بتمييزها العربي */
-function waited(hours: number): string {
+function waited(hours: number, locale: Locale = 'ar'): string {
+  if (locale === 'en') {
+    if (hours < 24) return `${hours} h`;
+    const days = Math.floor(hours / 24);
+    return days === 1 ? '1 day' : `${days} days`;
+  }
   if (hours < 24) return `${hours} س`;
   const d = Math.floor(hours / 24);
   if (d === 1) return 'يوم';
@@ -42,6 +49,9 @@ const PAGE = 100;
  * صاحبه داخل الحالة المختارة، و«المزيد» يُلحق المئة التالية.
  */
 export default function AdminVendorsPage() {
+  const t = useT();
+  const locale = useLocale();
+  const vendorStatus = localized(locale, VENDOR_STATUS, VENDOR_STATUS_EN);
   const [status, setStatus] = useState('in_review');
   const [search, setSearch] = useState('');
   // الطابور بالأقدم أولاً — من انتظر أطول يُراجَع أولاً
@@ -55,19 +65,34 @@ export default function AdminVendorsPage() {
   return (
     <div className="ao-page">
       <AdminHeader
-        title="المتاجر"
-        count={data ? (queue ? `${data.total} طلب ينتظر` : `${data.total} متجر`) : undefined}
-        hint={queue ? 'الأقدم أولاً — الانتظار فوق يومي عمل يظهر بالأحمر.' : 'كل المتاجر بحالاتها.'}
+        title={t('المتاجر', 'Shops')}
+        count={
+          data
+            ? queue
+              ? t(`${data.total} طلب ينتظر`, `${data.total} ${data.total === 1 ? 'request' : 'requests'} waiting`)
+              : t(`${data.total} متجر`, `${data.total} ${data.total === 1 ? 'shop' : 'shops'}`)
+            : undefined
+        }
+        hint={
+          queue
+            ? t('الأقدم أولاً — الانتظار فوق يومي عمل يظهر بالأحمر.', 'Oldest first — waits over two working days show in red.')
+            : t('كل المتاجر بحالاتها.', 'All shops with their statuses.')
+        }
       />
       <div className="toolbar">
         <Tabs
           value={status}
           onChange={setStatus}
-          label="حالة المتجر"
-          options={['in_review', 'approved', 'suspended', 'rejected', 'pending', 'banned'].map((k) => ({ key: k, label: VENDOR_STATUS[k] ?? k }))}
+          label={t('حالة المتجر', 'Shop status')}
+          options={['in_review', 'approved', 'suspended', 'rejected', 'pending', 'banned'].map((k) => ({ key: k, label: vendorStatus[k] ?? k }))}
         />
         <div className="toolbar__end">
-          <SearchBox value={search} onChange={setSearch} placeholder="اسم المتجر أو رابطه أو بريد صاحبه" label="بحث في المتاجر" />
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            placeholder={t('اسم المتجر أو رابطه أو بريد صاحبه', "Shop name, link, or owner's email")}
+            label={t('بحث في المتاجر', 'Search shops')}
+          />
           <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
@@ -77,22 +102,25 @@ export default function AdminVendorsPage() {
         search.trim() ? (
           <Empty
             icon="search"
-            title="لا متاجر بهذا البحث"
+            title={t('لا متاجر بهذا البحث', 'No shops match this search')}
             actions={
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
-                أزل التصفية
+                {t('أزل التصفية', 'Clear filters')}
               </button>
             }
           >
-            جرّب اسماً آخر أو حالة أخرى من الرقائق أعلاه.
+            {t('جرّب اسماً آخر أو حالة أخرى من الرقائق أعلاه.', 'Try another name or another status from the chips above.')}
           </Empty>
         ) : queue ? (
-          <Empty icon="check-circle" tone="success" title="لا طلبات اعتماد معلّقة">
-            كل طلبات المتاجر مُراجَعة. ستظهر الطلبات الجديدة هنا فور إرسال التاجر لمستنداته.
+          <Empty icon="check-circle" tone="success" title={t('لا طلبات اعتماد معلّقة', 'No pending approval requests')}>
+            {t(
+              'كل طلبات المتاجر مُراجَعة. ستظهر الطلبات الجديدة هنا فور إرسال التاجر لمستنداته.',
+              'All shop requests are reviewed. New requests appear here as soon as a seller submits their documents.',
+            )}
           </Empty>
         ) : (
-          <Empty icon="store" title="لا متاجر بهذه الحالة">
-            جرّب حالة أخرى من الرقائق أعلاه.
+          <Empty icon="store" title={t('لا متاجر بهذه الحالة', 'No shops with this status')}>
+            {t('جرّب حالة أخرى من الرقائق أعلاه.', 'Try another status from the chips above.')}
           </Empty>
         )
       ) : (
@@ -100,13 +128,13 @@ export default function AdminVendorsPage() {
           <table className="table ao-table">
             <thead>
               <tr>
-                <th>المتجر</th>
-                <th>البلد</th>
-                <th>أُرسل</th>
-                <th>الوثائق</th>
-                {queue ? <th>ينتظر</th> : <th>الحالة</th>}
+                <th>{t('المتجر', 'Shop')}</th>
+                <th>{t('البلد', 'Country')}</th>
+                <th>{t('أُرسل', 'Submitted')}</th>
+                <th>{t('الوثائق', 'Documents')}</th>
+                {queue ? <th>{t('ينتظر', 'Waiting')}</th> : <th>{t('الحالة', 'Status')}</th>}
                 <th className="end">
-                  <span className="visually-hidden">الإجراء</span>
+                  <span className="visually-hidden">{t('الإجراء', 'Action')}</span>
                 </th>
               </tr>
             </thead>
@@ -127,14 +155,14 @@ export default function AdminVendorsPage() {
                         </span>
                       </span>
                     </td>
-                    <td data-label="البلد" className="num">
+                    <td data-label={t('البلد', 'Country')} className="num">
                       {v.country}
                     </td>
-                    <td data-label="أُرسل" className="ao-date">
-                      {when(v.submittedAt)}
+                    <td data-label={t('أُرسل', 'Submitted')} className="ao-date">
+                      {when(v.submittedAt, locale)}
                     </td>
-                    <td data-label="الوثائق">
-                      <span className={`badge ${docsDone ? 'badge--success' : 'badge--pending'}`} title="الوثائق المقبولة من المطلوبة">
+                    <td data-label={t('الوثائق', 'Documents')}>
+                      <span className={`badge ${docsDone ? 'badge--success' : 'badge--pending'}`} title={t('الوثائق المقبولة من المطلوبة', 'Accepted documents out of required')}>
                         <Icon name="file" size={12} />
                         <span className="num">
                           {v.documentsAccepted}/{v.documentsTotal}
@@ -142,24 +170,25 @@ export default function AdminVendorsPage() {
                       </span>
                     </td>
                     {queue ? (
-                      <td data-label="ينتظر">
+                      <td data-label={t('ينتظر', 'Waiting')}>
                         {v.waitingHours === null ? (
                           '—'
                         ) : (
                           <span className="ao-wait" data-late={late}>
                             <Icon name="clock" size={12} />
-                            {waited(v.waitingHours)}
+                            {waited(v.waitingHours, locale)}
                           </span>
                         )}
                       </td>
                     ) : (
-                      <td data-label="الحالة">
-                        <span className={`badge ${TONE[v.status] ?? ''}`}>{VENDOR_STATUS[v.status] ?? v.status}</span>
+                      <td data-label={t('الحالة', 'Status')}>
+                        <span className={`badge ${TONE[v.status] ?? ''}`}>{vendorStatus[v.status] ?? v.status}</span>
                       </td>
                     )}
                     <td data-label="" className="end">
-                      <Link href={`/admin/vendors/${v.id}`} className={`btn btn--sm ${queue ? 'btn--primary' : 'btn--secondary'}`} aria-label={`${queue ? 'راجع' : 'افتح'} ${v.nameAr}`}>
-                        {queue ? 'راجع' : 'افتح'}
+                      <Link href={`/admin/vendors/${v.id}`} className={`btn btn--sm ${queue ? 'btn--primary' : 'btn--secondary'}`} aria-label={`${queue ? t('راجع', 'Review') : t('افتح', 'Open')} ${v.nameAr}`}
+                      >
+                        {queue ? t('راجع', 'Review') : t('افتح', 'Open')}
                       </Link>
                     </td>
                   </tr>

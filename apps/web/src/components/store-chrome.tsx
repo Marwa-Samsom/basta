@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { cartApi, CART_EVENT } from '@/lib/cart';
 import { Icon } from '@/components/icons';
-import { useT } from '@/components/locale';
+import { useLocale, useT } from '@/components/locale';
+import { nameIn } from '@/lib/i18n';
 
 /**
  * زرّ السلة في رأس المتجر — ST-01. العدد من الخادم لا من ذاكرة المتصفّح:
@@ -45,7 +46,8 @@ export function CartButton() {
  * رقائق المتاجر تحت الرأس — المتجر المفتوح بلون العلامة الخفيف. كانت رقائق أقسام
  * عامة، وسقطت الأقسام العامة حين صارت الفئات لكل متجر (14 أكتوبر 2026).
  */
-export function ShopStrip({ shops }: { shops: { slug: string; nameAr: string }[] }) {
+export function ShopStrip({ shops }: { shops: { slug: string; nameAr: string; nameEn?: string | null }[] }) {
+  const locale = useLocale();
   const pathname = usePathname();
   return (
     <>
@@ -59,7 +61,7 @@ export function ShopStrip({ shops }: { shops: { slug: string; nameAr: string }[]
             className="store__cat"
             {...(active ? { 'aria-current': 'page' as const } : {})}
           >
-            {c.nameAr}
+            {nameIn(locale, c)}
           </Link>
         );
       })}

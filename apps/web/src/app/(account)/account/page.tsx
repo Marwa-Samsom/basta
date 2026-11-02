@@ -5,20 +5,22 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { Alert, PageHead, TextInput } from '@/components/ui';
 import { api, session as tokens } from '@/lib/api';
 import { SecurityPanel, SessionsPanel, type Profile } from '@/components/account-security';
 
 type Tab = 'profile' | 'security' | 'sessions';
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'profile', label: 'الملف الشخصي' },
-  { id: 'security', label: 'الأمان' },
-  { id: 'sessions', label: 'الجلسات' },
+const TABS: { id: Tab; label: string; en: string }[] = [
+  { id: 'profile', label: 'الملف الشخصي', en: 'Profile' },
+  { id: 'security', label: 'الأمان', en: 'Security' },
+  { id: 'sessions', label: 'الجلسات', en: 'Sessions' },
 ];
 
 // ------------------------------------------------------------------ الملف
 
 function ProfilePanel({ profile, onSaved }: { profile: Profile; onSaved: (p: Profile) => void }) {
+  const t = useT();
   const [name, setName] = useState(profile.fullName);
   const [phone, setPhone] = useState(profile.phone ?? '');
   const [busy, setBusy] = useState(false);
@@ -56,12 +58,14 @@ function ProfilePanel({ profile, onSaved }: { profile: Profile; onSaved: (p: Pro
 
   return (
     <form className="card id-profile" onSubmit={save} noValidate>
-      <h2 className="id-card-title">البيانات الشخصية</h2>
+      <h2 className="id-card-title">{t('البيانات الشخصية', 'Personal details')}</h2>
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {saved && !dirty ? <Alert tone="success">حُفظت بياناتك.</Alert> : null}
+      {saved && !dirty ? (
+        <Alert tone="success">{t('حُفظت بياناتك.', 'Your details were saved.')}</Alert>
+      ) : null}
 
       <TextInput
-        label="الاسم الكامل"
+        label={t('الاسم الكامل', 'Full name')}
         autoComplete="name"
         required
         value={name}
@@ -69,27 +73,30 @@ function ProfilePanel({ profile, onSaved }: { profile: Profile; onSaved: (p: Pro
       />
 
       <div className="field">
-        <span className="field__label">البريد الإلكتروني</span>
+        <span className="field__label">{t('البريد الإلكتروني', 'Email')}</span>
         <div className="id-inline">
           <bdi dir="ltr" className="id-readonly">
             {profile.email ?? '—'}
           </bdi>
           <span className={`badge ${verified ? 'badge--success' : 'badge--warning'} id-badge`}>
             <Icon name={verified ? 'check-circle' : 'alert'} size={13} />
-            {verified ? 'موثّق' : 'غير موثّق'}
+            {verified ? t('موثّق', 'Verified') : t('غير موثّق', 'Not verified')}
           </span>
         </div>
         {!verified && profile.email ? (
           <Link href="/verify?next=/account" className="btn btn--secondary btn--sm id-fit">
-            أرسل رمز التحقّق
+            {t('أرسل رمز التحقّق', 'Send verification code')}
           </Link>
         ) : null}
       </div>
 
       <TextInput
-        label="رقم الجوال"
+        label={t('رقم الجوال', 'Mobile number')}
         optional
-        hint="بصيغة دولية تبدأ بـ + ورمز الدولة. اتركه فارغاً لحذفه."
+        hint={t(
+          'بصيغة دولية تبدأ بـ + ورمز الدولة. اتركه فارغاً لحذفه.',
+          'In international format, starting with + and the country code. Leave it empty to remove it.',
+        )}
         type="tel"
         dir="ltr"
         inputMode="tel"
@@ -102,14 +109,14 @@ function ProfilePanel({ profile, onSaved }: { profile: Profile; onSaved: (p: Pro
 
       <div className="id-actions">
         <button type="submit" className="btn btn--primary" disabled={busy || !dirty}>
-          {busy ? 'جارٍ الحفظ…' : 'احفظ التغييرات'}
+          {busy ? t('جارٍ الحفظ…', 'Saving…') : t('احفظ التغييرات', 'Save changes')}
         </button>
         {dirty ? (
           <>
             <button type="button" className="btn btn--ghost" onClick={cancel} disabled={busy}>
-              تراجع
+              {t('تراجع', 'Cancel')}
             </button>
-            <span className="id-dirty">تغييرات غير محفوظة</span>
+            <span className="id-dirty">{t('تغييرات غير محفوظة', 'Unsaved changes')}</span>
           </>
         ) : null}
       </div>
@@ -126,6 +133,8 @@ function ProfilePanel({ profile, onSaved }: { profile: Profile; onSaved: (p: Pro
  * الطلب. تأكيد البريد لا يحجب شيئاً؛ حالته هنا ورابطه إلى صفحة الرمز.
  */
 export default function AccountPage() {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,7 +153,9 @@ export default function AccountPage() {
 
   function onTabKey(event: React.KeyboardEvent, index: number): void {
     // الأسهم بين التبويبات؛ الاتجاه البصري في RTL معكوس: اليسار هو «التالي»
-    const step = event.key === 'ArrowLeft' ? 1 : event.key === 'ArrowRight' ? -1 : 0;
+    const forward = locale === 'ar' ? 'ArrowLeft' : 'ArrowRight';
+    const backward = locale === 'ar' ? 'ArrowRight' : 'ArrowLeft';
+    const step = event.key === forward ? 1 : event.key === backward ? -1 : 0;
     if (!step) return;
     event.preventDefault();
     const nextIndex = (index + step + TABS.length) % TABS.length;
@@ -154,27 +165,31 @@ export default function AccountPage() {
 
   return (
     <div className="id-account">
-      <PageHead title="الحساب" />
+      <PageHead title={t('الحساب', 'Account')} />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div className="tabs id-tabs" role="tablist" aria-label="أقسام الحساب">
-        {TABS.map((t, i) => (
+      <div
+        className="tabs id-tabs"
+        role="tablist"
+        aria-label={t('أقسام الحساب', 'Account sections')}
+      >
+        {TABS.map((item, i) => (
           <button
-            key={t.id}
+            key={item.id}
             ref={(el) => {
               tabRefs.current[i] = el;
             }}
             type="button"
             role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={tab === t.id}
-            aria-controls={tab === t.id ? `panel-${t.id}` : undefined}
-            tabIndex={tab === t.id ? 0 : -1}
+            id={`tab-${item.id}`}
+            aria-selected={tab === item.id}
+            aria-controls={tab === item.id ? `panel-${item.id}` : undefined}
+            tabIndex={tab === item.id ? 0 : -1}
             className="tabs__tab"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(item.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {t.label}
+            {t(item.label, item.en)}
           </button>
         ))}
       </div>
@@ -183,7 +198,7 @@ export default function AccountPage() {
         {!profile && !error ? (
           <div className="card" role="status">
             <span className="skeleton id-skel" />
-            <span className="visually-hidden">جارٍ جلب حسابك…</span>
+            <span className="visually-hidden">{t('جارٍ جلب حسابك…', 'Loading your account…')}</span>
           </div>
         ) : null}
         {profile && tab === 'profile' ? (

@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { api, session } from '@/lib/api';
+import { intlLocale, pick, type Bilingual, type Locale } from '@/lib/i18n';
 
 type Side = 'customer' | 'vendor';
 export type Audience = Side;
@@ -53,39 +55,44 @@ export const MESSAGE_MAX = 1000;
  * ردود البائع الجاهزة — عامّة تصلح لأي متجر. أمثلة التصميم (القطن المصري،
  * بطاقة الشحن المجاني) كانت بيانات عرض لمتجر بعينه، ووعدٌ لا يملكه كل بائع.
  */
-const QUICK_REPLIES = [
-  'متوفّر، نشحنه غداً.',
-  'شكراً لسؤالك، نتحقّق ونعود إليك اليوم.',
-  'هذا المقاس غير متوفّر حالياً، ونخبرك حين يعود.',
-  'نعتذر عن التأخير، نتابع مع الناقل الآن.',
+const QUICK_REPLIES: readonly Bilingual[] = [
+  { ar: 'متوفّر، نشحنه غداً.', en: "It's in stock — we'll ship it tomorrow." },
+  { ar: 'شكراً لسؤالك، نتحقّق ونعود إليك اليوم.', en: "Thanks for asking — we'll check and get back to you today." },
+  { ar: 'هذا المقاس غير متوفّر حالياً، ونخبرك حين يعود.', en: "This size isn't available right now — we'll let you know when it's back." },
+  { ar: 'نعتذر عن التأخير، نتابع مع الناقل الآن.', en: "Sorry for the delay — we're following up with the carrier now." },
 ];
 
 // ------------------------------------------------------------------ الوقت
 
 const DAY = 86_400_000;
-const clock = new Intl.DateTimeFormat('ar-u-nu-latn', { timeStyle: 'short' });
-const dayMonth = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long' });
+const clock = (locale: Locale) => new Intl.DateTimeFormat(intlLocale(locale), { timeStyle: 'short' });
+const dayMonth = (locale: Locale) => new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'long' });
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 const daysAgo = (iso: string) => Math.round((startOfDay(new Date()) - startOfDay(new Date(iso))) / DAY);
 
 /** في القائمة: الساعة اليوم، «أمس»، ثم اليوم والشهر */
-function listTime(iso: string): string {
+function listTime(iso: string, locale: Locale): string {
   const d = daysAgo(iso);
-  if (d <= 0) return clock.format(new Date(iso));
-  if (d === 1) return 'أمس';
-  return dayMonth.format(new Date(iso));
+  if (d <= 0) return clock(locale).format(new Date(iso));
+  if (d === 1) return locale === 'en' ? 'Yesterday' : 'أمس';
+  return dayMonth(locale).format(new Date(iso));
 }
 
 /** تحت الرسالة: «14:02» · «أمس · 11:10» · «9 سبتمبر · 10:02» */
-function messageTime(iso: string): string {
+function messageTime(iso: string, locale: Locale): string {
   const d = daysAgo(iso);
-  const t = clock.format(new Date(iso));
+  const t = clock(locale).format(new Date(iso));
   if (d <= 0) return t;
-  if (d === 1) return `أمس · ${t}`;
-  return `${dayMonth.format(new Date(iso))} · ${t}`;
+  if (d === 1) return locale === 'en' ? `Yesterday · ${t}` : `أمس · ${t}`;
+  return `${dayMonth(locale).format(new Date(iso))} · ${t}`;
 }
 
-function summary(total: number, unread: number): string {
+function summary(total: number, unread: number, locale: Locale): string {
+  if (locale === 'en') {
+    if (total === 0) return 'No conversations';
+    const t = `${total} ${total === 1 ? 'conversation' : 'conversations'}`;
+    return unread ? `${t} · ${unread} unread` : t;
+  }
   if (total === 0) return 'لا محادثات';
   const t = total === 1 ? 'محادثة واحدة' : total === 2 ? 'محادثتان' : total <= 10 ? `${total} محادثات` : `${total} محادثة`;
   return unread ? `${t} · ${unread} غير مقروءة` : t;
@@ -114,6 +121,8 @@ const WIDE = '(min-width: 761px)';
  * على الجوال: خيط مخفيّ لم يره أحد لا يُعدّ مقروءاً.
  */
 export function MessagesInbox({ audience }: { audience: Audience }) {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const params = useSearchParams();
   const selected = params.get('c');
@@ -182,9 +191,15 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
 
   const head =
     audience === 'customer' ? (
-      <PageHead title="رسائلي" meta="رسائل غير فورية مع المتاجر — يردّ المتجر عادةً خلال يوم عمل." />
+      <PageHead
+        title={t('رسائلي', 'My messages')}
+        meta={t(
+          'رسائل غير فورية مع المتاجر — يردّ المتجر عادةً خلال يوم عمل.',
+          'Non-instant messages with shops — a shop usually replies within one business day.',
+        )}
+      />
     ) : (
-      <PageHead title="الرسائل" {...(rows ? { count: summary(rows.length, unread) } : {})} />
+      <PageHead title={t('الرسائل', 'Messages')} {...(rows ? { count: summary(rows.length, unread, locale) } : {})} />
     );
 
   if (error && !rows) {
@@ -201,7 +216,7 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
       <div className={audience === 'customer' ? 'ms-page' : 'vm-page ms-page'}>
         {head}
         <div className={`ms-layout${audience === 'vendor' ? ' ms-layout--vendor' : ''}`} role="status">
-          <span className="visually-hidden">جارٍ جلب المحادثات…</span>
+          <span className="visually-hidden">{t('جارٍ جلب المحادثات…', 'Loading conversations…')}</span>
           <span className="skeleton ms-skel__list" aria-hidden />
           <span className="skeleton ms-skel__thread" aria-hidden />
         </div>
@@ -214,12 +229,15 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
       <div className={audience === 'customer' ? 'ms-page' : 'vm-page ms-page'}>
         {head}
         {audience === 'customer' ? (
-          <EmptyState icon="msg" title="لا رسائل بعد">
-            راسل المتجر من صفحة المنتج أو من تفاصيل الطلب إن احتجت سؤالاً عن مقاس أو شحنة.
+          <EmptyState icon="msg" title={t('لا رسائل بعد', 'No messages yet')}>
+            {t(
+              'راسل المتجر من صفحة المنتج أو من تفاصيل الطلب إن احتجت سؤالاً عن مقاس أو شحنة.',
+              'Message a shop from the product page or your order details if you have a question about a size or a shipment.',
+            )}
           </EmptyState>
         ) : (
-          <EmptyState icon="msg" title="لا رسائل">
-            أسئلة المشترين عن منتجاتك وطلباتهم تظهر هنا.
+          <EmptyState icon="msg" title={t('لا رسائل', 'No messages')}>
+            {t('أسئلة المشترين عن منتجاتك وطلباتهم تظهر هنا.', 'Buyer questions about your products and their orders show up here.')}
           </EmptyState>
         )}
       </div>
@@ -233,7 +251,7 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
         className={`ms-layout${audience === 'vendor' ? ' ms-layout--vendor' : ''}`}
         data-view={selected ? 'thread' : 'list'}
       >
-        <nav className="ms-panel ms-list" aria-label="المحادثات">
+        <nav className="ms-panel ms-list" aria-label={t('المحادثات', 'Conversations')}>
           {audience === 'vendor' ? (
             <div className="ms-list__search">
               <span className="input-icon">
@@ -241,15 +259,17 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
                 <input
                   className="field__control"
                   type="search"
-                  placeholder="المشتري أو المنتج أو الطلب"
+                  placeholder={t('المشتري أو المنتج أو الطلب', 'Buyer, product or order')}
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
-                  aria-label="صفِّ المحادثات"
+                  aria-label={t('صفِّ المحادثات', 'Filter conversations')}
                 />
               </span>
             </div>
           ) : null}
-          {shown.length === 0 ? <p className="ms-list__none">لا محادثة تطابق «{filter.trim()}».</p> : null}
+          {shown.length === 0 ? (
+            <p className="ms-list__none">{t(`لا محادثة تطابق «${filter.trim()}».`, `No conversation matches “${filter.trim()}”.`)}</p>
+          ) : null}
           <ul className="ms-list__items">
             {shown.map((r) => {
               const active = r.id === activeId;
@@ -275,13 +295,13 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
                             {isUnread ? (
                               <>
                                 <span className="ms-row__dot" aria-hidden />
-                                <span className="visually-hidden"> — غير مقروءة</span>
+                                <span className="visually-hidden">{t(' — غير مقروءة', ' — unread')}</span>
                               </>
                             ) : null}
                           </span>
                           <span className="ms-row__preview">{r.lastPreview}</span>
                           <time className="ms-row__time" dateTime={r.lastMessageAt}>
-                            {listTime(r.lastMessageAt)}
+                            {listTime(r.lastMessageAt, locale)}
                           </time>
                         </span>
                       </>
@@ -289,17 +309,17 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
                       <>
                         <span className="ms-row__top">
                           <span className="ms-row__initial" aria-hidden>
-                            {r.customer?.fullName.trim().charAt(0) ?? '؟'}
+                            {r.customer?.fullName.trim().charAt(0) ?? t('؟', '?')}
                           </span>
                           <span className="ms-row__name">{r.customer?.fullName}</span>
                           {isUnread ? (
                             <>
                               <span className="ms-row__dot" aria-hidden />
-                              <span className="visually-hidden"> — غير مقروءة</span>
+                              <span className="visually-hidden">{t(' — غير مقروءة', ' — unread')}</span>
                             </>
                           ) : null}
                           <time className="ms-row__time" dateTime={r.lastMessageAt}>
-                            {listTime(r.lastMessageAt)}
+                            {listTime(r.lastMessageAt, locale)}
                           </time>
                         </span>
                         <span className="ms-row__about">{r.context.label}</span>
@@ -324,8 +344,8 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
             onSent={onSent}
           />
         ) : (
-          <section className="ms-panel ms-thread" aria-label="المحادثة">
-            <p className="ms-thread__note">اختر محادثة من القائمة لتقرأها وتردّ.</p>
+          <section className="ms-panel ms-thread" aria-label={t('المحادثة', 'Conversation')}>
+            <p className="ms-thread__note">{t('اختر محادثة من القائمة لتقرأها وتردّ.', 'Choose a conversation from the list to read and reply.')}</p>
           </section>
         )}
       </div>
@@ -348,6 +368,8 @@ function ThreadPane({
   onOpened: (id: string) => void;
   onSent: (id: string, m: Message) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [thread, setThread] = useState<Thread | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -361,9 +383,9 @@ function ThreadPane({
   useEffect(() => {
     let alive = true;
     api<Thread>(`${base}/${id}`)
-      .then((t) => {
+      .then((next) => {
         if (!alive) return;
-        setThread(t);
+        setThread(next);
         onOpened(id);
       })
       .catch((e: Error) => alive && setError(e.message));
@@ -382,19 +404,23 @@ function ThreadPane({
   async function send(): Promise<void> {
     const body = draft.trim();
     if (!body) {
-      setStatus('اكتب رسالة أولاً.');
+      setStatus(t('اكتب رسالة أولاً.', 'Write a message first.'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
       const m = await api<Message>(`${base}/${id}/messages`, { method: 'POST', body: { body } });
-      setThread((t) => (t ? { ...t, messages: [...t.messages, m] } : t));
+      setThread((cur) => (cur ? { ...cur, messages: [...cur.messages, m] } : cur));
       setDraft('');
       onSent(id, m);
-      setStatus(audience === 'customer' ? 'أُرسلت رسالتك — يردّ المتجر عادةً خلال يوم عمل.' : 'أُرسل ردّك إلى المشتري.');
+      setStatus(
+        audience === 'customer'
+          ? t('أُرسلت رسالتك — يردّ المتجر عادةً خلال يوم عمل.', 'Your message was sent — a shop usually replies within one business day.')
+          : t('أُرسل ردّك إلى المشتري.', 'Your reply was sent to the buyer.'),
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذّر إرسال الرسالة.');
+      setError(e instanceof Error ? e.message : t('تعذّر إرسال الرسالة.', "Couldn't send the message."));
     } finally {
       setBusy(false);
     }
@@ -411,13 +437,13 @@ function ThreadPane({
   const back = (
     <Link href={backHref} replace scroll={false} className="btn btn--ghost btn--sm ms-thread__back">
       <Icon name="back" size={15} mirror />
-      المحادثات
+      {t('المحادثات', 'Conversations')}
     </Link>
   );
 
   if (!thread) {
     return (
-      <section className="ms-panel ms-thread" aria-label="المحادثة">
+      <section className="ms-panel ms-thread" aria-label={t('المحادثة', 'Conversation')}>
         <div className="ms-thread__head">{back}</div>
         {error ? (
           <div className="ms-thread__scroll">
@@ -425,7 +451,7 @@ function ThreadPane({
           </div>
         ) : (
           <div className="ms-thread__scroll" role="status">
-            <span className="visually-hidden">جارٍ فتح المحادثة…</span>
+            <span className="visually-hidden">{t('جارٍ فتح المحادثة…', 'Opening conversation…')}</span>
             <span className="skeleton ms-skel__thread" aria-hidden />
           </div>
         )}
@@ -434,8 +460,8 @@ function ThreadPane({
   }
 
   const href = contextHref(thread.context, audience);
-  const mineLabel = audience === 'customer' ? 'أنا' : 'متجر';
-  const theirsLabel = audience === 'customer' ? 'المتجر' : 'مشتري';
+  const mineLabel = audience === 'customer' ? t('أنا', 'Me') : t('متجر', 'Shop');
+  const theirsLabel = audience === 'customer' ? t('المتجر', 'Shop') : t('مشتري', 'Buyer');
 
   return (
     <section className="ms-panel ms-thread" aria-labelledby={titleId}>
@@ -450,11 +476,11 @@ function ThreadPane({
               <h2 id={titleId} className="ms-thread__shop">
                 {thread.shop.nameAr}
               </h2>
-              <span className="ms-thread__ctx">بخصوص {thread.context.label}</span>
+              <span className="ms-thread__ctx">{t(`بخصوص ${thread.context.label}`, `About ${thread.context.label}`)}</span>
             </span>
             {href ? (
               <Link href={href} className="btn btn--secondary btn--sm ms-thread__open">
-                {thread.context.kind === 'order' ? 'افتح الطلب' : 'افتح المنتج'}
+                {thread.context.kind === 'order' ? t('افتح الطلب', 'Open order') : t('افتح المنتج', 'Open product')}
               </Link>
             ) : null}
           </>
@@ -474,7 +500,7 @@ function ThreadPane({
         )}
       </header>
 
-      <div ref={scroller} className="ms-thread__scroll" tabIndex={0} role="region" aria-label="الرسائل">
+      <div ref={scroller} className="ms-thread__scroll" tabIndex={0} role="region" aria-label={t('الرسائل', 'Messages')}>
         {thread.messages.length ? (
           <ol className="ms-thread__list">
             {thread.messages.map((m) => (
@@ -483,7 +509,7 @@ function ThreadPane({
                   <div className="ms-msg__meta">
                     <span className="ms-msg__role">{m.mine ? mineLabel : theirsLabel}</span>
                     <time className="ms-msg__time" dateTime={m.createdAt}>
-                      {messageTime(m.createdAt)}
+                      {messageTime(m.createdAt, locale)}
                     </time>
                   </div>
                   <p className="ms-msg__body">{m.body}</p>
@@ -492,32 +518,35 @@ function ThreadPane({
             ))}
           </ol>
         ) : (
-          <p className="ms-thread__note">لا رسائل في هذه المحادثة بعد.</p>
+          <p className="ms-thread__note">{t('لا رسائل في هذه المحادثة بعد.', 'No messages in this conversation yet.')}</p>
         )}
       </div>
 
       <div className="ms-composer">
         {audience === 'vendor' ? (
-          <ul className="ms-quick" aria-label="ردود جاهزة">
-            {QUICK_REPLIES.map((r) => (
-              <li key={r}>
-                <button type="button" className="ms-chip" title={r} onClick={() => setDraft(r)}>
-                  {r}
-                </button>
-              </li>
-            ))}
+          <ul className="ms-quick" aria-label={t('ردود جاهزة', 'Quick replies')}>
+            {QUICK_REPLIES.map((q) => {
+              const r = pick(locale, q);
+              return (
+                <li key={q.ar}>
+                  <button type="button" className="ms-chip" title={r} onClick={() => setDraft(r)}>
+                    {r}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ) : null}
         {error ? <Alert tone="danger">{error}</Alert> : null}
         <label className="visually-hidden" htmlFor={draftId}>
-          {audience === 'customer' ? 'رسالتك للمتجر' : 'ردّك على المشتري'}
+          {audience === 'customer' ? t('رسالتك للمتجر', 'Your message to the shop') : t('ردّك على المشتري', 'Your reply to the buyer')}
         </label>
         <textarea
           id={draftId}
           className="field__control"
           rows={2}
           maxLength={MESSAGE_MAX}
-          placeholder={audience === 'customer' ? 'اكتب رسالتك للمتجر…' : 'اكتب ردّك…'}
+          placeholder={audience === 'customer' ? t('اكتب رسالتك للمتجر…', 'Write your message to the shop…') : t('اكتب ردّك…', 'Write your reply…')}
           value={draft}
           aria-describedby={countId}
           onChange={(e) => setDraft(e.target.value.slice(0, MESSAGE_MAX))}
@@ -534,7 +563,7 @@ function ThreadPane({
             onClick={() => void send()}
           >
             {busy ? <span className="spinner" aria-hidden /> : <Icon name="send" size={15} mirror />}
-            أرسل
+            {t('أرسل', 'Send')}
           </button>
         </div>
         <p className="visually-hidden" role="status" aria-live="polite">
