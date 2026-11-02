@@ -242,6 +242,33 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(bad.statusCode).toBe(400);
   });
 
+  // موجة «يُؤتمت» الثالثة (2 نوفمبر 2026): لا تعيين جماعي في التسجيل — VON-009
+  it('حقل غير معروف في جسم التسجيل يُرفض بلا متجر: الحالة والمالك وقفل العملة لا تُسند من الطلب', async () => {
+    if (!dbUp) return;
+    const email = `massassign.${SUFFIX}@basta.test`;
+    const userId = await registerUser(email, ['customer']);
+    const victimId = await registerUser(`massvictim.${SUFFIX}@basta.test`, ['customer']);
+    const token = await login(email);
+    const body = { nameAr: 'متجر الإسناد الجماعي', nameEn: `Mass Assign ${SUFFIX}`, country: 'JO' };
+    const apply = (payload: Record<string, unknown>) =>
+      app.inject({ method: 'POST', ...api('/vendor/onboarding/apply', token), payload });
+
+    for (const extra of [{ status: 'approved' }, { ownerUserId: victimId }, { settlementCurrencyLockedAt: new Date().toISOString() }]) {
+      const res = await apply({ ...body, ...extra });
+      expect(res.statusCode, `${Object.keys(extra)[0]}: ${res.body}`).toBe(400);
+      expect([res.json().message].flat()).toContain('في الطلب حقل غير معروف — حدّث الصفحة وأعد المحاولة.');
+    }
+    expect(await prisma.vendor.count({ where: { ownerUserId: { in: [userId, victimId] } } })).toBe(0);
+
+    const ok = await apply(body);
+    expect(ok.statusCode, ok.body).toBe(201);
+    createdVendorIds.push(ok.json().vendor.id);
+    const vendor = await prisma.vendor.findUniqueOrThrow({ where: { id: ok.json().vendor.id } });
+    expect(vendor.status).toBe('pending');
+    expect(vendor.ownerUserId).toBe(userId);
+    expect(vendor.settlementCurrencyLockedAt).toBeNull();
+  });
+
   it('اسم المتجر يُحفظ بمسافة واحدة بين كلماته — في التسجيل والتعديل (VON-014، 28 أكتوبر 2026)', async () => {
     if (!dbUp) return;
     // كان القصّ للطرفين وحدهما: «ركن␣␣الصوف» حُفظ بمسافتين لا تراهما الصفحة ويظهران في البريد النصي
