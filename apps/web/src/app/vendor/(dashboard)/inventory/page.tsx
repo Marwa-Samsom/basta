@@ -9,6 +9,7 @@ import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
 import { useAdminList } from '@/lib/admin';
 import { num } from '@/lib/catalog';
+import { counted, VARIANTS, type Counted } from '@/lib/arabic-count';
 import { useLocale, useT } from '@/components/locale';
 
 interface Row {
@@ -44,6 +45,15 @@ const REASONS = [
   ['return', 'مرتجع', 'Return'],
 ] as const;
 
+/** «واحد يحتاج انتباهاً»، «اثنان يحتاجان…»، «3 منها تحتاج…» — كان «4 متغيّراً · 3 يحتاج انتباهاً» (VCAT-086) */
+const ATTENTION: Counted = {
+  one: 'واحد يحتاج انتباهاً',
+  two: 'اثنان يحتاجان انتباهاً',
+  plural: '# منها تحتاج انتباهاً',
+  accusative: '# منها يحتاج انتباهاً',
+  genitive: '# منها يحتاج انتباهاً',
+};
+
 /**
  * VD-11 — المخزون.
  *
@@ -75,7 +85,7 @@ export default function InventoryPage() {
             ? counts.all === 0
               ? t('لا متغيّرات بعد', 'No variants yet')
               : t(
-                  `${num(counts.all)} متغيّراً · ${num(counts.attention)} يحتاج انتباهاً`,
+                  `${counted(counts.all, VARIANTS)} · ${counts.attention === 0 ? 'لا شيء يحتاج انتباهاً' : counted(counts.attention, ATTENTION)}`,
                   `${num(counts.all, locale)} ${counts.all === 1 ? 'variant' : 'variants'} · ${num(counts.attention, locale)} ${counts.attention === 1 ? 'needs' : 'need'} attention`,
                 )
             : undefined

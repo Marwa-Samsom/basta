@@ -419,7 +419,12 @@ function ProductsList() {
                         >
                           {num(p.available, locale)}
                         </span>
-                        {p.isLow ? <span className="badge badge--warning badge--after">{t('منخفض', 'Low')}</span> : null}
+                        {/* «نفد» قبل «منخفض» كصفحة المخزون — كانت القائمة تقول «منخفض» عن متاح 0 (VCAT-086) */}
+                        {p.available <= 0 ? (
+                          <span className="badge badge--danger badge--after">{t('نفد', 'Out of stock')}</span>
+                        ) : p.isLow ? (
+                          <span className="badge badge--warning badge--after">{t('منخفض', 'Low')}</span>
+                        ) : null}
                       </td>
                       <td data-label={t('الحالة', 'Status')}>
                         <span className={`badge ${statuses[p.status].tone}`} title={statuses[p.status].hint}>
