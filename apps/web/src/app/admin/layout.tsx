@@ -76,7 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       })
       .catch((e: Error) => {
         if (!alive) return;
-        if (e instanceof ApiError && e.status === 403 && /الثنائي/.test(e.message)) router.replace('/account/2fa');
+        if (e instanceof ApiError && e.status === 403 && (e.code === 'TOTP_SETUP_REQUIRED' || /الثنائي/.test(e.message))) router.replace('/account/2fa');
         else setError(e.message);
       });
     return () => {

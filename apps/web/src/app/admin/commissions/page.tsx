@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -36,6 +37,8 @@ const PICK = 20;
  * بين آلاف متاجر الاختبار — لا تُعطى نسبة خاصة.
  */
 export default function AdminCommissionsPage() {
+  const t = useT();
+  const locale = useLocale();
   const { data, error, forbidden, reload } = useAdminData<Rule[]>('/admin/finance/commissions');
   const act = useAction();
   const ask = useConfirm();
@@ -77,42 +80,54 @@ export default function AdminCommissionsPage() {
       });
       setRate('');
       reload();
-    }, 'سُجّلت النسبة الجديدة وأُنهيت السابقة. الطلبات السابقة لم تتغيّر.');
+    }, t('سُجّلت النسبة الجديدة وأُنهيت السابقة. الطلبات السابقة لم تتغيّر.', 'The new rate is recorded and the previous one has ended. Past orders are unchanged.'));
 
   const endCustom = async (r: Rule) => {
     if (!r.vendorId) return;
     const back = global ? `، ويعود المتجر إلى النسبة العامة ${pct(global.rateBps)}` : '';
+    const backEn = global ? `, and the shop returns to the general rate of ${pct(global.rateBps, locale)}` : '';
     const sure = await ask({
-      title: `تلغي نسبة «${r.vendor?.nameAr ?? 'المتجر'}» الخاصة؟`,
-      body: `من الآن${back}. الطلبات السابقة لا تتأثر.`,
-      confirmLabel: 'ألغِ النسبة الخاصة',
+      title: t(`تلغي نسبة «${r.vendor?.nameAr ?? 'المتجر'}» الخاصة؟`, `Cancel the custom rate for “${r.vendor?.nameAr ?? 'the shop'}”?`),
+      body: t(`من الآن${back}. الطلبات السابقة لا تتأثر.`, `Effective now${backEn}. Past orders are not affected.`),
+      confirmLabel: t('ألغِ النسبة الخاصة', 'Cancel custom rate'),
       danger: true,
     });
     if (!sure) return;
     void act.run(async () => {
       await api(`/admin/finance/commissions/vendor/${r.vendorId}`, { method: 'DELETE' });
       reload();
-    }, 'أُلغيت النسبة الخاصة — المتجر على النسبة العامة من الآن.');
+    }, t('أُلغيت النسبة الخاصة — المتجر على النسبة العامة من الآن.', 'Custom rate canceled — the shop is on the general rate from now on.'));
   };
 
   const validRate = rate !== '' && Number(rate) >= 0 && Number(rate) <= 50;
 
   return (
     <div className="ac2-page">
-      <AdminHeader title="العمولة" hint="نسبة على كل منتج يُباع بغضّ النظر عن فئته أو سعره: نسبة المتجر إن خُصّصت، وإلا النسبة العامة." />
+      <AdminHeader
+        title={t('العمولة', 'Commission')}
+        hint={t(
+          'نسبة على كل منتج يُباع بغضّ النظر عن فئته أو سعره: نسبة المتجر إن خُصّصت، وإلا النسبة العامة.',
+          'A rate on every product sold, whatever its category or price: the shop’s rate if it has one, otherwise the general rate.',
+        )}
+      />
       <div className="alert alert--warning ac2-callout">
         <Icon name="alert" size={16} />
-        <span>تغيير النسبة لا يؤثّر على أي طلب سابق — كل طلب يحمل نسبته الملقوطة لحظة الشراء. القواعد لا تُحذف: تُنهى صلاحيتها بتاريخ حين تحلّ محلّها قاعدة جديدة.</span>
+        <span>
+          {t(
+            'تغيير النسبة لا يؤثّر على أي طلب سابق — كل طلب يحمل نسبته الملقوطة لحظة الشراء. القواعد لا تُحذف: تُنهى صلاحيتها بتاريخ حين تحلّ محلّها قاعدة جديدة.',
+            'Changing the rate does not affect any past order — each order keeps the rate captured at the moment of purchase. Rules are never deleted: they get an end date when a new rule replaces them.',
+          )}
+        </span>
       </div>
       <Feedback error={act.error} notice={act.notice} />
 
-      <section className="card card--flush" aria-label="النسبة العامة">
+      <section className="card card--flush" aria-label={t('النسبة العامة', 'General rate')}>
         <header className="card__head">
-          <h2 className="ac2-title">النسبة العامة</h2>
-          <span className="ac2-hint">على كل متجر لم تُخصَّص له نسبة</span>
+          <h2 className="ac2-title">{t('النسبة العامة', 'General rate')}</h2>
+          <span className="ac2-hint">{t('على كل متجر لم تُخصَّص له نسبة', 'Applies to every shop without a custom rate')}</span>
           <span className="ac2-end">
             <button type="button" className="btn btn--secondary btn--sm" onClick={() => startRule('global')}>
-              غيّر النسبة العامة
+              {t('غيّر النسبة العامة', 'Change general rate')}
             </button>
           </span>
         </header>
@@ -121,57 +136,67 @@ export default function AdminCommissionsPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th scope="col">النطاق</th>
-                  <th scope="col">النسبة</th>
-                  <th scope="col">السريان</th>
+                  <th scope="col">{t('النطاق', 'Scope')}</th>
+                  <th scope="col">{t('النسبة', 'Rate')}</th>
+                  <th scope="col">{t('السريان', 'In effect')}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>
-                    <strong>كل المنصّة</strong>
+                    <strong>{t('كل المنصّة', 'Whole platform')}</strong>
                   </td>
-                  <td className="num ac2-rate" data-label="النسبة">
-                    {pct(global.rateBps)}
+                  <td className="num ac2-rate" data-label={t('النسبة', 'Rate')}>
+                    {pct(global.rateBps, locale)}
                   </td>
-                  <td className="ac2-muted-cell" data-label="السريان">
-                    {when(global.effectiveFrom)} — {global.effectiveTo ? when(global.effectiveTo) : 'مفتوحة'}
+                  <td className="ac2-muted-cell" data-label={t('السريان', 'In effect')}>
+                    {when(global.effectiveFrom, locale)} — {global.effectiveTo ? when(global.effectiveTo, locale) : t('مفتوحة', 'Open-ended')}
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="ac2-section-empty">لا نسبة عامة بعد — حدّدها من النموذج أدناه.</p>
+          <p className="ac2-section-empty">{t('لا نسبة عامة بعد — حدّدها من النموذج أدناه.', 'No general rate yet — set it in the form below.')}</p>
         )}
       </section>
 
-      <section className="card card--flush" aria-label="نسب خاصة بمتاجر">
+      <section className="card card--flush" aria-label={t('نسب خاصة بمتاجر', 'Custom shop rates')}>
         <header className="card__head">
-          <h2 className="ac2-title">نسب خاصة بمتاجر</h2>
-          <span className="ac2-hint">تتجاوز النسبة العامة للمتجر وحده</span>
+          <h2 className="ac2-title">{t('نسب خاصة بمتاجر', 'Custom shop rates')}</h2>
+          <span className="ac2-hint">{t('تتجاوز النسبة العامة للمتجر وحده', 'Override the general rate for that shop only')}</span>
           <span className="ac2-end ac2-inline">
-            {custom.length > 0 ? <SearchBox value={ruleSearch} onChange={setRuleSearch} placeholder="صفِّ باسم المتجر" label="صفِّ النسب الخاصة باسم المتجر" className="ac2-search" /> : null}
+            {custom.length > 0 ? (
+              <SearchBox
+                value={ruleSearch}
+                onChange={setRuleSearch}
+                placeholder={t('صفِّ باسم المتجر', 'Filter by shop name')}
+                label={t('صفِّ النسب الخاصة باسم المتجر', 'Filter custom rates by shop name')}
+                className="ac2-search"
+              />
+            ) : null}
             <button type="button" className="btn btn--secondary btn--sm" onClick={() => startRule('vendor')}>
               <Icon name="plus" size={14} />
-              نسبة لمتجر
+              {t('نسبة لمتجر', 'Rate for a shop')}
             </button>
           </span>
         </header>
         {custom.length === 0 ? (
-          <p className="ac2-section-empty">كل المتاجر على النسبة العامة.</p>
+          <p className="ac2-section-empty">{t('كل المتاجر على النسبة العامة.', 'All shops are on the general rate.')}</p>
         ) : shownCustom.length === 0 ? (
-          <p className="ac2-section-empty">لا نسبة خاصة لمتجر بهذا الاسم — ابحث عنه في «نسبة جديدة» لتعطيه واحدة.</p>
+          <p className="ac2-section-empty">
+            {t('لا نسبة خاصة لمتجر بهذا الاسم — ابحث عنه في «نسبة جديدة» لتعطيه واحدة.', 'No custom rate for a shop with this name — search for it in “New rate” to give it one.')}
+          </p>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th scope="col">المتجر</th>
-                  <th scope="col">النسبة</th>
-                  <th scope="col">السريان</th>
+                  <th scope="col">{t('المتجر', 'Shop')}</th>
+                  <th scope="col">{t('النسبة', 'Rate')}</th>
+                  <th scope="col">{t('السريان', 'In effect')}</th>
                   <th scope="col" className="end">
-                    <span className="visually-hidden">إجراءات</span>
+                    <span className="visually-hidden">{t('إجراءات', 'Actions')}</span>
                   </th>
                 </tr>
               </thead>
@@ -181,19 +206,19 @@ export default function AdminCommissionsPage() {
                     <td>
                       <strong>{r.vendor?.nameAr ?? '—'}</strong>
                     </td>
-                    <td className="num ac2-rate" data-label="النسبة">
-                      {pct(r.rateBps)}
+                    <td className="num ac2-rate" data-label={t('النسبة', 'Rate')}>
+                      {pct(r.rateBps, locale)}
                     </td>
-                    <td className="ac2-muted-cell" data-label="السريان">
-                      {when(r.effectiveFrom)} — {r.effectiveTo ? when(r.effectiveTo) : 'مفتوحة'}
+                    <td className="ac2-muted-cell" data-label={t('السريان', 'In effect')}>
+                      {when(r.effectiveFrom, locale)} — {r.effectiveTo ? when(r.effectiveTo, locale) : t('مفتوحة', 'Open-ended')}
                     </td>
                     <td className="end" data-label="">
                       <span className="ac2-inline">
                         <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => startRule('vendor', r.vendorId ?? '', r.vendor?.nameAr ?? '')}>
-                          غيّر
+                          {t('غيّر', 'Change')}
                         </button>
                         <button type="button" className="btn btn--ghost btn--sm" disabled={act.busy} onClick={() => void endCustom(r)}>
-                          أعده إلى العامة
+                          {t('أعده إلى العامة', 'Back to general rate')}
                         </button>
                       </span>
                     </td>
@@ -205,24 +230,30 @@ export default function AdminCommissionsPage() {
         )}
       </section>
 
-      <section ref={formRef} className="card" aria-label="نسبة جديدة">
-        <h2 className="ac2-title">نسبة جديدة</h2>
-        <p className="ac2-hint">تسري من لحظة الاعتماد وتُنهي القاعدة السارية في نطاقها.</p>
+      <section ref={formRef} className="card" aria-label={t('نسبة جديدة', 'New rate')}>
+        <h2 className="ac2-title">{t('نسبة جديدة', 'New rate')}</h2>
+        <p className="ac2-hint">{t('تسري من لحظة الاعتماد وتُنهي القاعدة السارية في نطاقها.', 'Takes effect the moment it is approved and ends the current rule in its scope.')}</p>
         <div className="ac2-form">
           <label className="field">
-            <span className="field__label">النطاق</span>
+            <span className="field__label">{t('النطاق', 'Scope')}</span>
             <select className="field__control" value={scope} onChange={(e) => (setScope(e.target.value as typeof scope), setTarget(''), setTargetName(''))}>
-              <option value="global">عامة — كل المنصّة</option>
-              <option value="vendor">خاصة بمتجر</option>
+              <option value="global">{t('عامة — كل المنصّة', 'General — whole platform')}</option>
+              <option value="vendor">{t('خاصة بمتجر', 'Custom for a shop')}</option>
             </select>
           </label>
           {scope === 'vendor' ? (
             <div className="field ac2-form__wide">
               <span className="field__label" id="commission-vendor">
-                المتجر
+                {t('المتجر', 'Shop')}
               </span>
               <div className="ac2-pick">
-                <SearchBox value={vendorSearch} onChange={setVendorSearch} placeholder="ابحث باسم المتجر أو رابطه أو بريد صاحبه" label="ابحث عن متجر" className="ac2-search" />
+                <SearchBox
+                  value={vendorSearch}
+                  onChange={setVendorSearch}
+                  placeholder={t('ابحث باسم المتجر أو رابطه أو بريد صاحبه', 'Search by shop name, link or owner email')}
+                  label={t('ابحث عن متجر', 'Search for a shop')}
+                  className="ac2-search"
+                />
                 <select
                   className="field__control"
                   value={target}
@@ -233,7 +264,13 @@ export default function AdminCommissionsPage() {
                   aria-labelledby="commission-vendor"
                 >
                   <option value="">
-                    {!vendors ? '…' : vendors.total > vendors.items.length ? `اختر من أول ${vendors.items.length} من ${vendors.total} — أو ضيّق بالبحث` : vendors.total === 0 ? 'لا متجر معتمد بهذا البحث' : 'اختر'}
+                    {!vendors
+                      ? '…'
+                      : vendors.total > vendors.items.length
+                        ? t(`اختر من أول ${vendors.items.length} من ${vendors.total} — أو ضيّق بالبحث`, `Pick from the first ${vendors.items.length} of ${vendors.total} — or search to narrow down`)
+                        : vendors.total === 0
+                          ? t('لا متجر معتمد بهذا البحث', 'No approved shop matches this search')
+                          : t('اختر', 'Choose')}
                   </option>
                   {target && !(vendors?.items ?? []).some((v) => v.id === target) ? <option value={target}>{targetName || target.slice(0, 8)}</option> : null}
                   {(vendors?.items ?? []).map((v) => (
@@ -246,7 +283,7 @@ export default function AdminCommissionsPage() {
             </div>
           ) : null}
           <label className="field">
-            <span className="field__label">النسبة %</span>
+            <span className="field__label">{t('النسبة %', 'Rate %')}</span>
             <ClearableInput ref={rateRef} className="field__control num" inputMode="decimal" dir="ltr" placeholder="3" value={rate} onChange={(e) => setRate(e.target.value)} />
           </label>
           <div className="ac2-form__actions">
@@ -256,14 +293,17 @@ export default function AdminCommissionsPage() {
               disabled={act.busy || !validRate || (scope === 'vendor' && !target)}
               onClick={async () => {
                 const sure = await ask({
-                  title: `تعتمد ${rate}% ${scope === 'global' ? 'نسبةً عامة' : 'لهذا المتجر'} من الآن؟`,
-                  body: 'تنتهي النسبة السابقة، والطلبات السابقة لا تتأثر.',
-                  confirmLabel: 'اعتمد النسبة',
+                  title: t(
+                    `تعتمد ${rate}% ${scope === 'global' ? 'نسبةً عامة' : 'لهذا المتجر'} من الآن؟`,
+                    `Approve ${rate}% ${scope === 'global' ? 'as the general rate' : 'for this shop'} from now on?`,
+                  ),
+                  body: t('تنتهي النسبة السابقة، والطلبات السابقة لا تتأثر.', 'The previous rate ends, and past orders are not affected.'),
+                  confirmLabel: t('اعتمد النسبة', 'Approve rate'),
                 });
                 if (sure) void save();
               }}
             >
-              اعتماد من الآن
+              {t('اعتماد من الآن', 'Approve from now')}
             </button>
           </div>
         </div>

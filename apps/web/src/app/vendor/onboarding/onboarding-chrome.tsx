@@ -6,6 +6,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { StatusBadge } from '@/components/ui';
+import { useLocale, useT } from '@/components/locale';
+import { pick, type Bilingual } from '@/lib/i18n';
 
 /**
  * إطار شاشات التأهيل VD-01 → VD-04 كما في ملف التصميم: شريط بالعلامة،
@@ -18,7 +20,14 @@ import { StatusBadge } from '@/components/ui';
  * والعملة قبل المستندات لا بعد المراجعة: الاعتماد يثبّتها، فكانت خطوتها تأتي
  * بعد أن ثُبّتت بعملة اقتُرحت من البلد ولم يرها صاحبها.
  */
-const STEPS = ['الحساب', 'المتجر', 'عملة التسوية', 'المستندات', 'المراجعة', 'ملف المتجر'] as const;
+const STEPS: readonly Bilingual[] = [
+  { ar: 'الحساب', en: 'Account' },
+  { ar: 'المتجر', en: 'Shop' },
+  { ar: 'عملة التسوية', en: 'Settlement currency' },
+  { ar: 'المستندات', en: 'Documents' },
+  { ar: 'المراجعة', en: 'Review' },
+  { ar: 'ملف المتجر', en: 'Shop profile' },
+];
 
 export function OnboardingFrame({
   step,
@@ -30,14 +39,16 @@ export function OnboardingFrame({
   status?: string | undefined;
   children: ReactNode;
 }) {
+  const t = useT();
+  const locale = useLocale();
   return (
     <div className="vo" data-density="compact">
       <header className="vo-top">
         <Link href="/" className="vo-top__mark">
-          بسطة
+          {t('بسطة', 'Basta')}
         </Link>
         <span className="vo-top__sep" aria-hidden />
-        <span className="vo-top__title">كن بائعاً — تهيئة المتجر</span>
+        <span className="vo-top__title">{t('كن بائعاً — تهيئة المتجر', 'Become a seller — shop setup')}</span>
         {status ? (
           <span className="vo-top__end">
             <StatusBadge status={status} />
@@ -46,13 +57,13 @@ export function OnboardingFrame({
       </header>
 
       <div className="vo-steps-bar">
-        <ol className="vo-steps" aria-label="خطوات التسجيل">
+        <ol className="vo-steps" aria-label={t('خطوات التسجيل', 'Registration steps')}>
           {STEPS.map((label, i) => {
             const pos = i + 1;
             const state = pos < step ? 'done' : pos === step ? 'current' : 'todo';
             return (
               <li
-                key={label}
+                key={label.ar}
                 className="vo-steps__item"
                 data-state={state}
                 {...(pos === step ? { 'aria-current': 'step' as const } : {})}
@@ -62,8 +73,8 @@ export function OnboardingFrame({
                     {state === 'done' ? <Icon name="check" size={15} /> : <span className="num">{pos}</span>}
                   </span>
                   <span className="vo-steps__label">
-                    {label}
-                    {state === 'done' ? <span className="visually-hidden"> — مكتملة</span> : null}
+                    {pick(locale, label)}
+                    {state === 'done' ? <span className="visually-hidden">{t(' — مكتملة', ' — complete')}</span> : null}
                   </span>
                 </span>
                 {pos < STEPS.length ? <span className="vo-steps__line" aria-hidden /> : null}
@@ -100,11 +111,12 @@ export function OnboardingHead({
 }
 
 /** هيكل التحميل — شكل الصفحة قبل بياناتها، لا دوّار في فراغ */
-export function OnboardingLoading({ label = 'جارٍ تحميل حالة متجرك…' }: { label?: string }) {
+export function OnboardingLoading({ label }: { label?: string }) {
+  const t = useT();
   return (
     <div className="vo-loading" aria-busy="true">
       <span className="visually-hidden" role="status">
-        {label}
+        {label ?? t('جارٍ تحميل حالة متجرك…', 'Loading your shop status…')}
       </span>
       <span className="skeleton vo-loading__title" />
       <span className="skeleton vo-loading__block" />
@@ -121,17 +133,18 @@ export function OnboardingError({
   message: string;
   onRetry?: () => void;
 }) {
+  const t = useT();
   return (
     <div className="vo-error" role="alert">
       <span className="vo-error__icon" aria-hidden>
         <Icon name="alert" size={26} />
       </span>
-      <p className="vo-error__title">تعذّر تحميل حالة متجرك</p>
+      <p className="vo-error__title">{t('تعذّر تحميل حالة متجرك', "Couldn't load your shop status")}</p>
       <p className="vo-error__text">{message}</p>
       {onRetry ? (
         <button className="btn btn--primary" type="button" onClick={onRetry}>
           <Icon name="refresh" size={16} />
-          أعد المحاولة
+          {t('أعد المحاولة', 'Try again')}
         </button>
       ) : null}
     </div>

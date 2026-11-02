@@ -32,5 +32,24 @@ export const translator =
 
 export const pick = (locale: Locale, text: Bilingual): string => text[locale];
 
+/**
+ * اسم كتبه البائع (متجر، فئة، منتج): الإنجليزي حين يكون الموقع بالإنجليزية وكتبه، وإلا العربي
+ * كما كتبه — الاسم لا يُترجم آلياً.
+ */
+export const nameIn = (locale: Locale, x: { nameAr: string; nameEn?: string | null | undefined }): string =>
+  locale === 'en' && x.nameEn?.trim() ? x.nameEn : x.nameAr;
+
+/** نسخة اللغة من قيمتين بالشكل نفسه — `localized(locale, STATUS_LABEL, STATUS_LABEL_EN)[s]` */
+export const localized = <T>(locale: Locale, ar: T, en: T): T => (locale === 'en' ? en : ar);
+
 /** لغة Intl للتواريخ والأعداد: الأرقام لاتينية في اللغتين — DESIGN-SYSTEM §7 */
 export const intlLocale = (locale: Locale): string => (locale === 'ar' ? 'ar-u-nu-latn' : 'en-GB');
+
+/**
+ * لغة الصفحة من `<html lang>` — لما يعمل خارج React (رسائل عميل الواجهة البرمجية).
+ * في الخادم لا مستند: العربية.
+ */
+export function documentLocale(): Locale {
+  if (typeof document === 'undefined') return DEFAULT_LOCALE;
+  return document.documentElement.lang.toLowerCase().startsWith('en') ? 'en' : 'ar';
+}

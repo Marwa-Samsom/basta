@@ -8,6 +8,8 @@ import { DateField } from '@/components/date-field';
 import { Icon } from '@/components/icons';
 import { api, apiBlob } from '@/lib/api';
 import { labelOf, money, toneOf } from '@/lib/orders';
+import { useLocale, useT } from '@/components/locale';
+import { intlLocale, type Locale } from '@/lib/i18n';
 
 interface Point {
   day: string;
@@ -43,18 +45,22 @@ interface Report {
 }
 
 const PRESETS = [
-  { days: 7, label: '7 أيام' },
-  { days: 30, label: '30 يوماً' },
-  { days: 90, label: '90 يوماً' },
+  { days: 7, label: '7 أيام', en: '7 days' },
+  { days: 30, label: '30 يوماً', en: '30 days' },
+  { days: 90, label: '90 يوماً', en: '90 days' },
 ] as const;
 
 /** أيام UTC كما يقرؤها الخادم — «اليوم» هنا هو يوم الدفتر نفسه */
 const isoDay = (d: Date): string => d.toISOString().slice(0, 10);
 const shift = (iso: string, days: number): string => isoDay(new Date(new Date(`${iso}T00:00:00Z`).getTime() + days * 86_400_000));
 
-const dateFmt = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-const shortFmt = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'numeric', timeZone: 'UTC' });
-const fmt = (iso: string, f = dateFmt) => f.format(new Date(`${iso}T00:00:00Z`));
+const formatsOf = (locale: Locale) => ({
+  date: new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }),
+  short: new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'numeric', timeZone: 'UTC' }),
+});
+const FORMATS: Readonly<Record<Locale, ReturnType<typeof formatsOf>>> = { ar: formatsOf('ar'), en: formatsOf('en') };
+const fmt = (iso: string, locale: Locale, kind: 'date' | 'short' = 'date') =>
+  FORMATS[locale][kind].format(new Date(`${iso}T00:00:00Z`));
 
 interface Bar {
   label: string;
@@ -67,7 +73,7 @@ interface Bar {
  * أعمدة الرسم: يومياً حتى 14 يوماً، وإلا مجموعات متساوية لا تتجاوز 12 عموداً
  * — كما في التصميم (7 أعمدة لأسبوع، 10–12 لما فوقه).
  */
-function bars(series: Point[]): Bar[] {
+function bars(series: Point[], locale: Locale): Bar[] {
   const size = series.length <= 14 ? 1 : Math.ceil(series.length / 12);
   const out: Bar[] = [];
   for (let i = 0; i < series.length; i += size) {
@@ -75,8 +81,8 @@ function bars(series: Point[]): Bar[] {
     const first = chunk[0]!.day;
     const last = chunk[chunk.length - 1]!.day;
     out.push({
-      label: fmt(first, shortFmt),
-      title: size === 1 ? fmt(first) : `${fmt(first)} – ${fmt(last)}`,
+      label: fmt(first, locale, 'short'),
+      title: size === 1 ? fmt(first, locale) : `${fmt(first, locale)} – ${fmt(last, locale)}`,
       sales: chunk.reduce((a, p) => a + BigInt(p.salesMinorUnits), 0n),
       orders: chunk.reduce((a, p) => a + p.orders, 0),
     });
@@ -85,24 +91,29 @@ function bars(series: Point[]): Bar[] {
 }
 
 function Chart({ c }: { c: CurrencyReport }) {
+  const t = useT();
+  const locale = useLocale();
   const [metric, setMetric] = useState<'sales' | 'orders'>('sales');
-  const data = bars(c.series);
+  const data = bars(c.series, locale);
   const value = (b: Bar): number => (metric === 'sales' ? Number(b.sales) : b.orders);
   const max = Math.max(1, ...data.map(value));
-  const text = (b: Bar) => (metric === 'sales' ? money(b.sales, c.currency) : `${b.orders} طلباً`);
+  const text = (b: Bar) =>
+    metric === 'sales'
+      ? money(b.sales, c.currency, locale)
+      : t(`${b.orders} طلباً`, `${b.orders} ${b.orders === 1 ? 'order' : 'orders'}`);
 
   return (
     <section className="vx-card" aria-labelledby={`vx-chart-${c.currency}`}>
       <div className="vx-card__head">
         <h3 className="vx-card__title" id={`vx-chart-${c.currency}`}>
-          المبيعات والطلبات
+          {t('المبيعات والطلبات', 'Sales and orders')}
         </h3>
-        <span className="vx-card__end vx-pills" role="group" aria-label="المؤشّر">
+        <span className="vx-card__end vx-pills" role="group" aria-label={t('المؤشّر', 'Metric')}>
           <button type="button" className="vx-pill" aria-pressed={metric === 'sales'} onClick={() => setMetric('sales')}>
-            المبيعات
+            {t('المبيعات', 'Sales')}
           </button>
           <button type="button" className="vx-pill" aria-pressed={metric === 'orders'} onClick={() => setMetric('orders')}>
-            الطلبات
+            {t('الطلبات', 'Orders')}
           </button>
         </span>
       </div>
@@ -119,7 +130,9 @@ function Chart({ c }: { c: CurrencyReport }) {
       </div>
       {/* الرسم لقارئ الشاشة: الأرقام نفسها جدولاً */}
       <table className="visually-hidden">
-        <caption>{metric === 'sales' ? 'المبيعات' : 'الطلبات'} لكل فترة</caption>
+        <caption>
+          {metric === 'sales' ? t('المبيعات', 'Sales') : t('الطلبات', 'Orders')} {t('لكل فترة', 'per period')}
+        </caption>
         <tbody>
           {data.map((b) => (
             <tr key={b.title}>
@@ -131,38 +144,43 @@ function Chart({ c }: { c: CurrencyReport }) {
       </table>
       <p className="vx-hint">
         <Icon name="info" size={13} />
-        مرّر على العمود لترى قيمته. المبيعات من دفترك (قيود البيع)، بعملة التسوية {c.currency}، وأيام الرسم بتوقيت UTC كأيام الدفتر.
+        {t(
+          `مرّر على العمود لترى قيمته. المبيعات من دفترك (قيود البيع)، بعملة التسوية ${c.currency}، وأيام الرسم بتوقيت UTC كأيام الدفتر.`,
+          `Hover over a bar to see its value. Sales come from your ledger (sale entries), in settlement currency ${c.currency}; chart days are in UTC, like the ledger.`,
+        )}
       </p>
     </section>
   );
 }
 
 function CurrencySection({ c, report, multi }: { c: CurrencyReport; report: Report; multi: boolean }) {
+  const t = useT();
+  const locale = useLocale();
   const rate = report.orders.returnRatePct;
   return (
-    <section className="vx-currency" aria-label={`أرقام ${c.currency}`}>
-      {multi ? <h2 className="vx-currency__title">بعملة {c.currency}</h2> : null}
+    <section className="vx-currency" aria-label={t(`أرقام ${c.currency}`, `${c.currency} figures`)}>
+      {multi ? <h2 className="vx-currency__title">{t(`بعملة ${c.currency}`, `In ${c.currency}`)}</h2> : null}
 
       <div className="vx-kpis">
         <div className="stat stat--money">
-          <span className="stat__label">المبيعات</span>
-          <span className="stat__value money num">{money(c.salesMinorUnits, c.currency)}</span>
-          <span className="stat__note">قيمة منتجاتك المبيعة — بعملة تسويتك</span>
+          <span className="stat__label">{t('المبيعات', 'Sales')}</span>
+          <span className="stat__value money num">{money(c.salesMinorUnits, c.currency, locale)}</span>
+          <span className="stat__note">{t('قيمة منتجاتك المبيعة — بعملة تسويتك', 'Value of your products sold — in your settlement currency')}</span>
         </div>
         <div className="stat">
-          <span className="stat__label">الطلبات</span>
+          <span className="stat__label">{t('الطلبات', 'Orders')}</span>
           <span className="stat__value num">{c.paidOrders}</span>
-          <span className="stat__note">طلبات مدفوعة في المدى</span>
+          <span className="stat__note">{t('طلبات مدفوعة في المدى', 'Paid orders in this range')}</span>
         </div>
         <div className="stat stat--money">
-          <span className="stat__label">العمولة المدفوعة</span>
-          <span className="stat__value money num">{money(c.commissionMinorUnits, c.currency)}</span>
-          <span className="stat__note">بعد ردّ عمولة القطع المرتجعة</span>
+          <span className="stat__label">{t('العمولة المدفوعة', 'Commission paid')}</span>
+          <span className="stat__value money num">{money(c.commissionMinorUnits, c.currency, locale)}</span>
+          <span className="stat__note">{t('بعد ردّ عمولة القطع المرتجعة', 'After commission refunded on returned items')}</span>
         </div>
         <div className="stat">
-          <span className="stat__label">نسبة الإرجاع</span>
+          <span className="stat__label">{t('نسبة الإرجاع', 'Return rate')}</span>
           <span className={`stat__value num${rate !== null && rate > 4 ? ' vx-kpi__warn' : ''}`}>{rate === null ? '—' : `${rate.toFixed(1)}%`}</span>
-          <span className="stat__note">من الطلبات المسلّمة</span>
+          <span className="stat__note">{t('من الطلبات المسلّمة', 'Of delivered orders')}</span>
         </div>
       </div>
 
@@ -172,23 +190,23 @@ function CurrencySection({ c, report, multi }: { c: CurrencyReport; report: Repo
         <section className="vx-card vx-card--flush" aria-labelledby={`vx-top-${c.currency}`}>
           <div className="vx-card__head vx-card__head--bar">
             <h3 className="vx-card__title" id={`vx-top-${c.currency}`}>
-              الأكثر مبيعاً
+              {t('الأكثر مبيعاً', 'Best sellers')}
             </h3>
           </div>
           {c.topProducts.length === 0 ? (
-            <p className="vm-list-empty">لا مبيعات في هذا المدى.</p>
+            <p className="vm-list-empty">{t('لا مبيعات في هذا المدى.', 'No sales in this range.')}</p>
           ) : (
-            <div role="table" aria-label="الأكثر مبيعاً">
+            <div role="table" aria-label={t('الأكثر مبيعاً', 'Best sellers')}>
               <div role="row" className="vx-top__row vx-top__row--head">
                 <span role="columnheader" className="num">
                   #
                 </span>
-                <span role="columnheader">المنتج</span>
+                <span role="columnheader">{t('المنتج', 'Product')}</span>
                 <span role="columnheader" className="vx-top__num">
-                  الوحدات
+                  {t('الوحدات', 'Units')}
                 </span>
                 <span role="columnheader" className="vx-top__num">
-                  قيمة المنتجات
+                  {t('قيمة المنتجات', 'Product value')}
                 </span>
               </div>
               {c.topProducts.map((p, i) => (
@@ -203,7 +221,7 @@ function CurrencySection({ c, report, multi }: { c: CurrencyReport; report: Repo
                     {p.units}
                   </span>
                   <span role="cell" className="vx-top__money money num">
-                    {money(p.revenueMinorUnits, c.currency)}
+                    {money(p.revenueMinorUnits, c.currency, locale)}
                   </span>
                 </div>
               ))}
@@ -213,50 +231,52 @@ function CurrencySection({ c, report, multi }: { c: CurrencyReport; report: Repo
 
         <section className="vx-card" aria-labelledby={`vx-misc-${c.currency}`}>
           <h3 className="vx-card__title" id={`vx-misc-${c.currency}`}>
-            مؤشرات أخرى
+            {t('مؤشرات أخرى', 'Other indicators')}
           </h3>
           <ul className="vx-misc">
             <li className="vx-misc__row">
               <span className="vx-misc__text">
-                <span className="vx-misc__label">صافي أرباحك</span>
-                <span className="vx-misc__note">المبيعات + الشحن − العمولة − المرتجعات ± التسويات</span>
+                <span className="vx-misc__label">{t('صافي أرباحك', 'Your net earnings')}</span>
+                <span className="vx-misc__note">
+                  {t('المبيعات + الشحن − العمولة − المرتجعات ± التسويات', 'Sales + shipping − commission − returns ± adjustments')}
+                </span>
               </span>
-              <span className="vx-misc__value money num">{money(c.netMinorUnits, c.currency)}</span>
+              <span className="vx-misc__value money num">{money(c.netMinorUnits, c.currency, locale)}</span>
             </li>
             <li className="vx-misc__row">
               <span className="vx-misc__text">
-                <span className="vx-misc__label">متوسط قيمة الطلب</span>
-                <span className="vx-misc__note">المبيعات ÷ الطلبات</span>
+                <span className="vx-misc__label">{t('متوسط قيمة الطلب', 'Average order value')}</span>
+                <span className="vx-misc__note">{t('المبيعات ÷ الطلبات', 'Sales ÷ orders')}</span>
               </span>
-              <span className="vx-misc__value money num">{money(c.averageOrderMinorUnits, c.currency)}</span>
+              <span className="vx-misc__value money num">{money(c.averageOrderMinorUnits, c.currency, locale)}</span>
             </li>
             <li className="vx-misc__row">
               <span className="vx-misc__text">
-                <span className="vx-misc__label">الشحن المحصَّل</span>
-                <span className="vx-misc__note">لا عمولة على الشحن</span>
+                <span className="vx-misc__label">{t('الشحن المحصَّل', 'Shipping collected')}</span>
+                <span className="vx-misc__note">{t('لا عمولة على الشحن', 'No commission on shipping')}</span>
               </span>
-              <span className="vx-misc__value money num">{money(c.shippingMinorUnits, c.currency)}</span>
+              <span className="vx-misc__value money num">{money(c.shippingMinorUnits, c.currency, locale)}</span>
             </li>
             <li className="vx-misc__row">
               <span className="vx-misc__text">
-                <span className="vx-misc__label">المرتجعات</span>
-                <span className="vx-misc__note">ما رُدّ من مبيعاتك للمشترين</span>
+                <span className="vx-misc__label">{t('المرتجعات', 'Returns')}</span>
+                <span className="vx-misc__note">{t('ما رُدّ من مبيعاتك للمشترين', 'Sales refunded to buyers')}</span>
               </span>
-              <span className="vx-misc__value money num">{money(c.refundsMinorUnits, c.currency)}</span>
+              <span className="vx-misc__value money num">{money(c.refundsMinorUnits, c.currency, locale)}</span>
             </li>
             {c.adjustmentsMinorUnits !== '0' ? (
               <li className="vx-misc__row">
                 <span className="vx-misc__text">
-                  <span className="vx-misc__label">تسويات</span>
-                  <span className="vx-misc__note">قيود تصحيح من الإدارة وفروق صرف</span>
+                  <span className="vx-misc__label">{t('تسويات', 'Adjustments')}</span>
+                  <span className="vx-misc__note">{t('قيود تصحيح من الإدارة وفروق صرف', 'Correction entries from admin and exchange differences')}</span>
                 </span>
-                <span className="vx-misc__value money num">{money(c.adjustmentsMinorUnits, c.currency)}</span>
+                <span className="vx-misc__value money num">{money(c.adjustmentsMinorUnits, c.currency, locale)}</span>
               </li>
             ) : null}
             <li className="vx-misc__row">
               <span className="vx-misc__text">
-                <span className="vx-misc__label">طلبات رُفضت منك</span>
-                <span className="vx-misc__note">تؤثّر على تقييم متجرك</span>
+                <span className="vx-misc__label">{t('طلبات رُفضت منك', 'Orders you rejected')}</span>
+                <span className="vx-misc__note">{t('تؤثّر على تقييم متجرك', "Affects your shop's rating")}</span>
               </span>
               <span className={`vx-misc__value num${report.orders.rejectedByVendor > 0 ? ' vx-misc__value--danger' : ''}`}>
                 {report.orders.rejectedByVendor}
@@ -276,6 +296,8 @@ function CurrencySection({ c, report, multi }: { c: CurrencyReport; report: Repo
  * ريال إلى دينار. المدى أيام كاملة: 7 أو 30 أو 90 يوماً حتى اليوم، أو من–إلى.
  */
 export default function ReportsPage() {
+  const t = useT();
+  const locale = useLocale();
   const today = isoDay(new Date());
   const [preset, setPreset] = useState<number | null>(30);
   const [from, setFrom] = useState(shift(today, -29));
@@ -326,14 +348,14 @@ export default function ReportsPage() {
   return (
     <div className="vm-page">
       <PageHead
-        title="التقارير"
-        meta={data ? `${fmt(data.range.from)} – ${fmt(data.range.to)}` : undefined}
+        title={t('التقارير', 'Reports')}
+        meta={data ? `${fmt(data.range.from, locale)} – ${fmt(data.range.to, locale)}` : undefined}
         actions={
           <span className="vx-range">
-            <span className="seg" role="group" aria-label="المدى">
+            <span className="seg" role="group" aria-label={t('المدى', 'Range')}>
               {PRESETS.map((p) => (
                 <button key={p.days} type="button" className="seg__opt" aria-pressed={preset === p.days} onClick={() => pick(p.days)}>
-                  {p.label}
+                  {t(p.label, p.en)}
                 </button>
               ))}
             </span>
@@ -351,9 +373,9 @@ export default function ReportsPage() {
 
       <div className="vx-range">
         <span className="vx-range__dates">
-          من
+          {t('من', 'From')}
           <DateField
-            label="من"
+            label={t('من', 'From')}
             value={from}
             max={to}
             onChange={(v) => {
@@ -364,9 +386,9 @@ export default function ReportsPage() {
           />
         </span>
         <span className="vx-range__dates">
-          إلى
+          {t('إلى', 'To')}
           <DateField
-            label="إلى"
+            label={t('إلى', 'To')}
             value={to}
             min={from}
             max={today}
@@ -377,7 +399,7 @@ export default function ReportsPage() {
             }}
           />
         </span>
-        {loading && data ? <span className="vx-range__dates">جارٍ التحديث…</span> : null}
+        {loading && data ? <span className="vx-range__dates">{t('جارٍ التحديث…', 'Updating…')}</span> : null}
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -385,14 +407,17 @@ export default function ReportsPage() {
       {!data ? (
         error ? null : (
           <div className="vm-loading vm-loading--page" role="status">
-            <span className="visually-hidden">جارٍ حساب التقرير…</span>
+            <span className="visually-hidden">{t('جارٍ حساب التقرير…', 'Calculating the report…')}</span>
             <span className="skeleton vm-loading__block" />
             <span className="skeleton vm-loading__panel" />
           </div>
         )
       ) : data.currencies.length === 0 ? (
-        <EmptyState icon="chart" title="لا مبيعات في هذا المدى">
-          اختر مدى أطول، أو عد بعد أول طلب مدفوع — تظهر أرقامك هنا من دفترك مباشرة.
+        <EmptyState icon="chart" title={t('لا مبيعات في هذا المدى', 'No sales in this range')}>
+          {t(
+            'اختر مدى أطول، أو عد بعد أول طلب مدفوع — تظهر أرقامك هنا من دفترك مباشرة.',
+            'Pick a longer range, or come back after your first paid order — your figures show here straight from your ledger.',
+          )}
         </EmptyState>
       ) : (
         data.currencies.map((c) => <CurrencySection key={c.currency} c={c} report={data} multi={data.currencies.length > 1} />)
@@ -402,16 +427,17 @@ export default function ReportsPage() {
         <section className="vx-card" aria-labelledby="vx-status-title">
           <div className="vx-card__head">
             <h2 className="vx-card__title" id="vx-status-title">
-              الطلبات حسب الحالة
+              {t('الطلبات حسب الحالة', 'Orders by status')}
             </h2>
             <span className="vx-card__sub">
-              <span className="num">{data.orders.total}</span> طلباً وصلك في المدى
+              <span className="num">{data.orders.total}</span>{' '}
+              {t('طلباً وصلك في المدى', data.orders.total === 1 ? 'order received in this range' : 'orders received in this range')}
             </span>
           </div>
           <ul className="vx-misc">
             {statuses.map(([s, n]) => (
               <li key={s} className="vx-misc__row">
-                <span className={`badge ${toneOf(s)}`}>{labelOf(s)}</span>
+                <span className={`badge ${toneOf(s)}`}>{labelOf(s, locale)}</span>
                 <span className="vx-misc__value num">{n}</span>
               </li>
             ))}

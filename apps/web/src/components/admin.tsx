@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons';
+import { useT } from './locale';
 import { Alert, Spinner, TextArea } from './ui';
 
 /**
@@ -51,11 +52,14 @@ export function Loading({
   onRetry?: (() => void) | undefined;
   inline?: boolean;
 }) {
+  const t = useT();
   if (forbidden) {
     return (
       <div className="ao-note" data-tone="warning" role="status">
         <Icon name="lock" size={16} />
-        <span>هذه الصفحة تحتاج صلاحية لا يملكها حسابك. {error}</span>
+        <span>
+          {t('هذه الصفحة تحتاج صلاحية لا يملكها حسابك.', "This page needs a permission your account doesn't have.")} {error}
+        </span>
       </div>
     );
   }
@@ -66,21 +70,21 @@ export function Loading({
         <span className="ao-error__icon" aria-hidden>
           <Icon name="alert" size={25} />
         </span>
-        <p className="ao-error__title">حدث خلل غير متوقّع ولم يكتمل طلبك</p>
+        <p className="ao-error__title">{t('حدث خلل غير متوقّع ولم يكتمل طلبك', "Something unexpected went wrong and your request wasn't completed")}</p>
         <p className="ao-error__body">{error}</p>
         {onRetry ? (
           <button type="button" className="btn btn--primary" onClick={onRetry}>
             <Icon name="refresh" size={16} />
-            أعد المحاولة
+            {t('أعد المحاولة', 'Try again')}
           </button>
         ) : null}
       </div>
     );
   }
-  if (inline) return <Spinner label={label ?? 'جارٍ التحميل…'} />;
+  if (inline) return <Spinner label={label ?? t('جارٍ التحميل…', 'Loading…')} />;
   return (
     <div className="ao-skel" role="status" aria-live="polite">
-      <span className="visually-hidden">{label ?? 'جارٍ التحميل…'}</span>
+      <span className="visually-hidden">{label ?? t('جارٍ التحميل…', 'Loading…')}</span>
       <span className="skeleton ao-skel__line" aria-hidden />
       <span className="skeleton ao-skel__block" aria-hidden />
       <span className="skeleton ao-skel__table" aria-hidden />
@@ -105,17 +109,18 @@ export function Feedback({ error, notice }: { error: string | null; notice: stri
 }
 
 function Toast({ message }: { message: string }) {
+  const t = useT();
   const [open, setOpen] = useState(true);
   useEffect(() => {
-    const t = window.setTimeout(() => setOpen(false), 6000);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => setOpen(false), 6000);
+    return () => window.clearTimeout(timer);
   }, []);
   if (!open) return null;
   return (
     <div className="ao-toast">
       <Icon name="check-circle" size={18} />
       <span className="ao-toast__msg">{message}</span>
-      <button type="button" className="ao-toast__close" aria-label="إغلاق" onClick={() => setOpen(false)}>
+      <button type="button" className="ao-toast__close" aria-label={t('إغلاق', 'Close')} onClick={() => setOpen(false)}>
         <Icon name="x" size={15} />
       </button>
     </div>
@@ -148,6 +153,7 @@ export function ReasonButton({
   icon?: IconName;
   onSubmit: (reason: string) => Promise<boolean>;
 }) {
+  const t = useT();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [reason, setReason] = useState('');
@@ -169,7 +175,7 @@ export function ReasonButton({
       <dialog ref={ref} className="ao-dialog" aria-labelledby={titleId}>
         <div className="ao-dialog__head">
           <h2 id={titleId}>{label}</h2>
-          <button type="button" className="icon-btn icon-btn--sm ao-dialog__x" aria-label="إغلاق" onClick={() => ref.current?.close()}>
+          <button type="button" className="icon-btn icon-btn--sm ao-dialog__x" aria-label={t('إغلاق', 'Close')} onClick={() => ref.current?.close()}>
             <Icon name="x" size={18} />
           </button>
         </div>
@@ -184,8 +190,8 @@ export function ReasonButton({
             </div>
           ) : null}
           <TextArea
-            label="السبب"
-            hint={hint ?? 'يُحفظ في السجل ويُعرض لصاحب الشأن كما تكتبه.'}
+            label={t('السبب', 'Reason')}
+            hint={hint ?? t('يُحفظ في السجل ويُعرض لصاحب الشأن كما تكتبه.', "It's saved in the log and shown to the person concerned exactly as you write it.")}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
@@ -193,7 +199,7 @@ export function ReasonButton({
         </div>
         <div className="ao-dialog__foot">
           <button type="button" className="btn btn--secondary" onClick={() => ref.current?.close()}>
-            تراجع
+            {t('تراجع', 'Cancel')}
           </button>
           <button
             type="button"

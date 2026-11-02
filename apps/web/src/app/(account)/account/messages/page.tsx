@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { MessagesInbox } from '@/components/messages';
+import { serverT } from '@/lib/i18n-server';
 
-export const metadata: Metadata = { title: 'رسائلي', robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t('رسائلي', 'My messages'), robots: { index: false } };
+}
 
 /**
  * ST-28 — رسائلي: محادثات المشتري مع المتاجر. `?c=<id>` يفتح محادثة بعينها

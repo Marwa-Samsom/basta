@@ -4,9 +4,11 @@ import { Fragment, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { ClearableInput, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAction, useAdminData } from '@/lib/admin';
+import { intlLocale, localized, type Locale } from '@/lib/i18n';
 
 interface Attr {
   id: string;
@@ -27,10 +29,19 @@ interface Usage {
   variantOptions: number;
 }
 
-const num = (n: number) => n.toLocaleString('ar-u-nu-latn');
+const num = (n: number, locale: Locale = 'ar') => n.toLocaleString(intlLocale(locale));
 
 /** «مستعملة في 12 منتجاً و95,017 متغيّراً» — أو «غير مستعملة» */
-function usageText(u: Usage & { productImages?: number }): string {
+function usageText(u: Usage & { productImages?: number }, locale: Locale = 'ar'): string {
+  if (locale === 'en') {
+    const en = [
+      u.productValues ? `${num(u.productValues, locale)} ${u.productValues === 1 ? 'product' : 'products'}` : null,
+      u.variantOptions ? `${num(u.variantOptions, locale)} ${u.variantOptions === 1 ? 'variant' : 'variants'}` : null,
+      u.productImages ? `${num(u.productImages, locale)} ${u.productImages === 1 ? 'image' : 'images'}` : null,
+    ].filter((p): p is string => p !== null);
+    if (!en.length) return 'Not used';
+    return `Used in ${en.length > 1 ? `${en.slice(0, -1).join(', ')} and ${en.at(-1)}` : en[0]}`;
+  }
   const parts = [
     u.productValues ? `${num(u.productValues)} منتجاً` : null,
     u.variantOptions ? `${num(u.variantOptions)} متغيّراً` : null,
@@ -42,6 +53,7 @@ function usageText(u: Usage & { productImages?: number }): string {
 const usedCount = (u: Usage & { productImages?: number }) => u.productValues + u.variantOptions + (u.productImages ?? 0);
 
 const TYPES: Record<string, string> = { select: 'قائمة', multiselect: 'قائمة متعددة', number: 'رقم', text: 'نص', boolean: 'نعم/لا' };
+const TYPES_EN: Record<string, string> = { select: 'List', multiselect: 'Multi-select list', number: 'Number', text: 'Text', boolean: 'Yes/No' };
 
 /**
  * AD-09 الخصائص — مكتبة عامة (اللون، المقاس، الضمان…) يستعملها أي منتج. كانت تُربط
@@ -50,11 +62,15 @@ const TYPES: Record<string, string> = { select: 'قائمة', multiselect: 'قا
  * متغيّراته ومواصفات منتجه.
  */
 export default function AdminAttributesPage() {
+  const t = useT();
   return (
     <div className="ac2-page">
       <AdminHeader
-        title="الخصائص"
-        hint="مكتبة عامة يختار منها كل بائع محاور متغيّراته (مقاس، لون) ومواصفات منتجه. فئات المتاجر يديرها البائعون أنفسهم."
+        title={t('الخصائص', 'Attributes')}
+        hint={t(
+          'مكتبة عامة يختار منها كل بائع محاور متغيّراته (مقاس، لون) ومواصفات منتجه. فئات المتاجر يديرها البائعون أنفسهم.',
+          'A shared library each seller picks their variant axes (size, color) and product specs from. Shop categories are managed by the sellers themselves.',
+        )}
       />
       <Attributes />
     </div>
@@ -62,12 +78,15 @@ export default function AdminAttributesPage() {
 }
 
 const ATTR_FILTERS = [
-  { key: 'all', label: 'الكل', test: () => true },
-  { key: 'axis', label: 'محاور المتغيّرات', test: (a: Attr) => a.isVariantAxis },
-  { key: 'filter', label: 'قابلة للتصفية', test: (a: Attr) => a.isFilterable },
+  { key: 'all', label: 'الكل', en: 'All', test: () => true },
+  { key: 'axis', label: 'محاور المتغيّرات', en: 'Variant axes', test: (a: Attr) => a.isVariantAxis },
+  { key: 'filter', label: 'قابلة للتصفية', en: 'Filterable', test: (a: Attr) => a.isFilterable },
 ];
 
 function Attributes() {
+  const t = useT();
+  const locale = useLocale();
+  const types = localized(locale, TYPES, TYPES_EN);
   const { data, error, forbidden, reload } = useAdminData<Attr[]>('/admin/attributes');
   const act = useAction();
   const [draft, setDraft] = useState({ code: '', nameAr: '', inputType: 'select', unit: '', values: '', isFilterable: true, isVariantAxis: false });
@@ -84,10 +103,10 @@ function Attributes() {
   return (
     <div className="ac2-page">
       <div className="toolbar">
-        <div className="tabs" role="tablist" aria-label="تصفية الخصائص">
+        <div className="tabs" role="tablist" aria-label={t('تصفية الخصائص', 'Filter attributes')}>
           {ATTR_FILTERS.map((f) => (
             <button key={f.key} type="button" role="tab" className="tabs__tab" aria-selected={filter === f.key} onClick={() => setFilter(f.key)}>
-              {f.label}
+              {t(f.label, f.en)}
               <span className="tabs__count">{data.filter(f.test).length}</span>
             </button>
           ))}
@@ -95,11 +114,18 @@ function Attributes() {
         <div className="toolbar__end">
           <label className="input-icon ac2-search">
             <Icon name="search" size={15} />
-            <input type="search" className="field__control" placeholder="ابحث باسم الخصيصة أو رمزها" aria-label="ابحث في الخصائص" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input
+              type="search"
+              className="field__control"
+              placeholder={t('ابحث باسم الخصيصة أو رمزها', 'Search by attribute name or code')}
+              aria-label={t('ابحث في الخصائص', 'Search attributes')}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
           </label>
           <button type="button" className="btn btn--primary" aria-expanded={showNew} onClick={() => setShowNew((v) => !v)}>
             <Icon name="plus" size={15} />
-            خصيصة جديدة
+            {t('خصيصة جديدة', 'New attribute')}
           </button>
         </div>
       </div>
@@ -107,21 +133,21 @@ function Attributes() {
       <Feedback error={act.error} notice={act.notice} />
 
       {showNew ? (
-        <section className="card" aria-label="خصيصة جديدة">
-          <h2 className="ac2-title">خصيصة جديدة</h2>
+        <section className="card" aria-label={t('خصيصة جديدة', 'New attribute')}>
+          <h2 className="ac2-title">{t('خصيصة جديدة', 'New attribute')}</h2>
           <div className="ac2-form">
             <label className="field">
-              <span className="field__label">الرمز (لاتيني)</span>
+              <span className="field__label">{t('الرمز (لاتيني)', 'Code (Latin letters)')}</span>
               <ClearableInput className="field__control num" dir="ltr" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value.toLowerCase() })} />
             </label>
             <label className="field">
-              <span className="field__label">الاسم</span>
+              <span className="field__label">{t('الاسم', 'Name')}</span>
               <ClearableInput className="field__control" value={draft.nameAr} onChange={(e) => setDraft({ ...draft, nameAr: e.target.value })} />
             </label>
             <label className="field">
-              <span className="field__label">النوع</span>
+              <span className="field__label">{t('النوع', 'Type')}</span>
               <select className="field__control" value={draft.inputType} onChange={(e) => setDraft({ ...draft, inputType: e.target.value })}>
-                {Object.entries(TYPES).map(([k, v]) => (
+                {Object.entries(types).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v}
                   </option>
@@ -130,22 +156,24 @@ function Attributes() {
             </label>
             {draft.inputType === 'number' ? (
               <label className="field">
-                <span className="field__label">الوحدة</span>
+                <span className="field__label">{t('الوحدة', 'Unit')}</span>
                 <ClearableInput className="field__control" value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} />
               </label>
             ) : null}
             {draft.inputType === 'select' || draft.inputType === 'multiselect' ? (
               <label className="field ac2-form__wide">
-                <span className="field__label">القيم (مفصولة بفاصلة)</span>
+                <span className="field__label">{t('القيم (مفصولة بفاصلة)', 'Values (comma-separated)')}</span>
                 <ClearableInput className="field__control" value={draft.values} onChange={(e) => setDraft({ ...draft, values: e.target.value })} />
               </label>
             ) : null}
             <div className="ac2-form__actions ac2-form__wide">
               <label className="ac2-check">
-                <input type="checkbox" checked={draft.isFilterable} onChange={(e) => setDraft({ ...draft, isFilterable: e.target.checked })} /> تُفلتر بها النتائج
+                <input type="checkbox" checked={draft.isFilterable} onChange={(e) => setDraft({ ...draft, isFilterable: e.target.checked })} />{' '}
+                {t('تُفلتر بها النتائج', 'Results can be filtered by it')}
               </label>
               <label className="ac2-check">
-                <input type="checkbox" checked={draft.isVariantAxis} onChange={(e) => setDraft({ ...draft, isVariantAxis: e.target.checked })} /> محور متغيّرات (مقاس، لون)
+                <input type="checkbox" checked={draft.isVariantAxis} onChange={(e) => setDraft({ ...draft, isVariantAxis: e.target.checked })} />{' '}
+                {t('محور متغيّرات (مقاس، لون)', 'Variant axis (size, color)')}
               </label>
               <span className="ac2-end">
                 <button
@@ -169,10 +197,10 @@ function Attributes() {
                       });
                       setDraft({ code: '', nameAr: '', inputType: 'select', unit: '', values: '', isFilterable: true, isVariantAxis: false });
                       reload();
-                    }, 'أُضيفت الخصيصة.')
+                    }, t('أُضيفت الخصيصة.', 'Attribute added.'))
                   }
                 >
-                  أضف الخصيصة
+                  {t('أضف الخصيصة', 'Add attribute')}
                 </button>
               </span>
             </div>
@@ -183,30 +211,32 @@ function Attributes() {
       {shown.length === 0 ? (
         <EmptyState
           icon="file"
-          title={data.length === 0 ? 'لا خصائص بعد' : 'لا خصائص بهذه التصفية'}
+          title={data.length === 0 ? t('لا خصائص بعد', 'No attributes yet') : t('لا خصائص بهذه التصفية', 'No attributes match this filter')}
           actions={
             data.length === 0 ? null : (
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => (setFilter('all'), setQ(''))}>
-                أزل التصفية
+                {t('أزل التصفية', 'Clear filter')}
               </button>
             )
           }
         >
-          {data.length === 0 ? 'أضف أول خصيصة من «خصيصة جديدة» — يراها كل بائع في محرّر منتجه.' : 'جرّب تصفية أخرى.'}
+          {data.length === 0
+            ? t('أضف أول خصيصة من «خصيصة جديدة» — يراها كل بائع في محرّر منتجه.', 'Add the first attribute from “New attribute” — every seller sees it in their product editor.')
+            : t('جرّب تصفية أخرى.', 'Try another filter.')}
         </EmptyState>
       ) : (
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th scope="col">الاسم</th>
-                <th scope="col">الرمز</th>
-                <th scope="col">النوع</th>
-                <th scope="col">الوحدة</th>
-                <th scope="col">للتصفية</th>
-                <th scope="col">محور</th>
+                <th scope="col">{t('الاسم', 'Name')}</th>
+                <th scope="col">{t('الرمز', 'Code')}</th>
+                <th scope="col">{t('النوع', 'Type')}</th>
+                <th scope="col">{t('الوحدة', 'Unit')}</th>
+                <th scope="col">{t('للتصفية', 'Filterable')}</th>
+                <th scope="col">{t('محور', 'Axis')}</th>
                 <th scope="col" className="end">
-                  <span className="visually-hidden">إجراء</span>
+                  <span className="visually-hidden">{t('إجراء', 'Action')}</span>
                 </th>
               </tr>
             </thead>
@@ -219,23 +249,25 @@ function Attributes() {
                     <td>
                       <span className="ac2-inline">
                         <strong>{a.nameAr}</strong>
-                        {a.archivedAt ? <span className="badge badge--pending">مؤرشفة</span> : null}
+                        {a.archivedAt ? <span className="badge badge--pending">{t('مؤرشفة', 'Archived')}</span> : null}
                       </span>
                     </td>
-                    <td className="num" data-label="الرمز">
+                    <td className="num" data-label={t('الرمز', 'Code')}>
                       {a.code}
                     </td>
-                    <td className="small" data-label="النوع">
-                      {TYPES[a.inputType] ?? a.inputType}
+                    <td className="small" data-label={t('النوع', 'Type')}>
+                      {types[a.inputType] ?? a.inputType}
                     </td>
-                    <td className="num ac2-muted-cell" data-label="الوحدة">
+                    <td className="num ac2-muted-cell" data-label={t('الوحدة', 'Unit')}>
                       {a.unit ?? '—'}
                     </td>
-                    <td data-label="للتصفية">{a.isFilterable ? <span className="badge badge--success">نعم</span> : <span className="badge badge--pending">لا</span>}</td>
-                    <td data-label="محور">{a.isVariantAxis ? <span className="badge badge--brand">محور</span> : <span className="badge badge--pending">—</span>}</td>
+                    <td data-label={t('للتصفية', 'Filterable')}>
+                      {a.isFilterable ? <span className="badge badge--success">{t('نعم', 'Yes')}</span> : <span className="badge badge--pending">{t('لا', 'No')}</span>}
+                    </td>
+                    <td data-label={t('محور', 'Axis')}>{a.isVariantAxis ? <span className="badge badge--brand">{t('محور', 'Axis')}</span> : <span className="badge badge--pending">—</span>}</td>
                     <td className="end" data-label="">
                       <button type="button" className="btn btn--secondary btn--sm" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : a.id)}>
-                        {isOpen ? 'أغلق' : 'حرّر'}
+                        {isOpen ? t('أغلق', 'Close') : t('حرّر', 'Edit')}
                       </button>
                     </td>
                   </tr>
@@ -263,6 +295,8 @@ function Attributes() {
  * أرشفة (ACFG-099، 1 نوفمبر 2026). الرمز والنوع والمحور ثابتة: المنتجات تشير إليها.
  */
 function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: () => void; onDeleted: () => void }) {
+  const t = useT();
+  const locale = useLocale();
   const act = useAction();
   const confirm = useConfirm();
   const [name, setName] = useState(a.nameAr);
@@ -277,12 +311,14 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
       <div className="stack stack--tight">
         <Feedback error={act.error} notice={act.notice} />
         <span className="ac2-fine">
-          {usageText(a._count)}
-          {a.archivedAt ? ' — مؤرشفة: لا تظهر لمنتج جديد، وتبقى عند المنتجات التي تستعملها.' : '.'}
+          {usageText(a._count, locale)}
+          {a.archivedAt
+            ? t(' — مؤرشفة: لا تظهر لمنتج جديد، وتبقى عند المنتجات التي تستعملها.', ' — archived: not offered for new products, and stays on the products that use it.')
+            : '.'}
         </span>
 
         <label className="field__label" htmlFor={`attr-name-${a.id}`}>
-          الاسم
+          {t('الاسم', 'Name')}
         </label>
         <div className="ac2-inline">
           <ClearableInput id={`attr-name-${a.id}`} className="field__control" value={name} onChange={(e) => setName(e.target.value)} />
@@ -294,19 +330,19 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
               void act.run(async () => {
                 await api(base, { method: 'PATCH', body: { nameAr: name.trim() } });
                 onChanged();
-              }, 'حُفظ الاسم.')
+              }, t('حُفظ الاسم.', 'Name saved.'))
             }
           >
-            احفظ الاسم
+            {t('احفظ الاسم', 'Save name')}
           </button>
         </div>
-        <span className="ac2-fine">الرمز والنوع والمحور ثابتة — المنتجات تشير إليها.</span>
+        <span className="ac2-fine">{t('الرمز والنوع والمحور ثابتة — المنتجات تشير إليها.', 'Code, type and axis are fixed — products refer to them.')}</span>
 
         {hasValues ? (
           <>
-            <span className="field__label">القيم</span>
+            <span className="field__label">{t('القيم', 'Values')}</span>
             {a.values.length ? (
-              <div className="stack stack--tight" role="list" aria-label={`قيم ${a.nameAr}`}>
+              <div className="stack stack--tight" role="list" aria-label={t(`قيم ${a.nameAr}`, `${a.nameAr} values`)}>
                 {a.values.map((v) => {
                   const vUsed = usedCount(v._count) > 0;
                   const draft = editing?.id === v.id ? editing.text : null;
@@ -316,7 +352,7 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
                         <>
                           <ClearableInput
                             className="field__control"
-                            aria-label={`الاسم الصحيح لـ «${v.valueAr}»`}
+                            aria-label={t(`الاسم الصحيح لـ «${v.valueAr}»`, `Correct name for “${v.valueAr}”`)}
                             value={draft}
                             onChange={(e) => setEditing({ id: v.id, text: e.target.value })}
                           />
@@ -329,13 +365,13 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
                                 await api(`${base}/values/${v.id}`, { method: 'PATCH', body: { valueAr: draft.trim() } });
                                 setEditing(null);
                                 onChanged();
-                              }, 'صُحّحت القيمة — يراها كل منتج يستعملها.')
+                              }, t('صُحّحت القيمة — يراها كل منتج يستعملها.', 'Value corrected — every product using it shows the new name.'))
                             }
                           >
-                            احفظ
+                            {t('احفظ', 'Save')}
                           </button>
                           <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(null)}>
-                            تراجع
+                            {t('تراجع', 'Cancel')}
                           </button>
                         </>
                       ) : (
@@ -344,31 +380,36 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
                             {v.hexColor ? <span className="ac2-swatch" style={{ background: v.hexColor }} aria-hidden /> : null}
                             {v.valueAr}
                           </span>
-                          <span className="ac2-fine">{usageText(v._count)}</span>
-                          <button type="button" className="btn btn--ghost btn--sm" aria-label={`صحّح «${v.valueAr}»`} onClick={() => setEditing({ id: v.id, text: v.valueAr })}>
-                            صحّح
+                          <span className="ac2-fine">{usageText(v._count, locale)}</span>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            aria-label={t(`صحّح «${v.valueAr}»`, `Correct “${v.valueAr}”`)}
+                            onClick={() => setEditing({ id: v.id, text: v.valueAr })}
+                          >
+                            {t('صحّح', 'Correct')}
                           </button>
                           {vUsed ? null : (
                             <button
                               type="button"
                               className="btn btn--ghost btn--sm"
-                              aria-label={`احذف «${v.valueAr}»`}
+                              aria-label={t(`احذف «${v.valueAr}»`, `Delete “${v.valueAr}”`)}
                               disabled={act.busy}
                               onClick={async () => {
                                 const sure = await confirm({
-                                  title: `تحذف «${v.valueAr}»؟`,
-                                  body: 'لا يستعملها منتج ولا متغيّر — تختفي من خيارات البائعين.',
-                                  confirmLabel: 'احذف القيمة',
+                                  title: t(`تحذف «${v.valueAr}»؟`, `Delete “${v.valueAr}”?`),
+                                  body: t('لا يستعملها منتج ولا متغيّر — تختفي من خيارات البائعين.', 'No product or variant uses it — it disappears from sellers’ options.'),
+                                  confirmLabel: t('احذف القيمة', 'Delete value'),
                                   danger: true,
                                 });
                                 if (!sure) return;
                                 void act.run(async () => {
                                   await api(`${base}/values/${v.id}`, { method: 'DELETE' });
                                   onChanged();
-                                }, 'حُذفت القيمة.');
+                                }, t('حُذفت القيمة.', 'Value deleted.'));
                               }}
                             >
-                              احذف
+                              {t('احذف', 'Delete')}
                             </button>
                           )}
                         </>
@@ -378,10 +419,16 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
                 })}
               </div>
             ) : (
-              <span className="ac2-fine">لا قيم.</span>
+              <span className="ac2-fine">{t('لا قيم.', 'No values.')}</span>
             )}
             <div className="ac2-inline">
-              <ClearableInput className="field__control" placeholder="قيمة جديدة" aria-label={`قيمة جديدة لـ ${a.nameAr}`} value={newValue} onChange={(e) => setNewValue(e.target.value)} />
+              <ClearableInput
+                className="field__control"
+                placeholder={t('قيمة جديدة', 'New value')}
+                aria-label={t(`قيمة جديدة لـ ${a.nameAr}`, `New value for ${a.nameAr}`)}
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+              />
               <button
                 type="button"
                 className="btn btn--secondary btn--sm"
@@ -391,11 +438,11 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
                     await api(`${base}/values`, { method: 'POST', body: { valueAr: newValue.trim() } });
                     setNewValue('');
                     onChanged();
-                  }, 'أُضيفت القيمة.')
+                  }, t('أُضيفت القيمة.', 'Value added.'))
                 }
               >
                 <Icon name="plus" size={14} />
-                أضف قيمة
+                {t('أضف قيمة', 'Add value')}
               </button>
             </div>
           </>
@@ -409,19 +456,19 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
               disabled={act.busy}
               onClick={async () => {
                 const sure = await confirm({
-                  title: `تحذف «${a.nameAr}»؟`,
-                  body: 'لا يستعملها منتج — تُحذف هي وقيمها، ويبقى أثرها في سجل التدقيق.',
-                  confirmLabel: 'احذف الخصيصة',
+                  title: t(`تحذف «${a.nameAr}»؟`, `Delete “${a.nameAr}”?`),
+                  body: t('لا يستعملها منتج — تُحذف هي وقيمها، ويبقى أثرها في سجل التدقيق.', 'No product uses it — it is deleted with its values, and a trace stays in the audit log.'),
+                  confirmLabel: t('احذف الخصيصة', 'Delete attribute'),
                   danger: true,
                 });
                 if (!sure) return;
                 void act.run(async () => {
                   await api(base, { method: 'DELETE' });
                   onDeleted();
-                }, 'حُذفت الخصيصة.');
+                }, t('حُذفت الخصيصة.', 'Attribute deleted.'));
               }}
             >
-              احذف الخصيصة
+              {t('احذف الخصيصة', 'Delete attribute')}
             </button>
           ) : a.archivedAt ? (
             <button
@@ -432,10 +479,10 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
                 void act.run(async () => {
                   await api(`${base}/restore`, { method: 'POST' });
                   onChanged();
-                }, 'استُرجعت الخصيصة — عادت إلى خيارات البائعين.')
+                }, t('استُرجعت الخصيصة — عادت إلى خيارات البائعين.', 'Attribute restored — it is back in sellers’ options.'))
               }
             >
-              استرجع الخصيصة
+              {t('استرجع الخصيصة', 'Restore attribute')}
             </button>
           ) : (
             <button
@@ -444,18 +491,21 @@ function AttrEditor({ attr: a, onChanged, onDeleted }: { attr: Attr; onChanged: 
               disabled={act.busy}
               onClick={async () => {
                 const sure = await confirm({
-                  title: `تؤرشف «${a.nameAr}»؟`,
-                  body: 'مستعملة فلا تُحذف. تختفي من خيارات البائعين لمنتج جديد، وتبقى عند المنتجات التي تستعملها — ويمكن استرجاعها.',
-                  confirmLabel: 'أرشف الخصيصة',
+                  title: t(`تؤرشف «${a.nameAr}»؟`, `Archive “${a.nameAr}”?`),
+                  body: t(
+                    'مستعملة فلا تُحذف. تختفي من خيارات البائعين لمنتج جديد، وتبقى عند المنتجات التي تستعملها — ويمكن استرجاعها.',
+                    'It is in use, so it cannot be deleted. It disappears from sellers’ options for new products and stays on the products that use it — and it can be restored.',
+                  ),
+                  confirmLabel: t('أرشف الخصيصة', 'Archive attribute'),
                 });
                 if (!sure) return;
                 void act.run(async () => {
                   await api(`${base}/archive`, { method: 'POST' });
                   onChanged();
-                }, 'أُرشفت الخصيصة.');
+                }, t('أُرشفت الخصيصة.', 'Attribute archived.'));
               }}
             >
-              أرشف الخصيصة
+              {t('أرشف الخصيصة', 'Archive attribute')}
             </button>
           )}
         </div>

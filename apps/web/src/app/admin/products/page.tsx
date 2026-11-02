@@ -5,7 +5,9 @@ import { useState } from 'react';
 import { AdminHeader, Empty, Loading, MoreButton, SearchBox, SortButton, Tabs } from '@/components/admin';
 import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
-import { media, PRODUCT_STATUS, TONE, useAdminList } from '@/lib/admin';
+import { useLocale, useT } from '@/components/locale';
+import { localized } from '@/lib/i18n';
+import { media, PRODUCT_STATUS, PRODUCT_STATUS_EN, TONE, useAdminList } from '@/lib/admin';
 import { PRODUCTS, counted } from '@/lib/arabic-count';
 import { money, when } from '@/lib/orders';
 
@@ -28,6 +30,9 @@ interface Item {
  * ينشر فيظهر منتجه، والإدارة تتابع المنشور وتوقف المخالف بسبب يصل البائع. الأحدث أولاً.
  */
 export default function AdminProductsPage() {
+  const t = useT();
+  const locale = useLocale();
+  const productStatus = localized(locale, PRODUCT_STATUS, PRODUCT_STATUS_EN);
   const [status, setStatus] = useState('active');
   const [search, setSearch] = useState('');
   // بتاريخ آخر تعديل
@@ -38,11 +43,23 @@ export default function AdminProductsPage() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="المنتجات" count={data ? counted(data.total, PRODUCTS) : undefined} hint="البائع ينشر بلا مراجعة. افتح أي منتج لتوقفه إن خالف — السبب يصل البائع حرفياً." />
+      <AdminHeader
+        title={t('المنتجات', 'Products')}
+        count={data ? t(counted(data.total, PRODUCTS), `${data.total} ${data.total === 1 ? 'product' : 'products'}`) : undefined}
+        hint={t(
+          'البائع ينشر بلا مراجعة. افتح أي منتج لتوقفه إن خالف — السبب يصل البائع حرفياً.',
+          'Sellers publish without review. Open any product to take it down if it breaks the rules — the seller receives the reason word for word.',
+        )}
+      />
       <div className="toolbar">
-        <Tabs value={status} onChange={setStatus} label="حالة المنتج" options={['active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: PRODUCT_STATUS[k]! }))} />
+        <Tabs
+          value={status}
+          onChange={setStatus}
+          label={t('حالة المنتج', 'Product status')}
+          options={['active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: productStatus[k]! }))}
+        />
         <div className="toolbar__end">
-          <SearchBox value={search} onChange={setSearch} placeholder="اسم المنتج أو المتجر" label="بحث في المنتجات" />
+          <SearchBox value={search} onChange={setSearch} placeholder={t('اسم المنتج أو المتجر', 'Product or shop name')} label={t('بحث في المنتجات', 'Search products')} />
           <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
@@ -50,14 +67,22 @@ export default function AdminProductsPage() {
         <Loading error={error} forbidden={forbidden} onRetry={reload} />
       ) : data.items.length === 0 ? (
         search.trim() ? (
-          <Empty icon="search" title="لا منتجات بهذا البحث" actions={<button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>أزل التصفية</button>}>
-            جرّب اسماً آخر أو امسح البحث.
+          <Empty
+            icon="search"
+            title={t('لا منتجات بهذا البحث', 'No products match this search')}
+            actions={
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
+                {t('أزل التصفية', 'Clear filters')}
+              </button>
+            }
+          >
+            {t('جرّب اسماً آخر أو امسح البحث.', 'Try another name or clear the search.')}
           </Empty>
         ) : (
-          <Empty icon="package" title="لا منتجات بهذه الحالة" />
+          <Empty icon="package" title={t('لا منتجات بهذه الحالة', 'No products with this status')} />
         )
       ) : (
-        <ul className="ao-plist" aria-label="المنتجات">
+        <ul className="ao-plist" aria-label={t('المنتجات', 'Products')}>
           {list.items.map((p) => {
             const thumb = media(p.thumbnail);
             return (
@@ -74,16 +99,22 @@ export default function AdminProductsPage() {
                       {p.vendorCategoryNameAr ? ` · ${p.vendorCategoryNameAr}` : ''}
                     </span>
                     <span className="ao-pitem__tags">
-                      <span className={`badge ${TONE[p.status] ?? ''}`}>{PRODUCT_STATUS[p.status] ?? p.status}</span>
+                      <span className={`badge ${TONE[p.status] ?? ''}`}>{productStatus[p.status] ?? p.status}</span>
                       <span className="ao-pitem__meta">
-                        <span className="num">{p.variantCount}</span> متغيّراً
+                        <span className="num">{p.variantCount}</span> {t('متغيّراً', p.variantCount === 1 ? 'variant' : 'variants')}
                       </span>
-                      <span className="ao-pitem__meta">عُدّل {when(p.updatedAt)}</span>
+                      <span className="ao-pitem__meta">
+                        {t('عُدّل', 'Edited')} {when(p.updatedAt, locale)}
+                      </span>
                     </span>
-                    {p.rejectReason ? <span className="ao-pitem__reason">«{p.rejectReason}»</span> : null}
+                    {p.rejectReason ? <span className="ao-pitem__reason">
+                        {t('«', '“')}
+                        {p.rejectReason}
+                        {t('»', '”')}
+                      </span> : null}
                   </span>
                   <span className="ao-pitem__end">
-                    {p.priceFrom ? <span className="money num">{money(p.priceFrom.minorUnits, p.priceFrom.currency)}</span> : <span className="muted">—</span>}
+                    {p.priceFrom ? <span className="money num">{money(p.priceFrom.minorUnits, p.priceFrom.currency, locale)}</span> : <span className="muted">—</span>}
                     <Icon name="chev-end" size={16} mirror />
                   </span>
                 </Link>

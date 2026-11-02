@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { QrCode } from '@/components/qr-code';
 import { digitsOnly } from '@/lib/digits';
 import { RecoveryCodes } from '@/components/recovery-codes';
@@ -31,6 +32,7 @@ function backFromUrl(): string {
  * حتى يُؤكَّد الجديد — فالصفحة المفتوحة لا تنزع الحماية.
  */
 export default function TwoFactorSetupPage() {
+  const t = useT();
   const router = useRouter();
   const [setup, setSetup] = useState<{ secret: string; uri: string } | null>(null);
   const [admin, setAdmin] = useState(false);
@@ -121,19 +123,23 @@ export default function TwoFactorSetupPage() {
       <div className="ac-auth__box ac-auth__box--xwide">
         <header className="ac-auth__head">
           <span className="ac-mark" aria-hidden>
-            ب
+            {t('ب', 'B')}
           </span>
           <h1 className="ac-auth__title">
-            {alreadyOn || rotating ? 'تغيير جهاز التحقّق بخطوتين' : 'تفعيل التحقّق بخطوتين'}
+            {alreadyOn || rotating
+              ? t('تغيير جهاز التحقّق بخطوتين', 'Change your two-step verification device')
+              : t('تفعيل التحقّق بخطوتين', 'Turn on two-step verification')}
           </h1>
         </header>
 
         {codes ? (
           <section className="ac-auth__card">
             <h2 className="ac-section-title">
-              {rotating ? 'رُبط الجهاز الجديد' : 'فُعِّل التحقّق بخطوتين'}
+              {rotating
+                ? t('رُبط الجهاز الجديد', 'Your new device is linked')
+                : t('فُعِّل التحقّق بخطوتين', 'Two-step verification is on')}
             </h2>
-            <RecoveryCodes codes={codes} onDone={finish} doneLabel="تابع إلى تسجيل الدخول" />
+            <RecoveryCodes codes={codes} onDone={finish} doneLabel={t('تابع إلى تسجيل الدخول', 'Continue to sign in')} />
           </section>
         ) : alreadyOn ? (
           <form
@@ -143,12 +149,14 @@ export default function TwoFactorSetupPage() {
               void beginRotation();
             }}
           >
-            <Alert tone="success" title="التحقّق بخطوتين مفعَّل على حسابك">
-              لنقله إلى هاتف جديد أكّد أنك صاحب الحساب بكلمة المرور ورمز من الجهاز الحالي. يبقى
-              الجهاز الحالي سارياً حتى تؤكّد الجديد.
+            <Alert tone="success" title={t('التحقّق بخطوتين مفعَّل على حسابك', 'Two-step verification is on for your account')}>
+              {t(
+                'لنقله إلى هاتف جديد أكّد أنك صاحب الحساب بكلمة المرور ورمز من الجهاز الحالي. يبقى الجهاز الحالي سارياً حتى تؤكّد الجديد.',
+                "To move it to a new phone, confirm it's your account with your password and a code from your current device. Your current device keeps working until you confirm the new one.",
+              )}
             </Alert>
             <TextInput
-              label="كلمة المرور"
+              label={t('كلمة المرور', 'Password')}
               type="password"
               autoComplete="current-password"
               dir="ltr"
@@ -157,7 +165,7 @@ export default function TwoFactorSetupPage() {
               onChange={(e) => setProof((p) => ({ ...p, password: e.target.value }))}
             />
             <TextInput
-              label="رمز من الجهاز الحالي أو رمز استعادة"
+              label={t('رمز من الجهاز الحالي أو رمز استعادة', 'Code from your current device, or a recovery code')}
               className="field__control ac-otp"
               autoComplete="one-time-code"
               dir="ltr"
@@ -173,17 +181,17 @@ export default function TwoFactorSetupPage() {
               className="btn btn--primary btn--block"
               disabled={busy || !proof.password || proof.code.trim().length < 6}
             >
-              تابع إلى الجهاز الجديد
+              {t('تابع إلى الجهاز الجديد', 'Continue to the new device')}
             </button>
             <Link
               href={admin ? '/admin' : back}
               className="btn btn--secondary btn--block ac-auth__cta"
             >
               {admin
-                ? 'عُد إلى لوحة الإدارة'
+                ? t('عُد إلى لوحة الإدارة', 'Back to the admin dashboard')
                 : back.startsWith('/vendor')
-                  ? 'عُد إلى الإعدادات'
-                  : 'عُد إلى حسابي'}
+                  ? t('عُد إلى الإعدادات', 'Back to settings')
+                  : t('عُد إلى حسابي', 'Back to my account')}
             </Link>
           </form>
         ) : (
@@ -193,10 +201,14 @@ export default function TwoFactorSetupPage() {
                 <div className="alert alert--info ac-note">
                   <Icon name="shield" size={19} />
                   <span className="ac-note__text">
-                    <span className="ac-note__title">أضف الحساب في تطبيق الهاتف الجديد</span>
+                    <span className="ac-note__title">
+                      {t('أضف الحساب في تطبيق الهاتف الجديد', 'Add the account in the app on your new phone')}
+                    </span>
                     <span className="ac-note__body">
-                      الجهاز القديم يبقى سارياً حتى تؤكّد برمز من الجديد. بعد التأكيد يتوقّف القديم،
-                      وتُستبدل رموز الاستعادة، وتُنهى كل الجلسات.
+                      {t(
+                        'الجهاز القديم يبقى سارياً حتى تؤكّد برمز من الجديد. بعد التأكيد يتوقّف القديم، وتُستبدل رموز الاستعادة، وتُنهى كل الجلسات.',
+                        'Your old device keeps working until you confirm with a code from the new one. After that, the old one stops, your recovery codes are replaced, and all sessions are signed out.',
+                      )}
                     </span>
                   </span>
                 </div>
@@ -205,10 +217,16 @@ export default function TwoFactorSetupPage() {
                   <Icon name="lock" size={19} />
                   <span className="ac-note__text">
                     <span className="ac-note__title">
-                      فعّل التحقّق بخطوتين أولاً — إلزامي لحسابات الإدارة
+                      {t(
+                        'فعّل التحقّق بخطوتين أولاً — إلزامي لحسابات الإدارة',
+                        'Turn on two-step verification first — required for admin accounts',
+                      )}
                     </span>
                     <span className="ac-note__body">
-                      لا يمكنك الوصول إلى أي شاشة قبل التفعيل. لا يوجد تخطٍّ.
+                      {t(
+                        'لا يمكنك الوصول إلى أي شاشة قبل التفعيل. لا يوجد تخطٍّ.',
+                        "You can't reach any screen until it's on. There's no skipping.",
+                      )}
                     </span>
                   </span>
                 </div>
@@ -216,10 +234,12 @@ export default function TwoFactorSetupPage() {
                 <div className="alert alert--info ac-note">
                   <Icon name="shield" size={19} />
                   <span className="ac-note__text">
-                    <span className="ac-note__title">طبقة حماية ثانية لحسابك</span>
+                    <span className="ac-note__title">{t('طبقة حماية ثانية لحسابك', 'A second layer of protection for your account')}</span>
                     <span className="ac-note__body">
-                      بعد التفعيل يطلب الدخول رمزاً من هاتفك مع كلمة المرور، فلا تكفي كلمة مرور
-                      مسروقة وحدها.
+                      {t(
+                        'بعد التفعيل يطلب الدخول رمزاً من هاتفك مع كلمة المرور، فلا تكفي كلمة مرور مسروقة وحدها.',
+                        'Once on, signing in asks for a code from your phone along with your password, so a stolen password alone is not enough.',
+                      )}
                     </span>
                   </span>
                 </div>
@@ -231,28 +251,33 @@ export default function TwoFactorSetupPage() {
                 <Alert tone="danger">{error}</Alert>
               ) : (
                 <section className="ac-auth__card">
-                  <Spinner label="جارٍ تجهيز المفتاح…" />
+                  <Spinner label={t('جارٍ تجهيز المفتاح…', 'Preparing the key…')} />
                 </section>
               )
             ) : (
               <section className="ac-auth__card">
-                <h2 className="ac-section-title">أضف حسابك في تطبيق المصادقة</h2>
+                <h2 className="ac-section-title">{t('أضف حسابك في تطبيق المصادقة', 'Add your account to an authenticator app')}</h2>
                 <p className="ac-help">
-                  افتح تطبيق مصادقة (Google Authenticator أو Microsoft Authenticator أو غيرهما) وامسح
-                  الرمز أدناه. على الهاتف نفسه يكفي أن تفتح{' '}
+                  {t(
+                    'افتح تطبيق مصادقة (Google Authenticator أو Microsoft Authenticator أو غيرهما) وامسح الرمز أدناه. على الهاتف نفسه يكفي أن تفتح',
+                    'Open an authenticator app (Google Authenticator, Microsoft Authenticator or another) and scan the code below. On the same phone, just open',
+                  )}{' '}
                   <a href={setup.uri} dir="ltr">
-                    هذا الرابط
+                    {t('هذا الرابط', 'this link')}
                   </a>
                   .
                 </p>
 
                 <div className="ac-group">
-                  <span className="ac-group__label">امسح الرمز بتطبيق المصادقة</span>
+                  <span className="ac-group__label">{t('امسح الرمز بتطبيق المصادقة', 'Scan the code with your authenticator app')}</span>
                   {/* الرمز يحمل الرابط نفسه (otpauth) — بدل مفتاح يُنسخ حرفاً حرفاً */}
-                  <QrCode value={setup.uri} label="رمز QR لإضافة الحساب في تطبيق المصادقة" />
+                  <QrCode
+                    value={setup.uri}
+                    label={t('رمز QR لإضافة الحساب في تطبيق المصادقة', 'QR code to add the account to your authenticator app')}
+                  />
                 </div>
 
-                <Field label="أكّد بالرمز من التطبيق (ستة أرقام)" error={error}>
+                <Field label={t('أكّد بالرمز من التطبيق (ستة أرقام)', 'Confirm with the code from the app (six digits)')} error={error}>
                   {(props) => (
                     <div className="ac-inline">
                       <ClearableInput
@@ -272,7 +297,7 @@ export default function TwoFactorSetupPage() {
                         disabled={busy || code.length !== 6}
                         onClick={() => void confirm()}
                       >
-                        تأكيد وتفعيل
+                        {t('تأكيد وتفعيل', 'Confirm and turn on')}
                       </button>
                     </div>
                   )}
@@ -280,13 +305,13 @@ export default function TwoFactorSetupPage() {
 
                 {rotating ? (
                   <Link href={admin ? '/admin' : back} className="ac-help">
-                    ألغِ — يبقى الجهاز الحالي كما هو
+                    {t('ألغِ — يبقى الجهاز الحالي كما هو', 'Cancel — keep your current device')}
                   </Link>
                 ) : admin ? null : (
                   <Link href={back} className="ac-help">
                     {back.startsWith('/vendor')
-                      ? 'ليس الآن — عُد إلى الإعدادات'
-                      : 'ليس الآن — عُد إلى حسابي'}
+                      ? t('ليس الآن — عُد إلى الإعدادات', 'Not now — back to settings')
+                      : t('ليس الآن — عُد إلى حسابي', 'Not now — back to my account')}
                   </Link>
                 )}
               </section>

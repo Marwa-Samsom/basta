@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Alert, PageHead } from '@/components/ui';
 import { Icon, type IconName } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
 import { when } from '@/lib/orders';
 
@@ -53,6 +54,8 @@ export function NotificationsInbox({
   filters: readonly { key: string; label: string }[];
   emptyBody: string;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [inbox, setInbox] = useState<Inbox | null>(null);
   const [filter, setFilter] = useState('all');
@@ -61,7 +64,7 @@ export function NotificationsInbox({
   const [version, setVersion] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const eventOf = (code: string): InboxEvent | { title: string; icon: IconName; tone: InboxTone; kind: null } =>
-    events[code] ?? { title: 'إشعار', icon: 'bell', tone: 'info', kind: null };
+    events[code] ?? { title: t('إشعار', 'Notification'), icon: 'bell', tone: 'info', kind: null };
 
   useEffect(() => {
     let alive = true;
@@ -116,12 +119,12 @@ export function NotificationsInbox({
   if (!inbox) {
     return error ? (
       <div className="vm-page vx-notifs">
-        <PageHead title="الإشعارات" />
+        <PageHead title={t('الإشعارات', 'Notifications')} />
         <Alert tone="danger">{error}</Alert>
       </div>
     ) : (
       <div className="vm-loading vm-loading--page" role="status">
-        <span className="visually-hidden">جارٍ فتح الإشعارات…</span>
+        <span className="visually-hidden">{t('جارٍ فتح الإشعارات…', 'Opening notifications…')}</span>
         <span className="skeleton vm-loading__title" />
         <span className="skeleton vm-loading__panel" />
       </div>
@@ -134,13 +137,20 @@ export function NotificationsInbox({
   return (
     <div className="vm-page vx-notifs">
       <PageHead
-        title="الإشعارات"
-        meta={inbox.items.length ? `${inbox.items.length} إشعاراً · ${inbox.unread} غير مقروء` : 'لا إشعارات'}
+        title={t('الإشعارات', 'Notifications')}
+        meta={
+          inbox.items.length
+            ? t(
+                `${inbox.items.length} إشعاراً · ${inbox.unread} غير مقروء`,
+                `${inbox.items.length} ${inbox.items.length === 1 ? 'notification' : 'notifications'} · ${inbox.unread} unread`,
+              )
+            : t('لا إشعارات', 'No notifications')
+        }
         actions={
           inbox.unread > 0 ? (
             <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => void markAll()}>
               <Icon name="check" size={14} />
-              تعليم الكل مقروءاً
+              {t('تعليم الكل مقروءاً', 'Mark all as read')}
             </button>
           ) : null
         }
@@ -148,7 +158,7 @@ export function NotificationsInbox({
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div className="vx-pills" role="group" aria-label="تصفية الإشعارات">
+      <div className="vx-pills" role="group" aria-label={t('تصفية الإشعارات', 'Filter notifications')}>
         {filters.map((f) => (
           <button key={f.key} type="button" className="vx-pill" aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>
             {f.label}
@@ -157,13 +167,13 @@ export function NotificationsInbox({
         ))}
       </div>
 
-      <section className="vx-card vx-card--flush" aria-label="قائمة الإشعارات">
+      <section className="vx-card vx-card--flush" aria-label={t('قائمة الإشعارات', 'Notification list')}>
         {shown.length === 0 ? (
           <div className="vx-notes-empty">
             <span className="vx-notes-empty__icon" aria-hidden>
               <Icon name="bell" size={24} />
             </span>
-            <p className="vx-notes-empty__title">لا إشعارات</p>
+            <p className="vx-notes-empty__title">{t('لا إشعارات', 'No notifications')}</p>
             <p className="vx-notes-empty__body">{emptyBody}</p>
           </div>
         ) : (
@@ -179,13 +189,13 @@ export function NotificationsInbox({
                     </span>
                     <span className="vx-note__text">
                       <span className="vx-note__title">
-                        {unread ? <span className="visually-hidden">غير مقروء: </span> : null}
+                        {unread ? <span className="visually-hidden">{t('غير مقروء: ', 'Unread: ')}</span> : null}
                         {ev.title}
                       </span>
                       {n.body ? <span className="vx-note__body">{n.body}</span> : null}
                     </span>
                     <span className="vx-note__meta">
-                      <span className="vx-note__time">{when(n.createdAt)}</span>
+                      <span className="vx-note__time">{when(n.createdAt, locale)}</span>
                       {unread ? <span className="vx-note__dot" aria-hidden /> : null}
                     </span>
                   </button>
@@ -197,7 +207,7 @@ export function NotificationsInbox({
         {inbox.nextCursor ? (
           <div className="list-more">
             <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void older()}>
-              {loadingMore ? 'جارٍ التحميل…' : 'الأقدم'}
+              {loadingMore ? t('جارٍ التحميل…', 'Loading…') : t('الأقدم', 'Older')}
             </button>
           </div>
         ) : null}

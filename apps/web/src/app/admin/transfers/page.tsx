@@ -11,6 +11,8 @@ import { useAction, useAdminList } from '@/lib/admin';
 import { minorUnitDigits } from '@/lib/money';
 import { money, when } from '@/lib/orders';
 import { ClearableInput } from '@/components/ui';
+import { useLocale, useT } from '@/components/locale';
+import { translator, type Locale } from '@/lib/i18n';
 
 interface Waiting {
   orderNumber: string;
@@ -48,9 +50,9 @@ interface RefundRow {
 }
 
 const TABS = [
-  { key: 'incoming', label: 'واردة — بانتظار التأكيد' },
-  { key: 'refunds', label: 'ردود — للتحويل' },
-  { key: 'confirmed', label: 'أُكّدت' },
+  { key: 'incoming', label: 'واردة — بانتظار التأكيد', en: 'Incoming — awaiting confirmation' },
+  { key: 'refunds', label: 'ردود — للتحويل', en: 'Refunds — to transfer' },
+  { key: 'confirmed', label: 'أُكّدت', en: 'Confirmed' },
 ];
 
 /**
@@ -66,14 +68,17 @@ function toMinor(text: string, currency: string): string | null {
 }
 
 /** الوقت الباقي على المهلة بكلمات — «بقيت 5 ساعات» يُقرأ أسرع من تاريخ */
-function left(expiresAt: string | null): string {
+function left(expiresAt: string | null, locale: Locale = 'ar'): string {
   if (!expiresAt) return '—';
+  const t = translator(locale);
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const ms = new Date(expiresAt).getTime() - Date.now();
-  if (ms <= 0) return 'انتهت المهلة';
+  if (ms <= 0) return t('انتهت المهلة', 'Deadline passed');
   const h = Math.floor(ms / 3_600_000);
-  if (h >= 24) return `بقي ${Math.floor(h / 24)} يوم و${h % 24} ساعة`;
-  if (h >= 1) return `بقيت ${h} ساعة`;
-  return `بقيت ${Math.max(1, Math.floor(ms / 60_000))} دقيقة`;
+  if (h >= 24) return t(`بقي ${Math.floor(h / 24)} يوم و${h % 24} ساعة`, `${plural(Math.floor(h / 24), 'day', 'days')} and ${plural(h % 24, 'hour', 'hours')} left`);
+  if (h >= 1) return t(`بقيت ${h} ساعة`, `${plural(h, 'hour', 'hours')} left`);
+  const m = Math.max(1, Math.floor(ms / 60_000));
+  return t(`بقيت ${m} دقيقة`, `${plural(m, 'minute', 'minutes')} left`);
 }
 
 /**
@@ -85,6 +90,8 @@ function left(expiresAt: string | null): string {
  *     «رُدّ المبلغ».
  */
 export default function AdminTransfersPage() {
+  const t = useT();
+  const locale = useLocale();
   const [tab, setTab] = useState('incoming');
   // بحث واحد بالرقم أو الاسم أو المرجع — يصفّي القوائم الثلاث، وكلٌّ خمسين خمسين
   const [search, setSearch] = useState('');
@@ -97,7 +104,7 @@ export default function AdminTransfersPage() {
   const searching = Boolean(search.trim());
   const clear = (
     <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
-      أزل التصفية
+      {t('أزل التصفية', 'Clear filters')}
     </button>
   );
   const act = useAction();
@@ -121,47 +128,63 @@ export default function AdminTransfersPage() {
   const recordRefund = async (r: RefundRow) => {
     const reference = (refundRefs[r.id] ?? '').trim();
     const sure = await ask({
-      title: `حوّلت ${money(r.amountMinorUnits, r.currency)} إلى ${r.buyer.name ?? 'المشتري'}؟`,
+      title: t(
+        `حوّلت ${money(r.amountMinorUnits, r.currency, locale)} إلى ${r.buyer.name ?? 'المشتري'}؟`,
+        `Did you transfer ${money(r.amountMinorUnits, r.currency, locale)} to ${r.buyer.name ?? 'the buyer'}?`,
+      ),
       body: (
         <>
           <p>
-            ردّ <bdi className="num">{r.subOrderNumber}</bdi> · {r.store} — بمرجع{' '}
+            {t('ردّ', 'Refund')} <bdi className="num">{r.subOrderNumber}</bdi> · {r.store} — {t('بمرجع', 'reference')}{' '}
             <bdi className="num" dir="ltr">
               {reference}
             </bdi>
           </p>
-          <p>يُبلَّغ المشتري الآن أن المبلغ خرج إليه، ولا يُلغى التسجيل بعده.</p>
+          <p>
+            {t(
+              'يُبلَّغ المشتري الآن أن المبلغ خرج إليه، ولا يُلغى التسجيل بعده.',
+              'The buyer will be told now that the amount has been sent to them, and the record cannot be undone afterwards.',
+            )}
+          </p>
         </>
       ),
-      confirmLabel: 'سجّل التحويل',
+      confirmLabel: t('سجّل التحويل', 'Record transfer'),
     });
     if (!sure) return;
     void act.run(async () => {
       await api(`/admin/refunds/${r.id}/transfer`, { method: 'POST', body: { reference } });
       refunds.reload();
-    }, 'سُجّل الردّ وأُبلغ المشتري بمرجعه.');
+    }, t('سُجّل الردّ وأُبلغ المشتري بمرجعه.', 'Refund recorded and the buyer notified with its reference.'));
   };
 
   return (
     <div className="ao-page">
       <AdminHeader
-        title="التحويلات"
-        count={counts.incoming !== undefined && !searching ? `${counts.incoming} بانتظار التأكيد` : undefined}
-        hint="تحتاج صلاحية payouts.approve — التأكيد ينشئ رصيداً للبائعين، والردّ يُبلغ المشتري بأن ماله خرج."
+        title={t('التحويلات', 'Transfers')}
+        count={counts.incoming !== undefined && !searching ? t(`${counts.incoming} بانتظار التأكيد`, `${counts.incoming} awaiting confirmation`) : undefined}
+        hint={t(
+          'تحتاج صلاحية payouts.approve — التأكيد ينشئ رصيداً للبائعين، والردّ يُبلغ المشتري بأن ماله خرج.',
+          'Requires the payouts.approve permission — confirming creates a balance for the sellers, and a refund tells the buyer their money has been sent.',
+        )}
       />
       <Feedback error={act.error} notice={act.notice} />
       <div className="toolbar">
         <Tabs
           value={tab}
           onChange={setTab}
-          label="نوع التحويل"
-          options={TABS.map((t) => ({
-            key: t.key,
-            label: t.key in counts && counts[t.key as keyof typeof counts] ? `${t.label} (${counts[t.key as keyof typeof counts]})` : t.label,
+          label={t('نوع التحويل', 'Transfer type')}
+          options={TABS.map((x) => ({
+            key: x.key,
+            label: x.key in counts && counts[x.key as keyof typeof counts] ? `${t(x.label, x.en)} (${counts[x.key as keyof typeof counts]})` : t(x.label, x.en),
           }))}
         />
         <div className="toolbar__end">
-          <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو اسم المشتري أو المرجع" label="بحث في التحويلات" />
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            placeholder={t('رقم الطلب أو اسم المشتري أو المرجع', 'Order number, buyer name, or reference')}
+            label={t('بحث في التحويلات', 'Search transfers')}
+          />
           <SortButton value={sorts[tab] ?? 'newest'} onChange={(v) => setSorts((s) => ({ ...s, [tab]: v }))} />
         </div>
       </div>
@@ -171,23 +194,26 @@ export default function AdminTransfersPage() {
           <Loading error={incoming.error} forbidden={incoming.forbidden} onRetry={incoming.reload} />
         ) : incoming.items.length === 0 ? (
           searching ? (
-            <Empty icon="search" title="لا تحويل ينتظر بهذا البحث" actions={clear} />
+            <Empty icon="search" title={t('لا تحويل ينتظر بهذا البحث', 'No waiting transfer matches this search')} actions={clear} />
           ) : (
-            <Empty icon="wallet" title="لا تحويلات تنتظر التأكيد">
-              حين يؤكّد مشترٍ طلبه يظهر هنا بمبلغه ورقمه حتى يصل تحويله أو تنقضي مهلته.
+            <Empty icon="wallet" title={t('لا تحويلات تنتظر التأكيد', 'No transfers awaiting confirmation')}>
+              {t(
+                'حين يؤكّد مشترٍ طلبه يظهر هنا بمبلغه ورقمه حتى يصل تحويله أو تنقضي مهلته.',
+                'When a buyer confirms their order, it appears here with its amount and number until their transfer arrives or the deadline passes.',
+              )}
             </Empty>
           )
         ) : (
-          <div className="table-wrap" tabIndex={0} role="region" aria-label="تحويلات بانتظار التأكيد">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label={t('تحويلات بانتظار التأكيد', 'Transfers awaiting confirmation')}>
             <table className="table ao-table">
               <thead>
                 <tr>
-                  <th>الطلب</th>
-                  <th>المشتري</th>
-                  <th className="end">المبلغ</th>
-                  <th>المهلة</th>
+                  <th>{t('الطلب', 'Order')}</th>
+                  <th>{t('المشتري', 'Buyer')}</th>
+                  <th className="end">{t('المبلغ', 'Amount')}</th>
+                  <th>{t('المهلة', 'Deadline')}</th>
                   <th>
-                    <span className="visually-hidden">التأكيد</span>
+                    <span className="visually-hidden">{t('التأكيد', 'Confirmation')}</span>
                   </th>
                 </tr>
               </thead>
@@ -202,11 +228,11 @@ export default function AdminTransfersPage() {
                         <span className="ao-stack">
                           <span className="num ao-strong">{w.orderNumber}</span>
                           <span className="ao-stack__sub">
-                            {when(w.placedAt)} · {w.storeCount === 1 ? 'متجر واحد' : `${w.storeCount} متاجر`}
+                            {when(w.placedAt, locale)} · {w.storeCount === 1 ? t('متجر واحد', '1 shop') : t(`${w.storeCount} متاجر`, `${w.storeCount} shops`)}
                           </span>
                         </span>
                       </td>
-                      <td data-label="المشتري">
+                      <td data-label={t('المشتري', 'Buyer')}>
                         <span className="ao-stack">
                           <span>{w.buyer.name ?? '—'}</span>
                           {w.buyer.phone ? (
@@ -217,17 +243,17 @@ export default function AdminTransfersPage() {
                           {w.buyer.email ? <span className="ao-stack__sub">{w.buyer.email}</span> : null}
                         </span>
                       </td>
-                      <td data-label="المبلغ" className="end">
-                        <span className="money num ao-amount">{money(w.amountMinorUnits, w.currency)}</span>
+                      <td data-label={t('المبلغ', 'Amount')} className="end">
+                        <span className="money num ao-amount">{money(w.amountMinorUnits, w.currency, locale)}</span>
                       </td>
-                      <td data-label="المهلة">
-                        <span className={`badge ${w.expired ? 'badge--rejected' : 'badge--warning'}`}>{left(w.expiresAt)}</span>
+                      <td data-label={t('المهلة', 'Deadline')}>
+                        <span className={`badge ${w.expired ? 'badge--rejected' : 'badge--warning'}`}>{left(w.expiresAt, locale)}</span>
                       </td>
                       <td data-label="">
                         {w.expired ? (
                           <span className="ao-rownote">
                             <Icon name="alert" size={13} />
-                            <span>يُلغى خلال دقائق. إن وصل تحويله فردّه له من البنك.</span>
+                            <span>{t('يُلغى خلال دقائق. إن وصل تحويله فردّه له من البنك.', 'It will be canceled within minutes. If their transfer arrives, return it to them from the bank.')}</span>
                           </span>
                         ) : (
                           <form
@@ -241,33 +267,33 @@ export default function AdminTransfersPage() {
                                   body: { reference: d.reference, receivedMinorUnits: received, ...(d.note.trim() ? { note: d.note } : {}) },
                                 });
                                 incoming.reload();
-                              }, `أُكّد تحويل ${w.orderNumber} — وصل الطلب إلى المتاجر.`);
+                              }, t(`أُكّد تحويل ${w.orderNumber} — وصل الطلب إلى المتاجر.`, `Transfer for ${w.orderNumber} confirmed — the order has reached the shops.`));
                             }}
                           >
                             <ClearableInput
                               className="field__control"
-                              placeholder="مرجع التحويل"
+                              placeholder={t('مرجع التحويل', 'Transfer reference')}
                               dir="ltr"
                               value={d.reference}
                               onChange={(e) => edit(w.orderNumber, { reference: e.target.value })}
-                              aria-label={`مرجع التحويل للطلب ${w.orderNumber}`}
+                              aria-label={t(`مرجع التحويل للطلب ${w.orderNumber}`, `Transfer reference for order ${w.orderNumber}`)}
                             />
                             <ClearableInput
                               className="field__control num"
-                              placeholder="المبلغ الواصل"
+                              placeholder={t('المبلغ الواصل', 'Amount received')}
                               dir="ltr"
                               inputMode="decimal"
                               value={d.amount}
                               onChange={(e) => edit(w.orderNumber, { amount: e.target.value })}
-                              aria-label={`المبلغ الذي وصل للطلب ${w.orderNumber}`}
+                              aria-label={t(`المبلغ الذي وصل للطلب ${w.orderNumber}`, `Amount received for order ${w.orderNumber}`)}
                               aria-invalid={mismatch || undefined}
                             />
                             <ClearableInput
                               className="field__control"
-                              placeholder="اسم المحوِّل أو حسابه (اختياري)"
+                              placeholder={t('اسم المحوِّل أو حسابه (اختياري)', "Sender's name or account (optional)")}
                               value={d.note}
                               onChange={(e) => edit(w.orderNumber, { note: e.target.value })}
-                              aria-label={`من حوّل للطلب ${w.orderNumber}`}
+                              aria-label={t(`من حوّل للطلب ${w.orderNumber}`, `Who transferred for order ${w.orderNumber}`)}
                             />
                             <button
                               type="submit"
@@ -275,12 +301,12 @@ export default function AdminTransfersPage() {
                               disabled={act.busy || d.reference.trim().length < 3 || !received || mismatch}
                             >
                               <Icon name="check" size={14} />
-                              وصل — أكّد
+                              {t('وصل — أكّد', 'Received — confirm')}
                             </button>
                             {mismatch ? (
                               <span className="ao-rownote" role="alert">
                                 <Icon name="alert" size={13} />
-                                <span>لا يطابق مبلغ الطلب — لا تؤكّد تحويلاً ناقصاً أو لطلب آخر.</span>
+                                <span>{t('لا يطابق مبلغ الطلب — لا تؤكّد تحويلاً ناقصاً أو لطلب آخر.', 'Does not match the order amount — do not confirm a short transfer or one for another order.')}</span>
                               </span>
                             ) : null}
                           </form>
@@ -301,23 +327,26 @@ export default function AdminTransfersPage() {
           <Loading error={refunds.error} forbidden={refunds.forbidden} onRetry={refunds.reload} />
         ) : refunds.items.length === 0 ? (
           searching ? (
-            <Empty icon="search" title="لا ردّ ينتظر بهذا البحث" actions={clear} />
+            <Empty icon="search" title={t('لا ردّ ينتظر بهذا البحث', 'No waiting refund matches this search')} actions={clear} />
           ) : (
-            <Empty icon="return" title="لا ردود تنتظر التحويل">
-              حين يُلغى أو يُرجع شيء من طلب مدفوع بتحويل يظهر هنا مبلغه حتى تحوّله وتسجّل مرجعك.
+            <Empty icon="return" title={t('لا ردود تنتظر التحويل', 'No refunds awaiting transfer')}>
+              {t(
+                'حين يُلغى أو يُرجع شيء من طلب مدفوع بتحويل يظهر هنا مبلغه حتى تحوّله وتسجّل مرجعك.',
+                'When something from an order paid by transfer is canceled or returned, its amount appears here until you transfer it and record your reference.',
+              )}
             </Empty>
           )
         ) : (
-          <div className="table-wrap" tabIndex={0} role="region" aria-label="ردود بانتظار التحويل">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label={t('ردود بانتظار التحويل', 'Refunds awaiting transfer')}>
             <table className="table ao-table">
               <thead>
                 <tr>
-                  <th>الطلب</th>
-                  <th>المشتري — حوّل إليه</th>
-                  <th className="end">المبلغ</th>
-                  <th>السبب</th>
+                  <th>{t('الطلب', 'Order')}</th>
+                  <th>{t('المشتري — حوّل إليه', 'Buyer — transfer to')}</th>
+                  <th className="end">{t('المبلغ', 'Amount')}</th>
+                  <th>{t('السبب', 'Reason')}</th>
                   <th>
-                    <span className="visually-hidden">التسجيل</span>
+                    <span className="visually-hidden">{t('التسجيل', 'Record')}</span>
                   </th>
                 </tr>
               </thead>
@@ -328,17 +357,21 @@ export default function AdminTransfersPage() {
                       <span className="ao-stack">
                         <span className="num ao-strong">{r.subOrderNumber}</span>
                         <span className="ao-stack__sub">
-                          {r.store} · {when(r.createdAt)}
+                          {r.store} · {when(r.createdAt, locale)}
                         </span>
                       </span>
                     </td>
-                    <td data-label="المشتري">
+                    <td data-label={t('المشتري', 'Buyer')}>
                       <span className="ao-stack">
                         <span>{r.buyer.name ?? '—'}</span>
-                        {r.paidWith.note ? <span className="ao-stack__sub">دفع من: {r.paidWith.note}</span> : null}
+                        {r.paidWith.note ? (
+                          <span className="ao-stack__sub">
+                            {t('دفع من:', 'Paid from:')} {r.paidWith.note}
+                          </span>
+                        ) : null}
                         {r.paidWith.reference ? (
                           <span className="ao-stack__sub">
-                            مرجع دفعه <bdi className="num" dir="ltr">{r.paidWith.reference}</bdi>
+                            {t('مرجع دفعه', 'Their payment reference')} <bdi className="num" dir="ltr">{r.paidWith.reference}</bdi>
                           </span>
                         ) : null}
                         {r.buyer.phone ? (
@@ -348,21 +381,21 @@ export default function AdminTransfersPage() {
                         ) : null}
                       </span>
                     </td>
-                    <td data-label="المبلغ" className="end">
-                      <span className="money num ao-amount">{money(r.amountMinorUnits, r.currency)}</span>
+                    <td data-label={t('المبلغ', 'Amount')} className="end">
+                      <span className="money num ao-amount">{money(r.amountMinorUnits, r.currency, locale)}</span>
                     </td>
-                    <td data-label="السبب" className="wrap">
+                    <td data-label={t('السبب', 'Reason')} className="wrap">
                       {r.reason}
                     </td>
                     <td data-label="">
                       <div className="ao-actions">
                         <ClearableInput
                           className="field__control ao-ref"
-                          placeholder="مرجع تحويلك"
+                          placeholder={t('مرجع تحويلك', 'Your transfer reference')}
                           dir="ltr"
                           value={refundRefs[r.id] ?? ''}
                           onChange={(e) => setRefundRefs({ ...refundRefs, [r.id]: e.target.value })}
-                          aria-label={`مرجع تحويل الردّ ${r.subOrderNumber}`}
+                          aria-label={t(`مرجع تحويل الردّ ${r.subOrderNumber}`, `Refund transfer reference ${r.subOrderNumber}`)}
                         />
                         <button
                           type="button"
@@ -370,7 +403,7 @@ export default function AdminTransfersPage() {
                           disabled={act.busy || (refundRefs[r.id]?.trim().length ?? 0) < 3}
                           onClick={() => void recordRefund(r)}
                         >
-                          حوّلته — سجّل
+                          {t('حوّلته — سجّل', 'Transferred — record')}
                         </button>
                       </div>
                     </td>
@@ -388,21 +421,21 @@ export default function AdminTransfersPage() {
           <Loading error={confirmed.error} forbidden={confirmed.forbidden} onRetry={confirmed.reload} />
         ) : confirmed.items.length === 0 ? (
           searching ? (
-            <Empty icon="search" title="لا تحويل مؤكَّد بهذا البحث" actions={clear} />
+            <Empty icon="search" title={t('لا تحويل مؤكَّد بهذا البحث', 'No confirmed transfer matches this search')} actions={clear} />
           ) : (
-            <Empty icon="check-circle" title="لم يُؤكَّد تحويل بعد">
-              التحويلات المؤكَّدة تظهر هنا بمرجعها ومن أكّدها، الأحدث أولاً.
+            <Empty icon="check-circle" title={t('لم يُؤكَّد تحويل بعد', 'No transfer confirmed yet')}>
+              {t('التحويلات المؤكَّدة تظهر هنا بمرجعها ومن أكّدها، الأحدث أولاً.', 'Confirmed transfers appear here with their reference and who confirmed them, newest first.')}
             </Empty>
           )
         ) : (
-          <div className="table-wrap" tabIndex={0} role="region" aria-label="تحويلات مؤكَّدة">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label={t('تحويلات مؤكَّدة', 'Confirmed transfers')}>
             <table className="table ao-table">
               <thead>
                 <tr>
-                  <th>الطلب</th>
-                  <th className="end">المبلغ</th>
-                  <th>المرجع</th>
-                  <th>أكّده</th>
+                  <th>{t('الطلب', 'Order')}</th>
+                  <th className="end">{t('المبلغ', 'Amount')}</th>
+                  <th>{t('المرجع', 'Reference')}</th>
+                  <th>{t('أكّده', 'Confirmed by')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -414,10 +447,10 @@ export default function AdminTransfersPage() {
                         <span className="ao-stack__sub">{c.buyerName ?? '—'}</span>
                       </span>
                     </td>
-                    <td data-label="المبلغ" className="end">
-                      <span className="money num">{money(c.amountMinorUnits, c.currency)}</span>
+                    <td data-label={t('المبلغ', 'Amount')} className="end">
+                      <span className="money num">{money(c.amountMinorUnits, c.currency, locale)}</span>
                     </td>
-                    <td data-label="المرجع">
+                    <td data-label={t('المرجع', 'Reference')}>
                       <span className="ao-stack">
                         <bdi className="num" dir="ltr">
                           {c.reference}
@@ -425,10 +458,10 @@ export default function AdminTransfersPage() {
                         {c.note ? <span className="ao-stack__sub">{c.note}</span> : null}
                       </span>
                     </td>
-                    <td data-label="أكّده">
+                    <td data-label={t('أكّده', 'Confirmed by')}>
                       <span className="ao-stack">
                         <span>{c.confirmedBy ?? '—'}</span>
-                        <span className="ao-stack__sub">{when(c.confirmedAt)}</span>
+                        <span className="ao-stack__sub">{when(c.confirmedAt, locale)}</span>
                       </span>
                     </td>
                   </tr>
@@ -441,7 +474,8 @@ export default function AdminTransfersPage() {
       {tab === 'confirmed' ? <MoreButton list={confirmed} /> : null}
 
       <p className="ao-foot-note">
-        بيانات الحساب التي يراها المشتري ومهلة التحويل من <Link href="/admin/settings">الإعدادات</Link>.
+        {t('بيانات الحساب التي يراها المشتري ومهلة التحويل من', 'The account details the buyer sees and the transfer deadline are set in')}{' '}
+        <Link href="/admin/settings">{t('الإعدادات', 'Settings')}</Link>.
       </p>
     </div>
   );

@@ -7,11 +7,14 @@ import { api, ApiError, mediaUrl } from '@/lib/api';
 import { digitsOnly } from '@/lib/digits';
 import { Alert, ClearableInput, EmptyState, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { MAX_IMAGES, ProductImages } from '@/components/product-images';
 import { useOnboarding } from '@/lib/vendor';
 import { formatMoney } from '@/lib/money';
+import { localized, type Locale } from '@/lib/i18n';
 import {
   PRODUCT_STATUS,
+  PRODUCT_STATUS_EN,
   num,
   type Attribute,
   type ProductDetail,
@@ -69,6 +72,13 @@ const KIND: Record<Attribute['inputType'], string> = {
   boolean: 'نعم/لا',
 };
 
+const KIND_EN: Record<Attribute['inputType'], string> = {
+  select: 'List',
+  text: 'Text',
+  number: 'Number',
+  boolean: 'Yes/No',
+};
+
 /**
  * VD-08 — محرّر المنتج.
  *
@@ -81,6 +91,9 @@ const KIND: Record<Attribute['inputType'], string> = {
  *    الخدمة ولا يخمّنها. متجر قيد المراجعة ينشر فيظهر منتجه لحظة اعتماده.
  */
 export function ProductEditor({ productId }: { productId?: string }) {
+  const t = useT();
+  const locale = useLocale();
+  const statusOf = localized(locale, PRODUCT_STATUS, PRODUCT_STATUS_EN);
   const router = useRouter();
   const isNew = !productId;
 
@@ -170,7 +183,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
       } catch (err) {
         if (alive) {
           setLoadError({
-            message: err instanceof Error ? err.message : 'تعذّر تحميل المحرّر.',
+            message: err instanceof Error ? err.message : t('تعذّر تحميل المحرّر.', "Couldn't load the editor."),
             notFound: err instanceof ApiError && err.status === 404,
           });
         }
@@ -181,10 +194,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
     return () => {
       alive = false;
     };
-  }, [productId, attempt]);
+  }, [productId, attempt, t]);
 
   if (loading) {
-    return <Spinner label="جارٍ فتح المحرّر…" />;
+    return <Spinner label={t('جارٍ فتح المحرّر…', 'Opening the editor…')} />;
   }
 
   // ما لم يُحمَّل لا يُرسم نموذجه: كان المحرّر يرسمه فارغاً تحت التنبيه و«احفظ» فعّال، فحفظٌ منه
@@ -195,19 +208,19 @@ export function ProductEditor({ productId }: { productId?: string }) {
         <div className="page-head">
           <Link className="btn btn--secondary btn--sm vp-back" href="/vendor/products">
             <Icon name="back" size={14} mirror />
-            المنتجات
+            {t('المنتجات', 'Products')}
           </Link>
         </div>
         {loadError.notFound ? (
           <EmptyState
-            title="المنتج غير موجود."
+            title={t('المنتج غير موجود.', "This product doesn't exist.")}
             actions={
               <Link className="btn btn--secondary" href="/vendor/products">
-                العودة إلى المنتجات
+                {t('العودة إلى المنتجات', 'Back to products')}
               </Link>
             }
           >
-            ربما الرابط قديم، أو لمنتج متجر آخر.
+            {t('ربما الرابط قديم، أو لمنتج متجر آخر.', "The link may be old, or it's for another shop's product.")}
           </EmptyState>
         ) : (
           <div className="alert alert--danger" role="alert">
@@ -222,7 +235,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
               }}
             >
               <Icon name="refresh" size={15} />
-              أعد المحاولة
+              {t('أعد المحاولة', 'Try again')}
             </button>
           </div>
         )}
@@ -302,7 +315,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
       setForm({ ...form, vendorCategoryId: created.id });
       setNewCat(null);
     } catch (err) {
-      setNewCatError(err instanceof Error ? err.message : 'تعذّرت إضافة الفئة.');
+      setNewCatError(err instanceof Error ? err.message : t('تعذّرت إضافة الفئة.', "Couldn't add the category."));
     } finally {
       setNewCatBusy(false);
     }
@@ -311,10 +324,18 @@ export function ProductEditor({ productId }: { productId?: string }) {
   /** ما يمنع الحفظ قبل إرساله — يُقال بالاسم بدل رفض الخادم العام، أو null */
   function unsavable(): string | null {
     // لا منتج بلا فئة (18 أكتوبر 2026) — والقديم بلا فئة يُصنَّف عند أوّل حفظ
-    if (!form.vendorCategoryId) return 'اختر فئة للمنتج من «الفئة في متجرك»، أو أضف فئة جديدة.';
+    if (!form.vendorCategoryId)
+      return t(
+        'اختر فئة للمنتج من «الفئة في متجرك»، أو أضف فئة جديدة.',
+        'Choose a category for the product under “Category in your shop”, or add a new one.',
+      );
     // محور مختار بلا قيمة في صفّ
     const unset = axes.find((a) => variants.some((v) => !v.options[a.attributeId]));
-    if (unset) return `اختر «${unset.nameAr}» لكل متغيّر، أو أزله من «ما يميّز متغيّراتك».`;
+    if (unset)
+      return t(
+        `اختر «${unset.nameAr}» لكل متغيّر، أو أزله من «ما يميّز متغيّراتك».`,
+        `Choose “${unset.nameAr}” for every variant, or remove it from “What sets your variants apart”.`,
+      );
     return null;
   }
 
@@ -354,10 +375,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
     try {
       const saved = await write(isNew ? null : productId);
       settle(saved);
-      setNotice('حُفظ المنتج.');
+      setNotice(t('حُفظ المنتج.', 'Product saved.'));
       if (isNew) router.replace(`/vendor/products/${saved.id}`);
     } catch (err) {
-      setFailure(err instanceof Error ? err.message : 'تعذّر حفظ المنتج.');
+      setFailure(err instanceof Error ? err.message : t('تعذّر حفظ المنتج.', "Couldn't save the product."));
     } finally {
       setBusy(false);
     }
@@ -394,13 +415,17 @@ export function ProductEditor({ productId }: { productId?: string }) {
         method: 'POST',
       });
       setProduct(next);
-      setNotice(storeInReview ? 'نُشر المنتج — يظهر للمشترين لحظة اعتماد متجرك.' : 'نُشر المنتج — يراه المشترون الآن.');
+      setNotice(
+        storeInReview
+          ? t('نُشر المنتج — يظهر للمشترين لحظة اعتماد متجرك.', 'Product published — buyers will see it the moment your shop is approved.')
+          : t('نُشر المنتج — يراه المشترون الآن.', 'Product published — buyers can see it now.'),
+      );
     } catch (err) {
       // الموانع تأتي من الخدمة مجتمعة — تُعرض كما هي لا تُختصر
       if (err instanceof ApiError && Array.isArray(err.details?.['reasons'])) {
         setBlockers(err.details['reasons'] as string[]);
       } else {
-        setFailure(err instanceof Error ? err.message : 'تعذّر نشر المنتج.');
+        setFailure(err instanceof Error ? err.message : t('تعذّر نشر المنتج.', "Couldn't publish the product."));
       }
     } finally {
       setBusy(false);
@@ -418,7 +443,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
   // والسعران «12.5» و«12.50» نطاقاً لأنهما نصّان (VON-055، 28 أكتوبر 2026)
   const priceCurrency = product?.currency ?? store?.settlementCurrency ?? null;
   const shown = (p: number): string =>
-    priceCurrency ? formatMoney(BigInt(Math.round(p * 10 ** decimalsOf(priceCurrency))), priceCurrency) : String(p);
+    priceCurrency ? formatMoney(BigInt(Math.round(p * 10 ** decimalsOf(priceCurrency))), priceCurrency, locale) : String(p);
   const priceRange =
     prices.length === 0
       ? null
@@ -433,12 +458,14 @@ export function ProductEditor({ productId }: { productId?: string }) {
       <div className="page-head">
         <Link className="btn btn--secondary btn--sm vp-back" href="/vendor/products">
           <Icon name="back" size={14} mirror />
-          المنتجات
+          {t('المنتجات', 'Products')}
         </Link>
-        <h1 className="vp-editor__title">{isNew ? 'منتج جديد' : form.nameAr || 'تحرير المنتج'}</h1>
+        <h1 className="vp-editor__title">
+          {isNew ? t('منتج جديد', 'New product') : (locale === 'en' && form.nameEn ? form.nameEn : form.nameAr) || t('تحرير المنتج', 'Edit product')}
+        </h1>
         {product ? (
-          <span className={`badge ${PRODUCT_STATUS[product.status].tone}`}>
-            {PRODUCT_STATUS[product.status].label}
+          <span className={`badge ${statusOf[product.status].tone}`}>
+            {statusOf[product.status].label}
           </span>
         ) : null}
         <span className="page-head__actions">
@@ -446,16 +473,20 @@ export function ProductEditor({ productId }: { productId?: string }) {
           {product?.status === 'active' && store?.status === 'approved' ? (
             <Link className="btn btn--secondary" href={`/p/${product.slug}`}>
               <Icon name="eye" size={16} />
-              عاين
+              {t('عاين', 'Preview')}
             </Link>
           ) : null}
           <button className="btn btn--secondary" type="button" disabled={busy} onClick={() => void save()}>
-            {busy ? 'جارٍ الحفظ…' : !product || product.status === 'draft' ? 'احفظ كمسودة' : 'احفظ'}
+            {busy
+              ? t('جارٍ الحفظ…', 'Saving…')
+              : !product || product.status === 'draft'
+                ? t('احفظ كمسودة', 'Save as draft')
+                : t('احفظ', 'Save')}
           </button>
           {canPublish ? (
             <button className="btn btn--primary" type="button" disabled={busy} onClick={() => void publish()}>
               <Icon name="send" size={16} />
-              انشر
+              {t('انشر', 'Publish')}
             </button>
           ) : null}
         </span>
@@ -470,9 +501,9 @@ export function ProductEditor({ productId }: { productId?: string }) {
             <Icon name="alert" size={17} />
           </span>
           <div className="vp-banner__text">
-            <p className="vp-banner__title">أوقفت الإدارة هذا المنتج — السبب</p>
+            <p className="vp-banner__title">{t('أوقفت الإدارة هذا المنتج — السبب', 'The admin took down this product — reason')}</p>
             <p>{product.rejectReason}</p>
-            <p>عدّله ثم اضغط «انشر» ليظهر للمشترين من جديد.</p>
+            <p>{t('عدّله ثم اضغط «انشر» ليظهر للمشترين من جديد.', 'Edit it, then press “Publish” so buyers can see it again.')}</p>
           </div>
         </div>
       ) : null}
@@ -482,24 +513,27 @@ export function ProductEditor({ productId }: { productId?: string }) {
           <Icon name="info" size={16} className="vp-banner__glyph" />
           <p>
             {storeInReview
-              ? 'منشور — يظهر للمشترين لحظة اعتماد متجرك، وتعديلاتك محفوظة معه.'
-              : 'منشور ويراه المشترون — تعديلاتك تظهر لهم فور الحفظ.'}
+              ? t(
+                  'منشور — يظهر للمشترين لحظة اعتماد متجرك، وتعديلاتك محفوظة معه.',
+                  'Published — buyers will see it the moment your shop is approved, and your edits are saved with it.',
+                )
+              : t('منشور ويراه المشترون — تعديلاتك تظهر لهم فور الحفظ.', 'Published and visible to buyers — your edits show up as soon as you save.')}
           </p>
         </div>
       ) : null}
 
       <div className="vp-editor">
         <div className="vp-editor__main">
-          <Section n={1} title="الأساسيات">
+          <Section n={1} title={t('الأساسيات', 'Basics')}>
             <div className="vp-grid-2">
               <TextInput
-                label="الاسم بالعربية *"
+                label={t('الاسم بالعربية *', 'Name in Arabic *')}
                 required
                 value={form.nameAr}
                 onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
               />
               <TextInput
-                label="الاسم بالإنجليزية"
+                label={t('الاسم بالإنجليزية', 'Name in English')}
                 optional
                 dir="ltr"
                 value={form.nameEn}
@@ -508,8 +542,11 @@ export function ProductEditor({ productId }: { productId?: string }) {
             </div>
             <div className="vp-grid-2">
               <Field
-                label="الفئة في متجرك"
-                hint="إلزامية — تظهر للمشترين أزراراً في صفحة متجرك. أدرها كلها من «الفئات» في القائمة."
+                label={t('الفئة في متجرك', 'Category in your shop')}
+                hint={t(
+                  'إلزامية — تظهر للمشترين أزراراً في صفحة متجرك. أدرها كلها من «الفئات» في القائمة.',
+                  'Required — buyers see categories as buttons on your shop page. Manage them all from “Categories” in the menu.',
+                )}
               >
                 {(props) => (
                   <select
@@ -526,21 +563,21 @@ export function ProductEditor({ productId }: { productId?: string }) {
                     }}
                   >
                     <option value="" disabled>
-                      اختر فئة
+                      {t('اختر فئة', 'Choose a category')}
                     </option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nameAr}
                       </option>
                     ))}
-                    <option value={NEW_CATEGORY}>+ إضافة فئة جديدة…</option>
+                    <option value={NEW_CATEGORY}>{t('+ إضافة فئة جديدة…', '+ Add a new category…')}</option>
                   </select>
                 )}
               </Field>
               {newCat !== null ? (
                 <div className="field">
                   <label className="field__label" htmlFor="vp-new-category">
-                    اسم الفئة الجديدة
+                    {t('اسم الفئة الجديدة', 'New category name')}
                   </label>
                   <div className="vp-newcat">
                     <ClearableInput
@@ -549,7 +586,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                       // يظهر الحقل بطلب البائع نفسه من القائمة — فالتركيز فيه متوقَّع لا مفاجئ
                       autoFocus
                       maxLength={80}
-                      placeholder="مثل: قمصان صيفية"
+                      placeholder={t('مثل: قمصان صيفية', 'e.g. Summer shirts')}
                       value={newCat}
                       aria-invalid={Boolean(newCatError)}
                       aria-describedby={newCatError ? 'vp-new-category-error' : undefined}
@@ -570,10 +607,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
                       onClick={() => void addCategory()}
                     >
                       <Icon name="plus" size={14} />
-                      أضف
+                      {t('أضف', 'Add')}
                     </button>
                     <button type="button" className="btn btn--ghost btn--sm" onClick={() => setNewCat(null)}>
-                      إلغاء
+                      {t('إلغاء', 'Cancel')}
                     </button>
                   </div>
                   {newCatError ? (
@@ -588,18 +625,21 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
           <Section
             n={2}
-            title="الوصف"
+            title={t('الوصف', 'Description')}
             meta={
               <span className="vp-sec__count num" data-over={descLength > DESCRIPTION_MAX}>
-                {num(descLength)} / {num(DESCRIPTION_MAX)}
+                {num(descLength, locale)} / {num(DESCRIPTION_MAX, locale)}
               </span>
             }
           >
             <TextArea
-              label="الوصف بالعربية"
+              label={t('الوصف بالعربية', 'Description in Arabic')}
               optional
               rows={5}
-              placeholder="اكتب وصفاً عربياً — المادة، المقاسات، العناية، ومن أين تشحن."
+              placeholder={t(
+                'اكتب وصفاً عربياً — المادة، المقاسات، العناية، ومن أين تشحن.',
+                'Write an Arabic description — material, sizes, care, and where you ship from.',
+              )}
               value={form.descriptionAr}
               onChange={(e) => setForm({ ...form, descriptionAr: e.target.value })}
             />
@@ -607,13 +647,15 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
           <Section
             n={3}
-            title="الصور"
+            title={t('الصور', 'Images')}
             meta={
               <>
                 <span className="vp-sec__count num">
-                  {num(product?.images.length ?? 0)} / {num(MAX_IMAGES)}
+                  {num(product?.images.length ?? 0, locale)} / {num(MAX_IMAGES, locale)}
                 </span>
-                <span className="vp-sec__meta">JPEG أو PNG أو WebP · حتى 10 م.ب · أقصر ضلع 300 بكسل</span>
+                <span className="vp-sec__meta">
+                  {t('JPEG أو PNG أو WebP · حتى 10 م.ب · أقصر ضلع 300 بكسل', 'JPEG, PNG or WebP · up to 10 MB · shortest side 300 px')}
+                </span>
               </>
             }
           >
@@ -628,8 +670,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
           {plain.length > 0 ? (
             <Section
               n={4}
-              title="المواصفات"
-              meta={<span className="vp-sec__meta">اختيارية — تظهر للمشتري في صفحة المنتج</span>}
+              title={t('المواصفات', 'Specifications')}
+              meta={<span className="vp-sec__meta">{t('اختيارية — تظهر للمشتري في صفحة المنتج', 'Optional — shown to buyers on the product page')}</span>}
             >
               <div className="vp-grid-2">
                 {plain.map((attr) => (
@@ -646,20 +688,23 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
           <Section
             n={plain.length > 0 ? 5 : 4}
-            title="المتغيّرات"
+            title={t('المتغيّرات', 'Variants')}
             meta={
               <span className="vp-sec__count num">
-                {num(variants.length)} صفّ · حتى 3 محاور
+                {t(
+                  `${num(variants.length)} صفّ · حتى 3 محاور`,
+                  `${num(variants.length, locale)} ${variants.length === 1 ? 'row' : 'rows'} · up to 3 axes`,
+                )}
               </span>
             }
           >
             <p className="card__hint">
-              السعر والمخزون على المتغيّر. المنتج البسيط متغيّر واحد بلا خيارات.
+              {t('السعر والمخزون على المتغيّر. المنتج البسيط متغيّر واحد بلا خيارات.', 'Price and stock are set per variant. A simple product is one variant with no options.')}
             </p>
 
             {axisChoices.length > 0 ? (
-              <div className="vp-axes" role="group" aria-label="محاور المتغيّرات">
-                <span className="vp-axes__label">ما يميّز متغيّراتك</span>
+              <div className="vp-axes" role="group" aria-label={t('محاور المتغيّرات', 'Variant axes')}>
+                <span className="vp-axes__label">{t('ما يميّز متغيّراتك', 'What sets your variants apart')}</span>
                 {axisChoices.map((a) => {
                   const on = axisIds.includes(a.attributeId);
                   return (
@@ -673,7 +718,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                     >
                       <Icon name={on ? 'check' : 'plus'} size={12} />
                       {a.nameAr}
-                      <span className="num">{num(a.values.length)}</span>
+                      <span className="num">{num(a.values.length, locale)}</span>
                     </button>
                   );
                 })}
@@ -690,14 +735,17 @@ export function ProductEditor({ productId }: { productId?: string }) {
                       </th>
                     ))}
                     <th scope="col">SKU</th>
-                    <th scope="col">السعر{product ? ` · ${product.currency}` : ''}</th>
-                    <th scope="col">قبل الخصم</th>
-                    <th scope="col">الكمية</th>
-                    <th scope="col">حدّ التنبيه</th>
-                    <th scope="col">الباركود</th>
-                    <th scope="col">الوزن · غ</th>
                     <th scope="col">
-                      <span className="visually-hidden">إجراءات</span>
+                      {t('السعر', 'Price')}
+                      {product ? ` · ${product.currency}` : ''}
+                    </th>
+                    <th scope="col">{t('قبل الخصم', 'Before discount')}</th>
+                    <th scope="col">{t('الكمية', 'Quantity')}</th>
+                    <th scope="col">{t('حدّ التنبيه', 'Alert threshold')}</th>
+                    <th scope="col">{t('الباركود', 'Barcode')}</th>
+                    <th scope="col">{t('الوزن · غ', 'Weight · g')}</th>
+                    <th scope="col">
+                      <span className="visually-hidden">{t('إجراءات', 'Actions')}</span>
                     </th>
                   </tr>
                 </thead>
@@ -708,7 +756,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         <td key={a.attributeId} data-label={a.nameAr}>
                           <select
                             className="field__control vp-cell"
-                            aria-label={`${a.nameAr} للمتغيّر ${num(i + 1)}`}
+                            aria-label={t(`${a.nameAr} للمتغيّر ${num(i + 1)}`, `${a.nameAr} for variant ${num(i + 1, locale)}`)}
                             value={v.options[a.attributeId] ?? ''}
                             onChange={(e) =>
                               update(i, { options: { ...v.options, [a.attributeId]: e.target.value } })
@@ -727,72 +775,72 @@ export function ProductEditor({ productId }: { productId?: string }) {
                         <ClearableInput
                           className="field__control num vp-cell vp-cell--sku"
                           dir="ltr"
-                          aria-label={`SKU للمتغيّر ${num(i + 1)}`}
+                          aria-label={t(`SKU للمتغيّر ${num(i + 1)}`, `SKU for variant ${num(i + 1, locale)}`)}
                           value={v.sku}
                           onChange={(e) => update(i, { sku: e.target.value.toUpperCase() })}
                         />
                       </td>
-                      <td data-label="السعر">
+                      <td data-label={t('السعر', 'Price')}>
                         <ClearableInput
                           className="field__control money num vp-cell vp-cell--price"
                           dir="ltr"
                           inputMode="decimal"
-                          aria-label={`السعر للمتغيّر ${num(i + 1)}`}
+                          aria-label={t(`السعر للمتغيّر ${num(i + 1)}`, `Price for variant ${num(i + 1, locale)}`)}
                           value={v.price}
                           onChange={(e) => update(i, { price: e.target.value })}
                         />
                       </td>
-                      <td data-label="قبل الخصم">
+                      <td data-label={t('قبل الخصم', 'Before discount')}>
                         <ClearableInput
                           className="field__control num vp-cell vp-cell--price"
                           dir="ltr"
                           inputMode="decimal"
                           placeholder="—"
-                          aria-label={`السعر قبل الخصم للمتغيّر ${num(i + 1)}`}
+                          aria-label={t(`السعر قبل الخصم للمتغيّر ${num(i + 1)}`, `Price before discount for variant ${num(i + 1, locale)}`)}
                           value={v.compareAtPrice}
                           onChange={(e) => update(i, { compareAtPrice: e.target.value })}
                         />
                       </td>
-                      <td data-label="الكمية">
+                      <td data-label={t('الكمية', 'Quantity')}>
                         <ClearableInput
                           className="field__control num vp-cell vp-cell--qty"
                           dir="ltr"
                           inputMode="numeric"
-                          aria-label={`الكمية للمتغيّر ${num(i + 1)}`}
+                          aria-label={t(`الكمية للمتغيّر ${num(i + 1)}`, `Quantity for variant ${num(i + 1, locale)}`)}
                           value={v.stock}
                           onChange={(e) => update(i, { stock: digitsOnly(e.target.value) })}
                         />
                       </td>
-                      <td data-label="حدّ التنبيه">
+                      <td data-label={t('حدّ التنبيه', 'Alert threshold')}>
                         <ClearableInput
                           className="field__control num vp-cell vp-cell--qty"
                           dir="ltr"
                           inputMode="numeric"
-                          aria-label={`حدّ التنبيه للمتغيّر ${num(i + 1)}`}
+                          aria-label={t(`حدّ التنبيه للمتغيّر ${num(i + 1)}`, `Alert threshold for variant ${num(i + 1, locale)}`)}
                           value={v.lowStockThreshold}
                           onChange={(e) =>
                             update(i, { lowStockThreshold: digitsOnly(e.target.value) })
                           }
                         />
                       </td>
-                      <td data-label="الباركود">
+                      <td data-label={t('الباركود', 'Barcode')}>
                         <ClearableInput
                           className="field__control num vp-cell vp-cell--sku"
                           dir="ltr"
                           maxLength={64}
                           placeholder="—"
-                          aria-label={`الباركود للمتغيّر ${num(i + 1)}`}
+                          aria-label={t(`الباركود للمتغيّر ${num(i + 1)}`, `Barcode for variant ${num(i + 1, locale)}`)}
                           value={v.barcode}
                           onChange={(e) => update(i, { barcode: e.target.value })}
                         />
                       </td>
-                      <td data-label="الوزن · غ">
+                      <td data-label={t('الوزن · غ', 'Weight · g')}>
                         <ClearableInput
                           className="field__control num vp-cell vp-cell--qty"
                           dir="ltr"
                           inputMode="numeric"
                           placeholder="—"
-                          aria-label={`الوزن بالغرام للمتغيّر ${num(i + 1)}`}
+                          aria-label={t(`الوزن بالغرام للمتغيّر ${num(i + 1)}`, `Weight in grams for variant ${num(i + 1, locale)}`)}
                           value={v.weightGrams}
                           onChange={(e) => update(i, { weightGrams: digitsOnly(e.target.value) })}
                         />
@@ -805,7 +853,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                             onClick={() => setVariants(variants.filter((_, j) => j !== i))}
                           >
                             <Icon name="trash" size={14} />
-                            حذف
+                            {t('حذف', 'Delete')}
                           </button>
                         ) : null}
                       </td>
@@ -822,25 +870,29 @@ export function ProductEditor({ productId }: { productId?: string }) {
                 onClick={() => setVariants([...variants, emptyVariant()])}
               >
                 <Icon name="plus" size={14} />
-                أضف متغيّراً
+                {t('أضف متغيّراً', 'Add a variant')}
               </button>
-              <span className="vp-faint">بلا محاور يصبح المنتج صفاً واحداً.</span>
+              <span className="vp-faint">{t('بلا محاور يصبح المنتج صفاً واحداً.', 'With no axes, the product becomes a single row.')}</span>
             </div>
             {product ? (
               <p className="small muted">
-                السعر بعملة متجرك (<span className="num">{product.currency}</span>). المحجوز للمشترين في
-                الدفع لا يُحسب متاحاً.
+                {t('السعر بعملة متجرك (', "Prices are in your shop's currency (")}
+                <span className="num">{product.currency}</span>
+                {t(
+                  '). المحجوز للمشترين في الدفع لا يُحسب متاحاً.',
+                  '). Stock reserved for buyers at checkout is not counted as available.',
+                )}
               </p>
             ) : null}
           </Section>
         </div>
 
-        <aside className="vp-editor__side" aria-label="حالة النشر والملخّص">
+        <aside className="vp-editor__side" aria-label={t('حالة النشر والملخّص', 'Publishing status and summary')}>
           {blockers.length > 0 ? (
             <section className="vp-blockers" role="alert">
               <header className="vp-blockers__head">
                 <Icon name="alert" size={17} />
-                <h2>لا يمكن النشر: {obstacles(blockers.length)}</h2>
+                <h2>{t(`لا يمكن النشر: ${obstacles(blockers.length)}`, `Can't publish: ${obstacles(blockers.length, locale)}`)}</h2>
               </header>
               <ul className="vp-blockers__list">
                 {blockers.map((message, i) => (
@@ -852,29 +904,29 @@ export function ProductEditor({ productId }: { productId?: string }) {
                   </li>
                 ))}
               </ul>
-              <p className="vp-blockers__hint">كل العوائق تُعرض معاً — أصلحها كلها ثم انشر.</p>
+              <p className="vp-blockers__hint">{t('كل العوائق تُعرض معاً — أصلحها كلها ثم انشر.', 'All issues are shown together — fix them all, then publish.')}</p>
             </section>
           ) : null}
 
           <section className="card vp-summary">
-            <h2 className="eyebrow">الملخّص</h2>
+            <h2 className="eyebrow">{t('الملخّص', 'Summary')}</h2>
             <dl className="vp-summary__rows">
               {product ? (
                 <div>
-                  <dt>الحالة</dt>
-                  <dd>{PRODUCT_STATUS[product.status].label}</dd>
+                  <dt>{t('الحالة', 'Status')}</dt>
+                  <dd>{statusOf[product.status].label}</dd>
                 </div>
               ) : null}
               <div>
-                <dt>الفئة</dt>
-                <dd>{categoryName ?? 'لم تُختر — مطلوبة'}</dd>
+                <dt>{t('الفئة', 'Category')}</dt>
+                <dd>{categoryName ?? t('لم تُختر — مطلوبة', 'Not chosen — required')}</dd>
               </div>
               <div>
-                <dt>المتغيّرات</dt>
-                <dd className="num">{num(variants.length)}</dd>
+                <dt>{t('المتغيّرات', 'Variants')}</dt>
+                <dd className="num">{num(variants.length, locale)}</dd>
               </div>
               <div>
-                <dt>نطاق السعر</dt>
+                <dt>{t('نطاق السعر', 'Price range')}</dt>
                 <dd>
                   {priceRange ? (
                     <span className="money num">{priceRange}</span>
@@ -884,8 +936,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
                 </dd>
               </div>
               <div>
-                <dt>المخزون الكلي</dt>
-                <dd className="num">{num(totalStock)}</dd>
+                <dt>{t('المخزون الكلي', 'Total stock')}</dt>
+                <dd className="num">{num(totalStock, locale)}</dd>
               </div>
             </dl>
           </section>
@@ -938,6 +990,8 @@ function AttrField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const id = useId();
   const labelId = `${id}-label`;
   const label = attr.nameAr;
@@ -956,7 +1010,7 @@ function AttrField({
             {label}
           </label>
         )}
-        <span className="vp-attr__kind">{KIND[attr.inputType]}</span>
+        <span className="vp-attr__kind">{localized(locale, KIND, KIND_EN)[attr.inputType]}</span>
       </div>
 
       {pills ? (
@@ -977,8 +1031,8 @@ function AttrField({
         <div className="seg vp-seg" role="group" aria-labelledby={labelId}>
           {(
             [
-              ['true', 'نعم'],
-              ['false', 'لا'],
+              ['true', t('نعم', 'Yes')],
+              ['false', t('لا', 'No')],
             ] as const
           ).map(([v, text]) => (
             <button
@@ -1021,7 +1075,8 @@ function AttrField({
 }
 
 /** «عائق واحد · عائقان · 3 عوائق · 11 عائقاً» — التمييز يتغيّر بالعدد */
-function obstacles(n: number): string {
+function obstacles(n: number, locale: Locale = 'ar'): string {
+  if (locale === 'en') return `${num(n, locale)} ${n === 1 ? 'issue' : 'issues'}`;
   if (n === 1) return 'عائق واحد';
   if (n === 2) return 'عائقان';
   if (n <= 10) return `${num(n)} عوائق`;

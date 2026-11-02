@@ -790,6 +790,8 @@ button.vp-axis { cursor: pointer; font-family: inherit; }
 .vc-up svg { transform: rotate(180deg); }
 .vc-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--space-3); flex: 1; min-width: 0; }
 .vc-name__text { font-weight: var(--weight-semi); color: var(--text-strong); overflow-wrap: anywhere; }
+/* الاسم الإنجليزي بجانب العربي — ما يراه المشتري حين يكون الموقع بالإنجليزية */
+.vc-name__en { color: var(--text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .vc-count { font-size: var(--text-xs); color: var(--text-muted); }
 .vc-rename { flex: 1; min-width: 0; }
 .vc-actions { display: inline-flex; align-items: center; gap: var(--space-2); }

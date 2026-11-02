@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { RecoveryCodes } from '@/components/recovery-codes';
 import { Alert, TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -32,6 +33,7 @@ export function TwoFactorCard({
   /** إلى أين يعود صاحب الحساب بعد التفعيل (يدخل من جديد) */
   returnTo?: string;
 }) {
+  const t = useT();
   const [mode, setMode] = useState<'idle' | 'regen' | 'disable'>('idle');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -72,7 +74,12 @@ export function TwoFactorCard({
     try {
       await api('/auth/totp/disable', { method: 'POST', body: { password, code: code.trim() } });
       reset('idle');
-      setNotice('عُطِّل التحقّق بخطوتين. حسابك يُفتح الآن بكلمة المرور وحدها.');
+      setNotice(
+        t(
+          'عُطِّل التحقّق بخطوتين. حسابك يُفتح الآن بكلمة المرور وحدها.',
+          'Two-step verification is off. Your account now opens with your password alone.',
+        ),
+      );
       onChanged();
     } catch (e) {
       setError((e as Error).message);
@@ -83,7 +90,7 @@ export function TwoFactorCard({
 
   const codeField = (
     <TextInput
-      label="رمز التطبيق أو رمز استعادة"
+      label={t('رمز التطبيق أو رمز استعادة', 'App code or recovery code')}
       className="field__control ac-otp"
       autoComplete="one-time-code"
       spellCheck={false}
@@ -98,19 +105,24 @@ export function TwoFactorCard({
 
   return (
     <section className="card id-card-start">
-      <h2 className="id-card-title">التحقّق بخطوتين</h2>
+      <h2 className="id-card-title">{t('التحقّق بخطوتين', 'Two-step verification')}</h2>
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
       <div className="id-tfa" data-on={on ? 'true' : undefined}>
         <Icon name="shield" size={20} />
         <span className="id-tfa__text">
-          <span className="id-tfa__title">{on ? 'التحقّق بخطوتين مُفعَّل' : 'التحقّق بخطوتين غير مُفعَّل'}</span>
+          <span className="id-tfa__title">
+            {on ? t('التحقّق بخطوتين مُفعَّل', 'Two-step verification is on') : t('التحقّق بخطوتين غير مُفعَّل', 'Two-step verification is off')}
+          </span>
           <span className="id-tfa__body">
             {on
               ? isAdmin
-                ? 'إلزامي لحسابات الإدارة ولا يمكن تعطيله.'
-                : 'الدخول يطلب رمزاً من تطبيق المصادقة مع كلمة المرور.'
-              : 'فعّله ليطلب الدخول رمزاً من هاتفك مع كلمة المرور — فلا تكفي كلمة مرور مسروقة وحدها.'}
+                ? t('إلزامي لحسابات الإدارة ولا يمكن تعطيله.', "It's required for admin accounts and can't be turned off.")
+                : t('الدخول يطلب رمزاً من تطبيق المصادقة مع كلمة المرور.', 'Signing in asks for a code from your authenticator app along with your password.')
+              : t(
+                  'فعّله ليطلب الدخول رمزاً من هاتفك مع كلمة المرور — فلا تكفي كلمة مرور مسروقة وحدها.',
+                  "Turn it on so signing in asks for a code from your phone along with your password — a stolen password alone won't be enough.",
+                )}
           </span>
         </span>
       </div>
@@ -118,12 +130,12 @@ export function TwoFactorCard({
       {!on ? (
         <Link href={`/account/2fa?next=${encodeURIComponent(returnTo)}`} className="btn btn--secondary id-fit">
           <Icon name="shield" size={16} />
-          فعّل التحقّق بخطوتين
+          {t('فعّل التحقّق بخطوتين', 'Turn on two-step verification')}
         </Link>
       ) : codes ? (
         <RecoveryCodes
           codes={codes}
-          doneLabel="تمّ"
+          doneLabel={t('تمّ', 'Done')}
           onDone={() => {
             setCodes(null);
             onChanged();
@@ -132,33 +144,38 @@ export function TwoFactorCard({
       ) : (
         <>
           {codesLeft <= LOW_CODES ? (
-            <Alert tone="warning" title="رموز الاستعادة قاربت على النفاد">
-              الرموز الباقية: {codesLeft}. أنشئ رموزاً جديدة قبل أن تحتاجها.
+            <Alert tone="warning" title={t('رموز الاستعادة قاربت على النفاد', 'Recovery codes are running low')}>
+              {t(
+                `الرموز الباقية: ${codesLeft}. أنشئ رموزاً جديدة قبل أن تحتاجها.`,
+                `Codes left: ${codesLeft}. Create new ones before you need them.`,
+              )}
             </Alert>
           ) : (
-            <p className="id-note">رموز الاستعادة الباقية: {codesLeft}</p>
+            <p className="id-note">{t(`رموز الاستعادة الباقية: ${codesLeft}`, `Recovery codes left: ${codesLeft}`)}</p>
           )}
 
           {error ? <Alert tone="danger">{error}</Alert> : null}
 
           {mode === 'regen' ? (
             <form className="stack" onSubmit={regenerate} noValidate>
-              <p className="id-note">الرموز الجديدة تُبطل كل الرموز القديمة، ولو لم تُستعمل.</p>
+              <p className="id-note">{t('الرموز الجديدة تُبطل كل الرموز القديمة، ولو لم تُستعمل.', 'New codes cancel all old codes, even unused ones.')}</p>
               {codeField}
               <div className="row">
                 <button type="submit" className="btn btn--primary" disabled={busy || code.length < 6}>
-                  {busy ? 'جارٍ الإنشاء…' : 'أنشئ الرموز'}
+                  {busy ? t('جارٍ الإنشاء…', 'Creating…') : t('أنشئ الرموز', 'Create codes')}
                 </button>
                 <button type="button" className="btn btn--ghost" onClick={() => reset('idle')}>
-                  إلغاء
+                  {t('إلغاء', 'Cancel')}
                 </button>
               </div>
             </form>
           ) : mode === 'disable' ? (
             <form className="stack" onSubmit={disable} noValidate>
-              <p className="id-note">بعد التعطيل يُفتح حسابك بكلمة المرور وحدها، وتُمحى رموز الاستعادة.</p>
+              <p className="id-note">
+                {t('بعد التعطيل يُفتح حسابك بكلمة المرور وحدها، وتُمحى رموز الاستعادة.', 'Once turned off, your account opens with your password alone, and your recovery codes are deleted.')}
+              </p>
               <TextInput
-                label="كلمة المرور"
+                label={t('كلمة المرور', 'Password')}
                 type="password"
                 autoComplete="current-password"
                 dir="ltr"
@@ -174,10 +191,10 @@ export function TwoFactorCard({
                   disabled={busy || !password || code.length < 6}
                 >
                   <Icon name="lock" size={16} />
-                  {busy ? 'جارٍ التعطيل…' : 'عطّل التحقّق بخطوتين'}
+                  {busy ? t('جارٍ التعطيل…', 'Turning off…') : t('عطّل التحقّق بخطوتين', 'Turn off two-step verification')}
                 </button>
                 <button type="button" className="btn btn--ghost" onClick={() => reset('idle')}>
-                  إلغاء
+                  {t('إلغاء', 'Cancel')}
                 </button>
               </div>
             </form>
@@ -185,15 +202,15 @@ export function TwoFactorCard({
             <div className="row">
               <button type="button" className="btn btn--secondary" onClick={() => reset('regen')}>
                 <Icon name="refresh" size={16} />
-                أنشئ رموز استعادة جديدة
+                {t('أنشئ رموز استعادة جديدة', 'Create new recovery codes')}
               </button>
               <Link href={`/account/2fa?next=${encodeURIComponent(returnTo)}`} className="btn btn--secondary">
                 <Icon name="shield" size={16} />
-                غيّر الجهاز
+                {t('غيّر الجهاز', 'Change device')}
               </Link>
               {isAdmin ? null : (
                 <button type="button" className="btn btn--danger" onClick={() => reset('disable')}>
-                  عطّل التحقّق بخطوتين
+                  {t('عطّل التحقّق بخطوتين', 'Turn off two-step verification')}
                 </button>
               )}
             </div>

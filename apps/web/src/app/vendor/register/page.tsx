@@ -9,6 +9,7 @@ import { Icon, type IconName } from '@/components/icons';
 import { withNext } from '@/lib/safe-path';
 import { COUNTRIES, type Onboarding } from '@/lib/vendor';
 import { OnboardingFrame, OnboardingHead } from '../onboarding/onboarding-chrome';
+import { useLocale, useT } from '@/components/locale';
 
 interface SlugCheck {
   slug: string;
@@ -48,8 +49,20 @@ const subscribeSession = (cb: () => void) => {
 };
 
 const BUSINESS_TYPES = [
-  { value: 'individual', label: 'فرد', hint: 'سجل تجاري فردي أو عمل حر' },
-  { value: 'company', label: 'شركة', hint: 'شركة ذات مسؤولية محدودة أو أكبر' },
+  {
+    value: 'individual',
+    label: 'فرد',
+    labelEn: 'Individual',
+    hint: 'سجل تجاري فردي أو عمل حر',
+    hintEn: 'Sole-trader commercial register or freelance',
+  },
+  {
+    value: 'company',
+    label: 'شركة',
+    labelEn: 'Company',
+    hint: 'شركة ذات مسؤولية محدودة أو أكبر',
+    hintEn: 'Limited liability company or larger',
+  },
 ] as const;
 
 /**
@@ -68,6 +81,8 @@ const BUSINESS_TYPES = [
  * `PATCH /vendor/onboarding/shop`. التسجيل ثانيةً كان يُرفض بـ«لديك متجر».
  */
 export default function VendorRegisterPage() {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const signedIn = useSyncExternalStore(subscribeSession, () => !!session.read(), () => false);
   const [form, setForm] = useState(BLANK);
@@ -202,7 +217,13 @@ export default function VendorRegisterPage() {
         router.push(withNext('/login', '/vendor/register'));
         return;
       }
-      setError(err instanceof Error ? err.message : existing ? 'تعذّر حفظ بيانات المتجر.' : 'تعذّر تسجيل المتجر.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : existing
+            ? t('تعذّر حفظ بيانات المتجر.', "Couldn't save the shop details.")
+            : t('تعذّر تسجيل المتجر.', "Couldn't register the shop."),
+      );
     } finally {
       setBusy(false);
     }
@@ -227,26 +248,38 @@ export default function VendorRegisterPage() {
   };
   const slugHint =
     slugState === 'ok'
-      ? 'الرابط متاح.'
+      ? t('الرابط متاح.', 'The link is available.')
       : slugState === 'checking'
-        ? 'نتحقّق من توفّر الرابط…'
-        : 'يُشتقّ من الاسم الإنجليزي، وتستطيع تغييره.';
-  const slugError = slugState === 'taken' ? 'الرابط محجوز لمتجر آخر — اختر رابطاً غيره.' : null;
+        ? t('نتحقّق من توفّر الرابط…', 'Checking the link is available…')
+        : t('يُشتقّ من الاسم الإنجليزي، وتستطيع تغييره.', 'Made from the English name, and you can change it.');
+  const slugError =
+    slugState === 'taken' ? t('الرابط محجوز لمتجر آخر — اختر رابطاً غيره.', 'This link is taken by another shop — choose a different one.') : null;
   const slugValue = slugTouched ? form.slug : (check?.slug ?? '');
 
   if (!signedIn) {
     return (
       <OnboardingFrame step={1}>
-        <OnboardingHead title="سجّل متجرك على بسطة" lead="متجرك يُربط بحسابك في بسطة — أنشئه أو ادخل، ثم نعود بك إلى هنا لبيانات المتجر." />
+        <OnboardingHead
+          title={t('سجّل متجرك على بسطة', 'Register your shop on Basta')}
+          lead={t(
+            'متجرك يُربط بحسابك في بسطة — أنشئه أو ادخل، ثم نعود بك إلى هنا لبيانات المتجر.',
+            "Your shop is linked to your Basta account — create one or sign in, and we'll bring you back here for your shop details.",
+          )}
+        />
         <section className="card vo-gate">
-          <h2 className="vo-card-title">ابدأ بحسابك</h2>
-          <p className="vo-note__text">بالحساب تتابع طلب متجرك، وتصلك نتيجة المراجعة على بريدك، وتدخل لوحتك بعدها.</p>
+          <h2 className="vo-card-title">{t('ابدأ بحسابك', 'Start with your account')}</h2>
+          <p className="vo-note__text">
+            {t(
+              'بالحساب تتابع طلب متجرك، وتصلك نتيجة المراجعة على بريدك، وتدخل لوحتك بعدها.',
+              'With an account you can follow your shop application, get the review result by email, and then sign in to your dashboard.',
+            )}
+          </p>
           <div className="vo-actions">
             <Link className="btn btn--primary" href={withNext('/register', '/vendor/register')}>
-              أنشئ حساباً
+              {t('أنشئ حساباً', 'Create an account')}
             </Link>
             <Link className="btn btn--secondary" href={withNext('/login', '/vendor/register')}>
-              لديّ حساب — ادخل
+              {t('لديّ حساب — ادخل', 'I have an account — sign in')}
             </Link>
           </div>
         </section>
@@ -257,24 +290,27 @@ export default function VendorRegisterPage() {
   return (
     <OnboardingFrame step={2}>
       <OnboardingHead
-        title={existing ? 'بيانات متجرك' : 'سجّل متجرك على بسطة'}
+        title={existing ? t('بيانات متجرك', 'Your shop details') : t('سجّل متجرك على بسطة', 'Register your shop on Basta')}
         lead={
           existing
-            ? 'عدّل ما تريد ثم تابع. ما رفعته من المستندات محفوظ.'
-            : 'بيانات متجرك الأساسية أولاً، ثم عملة التسوية، ثم المستندات.'
+            ? t('عدّل ما تريد ثم تابع. ما رفعته من المستندات محفوظ.', 'Change what you need, then continue. Documents you uploaded are kept.')
+            : t(
+                'بيانات متجرك الأساسية أولاً، ثم عملة التسوية، ثم المستندات.',
+                'Your basic shop details first, then the settlement currency, then the documents.',
+              )
         }
       />
 
       <div className="vo-split">
         <section className="card">
-          <h2 className="vo-card-title">بيانات المتجر</h2>
+          <h2 className="vo-card-title">{t('بيانات المتجر', 'Shop details')}</h2>
 
           <form className="vo-form" onSubmit={submit} noValidate>
             {error ? <Alert tone="danger">{error}</Alert> : null}
 
             <div className="grid-2">
               <TextInput
-                label="اسم المتجر بالعربية"
+                label={t('اسم المتجر بالعربية', 'Shop name in Arabic')}
                 required
                 maxLength={80}
                 value={form.nameAr}
@@ -282,18 +318,18 @@ export default function VendorRegisterPage() {
               />
 
               <TextInput
-                label="اسم المتجر بالإنجليزية"
+                label={t('اسم المتجر بالإنجليزية', 'Shop name in English')}
                 optional
                 dir="ltr"
                 maxLength={80}
-                hint="يُولَّد رابط المتجر تلقائياً من الاسم الإنجليزي."
+                hint={t('يُولَّد رابط المتجر تلقائياً من الاسم الإنجليزي.', 'The shop link is generated automatically from the English name.')}
                 value={form.nameEn}
                 onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
               />
             </div>
 
             <div className="vo-slug-field" data-state={slugState}>
-              <Field label="رابط المتجر" hint={slugHint} error={slugError}>
+              <Field label={t('رابط المتجر', 'Shop link')} hint={slugHint} error={slugError}>
                 {(props) => (
                   <span className="vo-slug" dir="ltr" data-state={slugState}>
                     <span className="vo-slug__prefix" aria-hidden>
@@ -329,11 +365,11 @@ export default function VendorRegisterPage() {
                   setForm((f) => ({ ...f, slug: check.suggestion }));
                 }}
               >
-                استخدم <span className="num">{check.suggestion}</span>
+                {t('استخدم', 'Use')} <span className="num">{check.suggestion}</span>
               </button>
             ) : null}
 
-            <Field label="البلد">
+            <Field label={t('البلد', 'Country')}>
               {(props) => (
                 <select
                   className="field__control"
@@ -343,7 +379,7 @@ export default function VendorRegisterPage() {
                 >
                   {COUNTRIES.map((c) => (
                     <option key={c.code} value={c.code}>
-                      {c.nameAr}
+                      {locale === 'en' ? c.nameEn : c.nameAr}
                     </option>
                   ))}
                 </select>
@@ -351,7 +387,7 @@ export default function VendorRegisterPage() {
             </Field>
 
             <fieldset className="vo-choices">
-              <legend>نوع النشاط</legend>
+              <legend>{t('نوع النشاط', 'Business type')}</legend>
               <div className="vo-choices__grid">
                 {BUSINESS_TYPES.map((b) => (
                   <label key={b.value} className="vo-radio">
@@ -363,9 +399,9 @@ export default function VendorRegisterPage() {
                         checked={form.businessType === b.value}
                         onChange={() => setForm((f) => ({ ...f, businessType: b.value }))}
                       />
-                      {b.label}
+                      {t(b.label, b.labelEn)}
                     </span>
-                    <span className="vo-radio__hint">{b.hint}</span>
+                    <span className="vo-radio__hint">{t(b.hint, b.hintEn)}</span>
                   </label>
                 ))}
               </div>
@@ -380,11 +416,11 @@ export default function VendorRegisterPage() {
                 {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
                 {busy
                   ? existing
-                    ? 'جارٍ الحفظ…'
-                    : 'جارٍ التسجيل…'
+                    ? t('جارٍ الحفظ…', 'Saving…')
+                    : t('جارٍ التسجيل…', 'Registering…')
                   : existing?.settlementCurrencyChosen
-                    ? 'التالي: المستندات'
-                    : 'التالي: عملة التسوية'}
+                    ? t('التالي: المستندات', 'Next: documents')
+                    : t('التالي: عملة التسوية', 'Next: settlement currency')}
                 {busy ? null : <Icon name="next" size={16} mirror />}
               </button>
             </div>
@@ -393,7 +429,7 @@ export default function VendorRegisterPage() {
 
         <aside className="vo-col">
           <section className="card">
-            <h3 className="vo-side-title">معاينة رابط المتجر</h3>
+            <h3 className="vo-side-title">{t('معاينة رابط المتجر', 'Shop link preview')}</h3>
             <div className="vo-urlbox">
               <span className="vo-urlbox__url" dir="ltr">
                 basta.com/s/{slugValue || '…'}
@@ -403,7 +439,7 @@ export default function VendorRegisterPage() {
                   <Icon name="store" size={20} />
                 </span>
                 <span className="vo-shopline__text">
-                  <span className="vo-shopline__name">{form.nameAr || 'اسم متجرك'}</span>
+                  <span className="vo-shopline__name">{form.nameAr || t('اسم متجرك', 'Your shop name')}</span>
                   {form.nameEn ? (
                     <span className="vo-shopline__en" dir="ltr">
                       {form.nameEn}
@@ -413,32 +449,40 @@ export default function VendorRegisterPage() {
               </span>
             </div>
             <div className="vo-note">
-              <span className="vo-note__title">الرابط لا يتغيّر بسهولة</span>
+              <span className="vo-note__title">{t('الرابط لا يتغيّر بسهولة', "The link isn't easy to change")}</span>
               <span className="vo-note__text">
-                تغييره بعد النشر يكسر الروابط المحفوظة عند المشترين، لذا اخترْه بعناية الآن.
+                {t(
+                  'تغييره بعد النشر يكسر الروابط المحفوظة عند المشترين، لذا اخترْه بعناية الآن.',
+                  'Changing it after publishing breaks links buyers have saved, so choose it carefully now.',
+                )}
               </span>
             </div>
           </section>
 
           <section className="card">
-            <h3 className="vo-side-title">ما تحتاجه للتسجيل</h3>
+            <h3 className="vo-side-title">{t('ما تحتاجه للتسجيل', 'What you need to register')}</h3>
             <ul className="vo-checklist">
               <li>
                 <Icon name="check-circle" size={16} />
-                سجل تجاري ساري وهوية صاحب النشاط
+                {t('سجل تجاري ساري وهوية صاحب النشاط', "A valid commercial register and the business owner's ID")}
               </li>
               <li>
                 <Icon name="check-circle" size={16} />
-                شهادة ضريبية وحساب بنكي باسم النشاط
+                {t('شهادة ضريبية وحساب بنكي باسم النشاط', 'A tax certificate and a bank account in the business name')}
               </li>
               <li>
                 <Icon name="check-circle" size={16} />
-                تستطيع الحفظ والعودة لاحقاً — كل مستند يُحفظ فور رفعه
+                {t('تستطيع الحفظ والعودة لاحقاً — كل مستند يُحفظ فور رفعه', 'You can save and come back later — each document is saved as soon as it is uploaded')}
               </li>
             </ul>
             <p className="vo-callout vo-callout--info">
               <Icon name="info" size={16} />
-              <span>تُراجَع المستندات خلال يوم عمل إلى ثلاثة أيام، وتصلك النتيجة على بريدك.</span>
+              <span>
+                {t(
+                  'تُراجَع المستندات خلال يوم عمل إلى ثلاثة أيام، وتصلك النتيجة على بريدك.',
+                  "Documents are reviewed within one to three working days, and you'll get the result by email.",
+                )}
+              </span>
             </p>
           </section>
         </aside>

@@ -2,20 +2,31 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { MoreButton } from '@/components/ui';
 import { apiBase } from '@/lib/api';
+import { intlLocale, type Locale } from '@/lib/i18n';
 import { num, type ProductReview, type ProductReviews as Reviews } from '@/lib/storefront';
 
-const dateOf = (iso: string) => new Intl.DateTimeFormat('ar-u-nu-latn', { dateStyle: 'medium' }).format(new Date(iso));
+const dateOf = (iso: string, locale: Locale) => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: 'medium' }).format(new Date(iso));
 
 /** العدد يُميَّز كما تقتضي العربية: تقييم واحد، تقييمان، 3–10 تقييمات، 11 فأكثر تقييماً */
-const countLabel = (n: number) =>
-  n === 1 ? 'من تقييم واحد' : n === 2 ? 'من تقييمين' : n <= 10 ? `من ${num(n)} تقييمات` : `من ${num(n)} تقييماً`;
+const countLabel = (n: number, locale: Locale) =>
+  locale === 'en'
+    ? `from ${num(n, locale)} ${n === 1 ? 'rating' : 'ratings'}`
+    : n === 1
+      ? 'من تقييم واحد'
+      : n === 2
+        ? 'من تقييمين'
+        : n <= 10
+          ? `من ${num(n)} تقييمات`
+          : `من ${num(n)} تقييماً`;
 
 function Stars({ value, size = 15 }: { value: number; size?: number }) {
+  const t = useT();
   const full = Math.round(value);
   return (
-    <span className="sd-stars" role="img" aria-label={`${value.toFixed(1)} من 5`}>
+    <span className="sd-stars" role="img" aria-label={t(`${value.toFixed(1)} من 5`, `${value.toFixed(1)} out of 5`)}>
       {[1, 2, 3, 4, 5].map((n) => (
         <Icon key={n} name={n <= full ? 'star-fill' : 'star'} size={size} />
       ))}
@@ -31,6 +42,8 @@ function Stars({ value, size = 15 }: { value: number; size?: number }) {
  * يطلب العشر التالية، و«السابق» يطوي آخر دفعة.
  */
 export function ProductReviews({ productId, initial }: { productId: string; initial: Reviews }) {
+  const t = useT();
+  const locale = useLocale();
   const [batches, setBatches] = useState<ProductReview[][]>([initial.items]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState<string | null>(null);
@@ -46,7 +59,7 @@ export function ProductReviews({ productId, initial }: { productId: string; init
       const page = (await res.json()) as Reviews;
       setBatches((b) => [...b, page.items]);
     } catch {
-      setMoreError('تعذّر تحميل المزيد.');
+      setMoreError(t('تعذّر تحميل المزيد.', "Couldn't load more."));
     } finally {
       setLoadingMore(false);
     }
@@ -55,21 +68,23 @@ export function ProductReviews({ productId, initial }: { productId: string; init
   return (
     <section className="sd-pdp__block" aria-labelledby="sd-reviews">
       <h2 id="sd-reviews" className="sd-pdp__tabs">
-        <span className="sd-pdp__tab">التقييمات</span>
+        <span className="sd-pdp__tab">{t('التقييمات', 'Reviews')}</span>
       </h2>
 
       {count === 0 || average === null ? (
-        <p className="sd-reviews__empty">لا تقييمات بعد. يقيّم المنتج من اشتراه واستلمه.</p>
+        <p className="sd-reviews__empty">
+          {t('لا تقييمات بعد. يقيّم المنتج من اشتراه واستلمه.', 'No reviews yet. Buyers who purchased and received this product can review it.')}
+        </p>
       ) : (
         <div className="sd-reviews">
           <div className="sd-reviews__summary">
             <p className="sd-reviews__avg">
               <span className="num">{average.toFixed(1)}</span>
-              <span className="sd-reviews__of">من 5</span>
+              <span className="sd-reviews__of">{t('من 5', 'out of 5')}</span>
             </p>
             <Stars value={average} size={17} />
-            <p className="sd-reviews__count">{countLabel(count)}</p>
-            <ul className="sd-reviews__dist" aria-label="توزيع النجوم">
+            <p className="sd-reviews__count">{countLabel(count, locale)}</p>
+            <ul className="sd-reviews__dist" aria-label={t('توزيع النجوم', 'Star distribution')}>
               {([5, 4, 3, 2, 1] as const).map((n) => {
                 const c = distribution[String(n) as keyof typeof distribution] ?? 0;
                 return (
@@ -79,7 +94,7 @@ export function ProductReviews({ productId, initial }: { productId: string; init
                     <span className="sd-reviews__bar" aria-hidden>
                       <span style={{ inlineSize: `${(c / count) * 100}%` }} />
                     </span>
-                    <span className="num sd-reviews__row-count" aria-label={`${n} نجوم: ${c}`}>
+                    <span className="num sd-reviews__row-count" aria-label={t(`${n} نجوم: ${c}`, `${n} ${n === 1 ? 'star' : 'stars'}: ${c}`)}>
                       {c}
                     </span>
                   </li>
@@ -99,12 +114,12 @@ export function ProductReviews({ productId, initial }: { productId: string; init
                   {r.body ? <p className="sd-review__body">{r.body}</p> : null}
                   <p className="sd-review__meta">
                     <span className="sd-review__author">{r.author}</span>
-                    <time dateTime={r.createdAt}>{dateOf(r.createdAt)}</time>
+                    <time dateTime={r.createdAt}>{dateOf(r.createdAt, locale)}</time>
                     {r.variant ? <span>{r.variant}</span> : null}
                     {r.verified ? (
                       <span className="badge badge--approved">
                         <Icon name="check" size={12} />
-                        شراء موثّق
+                        {t('شراء موثّق', 'Verified purchase')}
                       </span>
                     ) : null}
                   </p>

@@ -10,8 +10,10 @@ import { api } from '@/lib/api';
 import { minorUnitDigits } from '@/lib/money';
 import { money } from '@/lib/orders';
 import { COUNTRIES } from '@/lib/vendor';
-import { samePlace } from '@/lib/places';
+import { regionName, samePlace } from '@/lib/places';
 import { RegionSelect } from '@/components/region-select';
+import { useLocale, useT } from '@/components/locale';
+import type { Locale, Translate } from '@/lib/i18n';
 
 type Method = 'flat' | 'by_weight' | 'free_over';
 
@@ -45,14 +47,20 @@ interface ZonesView {
   zones: Zone[];
 }
 
-const METHODS: { key: Method; label: string }[] = [
-  { key: 'flat', label: 'سعر ثابت' },
-  { key: 'by_weight', label: 'حسب الوزن' },
-  { key: 'free_over', label: 'مجاني فوق مبلغ' },
+const METHODS: { key: Method; label: string; en: string }[] = [
+  { key: 'flat', label: 'سعر ثابت', en: 'Flat rate' },
+  { key: 'by_weight', label: 'حسب الوزن', en: 'By weight' },
+  { key: 'free_over', label: 'مجاني فوق مبلغ', en: 'Free over an amount' },
 ];
 
-const countryName = (code: string): string => COUNTRIES.find((c) => c.code === code)?.nameAr ?? code;
-const describe = (r: Region): string => [r.city, r.region, countryName(r.country)].filter(Boolean).join('، ');
+const countryName = (code: string, locale: Locale): string => {
+  const c = COUNTRIES.find((x) => x.code === code);
+  return (locale === 'en' ? c?.nameEn : c?.nameAr) ?? code;
+};
+const describe = (r: Region, locale: Locale): string =>
+  [r.city, r.region ? regionName(r.country, r.region, locale) : null, countryName(r.country, locale)]
+    .filter(Boolean)
+    .join(locale === 'en' ? ', ' : '، ');
 const keyOf = (r: Region): string => `${r.country}|${r.region ?? ''}|${r.city ?? ''}`;
 
 /** صفّ الإضافة في محرّر التغطية — `touched` حين اختار البائع بلداً أو كتب شيئاً */
@@ -125,25 +133,34 @@ const draftOf = (r: Rate, currency: string): RateDraft => ({
  * المسوّدة ← جسم الطلب. الحقل الذي لا تقرؤه الطريقة يُرسل null صراحةً: الخادم
  * يرفض سعر كيلو على «ثابت» مثلاً، والتبديل بين الطرق يمسح ما لا يخصّ الجديدة.
  */
-function bodyOf(d: RateDraft, currency: string): { body: Record<string, unknown> } | { error: string } {
+function bodyOf(d: RateDraft, currency: string, t: Translate): { body: Record<string, unknown> } | { error: string } {
   const price = toMinor(d.price || '0', currency);
-  if (price === null) return { error: 'اكتب السعر رقماً موجباً بخانات العملة.' };
+  if (price === null) return { error: t('اكتب السعر رقماً موجباً بخانات العملة.', "Enter the price as a positive number using the currency's decimal places.") };
   let perKg: string | null = null;
   let freeOver: string | null = null;
   if (d.method === 'by_weight') {
     perKg = toMinor(d.perKg, currency);
-    if (!perKg || perKg === '0') return { error: 'اكتب سعراً للكيلوغرام أكبر من صفر.' };
+    if (!perKg || perKg === '0') return { error: t('اكتب سعراً للكيلوغرام أكبر من صفر.', 'Enter a price per kilogram greater than zero.') };
   }
   if (d.method === 'free_over') {
     freeOver = toMinor(d.freeOver, currency);
-    if (!freeOver || freeOver === '0') return { error: 'اكتب حدّ الشحن المجاني — مبلغاً أكبر من صفر.' };
+    if (!freeOver || freeOver === '0') {
+      return { error: t('اكتب حدّ الشحن المجاني — مبلغاً أكبر من صفر.', 'Enter the free shipping threshold — an amount greater than zero.') };
+    }
   }
   const min = Number(d.minDays);
   const max = Number(d.maxDays);
   if (!/^\d{1,2}$/.test(d.minDays) || !/^\d{1,2}$/.test(d.maxDays) || max < 1 || max > 90) {
-    return { error: 'مدّة التوصيل أيام صحيحة بين 0 و 90.' };
+    return { error: t('مدّة التوصيل أيام صحيحة بين 0 و 90.', 'Delivery time must be whole days between 0 and 90.') };
   }
-  if (max < min) return { error: `نهاية المدى يجب أن تكون مساوية أو أكبر من بدايته (${min} أيام).` };
+  if (max < min) {
+    return {
+      error: t(
+        `نهاية المدى يجب أن تكون مساوية أو أكبر من بدايته (${min} أيام).`,
+        `The end of the range must be equal to or greater than its start (${min} ${min === 1 ? 'day' : 'days'}).`,
+      ),
+    };
+  }
   return {
     body: { method: d.method, priceMinorUnits: price, perKgMinorUnits: perKg, freeOverMinorUnits: freeOver, minDays: min, maxDays: max },
   };
@@ -176,32 +193,39 @@ function AmountField({
 
 /** حقول تسعيرة واحدة — الطريقة تبدّل الحقول (VD-16) */
 function RateFields({ draft, onChange, currency }: { draft: RateDraft; onChange: (d: RateDraft) => void; currency: string }) {
+  const t = useT();
   const set = (patch: Partial<RateDraft>) => onChange({ ...draft, ...patch });
   const daysBad = /^\d+$/.test(draft.minDays) && /^\d+$/.test(draft.maxDays) && Number(draft.maxDays) < Number(draft.minDays);
   return (
     <>
-      <div className="seg vx-rate__seg" role="group" aria-label="طريقة التسعير">
+      <div className="seg vx-rate__seg" role="group" aria-label={t('طريقة التسعير', 'Pricing method')}>
         {METHODS.map((m) => (
           <button key={m.key} type="button" className="seg__opt" aria-pressed={draft.method === m.key} onClick={() => set({ method: m.key })}>
-            {m.label}
+            {t(m.label, m.en)}
           </button>
         ))}
       </div>
       <div className="vx-rate__fields">
         <AmountField
-          label={draft.method === 'free_over' ? 'السعر تحت الحدّ' : draft.method === 'by_weight' ? 'رسم أساسي' : 'السعر الثابت'}
+          label={
+            draft.method === 'free_over'
+              ? t('السعر تحت الحدّ', 'Price below the threshold')
+              : draft.method === 'by_weight'
+                ? t('رسم أساسي', 'Base fee')
+                : t('السعر الثابت', 'Flat price')
+          }
           value={draft.price}
           onChange={(v) => set({ price: v })}
           currency={currency}
         />
         {draft.method === 'by_weight' ? (
-          <AmountField label="السعر لكل كيلوغرام" value={draft.perKg} onChange={(v) => set({ perKg: v })} currency={currency} suffix={`${currency} / kg`} />
+          <AmountField label={t('السعر لكل كيلوغرام', 'Price per kilogram')} value={draft.perKg} onChange={(v) => set({ perKg: v })} currency={currency} suffix={`${currency} / kg`} />
         ) : null}
         {draft.method === 'free_over' ? (
-          <AmountField label="مجاني فوق مبلغ" value={draft.freeOver} onChange={(v) => set({ freeOver: v })} currency={currency} />
+          <AmountField label={t('مجاني فوق مبلغ', 'Free over')} value={draft.freeOver} onChange={(v) => set({ freeOver: v })} currency={currency} />
         ) : null}
         <TextInput
-          label="من (أيام)"
+          label={t('من (أيام)', 'From (days)')}
           className="field__control vx-days"
           inputMode="numeric"
           dir="ltr"
@@ -209,24 +233,37 @@ function RateFields({ draft, onChange, currency }: { draft: RateDraft; onChange:
           onChange={(e) => set({ minDays: digitsOnly(e.target.value) })}
         />
         <TextInput
-          label="إلى (أيام)"
+          label={t('إلى (أيام)', 'To (days)')}
           className="field__control vx-days"
           inputMode="numeric"
           dir="ltr"
           value={draft.maxDays}
-          error={daysBad ? `نهاية المدى يجب أن تكون مساوية أو أكبر من بدايته (${draft.minDays} أيام).` : null}
+          error={
+            daysBad
+              ? t(
+                  `نهاية المدى يجب أن تكون مساوية أو أكبر من بدايته (${draft.minDays} أيام).`,
+                  `The end of the range must be equal to or greater than its start (${draft.minDays} ${Number(draft.minDays) === 1 ? 'day' : 'days'}).`,
+                )
+              : null
+          }
           onChange={(e) => set({ maxDays: digitsOnly(e.target.value) })}
         />
       </div>
       {draft.method === 'by_weight' ? (
         <p className="vx-hint">
           <Icon name="info" size={13} />
-          الرسم الأساسي + سعر الكيلو × وزن السلّة مقرّباً لأعلى كيلو (كيلو واحد على الأقل).
+          {t(
+            'الرسم الأساسي + سعر الكيلو × وزن السلّة مقرّباً لأعلى كيلو (كيلو واحد على الأقل).',
+            'Base fee + price per kg × cart weight, rounded up to the next kg (at least 1 kg).',
+          )}
         </p>
       ) : draft.method === 'free_over' ? (
         <p className="vx-hint">
           <Icon name="info" size={13} />
-          إن بلغت قيمة منتجاتك في السلّة الحدّ فالشحن مجاني، وإلا يدفع المشتري السعر تحت الحدّ.
+          {t(
+            'إن بلغت قيمة منتجاتك في السلّة الحدّ فالشحن مجاني، وإلا يدفع المشتري السعر تحت الحدّ.',
+            'If your products in the cart reach the threshold, shipping is free; otherwise the buyer pays the price below the threshold.',
+          )}
         </p>
       ) : null}
     </>
@@ -251,6 +288,7 @@ function RateCard({
   onToggle?: (active: boolean) => Promise<string | null>;
   onCancel?: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<RateDraft>(() => (rate ? draftOf(rate, currency) : emptyDraft()));
   const [failure, setFailure] = useState<{ text: string; at: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -258,7 +296,7 @@ function RateCard({
   const error = failure && failure.at === revision ? failure.text : null;
 
   const save = async () => {
-    const out = bodyOf(draft, currency);
+    const out = bodyOf(draft, currency, t);
     if ('error' in out) {
       fail(out.error);
       return;
@@ -281,7 +319,7 @@ function RateCard({
       ) : null}
       <div className="vx-rate__foot">
         <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => void save()}>
-          {rate ? 'احفظ التسعيرة' : 'أضف التسعيرة'}
+          {rate ? t('احفظ التسعيرة', 'Save rate') : t('أضف التسعيرة', 'Add rate')}
         </button>
         {rate && onToggle ? (
           <span className="vx-zone__state">
@@ -290,7 +328,7 @@ function RateCard({
               role="switch"
               className="vx-switch"
               aria-checked={rate.isActive}
-              aria-label="تسعيرة مفعّلة"
+              aria-label={t('تسعيرة مفعّلة', 'Rate active')}
               disabled={busy}
               onClick={async () => {
                 fail(null);
@@ -299,12 +337,14 @@ function RateCard({
                 setBusy(false);
               }}
             />
-            <span className={`vx-zone__label${rate.isActive ? ' vx-zone__label--on' : ''}`}>{rate.isActive ? 'مفعّلة' : 'موقوفة — لا تُحسب'}</span>
+            <span className={`vx-zone__label${rate.isActive ? ' vx-zone__label--on' : ''}`}>
+              {rate.isActive ? t('مفعّلة', 'Active') : t('موقوفة — لا تُحسب', 'Inactive — not applied')}
+            </span>
           </span>
         ) : null}
         {onCancel ? (
           <button type="button" className="btn btn--ghost btn--sm" onClick={onCancel}>
-            إلغاء
+            {t('إلغاء', 'Cancel')}
           </button>
         ) : null}
       </div>
@@ -325,6 +365,8 @@ function CoverageEditor({
   row: CoverRow;
   onRow: (r: CoverRow) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const { country, region, city } = row;
   const set = (patch: Partial<CoverRow>) => onRow({ ...row, ...patch, touched: true });
 
@@ -336,17 +378,17 @@ function CoverageEditor({
 
   return (
     <div className="vx-editor">
-      <span className="vx-label">التغطية</span>
+      <span className="vx-label">{t('التغطية', 'Coverage')}</span>
       {regions.length ? (
         <div className="vx-pills">
           {regions.map((r) => (
             <span key={keyOf(r)} className="vx-pill vx-pill--on">
               <Icon name="check" size={12} />
-              {describe(r)}
+              {describe(r, locale)}
               <button
                 type="button"
                 className="vx-chip-x"
-                aria-label={`أزل ${describe(r)} من التغطية`}
+                aria-label={t(`أزل ${describe(r, locale)} من التغطية`, `Remove ${describe(r, locale)} from coverage`)}
                 onClick={() => onChange(regions.filter((x) => keyOf(x) !== keyOf(r)))}
               >
                 <Icon name="x" size={12} />
@@ -355,31 +397,39 @@ function CoverageEditor({
           ))}
         </div>
       ) : (
-        <p className="vx-hint">لا تغطية بعد — أضف بلداً أو محافظة أو مدينة.</p>
+        <p className="vx-hint">{t('لا تغطية بعد — أضف بلداً أو محافظة أو مدينة.', 'No coverage yet — add a country, governorate or city.')}</p>
       )}
       <div className="vx-cover-add">
-        <Field label="البلد">
+        <Field label={t('البلد', 'Country')}>
           {(p) => (
             <select className="field__control" {...p} value={country} onChange={(e) => set({ country: e.target.value, region: '' })}>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {c.nameAr}
+                  {locale === 'en' ? c.nameEn : c.nameAr}
                 </option>
               ))}
             </select>
           )}
         </Field>
-        <RegionSelect country={country} value={region} onChange={(v) => set({ region: v })} emptyLabel="كل البلد" optional />
-        <TextInput label="المدينة" optional value={city} onChange={(e) => set({ city: e.target.value })} />
+        <RegionSelect
+          country={country}
+          value={region}
+          onChange={(v) => set({ region: v })}
+          emptyLabel={t('كل البلد', 'Whole country')}
+          optional
+        />
+        <TextInput label={t('المدينة', 'City')} optional value={city} onChange={(e) => set({ city: e.target.value })} />
         <button type="button" className="btn btn--secondary" onClick={add}>
           <Icon name="plus" size={15} />
-          أضف إلى التغطية
+          {t('أضف إلى التغطية', 'Add to coverage')}
         </button>
       </div>
       <p className="vx-hint">
         <Icon name="info" size={13} />
-        الدول ثم المناطق ثم المدن — والأدقّ يفوز: سعر المدينة قبل سعر محافظتها قبل سعر البلد. المحافظة من القائمة نفسها التي يختار منها
-        المشتري عنوانه، والمدينة تُطابَق بلا تشكيل ولا همزة. اترك المدينة فارغة لتغطية المحافظة كلها، و«كل البلد» لتغطيته كله.
+        {t(
+          'الدول ثم المناطق ثم المدن — والأدقّ يفوز: سعر المدينة قبل سعر محافظتها قبل سعر البلد. المحافظة من القائمة نفسها التي يختار منها المشتري عنوانه، والمدينة تُطابَق بلا تشكيل ولا همزة. اترك المدينة فارغة لتغطية المحافظة كلها، و«كل البلد» لتغطيته كله.',
+          "Countries, then regions, then cities — the most specific wins: a city's price comes before its governorate's, which comes before the country's. Governorates come from the same list buyers pick their address from, and cities are matched ignoring diacritics and hamza. Leave the city empty to cover the whole governorate, and choose “Whole country” to cover all of it.",
+        )}
       </p>
     </div>
   );
@@ -398,6 +448,7 @@ function ZoneEditor({
   onDeleted: (id: string) => void;
   onError: (msg: string | null) => void;
 }) {
+  const t = useT();
   const ask = useConfirm();
   const [name, setName] = useState(zone?.nameAr ?? '');
   const [regions, setRegions] = useState<Region[]>(zone?.regions.map((r) => ({ country: r.country, region: r.region, city: r.city })) ?? []);
@@ -423,31 +474,52 @@ function ZoneEditor({
   };
 
   const save = async () => {
-    if (name.trim().length < 2) return onError('اكتب اسماً للمنطقة — حرفان على الأقل.');
+    if (name.trim().length < 2) return onError(t('اكتب اسماً للمنطقة — حرفان على الأقل.', 'Enter a zone name — at least 2 characters.'));
     const pending = pendingRow(cover, regions);
     const all = pending ? [...regions, pending] : regions;
-    if (all.length === 0) return onError('اختر بلداً للتغطية ثم اضغط «أضف إلى التغطية».');
+    if (all.length === 0) {
+      return onError(t('اختر بلداً للتغطية ثم اضغط «أضف إلى التغطية».', 'Choose a country to cover, then press “Add to coverage”.'));
+    }
     if (pending) {
       setRegions(all);
       setCover({ ...cover, region: '', city: '', touched: false });
     }
     if (!zone) {
-      const out = bodyOf(draft, currency);
+      const out = bodyOf(draft, currency, t);
       if ('error' in out) return onError(out.error);
       const z = await run(() => api<Zone>('/vendor/shipping/zones', { method: 'POST', body: { nameAr: name, regions: all, rates: [out.body] } }));
-      if (z) onSaved(z, `أُضيفت منطقة «${z.nameAr}» — ${z.regions.length} في تغطيتها.`);
+      if (z) {
+        onSaved(
+          z,
+          t(
+            `أُضيفت منطقة «${z.nameAr}» — ${z.regions.length} في تغطيتها.`,
+            `Zone “${z.nameAr}” added — ${z.regions.length} ${z.regions.length === 1 ? 'place' : 'places'} in its coverage.`,
+          ),
+        );
+      }
       return;
     }
     const z = await run(() => api<Zone>(`/vendor/shipping/zones/${zone.id}`, { method: 'PATCH', body: { nameAr: name, regions: all } }));
-    if (z) onSaved(z, `حُفظت «${z.nameAr}» — ${z.regions.length} في تغطيتها.`);
+    if (z) {
+      onSaved(
+        z,
+        t(
+          `حُفظت «${z.nameAr}» — ${z.regions.length} في تغطيتها.`,
+          `“${z.nameAr}” saved — ${z.regions.length} ${z.regions.length === 1 ? 'place' : 'places'} in its coverage.`,
+        ),
+      );
+    }
   };
 
   const remove = async () => {
     if (!zone) return;
     const sure = await ask({
-      title: `تحذف «${zone.nameAr}»؟`,
-      body: 'المشترون في تغطيتها لن يستطيعوا الشراء منك إلا إن غطّتهم منطقة أخرى. الطلبات القائمة لا تتأثّر.',
-      confirmLabel: 'احذف المنطقة',
+      title: t(`تحذف «${zone.nameAr}»؟`, `Delete “${zone.nameAr}”?`),
+      body: t(
+        'المشترون في تغطيتها لن يستطيعوا الشراء منك إلا إن غطّتهم منطقة أخرى. الطلبات القائمة لا تتأثّر.',
+        "Buyers in its coverage won't be able to buy from you unless another zone covers them. Existing orders are not affected.",
+      ),
+      confirmLabel: t('احذف المنطقة', 'Delete zone'),
       danger: true,
     });
     if (!sure) return;
@@ -478,28 +550,34 @@ function ZoneEditor({
       <section className="vx-card" aria-labelledby="vx-zone-title">
         <div className="vx-card__head">
           <h2 className="vx-card__title" id="vx-zone-title">
-            {zone ? zone.nameAr : 'منطقة جديدة'}
+            {zone ? zone.nameAr : t('منطقة جديدة', 'New zone')}
           </h2>
-          <span className="vx-card__sub">{zone ? 'تحرير المنطقة' : 'تُحفظ مفعّلة بتسعيرتها الأولى'}</span>
+          <span className="vx-card__sub">{zone ? t('تحرير المنطقة', 'Edit zone') : t('تُحفظ مفعّلة بتسعيرتها الأولى', 'Saved as active with its first rate')}</span>
         </div>
-        <TextInput label="اسم المنطقة" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="الرياض الكبرى" />
+        <TextInput
+          label={t('اسم المنطقة', 'Zone name')}
+          value={name}
+          maxLength={80}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t('الرياض الكبرى', 'Greater Riyadh')}
+        />
         <CoverageEditor regions={regions} onChange={setRegions} row={cover} onRow={setCover} />
 
         {!zone ? (
           <div className="vx-divider vx-editor">
-            <span className="vx-label">طريقة التسعير</span>
+            <span className="vx-label">{t('طريقة التسعير', 'Pricing method')}</span>
             <RateFields draft={draft} onChange={setDraft} currency={currency} />
           </div>
         ) : null}
 
         <div className="row">
           <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void save()}>
-            احفظ المنطقة
+            {t('احفظ المنطقة', 'Save zone')}
           </button>
           {zone ? (
             <button type="button" className="btn btn--danger" disabled={busy} onClick={() => void remove()}>
               <Icon name="trash" size={15} />
-              احذف المنطقة
+              {t('احذف المنطقة', 'Delete zone')}
             </button>
           ) : null}
         </div>
@@ -509,14 +587,16 @@ function ZoneEditor({
         <section className="vx-card" aria-labelledby="vx-rates-title">
           <div className="vx-card__head">
             <h2 className="vx-card__title" id="vx-rates-title">
-              التسعيرات
+              {t('التسعيرات', 'Rates')}
             </h2>
-            <span className="vx-card__sub">يدفع المشتري أرخص تسعيرة مفعّلة تنطبق على سلّته</span>
+            <span className="vx-card__sub">
+              {t('يدفع المشتري أرخص تسعيرة مفعّلة تنطبق على سلّته', 'The buyer pays the cheapest active rate that applies to their cart')}
+            </span>
             {!adding ? (
               <span className="vx-card__end">
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => setAdding(true)}>
                   <Icon name="plus" size={14} />
-                  أضف تسعيرة
+                  {t('أضف تسعيرة', 'Add rate')}
                 </button>
               </span>
             ) : null}
@@ -528,9 +608,14 @@ function ZoneEditor({
                 rate={r}
                 currency={currency}
                 revision={revision}
-                onSave={(body) => saveRate(`/vendor/shipping/rates/${r.id}`, 'PATCH', body, 'حُفظت التسعيرة.')}
+                onSave={(body) => saveRate(`/vendor/shipping/rates/${r.id}`, 'PATCH', body, t('حُفظت التسعيرة.', 'Rate saved.'))}
                 onToggle={(active) =>
-                  saveRate(`/vendor/shipping/rates/${r.id}`, 'PATCH', { isActive: active }, active ? 'فُعّلت التسعيرة.' : 'أُوقفت التسعيرة.')
+                  saveRate(
+                    `/vendor/shipping/rates/${r.id}`,
+                    'PATCH',
+                    { isActive: active },
+                    active ? t('فُعّلت التسعيرة.', 'Rate activated.') : t('أُوقفت التسعيرة.', 'Rate deactivated.'),
+                  )
                 }
               />
             ))}
@@ -540,7 +625,7 @@ function ZoneEditor({
                 currency={currency}
                 revision={revision}
                 onSave={async (body) => {
-                  const failed = await saveRate(`/vendor/shipping/zones/${zone.id}/rates`, 'POST', body, 'أُضيفت التسعيرة.');
+                  const failed = await saveRate(`/vendor/shipping/zones/${zone.id}/rates`, 'POST', body, t('أُضيفت التسعيرة.', 'Rate added.'));
                   if (!failed) setAdding(false);
                   return failed;
                 }}
@@ -595,6 +680,8 @@ function previewQuote(zones: Zone[], addr: Region, itemsMinor: bigint, grams: nu
 }
 
 function Preview({ zones, currency }: { zones: Zone[]; currency: string }) {
+  const t = useT();
+  const locale = useLocale();
   const covered = useMemo(() => {
     const seen = new Map<string, Region>();
     for (const z of zones.filter((x) => x.isActive)) for (const r of z.regions) if (r.city && !seen.has(keyOf(r))) seen.set(keyOf(r), r);
@@ -608,15 +695,18 @@ function Preview({ zones, currency }: { zones: Zone[]; currency: string }) {
   const itemsMinor = BigInt(toMinor(basket || '0', currency) ?? '0');
   const grams = Math.round((Number(weight.replace(',', '.')) || 0) * 1000);
   const result = previewQuote(zones, addr, itemsMinor, grams);
-  const place = addr.city?.trim() || addr.region?.trim() || countryName(addr.country);
+  const place =
+    addr.city?.trim() ||
+    (addr.region?.trim() ? regionName(addr.country, addr.region.trim(), locale) : '') ||
+    countryName(addr.country, locale);
 
   return (
     <section className="vx-card vx-card--money" aria-labelledby="vx-preview-title">
       <h2 className="vx-card__title" id="vx-preview-title">
-        معاينة حيّة
+        {t('معاينة حيّة', 'Live preview')}
       </h2>
       {covered.length ? (
-        <div className="vx-pills" role="group" aria-label="مدن مغطّاة">
+        <div className="vx-pills" role="group" aria-label={t('مدن مغطّاة', 'Covered cities')}>
           {covered.map((c) => (
             <button
               key={keyOf(c)}
@@ -631,41 +721,66 @@ function Preview({ zones, currency }: { zones: Zone[]; currency: string }) {
         </div>
       ) : null}
       <div className="vx-preview__inputs">
-        <Field label="البلد">
+        <Field label={t('البلد', 'Country')}>
           {(p) => (
             <select className="field__control" {...p} value={addr.country} onChange={(e) => setAddr({ ...addr, country: e.target.value, region: '' })}>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {c.nameAr}
+                  {locale === 'en' ? c.nameEn : c.nameAr}
                 </option>
               ))}
             </select>
           )}
         </Field>
-        <RegionSelect label="المحافظة" country={addr.country} value={addr.region ?? ''} onChange={(v) => setAddr({ ...addr, region: v })} emptyLabel="—" optional />
-        <TextInput label="المدينة" value={addr.city ?? ''} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
-        <AmountField label="قيمة السلّة" value={basket} onChange={setBasket} currency={currency} />
-        <TextInput label="الوزن (كغ)" className="field__control vx-days" inputMode="decimal" dir="ltr" value={weight} onChange={(e) => setWeight(e.target.value)} />
+        <RegionSelect
+          label={t('المحافظة', 'Governorate')}
+          country={addr.country}
+          value={addr.region ?? ''}
+          onChange={(v) => setAddr({ ...addr, region: v })}
+          emptyLabel="—"
+          optional
+        />
+        <TextInput label={t('المدينة', 'City')} value={addr.city ?? ''} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
+        <AmountField label={t('قيمة السلّة', 'Cart value')} value={basket} onChange={setBasket} currency={currency} />
+        <TextInput label={t('الوزن (كغ)', 'Weight (kg)')} className="field__control vx-days" inputMode="decimal" dir="ltr" value={weight} onChange={(e) => setWeight(e.target.value)} />
       </div>
       <p className={`vx-preview__box${result.ok ? '' : ' vx-preview__box--out'}`} role="status">
         {result.ok ? (
           <>
-            المشتري في {place} يدفع{' '}
-            {result.minor === 0n ? 'شحناً مجانياً' : <span className="money num">{money(result.minor, currency)}</span>} ويستلم خلال{' '}
+            {t(`المشتري في ${place} يدفع`, result.minor === 0n ? `A buyer in ${place} gets` : `A buyer in ${place} pays`)}{' '}
+            {result.minor === 0n ? (
+              t('شحناً مجانياً', 'free shipping')
+            ) : (
+              <span className="money num">{money(result.minor, currency, locale)}</span>
+            )}{' '}
+            {t('ويستلم خلال', 'and receives the order within')}{' '}
             <span className="num">
               {result.minDays}–{result.maxDays}
             </span>{' '}
-            أيام — من منطقة «{result.zone}».
+            {t(`أيام — من منطقة «${result.zone}».`, `days — from the “${result.zone}” zone.`)}
           </>
         ) : result.reason === 'uncovered' ? (
-          <>المشتري في {place} غير مغطّى بأيّ منطقة مفعّلة — لا يستطيع إتمام الشراء منك. أضف مدينته أو محافظته أو بلده إلى التغطية.</>
+          <>
+            {t(
+              `المشتري في ${place} غير مغطّى بأيّ منطقة مفعّلة — لا يستطيع إتمام الشراء منك. أضف مدينته أو محافظته أو بلده إلى التغطية.`,
+              `A buyer in ${place} isn't covered by any active zone — they can't complete a purchase from you. Add their city, governorate or country to your coverage.`,
+            )}
+          </>
         ) : (
-          <>المنطقة التي تغطّي {place} بلا تسعيرة مفعّلة — المشتري هناك لا يستطيع إتمام الشراء.</>
+          <>
+            {t(
+              `المنطقة التي تغطّي ${place} بلا تسعيرة مفعّلة — المشتري هناك لا يستطيع إتمام الشراء.`,
+              `The zone covering ${place} has no active rate — buyers there can't complete a purchase.`,
+            )}
+          </>
         )}
       </p>
       <p className="vx-hint">
         <Icon name="info" size={13} />
-        الحساب على مناطقك المحفوظة وقواعد الدفع نفسها. التعديلات غير المحفوظة لا تدخل فيه.
+        {t(
+          'الحساب على مناطقك المحفوظة وقواعد الدفع نفسها. التعديلات غير المحفوظة لا تدخل فيه.',
+          'Calculated from your saved zones with the same rules as checkout. Unsaved changes are not included.',
+        )}
       </p>
     </section>
   );
@@ -682,6 +797,8 @@ function Preview({ zones, currency }: { zones: Zone[]; currency: string }) {
  * هنا كما هي. المبالغ بعملة التسوية، والمعاينة تحسب بقواعد الدفع نفسها.
  */
 export default function ShippingZonesPage() {
+  const t = useT();
+  const locale = useLocale();
   const [data, setData] = useState<ZonesView | null>(null);
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -706,12 +823,12 @@ export default function ShippingZonesPage() {
   if (!data) {
     return loadError ? (
       <div className="vm-page">
-        <PageHead title="مناطق الشحن" />
+        <PageHead title={t('مناطق الشحن', 'Shipping zones')} />
         <Alert tone="danger">{loadError}</Alert>
       </div>
     ) : (
       <div className="vm-loading vm-loading--page" role="status">
-        <span className="visually-hidden">جارٍ فتح مناطق الشحن…</span>
+        <span className="visually-hidden">{t('جارٍ فتح مناطق الشحن…', 'Opening shipping zones…')}</span>
         <span className="skeleton vm-loading__title" />
         <span className="skeleton vm-loading__block" />
         <span className="skeleton vm-loading__panel" />
@@ -725,10 +842,11 @@ export default function ShippingZonesPage() {
   const count = (lvl: 1 | 2 | 3) =>
     new Set(active.flatMap((z) => z.regions).filter((r) => (r.city ? 3 : r.region ? 2 : 1) === lvl).map(keyOf)).size;
   const cover = [
-    count(1) ? `${count(1)} بلد كامل` : null,
-    count(2) ? `${count(2)} محافظة` : null,
-    count(3) ? `${count(3)} مدينة` : null,
+    count(1) ? t(`${count(1)} بلد كامل`, `${count(1)} whole ${count(1) === 1 ? 'country' : 'countries'}`) : null,
+    count(2) ? t(`${count(2)} محافظة`, `${count(2)} ${count(2) === 1 ? 'governorate' : 'governorates'}`) : null,
+    count(3) ? t(`${count(3)} مدينة`, `${count(3)} ${count(3) === 1 ? 'city' : 'cities'}`) : null,
   ].filter(Boolean);
+  const coverEn = cover.length > 1 ? `${cover.slice(0, -1).join(', ')} and ${cover.at(-1)}` : cover.join('');
 
   const upsert = (z: Zone, msg: string, select = true) => {
     setData({ currency, zones: zones.some((x) => x.id === z.id) ? zones.map((x) => (x.id === z.id ? z : x)) : [...zones, z] });
@@ -740,7 +858,13 @@ export default function ShippingZonesPage() {
     setToggling(z.id);
     try {
       const next = await api<Zone>(`/vendor/shipping/zones/${z.id}`, { method: 'PATCH', body: { isActive: !z.isActive } });
-      upsert(next, next.isActive ? `فُعّلت ${next.nameAr}.` : `أُوقفت ${next.nameAr} — لا شراء من تغطيتها.`, false);
+      upsert(
+        next,
+        next.isActive
+          ? t(`فُعّلت ${next.nameAr}.`, `${next.nameAr} activated.`)
+          : t(`أُوقفت ${next.nameAr} — لا شراء من تغطيتها.`, `${next.nameAr} deactivated — no purchases from its coverage.`),
+        false,
+      );
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -752,8 +876,8 @@ export default function ShippingZonesPage() {
   return (
     <div className="vm-page">
       <PageHead
-        title="مناطق الشحن"
-        meta={`المبالغ بعملة التسوية: ${currency}`}
+        title={t('مناطق الشحن', 'Shipping zones')}
+        meta={t(`المبالغ بعملة التسوية: ${currency}`, `Amounts in settlement currency: ${currency}`)}
         actions={
           <button
             type="button"
@@ -765,23 +889,25 @@ export default function ShippingZonesPage() {
             }}
           >
             <Icon name="plus" size={15} />
-            أضف منطقة
+            {t('أضف منطقة', 'Add zone')}
           </button>
         }
       />
 
       <Alert tone="warning">
-        <strong>المشترون في مناطق لا تغطّيها لا يستطيعون الشراء منك.</strong>{' '}
-        {cover.length ? `مناطقك المفعّلة تغطّي ${cover.join(' و')} حتى الآن.` : 'لا منطقة مفعّلة بعد — لا أحد يستطيع الشراء منك الآن.'}
+        <strong>{t('المشترون في مناطق لا تغطّيها لا يستطيعون الشراء منك.', "Buyers in areas you don't cover can't buy from you.")}</strong>{' '}
+        {cover.length
+          ? t(`مناطقك المفعّلة تغطّي ${cover.join(' و')} حتى الآن.`, `Your active zones cover ${coverEn} so far.`)
+          : t('لا منطقة مفعّلة بعد — لا أحد يستطيع الشراء منك الآن.', 'No active zone yet — nobody can buy from you right now.')}
       </Alert>
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice && !error ? <Alert tone="success">{notice}</Alert> : null}
 
       <div className="vx-ship">
-        <section className="vx-card vx-card--flush" aria-label="المناطق">
+        <section className="vx-card vx-card--flush" aria-label={t('المناطق', 'Zones')}>
           {zones.length === 0 ? (
-            <EmptyState icon="truck" title="لا مناطق بعد">
-              أضف منطقتك الأولى: التغطية والسعر ومدّة التوصيل.
+            <EmptyState icon="truck" title={t('لا مناطق بعد', 'No zones yet')}>
+              {t('أضف منطقتك الأولى: التغطية والسعر ومدّة التوصيل.', 'Add your first zone: coverage, price and delivery time.')}
             </EmptyState>
           ) : (
             <ul className="vx-zones">
@@ -802,10 +928,10 @@ export default function ShippingZonesPage() {
                       <span className="vx-zone__line">
                         <span className="vx-zone__name">{z.nameAr}</span>
                         <span className="vx-zone__rates">
-                          <span className="num">{rates}</span> تسعيرة
+                          <span className="num">{rates}</span> {t('تسعيرة', rates === 1 ? 'rate' : 'rates')}
                         </span>
                       </span>
-                      <span className="vx-zone__cover">{z.regions.map(describe).join(' · ')}</span>
+                      <span className="vx-zone__cover">{z.regions.map((r) => describe(r, locale)).join(' · ')}</span>
                     </button>
                     <span className="vx-zone__state">
                       <button
@@ -813,12 +939,14 @@ export default function ShippingZonesPage() {
                         role="switch"
                         className="vx-switch"
                         aria-checked={z.isActive}
-                        aria-label={`${z.nameAr} مفعّلة`}
+                        aria-label={t(`${z.nameAr} مفعّلة`, `${z.nameAr} active`)}
                         disabled={toggling === z.id}
                         onClick={() => void toggleZone(z)}
                       />
                       <span className={`vx-zone__label${z.isActive ? ' vx-zone__label--on' : ''}`}>
-                        {z.isActive ? 'مفعّلة — المشترون فيها يستطيعون الشراء' : 'موقوفة — لا شراء من هذه المنطقة'}
+                        {z.isActive
+                          ? t('مفعّلة — المشترون فيها يستطيعون الشراء', 'Active — buyers there can buy')
+                          : t('موقوفة — لا شراء من هذه المنطقة', 'Inactive — no purchases from this zone')}
                       </span>
                     </span>
                   </li>
@@ -839,7 +967,7 @@ export default function ShippingZonesPage() {
                 const rest = zones.filter((x) => x.id !== id);
                 setData({ currency, zones: rest });
                 setSelected(rest[0]?.id ?? 'new');
-                setNotice('حُذفت المنطقة.');
+                setNotice(t('حُذفت المنطقة.', 'Zone deleted.'));
               }}
               onError={(m) => {
                 setError(m);

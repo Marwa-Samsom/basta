@@ -6,7 +6,9 @@ import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { TONE, useAction, useAdminList } from '@/lib/admin';
-import { labelOf, money, REFUND_STATUS, RETURN_REASONS, when } from '@/lib/orders';
+import { labelOf, money, REFUND_STATUS, REFUND_STATUS_EN, RETURN_REASONS, RETURN_REASONS_EN, when } from '@/lib/orders';
+import { useLocale, useT } from '@/components/locale';
+import { localized } from '@/lib/i18n';
 
 interface ReturnRow {
   id: string;
@@ -34,6 +36,7 @@ interface RefundRow {
 }
 
 const RETURN_STATUS: Record<string, string> = { requested: 'بانتظار البائع', received: 'استُلم', rejected: 'رُفض' };
+const RETURN_STATUS_EN: Record<string, string> = { requested: 'Awaiting seller', received: 'Received', rejected: 'Rejected' };
 
 /** ثلاثة أيام بلا ردّ من المتجر — يظهر العمر بالأحمر ويصير التدخّل الإجراء الأوّل */
 // العتبة نفسها التي ينبّه بها الخادم المديرين (RETURN_STALL_DAYS في admin-alerts.scheduler)
@@ -48,6 +51,8 @@ const STALL_MS = 3 * 24 * 3_600_000;
  * أحدث مئة بلا بحث.
  */
 export default function AdminReturnsPage() {
+  const t = useT();
+  const locale = useLocale();
   const [search, setSearch] = useState('');
   // ترتيب واحد للقائمتين
   const [sort, setSort] = useState<SortOrder>('newest');
@@ -64,7 +69,7 @@ export default function AdminReturnsPage() {
   const searching = Boolean(search.trim());
   const clear = (
     <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
-      أزل التصفية
+      {t('أزل التصفية', 'Clear filters')}
     </button>
   );
 
@@ -73,45 +78,50 @@ export default function AdminReturnsPage() {
       await api(`/admin/orders/stores/${subOrderId}/transition`, { method: 'POST', body: { to: 'returned', returnRequestId } });
       requests.reload();
       refunds.reload();
-    }, 'سُجّل الاستلام: عادت القطع للمخزون ويُردّ نصيبها للمشتري.');
+    }, t('سُجّل الاستلام: عادت القطع للمخزون ويُردّ نصيبها للمشتري.', "Receipt recorded: the items are back in stock and their share is being refunded to the buyer."));
 
   return (
     <div className="ao-page">
-      <AdminHeader title="المرتجعات والمبالغ المعادة" />
+      <AdminHeader title={t('المرتجعات والمبالغ المعادة', 'Returns and refunds')} />
       <Feedback error={act.error} notice={act.notice} />
       <div className="toolbar">
         <div className="toolbar__end">
-          <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب أو المتجر أو المشتري" label="بحث في المرتجعات والمبالغ المعادة" />
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            placeholder={t('رقم الطلب أو المتجر أو المشتري', 'Order number, shop, or buyer')}
+            label={t('بحث في المرتجعات والمبالغ المعادة', 'Search returns and refunds')}
+          />
           <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
 
       <section className="card card--flush">
         <header className="card__head">
-          <h2>طلبات الإرجاع</h2>
+          <h2>{t('طلبات الإرجاع', 'Return requests')}</h2>
           <span className="ao-card-count num">{requests.total}</span>
         </header>
         {requests.items.length === 0 ? (
           searching ? (
-            <Empty icon="search" title="لا طلبات إرجاع بهذا البحث" actions={clear} />
+            <Empty icon="search" title={t('لا طلبات إرجاع بهذا البحث', 'No return requests match this search')} actions={clear} />
           ) : (
-            <Empty icon="return" title="لا طلبات إرجاع">
-              تظهر هنا طلبات الإرجاع حين يفتحها المشترون.
+            <Empty icon="return" title={t('لا طلبات إرجاع', 'No return requests')}>
+              {t('تظهر هنا طلبات الإرجاع حين يفتحها المشترون.', 'Return requests appear here when buyers open them.')}
             </Empty>
           )
         ) : (
-          <div className="table-wrap" tabIndex={0} role="region" aria-label="طلبات الإرجاع">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label={t('طلبات الإرجاع', 'Return requests')}>
             <table className="table ao-table">
               <thead>
                 <tr>
-                  <th>الطلب</th>
-                  <th>المتجر</th>
-                  <th>السبب</th>
-                  <th className="end">القطع</th>
-                  <th>منذ</th>
-                  <th>الحالة</th>
+                  <th>{t('الطلب', 'Order')}</th>
+                  <th>{t('المتجر', 'Shop')}</th>
+                  <th>{t('السبب', 'Reason')}</th>
+                  <th className="end">{t('القطع', 'Items')}</th>
+                  <th>{t('منذ', 'Since')}</th>
+                  <th>{t('الحالة', 'Status')}</th>
                   <th className="end">
-                    <span className="visually-hidden">الإجراء</span>
+                    <span className="visually-hidden">{t('الإجراء', 'Action')}</span>
                   </th>
                 </tr>
               </thead>
@@ -121,31 +131,37 @@ export default function AdminReturnsPage() {
                   return (
                     <tr key={r.id}>
                       <td className="num ao-strong">{r.subOrder.subOrderNumber}</td>
-                      <td data-label="المتجر" className="ao-strong">
+                      <td data-label={t('المتجر', 'Shop')} className="ao-strong">
                         {r.subOrder.vendor.nameAr}
                       </td>
-                      <td data-label="السبب" className="wrap">
+                      <td data-label={t('السبب', 'Reason')} className="wrap">
                         <span className="ao-stack">
-                          <span>{RETURN_REASONS[r.reasonCode] ?? r.reasonCode}</span>
-                          {r.description ? <span className="ao-stack__sub">«{r.description}»</span> : null}
+                          <span>{localized(locale, RETURN_REASONS, RETURN_REASONS_EN)[r.reasonCode] ?? r.reasonCode}</span>
+                          {r.description ? (
+                            <span className="ao-stack__sub">
+                              {t('«', '“')}
+                              {r.description}
+                              {t('»', '”')}
+                            </span>
+                          ) : null}
                         </span>
                       </td>
-                      <td data-label="القطع" className="end num">
+                      <td data-label={t('القطع', 'Items')} className="end num">
                         {r.itemsJson.reduce((a, i) => a + i.qty, 0)}
                       </td>
-                      <td data-label="منذ" className="ao-date" data-late={stalled}>
-                        {when(r.requestedAt)}
+                      <td data-label={t('منذ', 'Since')} className="ao-date" data-late={stalled}>
+                        {when(r.requestedAt, locale)}
                       </td>
-                      <td data-label="الحالة">
+                      <td data-label={t('الحالة', 'Status')}>
                         <span className="ao-stack">
-                          <span className={`badge ${TONE[r.status] ?? 'badge--warning'}`}>{RETURN_STATUS[r.status] ?? r.status}</span>
-                          <span className="ao-stack__sub">{labelOf(r.subOrder.status)}</span>
+                          <span className={`badge ${TONE[r.status] ?? 'badge--warning'}`}>{localized(locale, RETURN_STATUS, RETURN_STATUS_EN)[r.status] ?? r.status}</span>
+                          <span className="ao-stack__sub">{labelOf(r.subOrder.status, locale)}</span>
                         </span>
                       </td>
                       <td data-label="" className="end">
                         {r.status === 'requested' ? (
                           <button type="button" className={`btn btn--sm ${stalled ? 'btn--primary' : 'btn--secondary'}`} disabled={act.busy} onClick={() => void receive(r.subOrder.id, r.id)}>
-                            تسجيل الاستلام بدل المتجر
+                            {t('تسجيل الاستلام بدل المتجر', 'Record receipt for the shop')}
                           </button>
                         ) : null}
                       </td>
@@ -161,28 +177,28 @@ export default function AdminReturnsPage() {
 
       <section className="card card--flush">
         <header className="card__head">
-          <h2>المبالغ المعادة</h2>
+          <h2>{t('المبالغ المعادة', 'Refunds')}</h2>
           <span className="ao-card-count num">{refunds.total}</span>
         </header>
         {refunds.items.length === 0 ? (
           searching ? (
-            <Empty icon="search" title="لا استردادات بهذا البحث" actions={clear} />
+            <Empty icon="search" title={t('لا استردادات بهذا البحث', 'No refunds match this search')} actions={clear} />
           ) : (
-            <Empty icon="wallet" title="لا استردادات">
-              تظهر هنا المبالغ المعادة للمشترين بمرجع البوابة أو التحويل.
+            <Empty icon="wallet" title={t('لا استردادات', 'No refunds')}>
+              {t('تظهر هنا المبالغ المعادة للمشترين بمرجع البوابة أو التحويل.', 'Amounts refunded to buyers appear here with the gateway or transfer reference.')}
             </Empty>
           )
         ) : (
-          <div className="table-wrap" tabIndex={0} role="region" aria-label="الاستردادات">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label={t('الاستردادات', 'Refunds')}>
             <table className="table ao-table">
               <thead>
                 <tr>
-                  <th>الطلب</th>
-                  <th className="end">للمشتري</th>
-                  <th className="end">على البائع</th>
-                  <th>السبب</th>
-                  <th>الحالة</th>
-                  <th>المرجع</th>
+                  <th>{t('الطلب', 'Order')}</th>
+                  <th className="end">{t('للمشتري', 'To buyer')}</th>
+                  <th className="end">{t('على البائع', 'Charged to seller')}</th>
+                  <th>{t('السبب', 'Reason')}</th>
+                  <th>{t('الحالة', 'Status')}</th>
+                  <th>{t('المرجع', 'Reference')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,32 +207,33 @@ export default function AdminReturnsPage() {
                     <td>
                       <span className="ao-stack">
                         <span className="num ao-strong">{r.subOrder.subOrderNumber}</span>
-                        <span className="ao-stack__sub">{when(r.createdAt)}</span>
+                        <span className="ao-stack__sub">{when(r.createdAt, locale)}</span>
                       </span>
                     </td>
-                    <td data-label="للمشتري" className="end">
-                      <span className="money num">{money(r.amountMinorUnits, r.currency)}</span>
+                    <td data-label={t('للمشتري', 'To buyer')} className="end">
+                      <span className="money num">{money(r.amountMinorUnits, r.currency, locale)}</span>
                     </td>
-                    <td data-label="على البائع" className="end">
+                    <td data-label={t('على البائع', 'Charged to seller')} className="end">
                       <span className="ao-stack ao-stack--end">
-                        {r.vendorChargeMinorUnits ? <span className="money num">{money(r.vendorChargeMinorUnits, r.subOrder.settlementCurrency)}</span> : '—'}
+                        {r.vendorChargeMinorUnits ? <span className="money num">{money(r.vendorChargeMinorUnits, r.subOrder.settlementCurrency, locale)}</span> : '—'}
                         {r.vendorNegative ? (
                           <span className="ao-rownote">
                             <Icon name="alert" size={13} />
                             <span>
-                              رصيد {r.subOrder.vendor.nameAr} سالب: <span className="num">{money(r.vendorNegative, r.subOrder.settlementCurrency)}</span>
+                              {t('رصيد', 'Balance of')} {r.subOrder.vendor.nameAr} {t('سالب:', 'is negative:')}{' '}
+                              <span className="num">{money(r.vendorNegative, r.subOrder.settlementCurrency, locale)}</span>
                             </span>
                           </span>
                         ) : null}
                       </span>
                     </td>
-                    <td data-label="السبب" className="wrap">
+                    <td data-label={t('السبب', 'Reason')} className="wrap">
                       {r.reason}
                     </td>
-                    <td data-label="الحالة">
-                      <span className={`badge ${r.status === 'succeeded' ? 'badge--approved' : 'badge--warning'}`}>{REFUND_STATUS[r.status] ?? r.status}</span>
+                    <td data-label={t('الحالة', 'Status')}>
+                      <span className={`badge ${r.status === 'succeeded' ? 'badge--approved' : 'badge--warning'}`}>{localized(locale, REFUND_STATUS, REFUND_STATUS_EN)[r.status] ?? r.status}</span>
                     </td>
-                    <td data-label="المرجع" className="num">
+                    <td data-label={t('المرجع', 'Reference')} className="num">
                       {r.providerRefundId?.replace(/^manual:/, '') ?? '—'}
                     </td>
                   </tr>

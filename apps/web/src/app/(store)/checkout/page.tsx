@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { Alert, Field, PageHead, Spinner, TextInput } from '@/components/ui';
 import { addressLine, addressTitle, type SavedAddress } from '@/lib/addresses';
 import { api, ApiError, session } from '@/lib/api';
@@ -12,6 +13,7 @@ import { CART_EVENT, cartApi, cartHeaders, type CartView } from '@/lib/cart';
 import { RegionSelect } from '@/components/region-select';
 import { attemptKey, definitive, endAttempt } from '@/lib/checkout-attempt';
 import { digitsOnly } from '@/lib/digits';
+import { nameIn, type Locale } from '@/lib/i18n';
 import { withNext } from '@/lib/safe-path';
 import { imageUrl } from '@/lib/storefront';
 
@@ -30,23 +32,25 @@ const HERE = '/checkout';
 
 /** بطاقات المزوّد الوهمي — كل واحدة تصنع حالة من حالات البوابة (ADR-012) */
 const TEST_CARDS = [
-  { token: 'tok_success', label: 'بطاقة تنجح' },
-  { token: 'tok_decline', label: 'بطاقة يرفضها البنك' },
-  { token: 'tok_insufficient', label: 'رصيد غير كافٍ' },
-  { token: 'tok_timeout', label: 'ينقطع الاتصال بعد الخصم' },
-  { token: 'tok_timeout_fail', label: 'ينقطع الاتصال بلا خصم' },
+  { token: 'tok_success', label: 'بطاقة تنجح', en: 'Card that succeeds' },
+  { token: 'tok_decline', label: 'بطاقة يرفضها البنك', en: 'Card declined by the bank' },
+  { token: 'tok_insufficient', label: 'رصيد غير كافٍ', en: 'Insufficient funds' },
+  { token: 'tok_timeout', label: 'ينقطع الاتصال بعد الخصم', en: 'Connection drops after the charge' },
+  { token: 'tok_timeout_fail', label: 'ينقطع الاتصال بلا خصم', en: 'Connection drops with no charge' },
 ] as const;
 
 const thumbOf = (key: string | null): string | null => (key ? imageUrl(`/uploads/${key}/thumb.webp`) : null);
 
 /** تمييز العدد بالعربية يتغيّر بالعدد نفسه */
-function pieces(n: number): string {
+function pieces(n: number, locale: Locale): string {
+  if (locale === 'en') return n === 1 ? '1 item' : `${n} items`;
   if (n === 1) return 'قطعة واحدة';
   if (n === 2) return 'قطعتان';
   if (n <= 10) return `${n} قطع`;
   return `${n} قطعة`;
 }
-function shipments(n: number): string {
+function shipments(n: number, locale: Locale): string {
+  if (locale === 'en') return n === 1 ? '1 shipment from 1 shop' : `${n} shipments from ${n} shops`;
   if (n === 1) return 'شحنة واحدة من متجر واحد';
   if (n === 2) return 'شحنتين من متجرين';
   if (n <= 10) return `${n} شحنات من ${n} متاجر`;
@@ -109,6 +113,7 @@ function fieldsOf(a: SavedAddress) {
 
 /** خطوة مرقّمة — الدائرة تصير علامة صحّ حين تكتمل، والحالية بإطار العلامة */
 function Section({ n, title, state, children }: { n: number; title: string; state: StepState; children: ReactNode }) {
+  const t = useT();
   return (
     <section className="sp-sec" data-state={state} aria-labelledby={`sec-${n}`}>
       <header className="sp-sec__head">
@@ -118,7 +123,7 @@ function Section({ n, title, state, children }: { n: number; title: string; stat
         <div className="sp-sec__titles">
           <h2 className="sp-sec__title" id={`sec-${n}`}>
             {title}
-            {state === 'done' ? <span className="visually-hidden"> — مكتملة</span> : null}
+            {state === 'done' ? <span className="visually-hidden">{t(' — مكتملة', ' — completed')}</span> : null}
           </h2>
         </div>
       </header>
@@ -139,40 +144,44 @@ function Section({ n, title, state, children }: { n: number; title: string; stat
  * ويعود إلى الصفحة نفسها بعد الدخول أو التسجيل — والسلة برمزها فتبقى كما هي.
  */
 export default function CheckoutPage() {
+  const t = useT();
   // الخادم لا يعرف الجلسة: لقطته «لا يُعرف»، فلا تومض بوابة الدخول لمن دخل
   const auth = useSyncExternalStore(
     () => () => undefined,
     () => (session.read() !== null ? 'in' : 'out'),
     () => 'unknown',
   );
-  if (auth === 'unknown') return <Spinner label="جارٍ فتح الدفع…" />;
+  if (auth === 'unknown') return <Spinner label={t('جارٍ فتح الدفع…', 'Opening checkout…')} />;
   if (auth === 'out') return <SignInFirst />;
   return <CheckoutForm />;
 }
 
 /** بوابة الدخول — لماذا يُطلب الحساب، وأن السلة لا تضيع */
 function SignInFirst() {
+  const t = useT();
   return (
     <div className="sp-page sp-page--narrow">
-      <PageHead title="إتمام الشراء" />
+      <PageHead title={t('إتمام الشراء', 'Checkout')} />
       <section className="sp-hero sp-hero--info">
         <span className="sp-hero__icon" aria-hidden>
           <Icon name="user" size={28} />
         </span>
-        <h2 className="sp-hero__title">ادخل لتكمل الشراء</h2>
+        <h2 className="sp-hero__title">{t('ادخل لتكمل الشراء', 'Sign in to complete your purchase')}</h2>
         <p className="sp-hero__text">
-          سلّتك محفوظة كما هي. بحسابك تتابع طلبك من أي جهاز، وتلغيه أو ترجعه، وتراسل البائع — وتعود إلى هنا بعد
-          الدخول مباشرةً.
+          {t(
+            'سلّتك محفوظة كما هي. بحسابك تتابع طلبك من أي جهاز، وتلغيه أو ترجعه، وتراسل البائع — وتعود إلى هنا بعد الدخول مباشرةً.',
+            'Your cart is saved as it is. With an account you can track your order from any device, cancel or return it, and message the seller — and you come straight back here after signing in.',
+          )}
         </p>
         <div className="sp-hero__actions">
           <Link className="btn btn--primary" href={withNext('/login', HERE)}>
-            ادخل
+            {t('ادخل', 'Sign in')}
           </Link>
           <Link className="btn btn--secondary" href={withNext('/register', HERE)}>
-            أنشئ حساباً
+            {t('أنشئ حساباً', 'Create an account')}
           </Link>
           <Link className="btn btn--ghost" href="/cart">
-            عُد إلى السلة
+            {t('عُد إلى السلة', 'Back to cart')}
           </Link>
         </div>
       </section>
@@ -183,6 +192,8 @@ function SignInFirst() {
 function CheckoutForm() {
   // البوابة فوقه لا تعرضه إلا لمن دخل
   const router = useRouter();
+  const t = useT();
+  const locale = useLocale();
 
   // الصفحة لا تُرسم في الخادم (البوابة فوقها تنتظر الجلسة)، فقراءة التبويب هنا آمنة
   const [restored] = useState(readDraft);
@@ -242,12 +253,12 @@ function CheckoutForm() {
         if (alive) setPayment(m);
       })
       .catch((err: unknown) => {
-        if (alive) setPaymentError(err instanceof Error ? err.message : 'تعذّر الاتصال بالخادم.');
+        if (alive) setPaymentError(err instanceof Error ? err.message : t('تعذّر الاتصال بالخادم.', "Couldn't reach the server."));
       });
     return () => {
       alive = false;
     };
-  }, [paymentAttempt]);
+  }, [paymentAttempt, t]);
 
   useEffect(() => {
     let alive = true;
@@ -279,7 +290,7 @@ function CheckoutForm() {
       const q = await cartApi.quote({ country: address.country, region: address.region, city: address.city });
       priced(q, address);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر حساب الشحن.');
+      setError(err instanceof Error ? err.message : t('تعذّر حساب الشحن.', "Couldn't calculate shipping."));
     } finally {
       setBusy(false);
     }
@@ -337,7 +348,7 @@ function CheckoutForm() {
       // رفض قاطع قبل أي مال ينهي المحاولة؛ 502/504 وانقطاع الشبكة يُبقيان المفتاح
       // (checkout-attempt) — «ادفع» ثانيةً يعيد الطلب نفسه إن كان خُصم، لا يدفع مرتين
       if (definitive(err)) endAttempt();
-      setError(err instanceof Error ? err.message : 'تعذّر إتمام الطلب.');
+      setError(err instanceof Error ? err.message : t('تعذّر إتمام الطلب.', "Couldn't place the order."));
     } finally {
       // أجاب الخادم بطلب والصفحة تنتقل إليه: «ادفع» يبقى معطّلاً حتى تنتقل. كان يعود فعّالاً
       // أثناء الانتقال، فضغطة ثانية أرسلت محاولة بمفتاح جديد على سلة فرغت — «السلة فارغة.»
@@ -352,9 +363,9 @@ function CheckoutForm() {
    * يعمل والحقول فارغة، فيعود ردّ تحقّق من الخادم بدل أن تقول الصفحة ماذا ينقص.
    */
   const missing = [
-    address.recipientName.trim().length < 2 ? 'اسم المستلم' : null,
-    address.street.trim().length < 2 ? 'الشارع ورقم البناء' : null,
-    digitsOnly(address.phone).length < 7 ? 'الهاتف' : null,
+    address.recipientName.trim().length < 2 ? t('اسم المستلم', 'Recipient name') : null,
+    address.street.trim().length < 2 ? t('الشارع ورقم البناء', 'Street and building number') : null,
+    digitsOnly(address.phone).length < 7 ? t('الهاتف', 'Phone') : null,
   ].filter((m): m is string => m !== null);
   // التحويل بلا بيانات حساب مضبوطة يُرفض في الخادم — الزر لا يَعِد بما لن يقبله
   const ready =
@@ -366,11 +377,11 @@ function CheckoutForm() {
 
   return (
     <div className="sp-page">
-      <PageHead title="إتمام الشراء" />
+      <PageHead title={t('إتمام الشراء', 'Checkout')} />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {/* موانع حساب قديم لعنوان تغيّر لا تُعرض — تُحسب من جديد مع الشحن */}
       {blockers.length > 0 && !stale ? (
-        <Alert tone="warning" title="قبل الدفع">
+        <Alert tone="warning" title={t('قبل الدفع', 'Before you pay')}>
           <ul className="blockers">
             {blockers.map((b) => (
               <li key={b}>{b}</li>
@@ -381,20 +392,20 @@ function CheckoutForm() {
 
       <div className="sp-layout sp-layout--checkout">
         <div className="sp-main">
-          <Section n={1} title="بيانات التواصل" state={stateOf(1)}>
+          <Section n={1} title={t('بيانات التواصل', 'Contact details')} state={stateOf(1)}>
             <div className="sp-fields">
-              <TextInput label="الهاتف" dir="ltr" inputMode="tel" value={address.phone} onChange={set('phone')} />
+              <TextInput label={t('الهاتف', 'Phone')} dir="ltr" inputMode="tel" value={address.phone} onChange={set('phone')} />
             </div>
             <p className="sp-note sp-note--xs">
               <Icon name="info" size={14} />
-              نرسل رقم الطلب وتحديثات الشحن إلى بيانات التواصل هذه.
+              {t('نرسل رقم الطلب وتحديثات الشحن إلى بيانات التواصل هذه.', 'We send the order number and shipping updates to these contact details.')}
             </p>
           </Section>
 
-          <Section n={2} title="عنوان التوصيل" state={stateOf(2)}>
+          <Section n={2} title={t('عنوان التوصيل', 'Delivery address')} state={stateOf(2)}>
             {saved.length > 0 ? (
               <fieldset className="aa-pick-set">
-                <legend>عناوينك المحفوظة</legend>
+                <legend>{t('عناوينك المحفوظة', 'Your saved addresses')}</legend>
                 <div className="aa-picks">
                   {saved.map((a) => (
                     <label key={a.id} className="aa-pick">
@@ -410,11 +421,11 @@ function CheckoutForm() {
                         />
                         <span className="aa-pick__label" id={`pick-${a.id}`}>
                           {addressTitle(a)}
-                          {a.isDefault ? <span className="visually-hidden"> — الافتراضي</span> : null}
+                          {a.isDefault ? <span className="visually-hidden">{t(' — الافتراضي', ' — default')}</span> : null}
                         </span>
                       </span>
                       <span className="aa-pick__line" id={`pick-${a.id}-line`}>
-                        {addressLine(a)}
+                        {addressLine(a, locale)}
                       </span>
                       <bdi className="aa-pick__phone num" dir="ltr">
                         {a.phone}
@@ -431,15 +442,15 @@ function CheckoutForm() {
                     />
                     <span className="aa-pick__head">
                       <Icon name="plus" size={20} />
-                      <span className="aa-pick__label">عنوان جديد</span>
+                      <span className="aa-pick__label">{t('عنوان جديد', 'New address')}</span>
                     </span>
                   </label>
                 </div>
               </fieldset>
             ) : null}
             <div className="sp-fields sp-fields--3">
-              <TextInput label="اسم المستلم" value={address.recipientName} onChange={set('recipientName')} />
-              <Field label="البلد">
+              <TextInput label={t('اسم المستلم', 'Recipient name')} value={address.recipientName} onChange={set('recipientName')} />
+              <Field label={t('البلد', 'Country')}>
                 {(props) => (
                   <select
                     className="field__control"
@@ -447,18 +458,18 @@ function CheckoutForm() {
                     value={address.country}
                     onChange={(e) => setAddress((a) => ({ ...a, country: e.target.value, region: '' }))}
                   >
-                    <option value="JO">الأردن</option>
-                    <option value="SA">السعودية</option>
-                    <option value="AE">الإمارات</option>
-                    <option value="KW">الكويت</option>
-                    <option value="EG">مصر</option>
+                    <option value="JO">{t('الأردن', 'Jordan')}</option>
+                    <option value="SA">{t('السعودية', 'Saudi Arabia')}</option>
+                    <option value="AE">{t('الإمارات', 'United Arab Emirates')}</option>
+                    <option value="KW">{t('الكويت', 'Kuwait')}</option>
+                    <option value="EG">{t('مصر', 'Egypt')}</option>
                   </select>
                 )}
               </Field>
               <RegionSelect country={address.country} value={address.region} onChange={(v) => setAddress((a) => ({ ...a, region: v }))} />
-              <TextInput label="المدينة" value={address.city} onChange={set('city')} />
+              <TextInput label={t('المدينة', 'City')} value={address.city} onChange={set('city')} />
               <div className="sp-fields__wide">
-                <TextInput label="الشارع ورقم البناء" value={address.street} onChange={set('street')} />
+                <TextInput label={t('الشارع ورقم البناء', 'Street and building number')} value={address.street} onChange={set('street')} />
               </div>
             </div>
             <button
@@ -467,17 +478,20 @@ function CheckoutForm() {
               disabled={busy || !address.region || !address.city}
               onClick={() => void calculate()}
             >
-              احسب الشحن
+              {t('احسب الشحن', 'Calculate shipping')}
             </button>
             {stale ? (
               <p className="sp-note" role="status">
                 <Icon name="info" size={14} />
-                غيّرت العنوان — احسب الشحن من جديد لترى الإجمالي لهذا العنوان قبل الدفع.
+                {t(
+                  'غيّرت العنوان — احسب الشحن من جديد لترى الإجمالي لهذا العنوان قبل الدفع.',
+                  'You changed the address — calculate shipping again to see the total for this address before you pay.',
+                )}
               </p>
             ) : null}
           </Section>
 
-          <Section n={3} title="الشحن لكل متجر" state={stateOf(3)}>
+          <Section n={3} title={t('الشحن لكل متجر', 'Shipping per shop')} state={stateOf(3)}>
             {quote ? (
               quote.groups.map((g) => {
                 const count = g.lines.reduce((sum, l) => sum + l.qty, 0);
@@ -485,20 +499,23 @@ function CheckoutForm() {
                   <div key={g.vendorId} className={`sp-sub ${g.shipping ? '' : 'sp-sub--warn'}`}>
                     <div className="sp-sub__head">
                       <Icon name="store" size={15} />
-                      <span className="sp-sub__name">{g.vendorNameAr}</span>
-                      <span className="sp-sub__meta">{pieces(count)}</span>
+                      <span className="sp-sub__name">{nameIn(locale, { nameAr: g.vendorNameAr, nameEn: g.vendorNameEn })}</span>
+                      <span className="sp-sub__meta">{pieces(count, locale)}</span>
                     </div>
                     {g.shipping ? (
                       <div className="sp-sub__body">
                         <p className="sp-kv">
-                          <span>شحن هذا المتجر — يُشحن منفصلاً</span>
+                          <span>{t('شحن هذا المتجر — يُشحن منفصلاً', 'Shipping for this shop — ships separately')}</span>
                           <span className="sp-kv__v money num">{g.shipping.formatted}</span>
                         </p>
                       </div>
                     ) : (
                       <p className="sp-sub__warn">
                         <Icon name="alert" size={15} />
-                        لم يُحسب شحن هذا المتجر إلى العنوان المدخل — راجع التنبيه أعلى الصفحة.
+                        {t(
+                          'لم يُحسب شحن هذا المتجر إلى العنوان المدخل — راجع التنبيه أعلى الصفحة.',
+                          "Shipping for this shop couldn't be calculated to the address entered — see the alert at the top of the page.",
+                        )}
                       </p>
                     )}
                   </div>
@@ -507,15 +524,20 @@ function CheckoutForm() {
             ) : (
               <p className="sp-note sp-note--xs">
                 <Icon name="truck" size={14} />
-                أدخل العنوان واضغط «احسب الشحن» — كل متجر يشحن منفصلاً وبتكلفته.
+                {t(
+                  'أدخل العنوان واضغط «احسب الشحن» — كل متجر يشحن منفصلاً وبتكلفته.',
+                  'Enter the address and press “Calculate shipping” — each shop ships separately, at its own cost.',
+                )}
               </p>
             )}
           </Section>
 
-          <Section n={4} title="الدفع" state={stateOf(4)}>
+          <Section n={4} title={t('الدفع', 'Payment')} state={stateOf(4)}>
             {payment === null && paymentError ? (
-              <Alert tone="danger" title="تعذّر تحميل طريقة الدفع">
-                <p>{paymentError} عنوانك والشحن المحسوب باقيان.</p>
+              <Alert tone="danger" title={t('تعذّر تحميل طريقة الدفع', "Couldn't load the payment method")}>
+                <p>
+                  {paymentError} {t('عنوانك والشحن المحسوب باقيان.', 'Your address and calculated shipping are kept.')}
+                </p>
                 <button
                   type="button"
                   className="btn btn--secondary btn--sm"
@@ -525,35 +547,57 @@ function CheckoutForm() {
                   }}
                 >
                   <Icon name="refresh" size={15} />
-                  أعد المحاولة
+                  {t('أعد المحاولة', 'Try again')}
                 </button>
               </Alert>
             ) : payment === null ? (
-              <Spinner label="جارٍ تحميل طريقة الدفع…" />
+              <Spinner label={t('جارٍ تحميل طريقة الدفع…', 'Loading payment method…')} />
             ) : transfer ? (
               <>
                 <div className="sp-pay sp-pay--static">
                   <Icon name="wallet" size={19} />
-                  <span className="sp-pay__label">{transfer.cliq ? 'تحويل عبر كليك أو تحويل بنكي' : 'تحويل بنكي'}</span>
+                  <span className="sp-pay__label">
+                    {transfer.cliq ? t('تحويل عبر كليك أو تحويل بنكي', 'CliQ or bank transfer') : t('تحويل بنكي', 'Bank transfer')}
+                  </span>
                 </div>
                 {transfer.ready ? (
                   <ol className="sp-transfer__steps">
-                    <li>تضغط «أكّد الطلب» فنحجز لك القطع {transfer.windowHours} ساعة — بلا أي خصم.</li>
-                    <li>نعرض لك المبلغ وبيانات الحساب، فتحوّل من تطبيق بنكك وتكتب رقم الطلب في الملاحظة.</li>
-                    <li>نؤكّد وصول التحويل ونرسل طلبك إلى المتاجر، ونبلغك حينها.</li>
+                    <li>
+                      {t(
+                        `تضغط «أكّد الطلب» فنحجز لك القطع ${transfer.windowHours} ساعة — بلا أي خصم.`,
+                        `You press “Confirm order” and we reserve the items for you for ${transfer.windowHours} ${transfer.windowHours === 1 ? 'hour' : 'hours'} — with no charge.`,
+                      )}
+                    </li>
+                    <li>
+                      {t(
+                        'نعرض لك المبلغ وبيانات الحساب، فتحوّل من تطبيق بنكك وتكتب رقم الطلب في الملاحظة.',
+                        'We show you the amount and the account details; you transfer from your banking app and write the order number in the note.',
+                      )}
+                    </li>
+                    <li>
+                      {t(
+                        'نؤكّد وصول التحويل ونرسل طلبك إلى المتاجر، ونبلغك حينها.',
+                        'We confirm the transfer has arrived, send your order to the shops, and let you know.',
+                      )}
+                    </li>
                   </ol>
                 ) : (
-                  <Alert tone="warning">الدفع غير متاح الآن — نضبط بيانات التحويل. سلّتك محفوظة، جرّب بعد قليل.</Alert>
+                  <Alert tone="warning">
+                    {t(
+                      'الدفع غير متاح الآن — نضبط بيانات التحويل. سلّتك محفوظة، جرّب بعد قليل.',
+                      "Payment isn't available right now — we're setting up the transfer details. Your cart is saved; try again shortly.",
+                    )}
+                  </Alert>
                 )}
               </>
             ) : (
               <>
                 <p className="sp-note sp-note--xs">
                   <Icon name="info" size={14} />
-                  بيئة تجريبية: اختر كيف تتصرّف البطاقة.
+                  {t('بيئة تجريبية: اختر كيف تتصرّف البطاقة.', 'Test environment: choose how the card behaves.')}
                 </p>
                 <fieldset className="sp-fieldset">
-                  <legend className="visually-hidden">بطاقة الدفع</legend>
+                  <legend className="visually-hidden">{t('بطاقة الدفع', 'Payment card')}</legend>
                   {TEST_CARDS.map((c) => (
                     <label key={c.token} className="sp-pay">
                       <input
@@ -564,29 +608,34 @@ function CheckoutForm() {
                         onChange={() => setCard(c.token)}
                       />
                       <Icon name="card" size={19} />
-                      <span className="sp-pay__label">{c.label}</span>
+                      <span className="sp-pay__label">{t(c.label, c.en)}</span>
                     </label>
                   ))}
                 </fieldset>
                 <p className="sp-note">
                   <Icon name="lock" size={13} />
-                  تُعالَج البطاقة عند بوّابة الدفع.
+                  {t('تُعالَج البطاقة عند بوّابة الدفع.', 'The card is processed by the payment gateway.')}
                 </p>
               </>
             )}
           </Section>
 
-          <Section n={5} title="المراجعة" state={stateOf(5)}>
+          <Section n={5} title={t('المراجعة', 'Review')} state={stateOf(5)}>
             {quote ? (
               <>
-                <p className="sp-review__lead">يصلك طلبك في {shipments(quote.groups.length)}.</p>
+                <p className="sp-review__lead">
+                  {t(
+                    `يصلك طلبك في ${shipments(quote.groups.length, locale)}.`,
+                    `Your order arrives in ${shipments(quote.groups.length, locale)}.`,
+                  )}
+                </p>
                 {quote.groups.map((g, i) => (
                   <div key={g.vendorId} className="sp-sub">
                     <div className="sp-sub__head">
                       <span className="sp-sub__n" aria-hidden>
                         {i + 1}
                       </span>
-                      <span className="sp-sub__name">{g.vendorNameAr}</span>
+                      <span className="sp-sub__name">{nameIn(locale, { nameAr: g.vendorNameAr, nameEn: g.vendorNameEn })}</span>
                     </div>
                     <ul className="sp-sub__body sp-sub__list">
                       {g.lines.map((l) => {
@@ -602,7 +651,7 @@ function CheckoutForm() {
                               )}
                             </span>
                             <span className="sp-item__name">
-                              {l.nameAr}
+                              {nameIn(locale, l)}
                               {l.variantLabel ? ` — ${l.variantLabel}` : ''}
                             </span>
                             <span className="sp-item__qty num">× {l.qty}</span>
@@ -616,44 +665,50 @@ function CheckoutForm() {
             ) : (
               <p className="sp-note sp-note--xs">
                 <Icon name="package" size={14} />
-                تظهر هنا شحنات طلبك متجراً متجراً بعد حساب الشحن.
+                {t(
+                  'تظهر هنا شحنات طلبك متجراً متجراً بعد حساب الشحن.',
+                  "Your order's shipments appear here, shop by shop, once shipping is calculated.",
+                )}
               </p>
             )}
           </Section>
         </div>
 
-        <aside className="sp-aside" aria-label="ملخّص الدفع">
+        <aside className="sp-aside" aria-label={t('ملخّص الدفع', 'Payment summary')}>
           <div className="sp-sum">
-            <h2 className="sp-sum__title">ملخّص الدفع</h2>
+            <h2 className="sp-sum__title">{t('ملخّص الدفع', 'Payment summary')}</h2>
             {quote ? (
               <dl className="sp-sum__rows">
                 <div>
-                  <dt>قيمة المنتجات</dt>
+                  <dt>{t('قيمة المنتجات', 'Items')}</dt>
                   <dd className="num">{quote.totals.items.formatted}</dd>
                 </div>
                 {quote.totals.discount.minorUnits !== '0' ? (
                   <div>
                     <dt>
-                      الخصم{quote.couponCode ? <> (<bdi>{quote.couponCode}</bdi>)</> : null}
+                      {t('الخصم', 'Discount')}
+                      {quote.couponCode ? <> (<bdi>{quote.couponCode}</bdi>)</> : null}
                     </dt>
                     <dd className="num sp-sum__saving">− {quote.totals.discount.formatted}</dd>
                   </div>
                 ) : null}
                 <div>
-                  <dt>الشحن</dt>
+                  <dt>{t('الشحن', 'Shipping')}</dt>
                   <dd className="num">{quote.totals.shipping.formatted}</dd>
                 </div>
                 <div>
-                  <dt>{quote.taxInclusive ? 'الضريبة (مشمولة)' : 'الضريبة'}</dt>
+                  <dt>{quote.taxInclusive ? t('الضريبة (مشمولة)', 'Tax (included)') : t('الضريبة', 'Tax')}</dt>
                   <dd className="num">{quote.totals.tax.formatted}</dd>
                 </div>
                 <div className="sp-sum__total">
-                  <dt>الإجمالي</dt>
+                  <dt>{t('الإجمالي', 'Total')}</dt>
                   <dd className="money num">{quote.totals.total.formatted}</dd>
                 </div>
               </dl>
             ) : (
-              <p className="sp-sum__fx">أدخل العنوان واحسب الشحن لترى الإجمالي النهائي.</p>
+              <p className="sp-sum__fx">
+                {t('أدخل العنوان واحسب الشحن لترى الإجمالي النهائي.', 'Enter the address and calculate shipping to see the final total.')}
+              </p>
             )}
           </div>
 
@@ -672,25 +727,31 @@ function CheckoutForm() {
               {busy ? (
                 <>
                   <span className="spinner" aria-hidden />
-                  {transfer ? 'جارٍ تأكيد الطلب…' : 'جارٍ الدفع…'}
+                  {transfer ? t('جارٍ تأكيد الطلب…', 'Confirming order…') : t('جارٍ الدفع…', 'Paying…')}
                 </>
               ) : transfer ? (
-                'أكّد الطلب'
+                t('أكّد الطلب', 'Confirm order')
               ) : (
-                'ادفع'
+                t('ادفع', 'Pay')
               )}
             </button>
             {quote && missing.length > 0 ? (
               <p className="sp-note sp-note--warn" role="status">
                 <Icon name="info" size={13} />
-                أكمل قبل التأكيد: {missing.join('، ')}.
+                {t(`أكمل قبل التأكيد: ${missing.join('، ')}.`, `Complete before confirming: ${missing.join(', ')}.`)}
               </p>
             ) : null}
             <p className="sp-note">
               <Icon name="lock" size={13} />
               {transfer
-                ? `لا يُخصم شيء — تحوّل أنت المبلغ بعد التأكيد، والقطع محجوزة لك ${transfer.windowHours} ساعة.`
-                : 'لا يُخصم شيء قبل أن تضغط «ادفع»، والمخزون يُحجز لك لحظتها.'}
+                ? t(
+                    `لا يُخصم شيء — تحوّل أنت المبلغ بعد التأكيد، والقطع محجوزة لك ${transfer.windowHours} ساعة.`,
+                    `Nothing is charged — you transfer the amount after confirming, and the items stay reserved for you for ${transfer.windowHours} ${transfer.windowHours === 1 ? 'hour' : 'hours'}.`,
+                  )
+                : t(
+                    'لا يُخصم شيء قبل أن تضغط «ادفع»، والمخزون يُحجز لك لحظتها.',
+                    'Nothing is charged until you press “Pay”, and the stock is reserved for you at that moment.',
+                  )}
             </p>
           </div>
         </aside>

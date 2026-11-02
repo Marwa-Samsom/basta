@@ -7,8 +7,11 @@ import { Icon, type IconName } from '@/components/icons';
 import { api } from '@/lib/api';
 import {
   ACTION_LABEL,
+  ACTION_LABEL_EN,
   RETURN_REASONS,
+  RETURN_REASONS_EN,
   ROLE_LABEL,
+  ROLE_LABEL_EN,
   carrierName,
   historyReason,
   labelOf,
@@ -20,6 +23,9 @@ import {
   type SubOrderStatus,
   type SubOrderView,
 } from '@/lib/orders';
+import { regionName } from '@/lib/places';
+import { localized } from '@/lib/i18n';
+import { useLocale, useT } from '@/components/locale';
 
 interface VendorDetail extends SubOrderView {
   orderNumber: string;
@@ -71,6 +77,8 @@ const BAD = new Set(['delivery_failed', 'return_requested', 'returned', 'rejecte
  * على الخادم. فلا زرّ يظهر لانتقال يُرفض، ولا انتقال يُقبل بلا زرّ.
  */
 export default function VendorOrderPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = useT();
+  const locale = useLocale();
   const { id } = use(params);
   const [order, setOrder] = useState<VendorDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -170,19 +178,19 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
       <div className="vm-page">
         <Link href="/vendor/orders" className="vm-back">
           <Icon name="back" size={14} mirror />
-          الطلبات
+          {t('الطلبات', 'Orders')}
         </Link>
         <div className="empty">
           <span className="empty__icon vm-error-icon" aria-hidden>
             <Icon name="alert" size={26} />
           </span>
-          <p className="empty__title">تعذّر فتح الطلب</p>
+          <p className="empty__title">{t('تعذّر فتح الطلب', 'Could not open the order')}</p>
           <Alert tone="danger">{error}</Alert>
         </div>
       </div>
     ) : (
       <div className="vm-loading vm-loading--page" role="status">
-        <span className="visually-hidden">جارٍ فتح الطلب…</span>
+        <span className="visually-hidden">{t('جارٍ فتح الطلب…', 'Opening the order…')}</span>
         <span className="skeleton vm-loading__title" />
         <span className="skeleton vm-loading__block" />
         <span className="skeleton vm-loading__panel" />
@@ -196,35 +204,46 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
   const simple = order.actions.filter((a) => a !== 'rejected_by_vendor' && a !== 'shipped' && a !== 'returned' && !(a === 'delivered' && order.status === 'return_requested'));
   const f = order.financials;
   const rate = (f.commissionRateBps / 100).toFixed(1);
-  const address = [addr['street'], addr['building'], addr['area'], addr['city'], addr['region']].filter(Boolean).join('، ');
+  const address = [addr['street'], addr['building'], addr['area'], addr['city'], addr['region'] && regionName(addr['country'] ?? '', addr['region'], locale)]
+    .filter(Boolean)
+    .join(locale === 'en' ? ', ' : '، ');
+  const returnReasons = localized(locale, RETURN_REASONS, RETURN_REASONS_EN);
+  const roleLabel = localized(locale, ROLE_LABEL, ROLE_LABEL_EN);
+  const actionLabel = localized(locale, ACTION_LABEL, ACTION_LABEL_EN);
 
   return (
     <div className="vm-page">
       <div className="vm-detail-head">
         <Link href="/vendor/orders" className="vm-back">
           <Icon name="back" size={14} mirror />
-          الطلبات
+          {t('الطلبات', 'Orders')}
         </Link>
         <h1 className="num">{order.number}</h1>
         <span className={`badge vm-status ${toneOf(order.status)}`}>
           <span className="vm-status__dot" aria-hidden />
-          {labelOf(order.status)}
+          {labelOf(order.status, locale)}
         </span>
         <span className="vm-detail-head__meta">
-          أُنشئ {when(order.placedAt)} · طلب المشتري <span className="num">{order.orderNumber}</span>
+          {t(`أُنشئ ${when(order.placedAt)} · طلب المشتري`, `Created ${when(order.placedAt, locale)} · Buyer order`)}{' '}
+          <span className="num">{order.orderNumber}</span>
         </span>
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       {order.status === 'awaiting_vendor' ? (
-        <Alert tone="warning">اقبل الطلب أو ارفضه خلال {hoursAr(order.acceptanceHours)} من وصوله، وإلا أُلغي آلياً.</Alert>
+        <Alert tone="warning">
+          {t(
+            `اقبل الطلب أو ارفضه خلال ${hoursAr(order.acceptanceHours)} من وصوله، وإلا أُلغي آلياً.`,
+            `Accept or reject the order within ${hoursAr(order.acceptanceHours, locale)} of its arrival, or it is canceled automatically.`,
+          )}
+        </Alert>
       ) : null}
 
       {order.status === 'awaiting_vendor' || order.status === 'accepted' ? (
         <p className="vm-note">
           <Icon name="info" size={16} />
-          بعد بدء التجهيز لا يستطيع المشتري إلغاء الطلب.
+          {t('بعد بدء التجهيز لا يستطيع المشتري إلغاء الطلب.', 'Once preparation starts, the buyer can no longer cancel the order.')}
         </p>
       ) : null}
 
@@ -234,19 +253,19 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
           {openReturn ? (
             <section className="card vm-return">
               <div className="vm-return__head">
-                <h2>طلب إرجاع</h2>
-                <span className="badge badge--warning">بانتظار قرارك</span>
-                <span className="vm-return__date">{when(openReturn.requestedAt)}</span>
+                <h2>{t('طلب إرجاع', 'Return request')}</h2>
+                <span className="badge badge--warning">{t('بانتظار قرارك', 'Awaiting your decision')}</span>
+                <span className="vm-return__date">{when(openReturn.requestedAt, locale)}</span>
               </div>
               <div className="vm-field">
-                <span className="vm-field__label">سبب المشتري</span>
+                <span className="vm-field__label">{t('سبب المشتري', 'Buyer’s reason')}</span>
                 <p className="vm-field__text">
-                  {RETURN_REASONS[openReturn.reasonCode] ?? openReturn.reasonCode}
+                  {returnReasons[openReturn.reasonCode] ?? openReturn.reasonCode}
                   {openReturn.description ? <> — «{openReturn.description}»</> : null}
                 </p>
               </div>
               <div className="vm-field">
-                <span className="vm-field__label">القطع المطلوب إرجاعها</span>
+                <span className="vm-field__label">{t('القطع المطلوب إرجاعها', 'Items to return')}</span>
                 <ul className="vm-return__items">
                   {openReturn.itemsJson.map((i) => {
                     const item = itemOf(i.orderItemId);
@@ -262,27 +281,37 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                   })}
                 </ul>
               </div>
-              <p className="vm-hint">عند الاستلام تعود القطع للمخزون ويُردّ ثمنها للمشتري آلياً. الشحن لا يُردّ في الإرجاع.</p>
+              <p className="vm-hint">
+                {t(
+                  'عند الاستلام تعود القطع للمخزون ويُردّ ثمنها للمشتري آلياً. الشحن لا يُردّ في الإرجاع.',
+                  'On receipt, the items go back to stock and the buyer is refunded automatically. Shipping is not refunded on returns.',
+                )}
+              </p>
               <div className="row">
                 <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void move('returned', { returnRequestId: openReturn.id })}>
                   <Icon name="package" size={15} />
-                  استلمت المرتجع
+                  {t('استلمت المرتجع', 'Return received')}
                 </button>
                 <button type="button" className="btn btn--danger" disabled={busy} onClick={() => ask('deny')}>
                   <Icon name="x" size={15} />
-                  رفض الإرجاع
+                  {t('رفض الإرجاع', 'Reject return')}
                 </button>
               </div>
               {asking === 'deny' ? (
                 <div className="vm-subpanel">
-                  <TextArea label="سبب رفض الإرجاع — يُعرض للمشتري" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
+                  <TextArea
+                    label={t('سبب رفض الإرجاع — يُعرض للمشتري', 'Reason for rejecting the return — shown to the buyer')}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    rows={3}
+                  />
                   <div className="row">
                     <button type="button" className="btn btn--danger" disabled={busy || reason.trim().length < 5} onClick={() => void denyReturn()}>
                       <Icon name="x" size={15} />
-                      تأكيد الرفض
+                      {t('تأكيد الرفض', 'Confirm rejection')}
                     </button>
                     <button type="button" className="btn btn--secondary" onClick={() => ask(null)}>
-                      تراجع
+                      {t('تراجع', 'Cancel')}
                     </button>
                   </div>
                 </div>
@@ -291,37 +320,37 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
           ) : null}
 
           <section className="card">
-            <h2 className="vm-card-title">بيانات الشحن</h2>
+            <h2 className="vm-card-title">{t('بيانات الشحن', 'Shipping details')}</h2>
             <dl className="vm-kv">
               <div>
-                <dt>المستلم</dt>
+                <dt>{t('المستلم', 'Recipient')}</dt>
                 <dd className="vm-kv__strong">{addr['recipientName'] ?? '—'}</dd>
               </div>
               <div>
-                <dt>الجوال</dt>
+                <dt>{t('الجوال', 'Mobile')}</dt>
                 <dd className="num">{addr['phone'] ?? '—'}</dd>
               </div>
               <div className="vm-kv__wide">
-                <dt>العنوان</dt>
+                <dt>{t('العنوان', 'Address')}</dt>
                 <dd className="vm-kv__body">{address || '—'}</dd>
               </div>
               {order.shipment ? (
                 <div>
-                  <dt>الناقل</dt>
-                  <dd>{carrierName(order.shipment.carrierCode)}</dd>
+                  <dt>{t('الناقل', 'Carrier')}</dt>
+                  <dd>{carrierName(order.shipment.carrierCode, locale)}</dd>
                 </div>
               ) : null}
               <div>
-                <dt>{order.shipment ? trackingLabel(order.shipment.carrierCode) : 'رقم التتبّع'}</dt>
+                <dt>{order.shipment ? trackingLabel(order.shipment.carrierCode, locale) : t('رقم التتبّع', 'Tracking number')}</dt>
                 {order.shipment ? (
                   <dd className="num">{order.shipment.trackingNumber}</dd>
                 ) : (
-                  <dd className="vm-kv__empty">لم يُشحن بعد</dd>
+                  <dd className="vm-kv__empty">{t('لم يُشحن بعد', 'Not shipped yet')}</dd>
                 )}
               </div>
               {order.customerNote ? (
                 <div className="vm-kv__wide">
-                  <dt>ملاحظة المشتري</dt>
+                  <dt>{t('ملاحظة المشتري', 'Buyer’s note')}</dt>
                   <dd className="vm-kv__body">{order.customerNote}</dd>
                 </div>
               ) : null}
@@ -330,7 +359,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
 
           <section className="card card--flush">
             <header className="card__head">
-              <h2>المنتجات</h2>
+              <h2>{t('المنتجات', 'Products')}</h2>
               <span className="num vm-count">{order.items.length}</span>
             </header>
             <ul className="vm-lines">
@@ -350,7 +379,12 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                       <span className="vm-line__refund">
                         {' '}
                         (
-                        {[i.returnedQty ? `أُرجع ${i.returnedQty}` : '', i.refundedQty > i.returnedQty ? `أُلغي ${i.refundedQty - i.returnedQty}` : '']
+                        {[
+                          i.returnedQty ? t(`أُرجع ${i.returnedQty}`, `${i.returnedQty} returned`) : '',
+                          i.refundedQty > i.returnedQty
+                            ? t(`أُلغي ${i.refundedQty - i.returnedQty}`, `${i.refundedQty - i.returnedQty} canceled`)
+                            : '',
+                        ]
                           .filter(Boolean)
                           .join(' · ')}
                         )
@@ -359,14 +393,14 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                   </span>
                   {/* سعر القطعة × الكمية كالتصميم VD-13، ومجموعها «المنتجات» في التفصيل — لا الإجمالي بضريبة
                       ليست للمتجر: كان «230.00» جنب «المنتجات 200.00» حيث الضريبة تُضاف (VOPS-010، 29 أكتوبر 2026) */}
-                  <span className="money num vm-line__total">{money(i.lineSubtotalMinorUnits, order.currency)}</span>
+                  <span className="money num vm-line__total">{money(i.lineSubtotalMinorUnits, order.currency, locale)}</span>
                 </li>
               ))}
             </ul>
           </section>
 
           <section className="card">
-            <h2 className="vm-card-title">مسار الطلب</h2>
+            <h2 className="vm-card-title">{t('مسار الطلب', 'Order timeline')}</h2>
             <ol className="vm-timeline">
               {order.history.map((h, i) => {
                 const last = i === order.history.length - 1;
@@ -380,12 +414,14 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                       {last ? null : <span className="vm-timeline__line" />}
                     </span>
                     <span className="vm-timeline__body">
-                      <span className="vm-timeline__label">{h.toLabel}</span>
+                      <span className="vm-timeline__label">{locale === 'en' ? labelOf(h.toStatus, locale) : h.toLabel}</span>
                       <span className="vm-timeline__meta">
-                        <span className="vm-timeline__date">{when(h.createdAt)}</span>
-                        <span>المنفّذ: {h.actorRole ? ROLE_LABEL[h.actorRole] ?? h.actorRole : 'آلي'}</span>
+                        <span className="vm-timeline__date">{when(h.createdAt, locale)}</span>
+                        <span>
+                          {t('المنفّذ:', 'By:')} {h.actorRole ? roleLabel[h.actorRole] ?? h.actorRole : t('آلي', 'Automatic')}
+                        </span>
                       </span>
-                      {h.reason ? <span className="vm-timeline__note">«{historyReason(h)}»</span> : null}
+                      {h.reason ? <span className="vm-timeline__note">«{historyReason(h, locale)}»</span> : null}
                     </span>
                   </li>
                 );
@@ -396,50 +432,54 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
 
         <aside className="vm-detail__side">
           <section className="card vm-amounts">
-            <h2 className="vm-card-title">تفصيل المبالغ</h2>
+            <h2 className="vm-card-title">{t('تفصيل المبالغ', 'Amount breakdown')}</h2>
             <dl className="vm-amounts__rows">
               <div>
-                <dt>المنتجات</dt>
-                <dd className="money num">{money(f.itemsSubtotalMinorUnits, order.currency)}</dd>
+                <dt>{t('المنتجات', 'Products')}</dt>
+                <dd className="money num">{money(f.itemsSubtotalMinorUnits, order.currency, locale)}</dd>
               </div>
               {/* حصّتك وحدها: خصم كوبون المنصّة لا يُنقص صافيك، فلا يُطرح هنا — والسطور تجمع إلى الصافي (VOPS-012) */}
               {BigInt(f.vendorDiscountMinorUnits) > 0n ? (
                 <div>
-                  <dt>الخصم</dt>
-                  <dd className="money num">−{money(f.vendorDiscountMinorUnits, order.currency)}</dd>
+                  <dt>{t('الخصم', 'Discount')}</dt>
+                  <dd className="money num">−{money(f.vendorDiscountMinorUnits, order.currency, locale)}</dd>
                 </div>
               ) : null}
               <div>
-                <dt>عمولة بسطة ({rate}%)</dt>
-                <dd className="money num">−{money(f.commissionMinorUnits, order.currency)}</dd>
+                <dt>{t(`عمولة بسطة (${rate}%)`, `Basta commission (${rate}%)`)}</dt>
+                <dd className="money num">−{money(f.commissionMinorUnits, order.currency, locale)}</dd>
               </div>
               <div>
-                <dt>الشحن</dt>
-                <dd className="money num">+{money(f.shippingMinorUnits, order.currency)}</dd>
+                <dt>{t('الشحن', 'Shipping')}</dt>
+                <dd className="money num">+{money(f.shippingMinorUnits, order.currency, locale)}</dd>
               </div>
               {BigInt(f.refundedMinorUnits) > 0n ? (
                 <div>
-                  <dt>رُدّ للمشتري من نصيبك</dt>
-                  <dd className="money num">−{money(f.refundedMinorUnits, order.currency)}</dd>
+                  <dt>{t('رُدّ للمشتري من نصيبك', 'Refunded to the buyer from your share')}</dt>
+                  <dd className="money num">−{money(f.refundedMinorUnits, order.currency, locale)}</dd>
                 </div>
               ) : null}
               {/* من الدفتر لا من لقطة الطلب — طلب رُدّ كله صافيه صفر لا 92.000 (J-03) */}
               <div className="vm-amounts__total">
-                <dt>صافي أرباحك</dt>
-                <dd className="money num">{money(f.netAfterRefundsMinorUnits, order.currency)}</dd>
+                <dt>{t('صافي أرباحك', 'Your net earnings')}</dt>
+                <dd className="money num">{money(f.netAfterRefundsMinorUnits, order.currency, locale)}</dd>
               </div>
             </dl>
-            <p className="vm-hint">العمولة {rate}% على القطع لا على الشحن.</p>
+            <p className="vm-hint">{t(`العمولة ${rate}% على القطع لا على الشحن.`, `The ${rate}% commission applies to items, not shipping.`)}</p>
             {BigInt(f.platformDiscountMinorUnits) > 0n ? (
               <p className="vm-hint">
-                خصم كوبون بسطة {money(f.platformDiscountMinorUnits, order.currency)} على حساب المنصّة — لا يُنقص صافيك.
+                {t(
+                  `خصم كوبون بسطة ${money(f.platformDiscountMinorUnits, order.currency)} على حساب المنصّة — لا يُنقص صافيك.`,
+                  `The Basta coupon discount of ${money(f.platformDiscountMinorUnits, order.currency, locale)} is covered by the platform — it does not reduce your net.`,
+                )}
               </p>
             ) : null}
             {order.refunds.length > 0 ? (
               <ul className="vm-refunds">
                 {order.refunds.map((r) => (
                   <li key={r.id}>
-                    استرداد للمشتري ({r.reason}) · {r.status === 'succeeded' ? 'تمّ' : 'قيد التنفيذ'}
+                    {t('استرداد للمشتري', 'Refund to buyer')} ({r.reason}) ·{' '}
+                    {r.status === 'succeeded' ? t('تمّ', 'Done') : t('قيد التنفيذ', 'In progress')}
                   </li>
                 ))}
               </ul>
@@ -447,9 +487,11 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
           </section>
 
           <section className="card vm-actions">
-            <h2 className="vm-card-title">الإجراءات المتاحة</h2>
+            <h2 className="vm-card-title">{t('الإجراءات المتاحة', 'Available actions')}</h2>
             <p className="vm-hint">
-              {order.actions.length > 0 ? 'الأزرار المعروضة هي المسموحة في هذه الحالة فقط.' : 'لا إجراءات متاحة في هذه الحالة.'}
+              {order.actions.length > 0
+                ? t('الأزرار المعروضة هي المسموحة في هذه الحالة فقط.', 'Only the actions allowed in this status are shown.')
+                : t('لا إجراءات متاحة في هذه الحالة.', 'No actions available in this status.')}
             </p>
 
             {simple.map((to) => (
@@ -461,27 +503,32 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                 onClick={() => void move(to)}
               >
                 {ACTION_ICON[to] ? <Icon name={ACTION_ICON[to]} size={16} /> : null}
-                {ACTION_LABEL[to] ?? labelOf(to)}
+                {actionLabel[to] ?? labelOf(to, locale)}
               </button>
             ))}
 
             {order.actions.includes('rejected_by_vendor') ? (
               <button type="button" className="btn btn--danger" disabled={busy} onClick={() => ask('reject')}>
                 <Icon name="x" size={16} />
-                رفض الطلب
+                {t('رفض الطلب', 'Reject order')}
               </button>
             ) : null}
 
             {asking === 'reject' ? (
               <div className="vm-subpanel">
-                <TextArea label="سبب الرفض — يُعرض للمشتري كما تكتبه" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
+                <TextArea
+                  label={t('سبب الرفض — يُعرض للمشتري كما تكتبه', 'Reason for rejection — shown to the buyer as you write it')}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={3}
+                />
                 <div className="row">
                   <button type="button" className="btn btn--danger" disabled={busy || reason.trim().length < 5} onClick={() => void move('rejected_by_vendor', { reason })}>
                     <Icon name="x" size={15} />
-                    تأكيد الرفض
+                    {t('تأكيد الرفض', 'Confirm rejection')}
                   </button>
                   <button type="button" className="btn btn--secondary" onClick={() => ask(null)}>
-                    تراجع
+                    {t('تراجع', 'Cancel')}
                   </button>
                 </div>
               </div>
@@ -491,21 +538,28 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
               <div className="vm-subpanel">
                 {hasCarrier ? (
                   <>
-                    <p className="vm-hint">أصدر بوليصة من شركة الشحن، أو أدخل رقم تتبّع توصيلك الذاتي.</p>
+                    <p className="vm-hint">
+                      {t(
+                        'أصدر بوليصة من شركة الشحن، أو أدخل رقم تتبّع توصيلك الذاتي.',
+                        'Issue a waybill from the shipping company, or enter your self-delivery tracking number.',
+                      )}
+                    </p>
                     <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void issueWaybill()}>
                       <Icon name="file" size={16} />
-                      إصدار بوليصة
+                      {t('إصدار بوليصة', 'Issue waybill')}
                     </button>
                     {waybill ? <pre className="vm-waybill">{waybill.labelText}</pre> : null}
                   </>
                 ) : (
                   <p className="vm-hint">
-                    التوصيل ذاتي: سلّم الطلب بنفسك أو بمندوبك، واكتب مرجعاً تعرفه به (رقم إيصال أو اسم المندوب). بعد أن
-                    يستلمه المشتري أكّد التسليم — يُبلَّغ المشتري، وله فتح نزاع قبل أن يُحرَّر مالك.
+                    {t(
+                      'التوصيل ذاتي: سلّم الطلب بنفسك أو بمندوبك، واكتب مرجعاً تعرفه به (رقم إيصال أو اسم المندوب). بعد أن يستلمه المشتري أكّد التسليم — يُبلَّغ المشتري، وله فتح نزاع قبل أن يُحرَّر مالك.',
+                      'Self-delivery: hand the order over yourself or through your courier, and write a reference you know it by (a receipt number or the courier’s name). Once the buyer receives it, confirm delivery — the buyer is notified and can open a dispute before your money is released.',
+                    )}
                   </p>
                 )}
                 <TextInput
-                  label={hasCarrier ? 'رقم التتبّع' : 'مرجع التوصيل'}
+                  label={hasCarrier ? t('رقم التتبّع', 'Tracking number') : t('مرجع التوصيل', 'Delivery reference')}
                   className="field__control vm-mono"
                   value={tracking}
                   onChange={(e) => setTracking(e.target.value)}
@@ -518,7 +572,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
                   onClick={() => void move('shipped', { tracking, carrierCode: carrier })}
                 >
                   <Icon name="truck" size={16} />
-                  تأكيد الشحن
+                  {t('تأكيد الشحن', 'Confirm shipment')}
                 </button>
               </div>
             ) : null}
@@ -528,7 +582,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
             {order.status === 'delivery_failed' && order.actions.includes('returned') ? (
               <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void move('returned')}>
                 <Icon name="store" size={16} />
-                أرجعه للمتجر
+                {t('أرجعه للمتجر', 'Return to shop')}
               </button>
             ) : null}
           </section>

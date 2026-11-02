@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { Icon } from '@/components/icons';
+import { intlLocale, translator, type Locale } from '@/lib/i18n';
+import { pageLocale } from '@/lib/i18n-server';
 import { getPage } from '@/lib/storefront';
 
 /** «1 سبتمبر 2026» كما في التصميم — أرقام لاتينية، والتاريخ الفاسد لا يُعرض */
-function formatUpdated(iso: string): string | null {
+function formatUpdated(iso: string, locale: Locale): string | null {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
 }
 
 /** ST-30 — صفحة محتوى من AD-18. مكوّن خادم، والنص يُعرض بفقراته كما كُتب */
@@ -18,7 +20,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function ContentPage({ params }: { params: Promise<{ slug: string }> }) {
   const page = await getPage((await params).slug);
-  const updated = formatUpdated(page.updatedAt);
+  const locale = await pageLocale();
+  const t = translator(locale);
+  const updated = formatUpdated(page.updatedAt, locale);
   return (
     <div className="ac-page">
       <article className="ac-page__article">
@@ -27,7 +31,7 @@ export default async function ContentPage({ params }: { params: Promise<{ slug: 
           <p className="ac-page__updated">
             <Icon name="clock" size={14} />
             <span>
-              آخر تحديث <time dateTime={page.updatedAt}>{updated}</time>
+              {t('آخر تحديث', 'Last updated')} <time dateTime={page.updatedAt}>{updated}</time>
             </span>
           </p>
         ) : null}

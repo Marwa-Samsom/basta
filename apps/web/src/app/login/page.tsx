@@ -8,6 +8,7 @@ import { api, ApiError, session, type Tokens } from '@/lib/api';
 import { syncAccountCurrency } from '@/lib/currency';
 import { digitsOnly } from '@/lib/digits';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { Field, TextInput } from '@/components/ui';
 import { homeFor, internalPath, withNext } from '@/lib/safe-path';
 
@@ -53,9 +54,10 @@ function EmailField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const t = useT();
   const input = useRef<HTMLInputElement>(null);
   return (
-    <Field label="البريد الإلكتروني">
+    <Field label={t('البريد الإلكتروني', 'Email')}>
       {(props) => (
         <span className="ac-clearable">
           <input
@@ -70,7 +72,7 @@ function EmailField({
             onChange={(e) => onChange(e.target.value)}
             {...props}
           />
-          {value ? <ClearButton label="امسح البريد" input={input} onClear={() => onChange('')} /> : null}
+          {value ? <ClearButton label={t('امسح البريد', 'Clear email')} input={input} onClear={() => onChange('')} /> : null}
         </span>
       )}
     </Field>
@@ -88,10 +90,11 @@ function PasswordField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const t = useT();
   const [shown, setShown] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   return (
-    <Field label="كلمة المرور">
+    <Field label={t('كلمة المرور', 'Password')}>
       {(props) => (
         <span className="ac-pw">
           <input
@@ -108,13 +111,13 @@ function PasswordField({
           <button
             type="button"
             className="ac-pw__toggle"
-            aria-label="إظهار الحروف"
+            aria-label={t('إظهار الحروف', 'Show characters')}
             aria-pressed={shown}
             onClick={() => setShown((s) => !s)}
           >
             <Icon name={shown ? 'eye-off' : 'eye'} size={18} />
           </button>
-          {value ? <ClearButton label="امسح الحروف" input={input} onClear={() => onChange('')} /> : null}
+          {value ? <ClearButton label={t('امسح الحروف', 'Clear characters')} input={input} onClear={() => onChange('')} /> : null}
         </span>
       )}
     </Field>
@@ -129,6 +132,7 @@ function PasswordField({
  * الثاني يرسل الثلاثة معاً كما كان.
  */
 function LoginForm() {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   // الوجهة من الرابط: مسار داخلي وإلا فلا — لا `?next=https://…` يخرج بالمستخدم بعد الدخول.
@@ -159,10 +163,11 @@ function LoginForm() {
       await syncAccountCurrency();
       router.push(res.requiresTotpSetup ? '/account/2fa' : (next ?? homeFor(session.roles())));
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'تعذّر تسجيل الدخول.';
+      const message = err instanceof Error ? err.message : t('تعذّر تسجيل الدخول.', "Couldn't sign in.");
       // الخادم يطلب رمز التحقق الثنائي ممّن فعّله — الحقل يظهر عندها لا قبلها.
       // أول طلب للرمز ليس خطأً بل خطوة: يشرحها شريط المعلومات لا تنبيه أحمر.
-      if (err instanceof ApiError && /التحقق|رمز/.test(message)) {
+      // الرمز أولاً — النصّ بلغة الصفحة؛ والنصّ العربي لخادم أقدم لا يرسل الرمز
+      if (err instanceof ApiError && (err.code === 'TOTP_REQUIRED' || /التحقق|رمز/.test(message))) {
         const firstAsk = !needsTotp;
         setNeedsTotp(true);
         setError(firstAsk ? null : message);
@@ -183,24 +188,26 @@ function LoginForm() {
 
   const sub = isAdmin
     ? needsTotp
-      ? 'اكتب الرمز من تطبيق المصادقة.'
-      : 'خطوتان: بياناتك ثم رمز التحقّق.'
-    : 'تابع طلباتك من أي جهاز.';
+      ? t('اكتب الرمز من تطبيق المصادقة.', 'Enter the code from your authenticator app.')
+      : t('خطوتان: بياناتك ثم رمز التحقّق.', 'Two steps: your details, then the verification code.')
+    : t('تابع طلباتك من أي جهاز.', 'Track your orders from any device.');
 
   return (
     <main className="ac-auth">
       <div className="ac-auth__box">
         <header className="ac-auth__head">
           {isAdmin ? (
-            <Link href="/" className="ac-mark" aria-label="بسطة — الرئيسية">
-              ب
+            <Link href="/" className="ac-mark" aria-label={t('بسطة — الرئيسية', 'Basta — Home')}>
+              {t('ب', 'B')}
             </Link>
           ) : (
             <Link href="/" className="ac-wordmark">
-              بسطة
+              {t('بسطة', 'Basta')}
             </Link>
           )}
-          <h1 className="ac-auth__title">{isAdmin ? 'دخول لوحة الإدارة' : 'ادخل إلى حسابك'}</h1>
+          <h1 className="ac-auth__title">
+            {isAdmin ? t('دخول لوحة الإدارة', 'Admin sign in') : t('ادخل إلى حسابك', 'Sign in to your account')}
+          </h1>
           <p className="ac-auth__sub">{sub}</p>
         </header>
 
@@ -217,13 +224,18 @@ function LoginForm() {
               <div className="alert alert--info ac-note" role="status">
                 <Icon name="shield" size={16} />
                 <span>
-                  {isAdmin ? 'رمز التحقّق بخطوتين إلزامي لحسابات الإدارة' : 'حسابك محمي بالتحقّق بخطوتين'}
+                  {isAdmin
+                    ? t('رمز التحقّق بخطوتين إلزامي لحسابات الإدارة', 'Two-step verification is required for admin accounts')
+                    : t('حسابك محمي بالتحقّق بخطوتين', 'Your account is protected by two-step verification')}
                 </span>
               </div>
               {useRecovery ? (
                 <TextInput
-                  label="رمز الاستعادة"
-                  hint="أحد الرموز العشرة التي حفظتها عند التفعيل — كلٌّ يُستعمل مرة واحدة."
+                  label={t('رمز الاستعادة', 'Recovery code')}
+                  hint={t(
+                    'أحد الرموز العشرة التي حفظتها عند التفعيل — كلٌّ يُستعمل مرة واحدة.',
+                    'One of the ten codes you saved when you turned it on — each works only once.',
+                  )}
                   className="field__control ac-otp"
                   autoComplete="off"
                   autoCapitalize="characters"
@@ -236,8 +248,8 @@ function LoginForm() {
                 />
               ) : (
                 <TextInput
-                  label="رمز التحقق الثنائي"
-                  hint="ستة أرقام من تطبيق المصادقة."
+                  label={t('رمز التحقق الثنائي', 'Two-step verification code')}
+                  hint={t('ستة أرقام من تطبيق المصادقة.', 'Six digits from your authenticator app.')}
                   className="field__control ac-otp"
                   inputMode="numeric"
                   autoComplete="one-time-code"
@@ -257,7 +269,9 @@ function LoginForm() {
                   setError(null);
                 }}
               >
-                {useRecovery ? 'استعمل رمز التطبيق' : 'أضعت هاتفك؟ استعمل رمز استعادة'}
+                {useRecovery
+                  ? t('استعمل رمز التطبيق', 'Use the app code')
+                  : t('أضعت هاتفك؟ استعمل رمز استعادة', 'Lost your phone? Use a recovery code')}
               </button>
             </>
           ) : (
@@ -266,26 +280,26 @@ function LoginForm() {
               <PasswordField value={password} onChange={setPassword} />
               {/* رابط لا تسمية: البحث بالتسمية «كلمة المرور» يبقى يجد الحقل وحده */}
               <Link href={withNext('/forgot', next)} className="id-forgot">
-                نسيت كلمة المرور؟
+                {t('نسيت كلمة المرور؟', 'Forgot your password?')}
               </Link>
             </>
           )}
 
           <button className="btn btn--primary btn--block ac-auth__cta" type="submit" disabled={busy}>
-            {busy ? 'جارٍ الدخول…' : 'دخول'}
+            {busy ? t('جارٍ الدخول…', 'Signing in…') : t('دخول', 'Sign in')}
           </button>
 
           {needsTotp ? (
             <button type="button" className="ac-link-btn" onClick={back}>
-              رجوع
+              {t('رجوع', 'Back')}
             </button>
           ) : null}
         </form>
 
         {isAdmin ? null : (
           <p className="ac-auth__foot">
-            <span>ليس لديك حساب؟</span>
-            <Link href={withNext('/register', next)}>أنشئ حساباً</Link>
+            <span>{t('ليس لديك حساب؟', "Don't have an account?")}</span>
+            <Link href={withNext('/register', next)}>{t('أنشئ حساباً', 'Create an account')}</Link>
           </p>
         )}
       </div>

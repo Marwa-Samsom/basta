@@ -3,6 +3,8 @@
 import type { InputHTMLAttributes, ReactNode, Ref, TextareaHTMLAttributes } from 'react';
 import { useId, useRef, useState } from 'react';
 import { Icon, type IconName } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
+import { localized } from '@/lib/i18n';
 
 /**
  * المكوّنات المشتركة — تقابل ورقة المكوّنات في `docs/02-design/screens`.
@@ -25,6 +27,7 @@ export function Field({
   children: (props: { id: string; 'aria-invalid': boolean; 'aria-describedby': string }) => ReactNode;
   id?: string | undefined;
 }) {
+  const t = useT();
   const generated = useId();
   const fieldId = id ?? generated;
   const describedBy = `${fieldId}-help`;
@@ -33,7 +36,7 @@ export function Field({
     <div className="field">
       <label className="field__label" htmlFor={fieldId}>
         {label}
-        {optional ? <span className="field__optional"> · اختياري</span> : null}
+        {optional ? <span className="field__optional">{t(' · اختياري', ' · optional')}</span> : null}
       </label>
       {children({ id: fieldId, 'aria-invalid': Boolean(error), 'aria-describedby': describedBy })}
       {/* الخطأ يحلّ محلّ التلميح لا يُضاف إليه: سطران متناقضان يربكان */}
@@ -89,6 +92,7 @@ const CLEARABLE_TYPES = new Set(['text', 'email', 'tel', 'url', 'password']);
  * و`ref` صاحب الخانة يصل إلى الحقل نفسه كما كان (التركيز فيه من الصفحة).
  */
 export function ClearableInput({ ref, ...input }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
+  const t = useT();
   const own = useRef<HTMLInputElement | null>(null);
   const [typed, setTyped] = useState(() => String(input.defaultValue ?? '') !== '');
   const attach = (el: HTMLInputElement | null) => {
@@ -124,7 +128,7 @@ export function ClearableInput({ ref, ...input }: InputHTMLAttributes<HTMLInputE
         <button
           type="button"
           className="field__clear"
-          aria-label="امسح المكتوب"
+          aria-label={t('امسح المكتوب', 'Clear text')}
           tabIndex={-1}
           onMouseDown={(e) => e.preventDefault()}
           onClick={clear}
@@ -223,11 +227,27 @@ const VENDOR_LABEL: Record<string, string> = {
   banned: 'محظور',
 };
 
+const VENDOR_LABEL_EN: Record<string, string> = {
+  pending: 'Draft',
+  in_review: 'Under review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  suspended: 'Suspended',
+  banned: 'Banned',
+};
+
 const DOCUMENT_LABEL: Record<string, string> = {
   missing: 'لم تُرفع',
   pending: 'بانتظار المراجعة',
   accepted: 'مقبولة',
   rejected: 'مرفوضة',
+};
+
+const DOCUMENT_LABEL_EN: Record<string, string> = {
+  missing: 'Not uploaded',
+  pending: 'Awaiting review',
+  accepted: 'Accepted',
+  rejected: 'Rejected',
 };
 
 export function StatusBadge({
@@ -237,7 +257,11 @@ export function StatusBadge({
   status: string;
   kind?: 'vendor' | 'document';
 }) {
-  const label = kind === 'document' ? DOCUMENT_LABEL[status] : VENDOR_LABEL[status];
+  const locale = useLocale();
+  const label =
+    kind === 'document'
+      ? localized(locale, DOCUMENT_LABEL, DOCUMENT_LABEL_EN)[status]
+      : localized(locale, VENDOR_LABEL, VENDOR_LABEL_EN)[status];
   return <span className={`badge ${STATUS_TONE[status] ?? ''}`}>{label ?? status}</span>;
 }
 
@@ -247,11 +271,12 @@ export interface Blocker {
   field: string;
 }
 
-export function Spinner({ label = 'جارٍ التحميل' }: { label?: string }) {
+export function Spinner({ label }: { label?: string }) {
+  const t = useT();
   return (
     <p className="row muted small">
       <span className="spinner" aria-hidden />
-      {label}
+      {label ?? t('جارٍ التحميل', 'Loading')}
     </p>
   );
 }
@@ -275,6 +300,7 @@ export function MoreButton({
     canLess?: boolean;
   };
 }) {
+  const t = useT();
   const bar = useRef<HTMLDivElement>(null);
   if (!list.hasMore && !list.moreError && !list.canLess) return null;
   const less = () => {
@@ -285,7 +311,7 @@ export function MoreButton({
   return (
     <div className="list-more" ref={bar}>
       <span className="list-more__count num">
-        {list.items.length} من {list.total}
+        {t(`${list.items.length} من ${list.total}`, `${list.items.length} of ${list.total}`)}
       </span>
       {list.moreError ? (
         <span className="list-more__error" role="alert">
@@ -294,12 +320,12 @@ export function MoreButton({
       ) : null}
       {list.canLess && list.less ? (
         <button type="button" className="btn btn--ghost btn--sm" disabled={list.loadingMore} onClick={less}>
-          السابق
+          {t('السابق', 'Previous')}
         </button>
       ) : null}
       {list.hasMore || list.moreError ? (
         <button type="button" className="btn btn--secondary btn--sm" disabled={list.loadingMore} onClick={list.more}>
-          {list.loadingMore ? 'جارٍ التحميل…' : list.moreError ? 'أعد المحاولة' : 'المزيد'}
+          {list.loadingMore ? t('جارٍ التحميل…', 'Loading…') : list.moreError ? t('أعد المحاولة', 'Try again') : t('المزيد', 'Load more')}
         </button>
       ) : null}
     </div>
@@ -314,17 +340,21 @@ export type SortOrder = 'newest' | 'oldest';
  * جديد بترتيبها من أولها، لا تُعكس الصفحة المعروضة وحدها.
  */
 export function SortButton({ value, onChange }: { value: SortOrder; onChange: (v: SortOrder) => void }) {
+  const t = useT();
   const newest = value === 'newest';
   return (
     <button
       type="button"
       className="btn btn--secondary btn--sm sort-btn"
       onClick={() => onChange(newest ? 'oldest' : 'newest')}
-      aria-label={`الترتيب: ${newest ? 'الأحدث أولاً' : 'الأقدم أولاً'} — اضغط لعكسه`}
-      title="اعكس الترتيب"
+      aria-label={t(
+        `الترتيب: ${newest ? 'الأحدث أولاً' : 'الأقدم أولاً'} — اضغط لعكسه`,
+        `Sort: ${newest ? 'newest first' : 'oldest first'} — press to reverse`,
+      )}
+      title={t('اعكس الترتيب', 'Reverse order')}
     >
       <Icon name="sort" size={14} />
-      {newest ? 'الأحدث أولاً' : 'الأقدم أولاً'}
+      {newest ? t('الأحدث أولاً', 'Newest first') : t('الأقدم أولاً', 'Oldest first')}
     </button>
   );
 }
