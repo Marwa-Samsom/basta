@@ -11,7 +11,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
@@ -924,5 +924,193 @@ describe('قطعة لم تعد تُباع لا تُسقط السلة — تُع�
     } finally {
       await prisma.product.update({ where: { id: productId }, data: { status: 'active' } });
     }
+  });
+});
+
+/**
+ * موجة «يُؤتمت» · الدفعة 2 — المال عند الدفع: ما لا تقدر عليه يد في المتصفّح (مفتاح يُعاد بعد رفض،
+ * إشعار بوابة موقَّع بمبلغ آخر، عملة بثلاث خانات من متجر بخانتين، كوبون ثابت أكبر من القطعة).
+ */
+describe('المال عند الدفع (موجة «يُؤتمت» · الدفعة 2، 2 نوفمبر 2026)', () => {
+  const cartIdOf = async (token: string) => (await prisma.cart.findFirstOrThrow({ where: { sessionToken: token }, select: { id: true } })).id;
+
+  it('المفتاح نفسه بعد رفض نهائي: يعيد الطلب المرفوض، بلا دفع ولا حجز ولا طلب ثانٍ (CHK-077)', async () => {
+    if (!dbUp) return;
+    const token = await cartWith([{ variantId: variantIds[0]!, qty: 1 }]);
+    const key = randomUUID();
+    const declined = await pay(token, 'tok_decline', key);
+    expect(declined.statusCode, declined.body).toBe(200);
+    expect(declined.json()).toMatchObject({ outcome: 'failed', failure: { code: 'card_declined' } });
+
+    const cartId = await cartIdOf(token);
+    const reservations = await prisma.stockReservation.count({ where: { cartId } });
+    const stock = await stockOf(variantIds[0]!);
+    const charge = vi.spyOn(fake, 'charge');
+    try {
+      // الواجهة تولّد مفتاحاً جديداً بعد أي ردّ (endAttempt) — هنا صفحة أو عميل يعيد المفتاح نفسه ببطاقة تنجح
+      const again = await pay(token, 'tok_success', key);
+      expect(again.statusCode, again.body).toBe(200);
+      expect(again.json().orderId).toBe(declined.json().orderId);
+      expect(again.json()).toMatchObject({ outcome: 'failed', failure: { code: 'card_declined' } });
+      expect(charge).not.toHaveBeenCalled();
+    } finally {
+      charge.mockRestore();
+    }
+    expect(await prisma.order.count({ where: { idempotencyKey: key } })).toBe(1);
+    expect(await prisma.stockReservation.count({ where: { cartId } })).toBe(reservations);
+    expect(await stockOf(variantIds[0]!)).toEqual(stock);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: declined.json().orderId } })).status).toBe('payment_failed');
+  });
+
+  it('إشعار موقَّع بمبلغ لا يطابق الطلب: لا يُعتمد — يُختم فاشلاً ويُحرَّر حجزه بلا فرعي (CHK-100)', async () => {
+    if (!dbUp) return;
+    const token = await cartWith([{ variantId: variantIds[1]!, qty: 1 }]);
+    const before = await stockOf(variantIds[1]!);
+    const res = await pay(token, 'tok_3ds');
+    expect(res.json().outcome).toBe('requires_action');
+    const orderId = res.json().orderId as string;
+    expect((await stockOf(variantIds[1]!)).reserved).toBe(before.reserved + 1);
+
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+    expect(payment.amountMinorUnits).toBe(14_000n); // 12.500 + شحن 1.500
+    // توقيع صحيح من البوابة، والمبلغ فلس واحد
+    const body = fake.eventFor(payment.providerIntentId!, orderId, 1n, payment.currency);
+    const hook = await app.inject({
+      method: 'POST',
+      url: '/api/v1/payments/webhook/fake',
+      headers: { 'x-signature': FakePaymentProvider.sign(body), 'content-type': 'application/json' },
+      payload: body,
+    });
+    expect(hook.statusCode, hook.body).toBe(200);
+    expect(hook.json()).toEqual({ received: true, rejected: 'amount_mismatch' });
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true, subOrders: true } });
+    expect(order.status).toBe('payment_failed');
+    expect(order.payment).toMatchObject({ failureCode: 'amount_mismatch', failureMessage: 'مبلغ الإشعار لا يطابق الطلب.' });
+    expect(order.subOrders).toHaveLength(0);
+    expect(await stockOf(variantIds[1]!)).toEqual(before);
+    expect(await prisma.stockReservation.count({ where: { id: { in: order.reservationIds }, status: 'active' } })).toBe(0);
+    const seenByBuyer = await call('GET', `/checkout/orders/${order.orderNumber}`, { headers: { authorization: `Bearer ${buyerToken}` } });
+    expect(seenByBuyer.json()).toMatchObject({ outcome: 'failed', failure: { code: 'amount_mismatch', message: 'مبلغ الإشعار لا يطابق الطلب.' } });
+  });
+
+  it('سلة بالدينار الكويتي من متجر بالدولار: الإجمالي بثلاث خانات بالصرف والهامش، ومجموع الفرعية = الأب (CHK-055)', async () => {
+    if (!dbUp) return;
+    const KW = { recipientName: 'مشترٍ كويتي', phone: '+96550000000', country: 'KW', region: 'العاصمة', city: 'الكويت', street: 'شارع الخليج 1' };
+    const owner = await prisma.user.create({
+      data: { email: `kwd.${SUFFIX}@basta.test`, fullName: 'بائع بالدولار', passwordHash: await hashPassword('كلمة-مرور-اختبار-طويلة'), roles: { create: { role: 'vendor_owner' } } },
+    });
+    const vendor = await prisma.vendor.create({
+      data: {
+        ownerUserId: owner.id, slug: `v-kwd-${SUFFIX}`, nameAr: 'متجر usd للكويت', status: 'approved', approvedAt: new Date(),
+        settlementCurrency: 'USD', country: 'JO',
+        shippingZones: { create: { nameAr: 'الكويت', regions: { create: { country: 'KW' } }, rates: { create: { method: 'flat', priceMinorUnits: 800n, minDays: 2, maxDays: 5 } } } },
+      },
+    });
+    const product = await prisma.product.create({ data: { vendorId: vendor.id, slug: `p-kwd-${SUFFIX}`, nameAr: 'منتج بالدولار', status: 'active', publishedAt: new Date() } });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendor.id, sku: `KWD-${SUFFIX}`.toUpperCase(), priceMinorUnits: 4_750n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 5, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 5, reason: 'import' } });
+
+    const token = await cartWith([{ variantId: variant.id, qty: 1 }]);
+    const headers = { 'x-cart-token': token };
+    const switched = await call('PUT', '/cart/currency', { body: { currency: 'KWD' }, headers });
+    expect(switched.statusCode, switched.body).toBe(200);
+
+    // المتوقَّع من سعر الصرف النافذ وهامش الإعدادات في القاعدة كما هما — لا يُغيَّران لأجل الاختبار
+    const rate = await prisma.exchangeRate.findFirstOrThrow({
+      where: { baseCode: 'USD', quoteCode: 'KWD', effectiveAt: { lte: new Date() } },
+      orderBy: { effectiveAt: 'desc' },
+    });
+    const spread = Number((await prisma.setting.findUnique({ where: { key: 'fx_spread_bps' } }))?.valueJson ?? 200);
+    // سنتات ← فلوس: ×10 لفرق الخانات، ثم السعر والهامش؛ القطعة والشحن كلٌّ بتقريبه
+    const factor = Number(rate.rate) * 10 * (1 + spread / 10_000);
+    const expected = BigInt(Math.round(4_750 * factor)) + BigInt(Math.round(800 * factor));
+    expect(Number(expected - BigInt(Math.round(5_550 * factor)))).toBeLessThanOrEqual(1);
+
+    const q = await call('POST', '/checkout/quote', { body: { country: KW.country, region: KW.region, city: KW.city }, headers });
+    expect(q.statusCode, q.body).toBe(200);
+    expect(q.json().currency).toBe('KWD');
+    expect(q.json().totals.tax.minorUnits).toBe('0');
+    expect(q.json().totals.total.minorUnits).toBe(expected.toString());
+
+    const res = await call('POST', '/checkout', {
+      body: { address: KW, paymentToken: 'tok_success', expectedTotal: expected.toString(), expectedCurrency: 'KWD' },
+      headers: { ...headers, 'idempotency-key': randomUUID(), authorization: `Bearer ${buyerToken}` },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({ outcome: 'paid', total: { minorUnits: expected.toString(), currency: 'KWD' } });
+
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: res.json().orderId }, include: { subOrders: true, payment: true } });
+    expect(order).toMatchObject({ currency: 'KWD', grandTotalMinorUnits: expected, taxTotalMinorUnits: 0n });
+    expect(order.payment).toMatchObject({ currency: 'KWD', amountMinorUnits: expected });
+    expect(order.subOrders.reduce((a, s) => a + (s.chargeTotalMinorUnits ?? 0n), 0n)).toBe(expected);
+    // والبائع يُقيَّد له بعملته: 47.50 + 8.00 دولاراً بالسنت، لا بالفلس
+    expect(order.subOrders[0]).toMatchObject({ settlementCurrency: 'USD', totalMinorUnits: 5_550n });
+    expect(await prisma.$queryRaw<unknown[]>`SELECT * FROM audit_order_split_drift WHERE order_id = ${order.id}::uuid`).toEqual([]);
+  });
+
+  it('الكوبون الثابت: لا يخصم أكثر من قيمة القطعة، وبعملة غير عملة السلة لا يخصم ويظهر مانعه (CHK-029)', async () => {
+    if (!dbUp) return;
+    // قطعة بالدينار 10.000 عند متجر الدينار
+    const product = await prisma.product.create({
+      data: { vendorId: vendorIds[1]!, slug: `fix-cap-${SUFFIX}`, nameAr: 'منتج الكوبون الثابت', status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendorIds[1]!, sku: `FIXCAP-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 5, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 5, reason: 'import' } });
+
+    const quoteWith = async (code: string) => {
+      const cart = await cartWith([{ variantId: variant.id, qty: 1 }]);
+      const applied = await call('PUT', '/cart/coupon', { body: { code }, headers: { 'x-cart-token': cart } });
+      expect(applied.statusCode, applied.body).toBe(200);
+      const q = await call('POST', '/checkout/quote', { body: { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, headers: { 'x-cart-token': cart } });
+      expect(q.statusCode, q.body).toBe(200);
+      return { cart, ...(q.json() as { totals: Record<string, { minorUnits: string }>; blockers: string[] }) };
+    };
+    /** يُدفع ويعيد الفرعي — خصم البائع في دفتره غير ما يراه المشتري، فيُفحص هو أيضاً */
+    const paidSub = async (cart: string) => {
+      const res = await pay(cart, 'tok_success');
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().outcome).toBe('paid');
+      return prisma.subOrder.findFirstOrThrow({ where: { orderId: res.json().orderId } });
+    };
+    const coupon = (tag: string, data: { scope: 'vendor' | 'platform'; currency: string; fundedBy: 'vendor' | 'platform' }) =>
+      prisma.coupon.create({
+        data: {
+          code: `${tag}-${SUFFIX}`.toUpperCase(),
+          type: 'fixed',
+          valueMinorUnits: 15_000n,
+          ...data,
+          ...(data.scope === 'vendor' ? { vendorId: vendorIds[1]! } : {}),
+        },
+      });
+
+    // كوبون المتجر 15.000 على قطعة 10.000: يُخصم 10.000، والإجمالي الشحن وحده لا سالب
+    const store = await quoteWith((await coupon('VFIX', { scope: 'vendor', currency: 'JOD', fundedBy: 'vendor' })).code);
+    expect(store.totals['discount']!.minorUnits).toBe('10000');
+    expect(store.totals['total']!.minorUnits).toBe('1500');
+    expect(store.blockers).toEqual([]);
+    // وعلى البائع 10.000 لا 15.000: صافيه الشحن ناقص العمولة، لا سالب
+    const sub = await paidSub(store.cart);
+    expect(sub).toMatchObject({ discountMinorUnits: 10_000n, totalMinorUnits: 1_500n });
+    // قيد البيع صفر فلا يُكتب، وقيد الشحن يكفي: ليس «طلباً مدفوعاً بلا قيد بيع» في تنبيهات الإدارة
+    expect(await prisma.$queryRaw<unknown[]>`SELECT 1 FROM audit_sub_order_without_ledger WHERE sub_order_id = ${sub.id}::uuid`).toEqual([]);
+
+    // كوبون المنصّة الثابت يُستعمل منذ ACFG-035 (كان «غير مدعوم») — وبالسقف نفسه
+    const platform = await quoteWith((await coupon('PFIX', { scope: 'platform', currency: 'JOD', fundedBy: 'platform' })).code);
+    expect(platform.totals['discount']!.minorUnits).toBe('10000');
+    expect(platform.totals['total']!.minorUnits).toBe('1500');
+    expect(await paidSub(platform.cart)).toMatchObject({ discountMinorUnits: 10_000n, totalMinorUnits: 1_500n });
+
+    // ثابت بالريال على قطعة بالدينار: لا صرف صامت — لا خصم، ومانع «لا ينطبق»
+    const sarCoupon = await coupon('SFIX', { scope: 'platform', currency: 'SAR', fundedBy: 'platform' });
+    const foreign = await quoteWith(sarCoupon.code);
+    expect(foreign.totals['discount']!.minorUnits).toBe('0');
+    expect(foreign.blockers).toContain(`الكوبون ${sarCoupon.code} لا ينطبق على منتجات سلّتك.`);
   });
 });

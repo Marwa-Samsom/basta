@@ -45,7 +45,9 @@ export class ReleaseScheduler implements OnApplicationBootstrap, OnModuleDestroy
           status: { in: ['delivered', 'completed', 'refunded'] },
           disputes: { none: { status: { in: ['open', 'escalated'] } } },
           returns: { none: { status: 'requested' } },
-          ledgerEntries: { some: { entryType: 'sale_credit' }, none: { entryType: 'hold_release_out' } },
+          // قيد البيع أو الشحن: كوبون يموّله البائع بقيمة القطعة كلها يجعل قيد البيع صفراً فلا يُكتب،
+          // وكان الفرعي لا يُلتقط أبداً فيبقى شحن البائع معلّقاً إلى الأبد (CHK-029، 2 نوفمبر 2026)
+          ledgerEntries: { some: { entryType: { in: ['sale_credit', 'shipping_credit'] } }, none: { entryType: 'hold_release_out' } },
         },
         select: { id: true },
         orderBy: { holdReleaseAt: 'asc' },

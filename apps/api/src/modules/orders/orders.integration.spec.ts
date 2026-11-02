@@ -6,6 +6,7 @@
  *   3. إلغاء فرعي واحد لا يمسّ إخوته
  *   4. كل تغيير حالة له سطر تدقيق بالفاعل والوقت
  */
+import { Logger } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -1566,6 +1567,182 @@ describe('فترة التعليق ومهلة الإرجاع صفراً كما ت
         if (was) await prisma.setting.update({ where: { key }, data: { valueJson: was.valueJson as Prisma.InputJsonValue } });
         else await prisma.setting.delete({ where: { key } });
       }
+    }
+  });
+});
+
+/**
+ * موجة «يُؤتمت» · الدفعة 2 — نقرتان في اللحظة نفسها لا تحرّكان المال أو المخزون مرتين. ما لا تقدر
+ * عليه يد في المتصفّح: الطلبان يُرسلان معاً، والفائز أيّهما كان — فالتحقّق على ما يجب أن يصحّ في الحالتين.
+ */
+describe('التزامن على الطلب نفسه (موجة «يُؤتمت» · الدفعة 2، 2 نوفمبر 2026)', () => {
+  const RACED = /تغيّرت حالة الطلب للتوّ\. حدّث الصفحة\.|انتقال غير مسموح|لا طلب إرجاع قائم/;
+
+  /** طلب مسلَّم بقطعة من البائع A وطلب إرجاعها — يعيد الفرعي ومعرّف طلب الإرجاع */
+  async function returnRequested() {
+    const { a, order } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    const req = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+      items: [{ orderItemId: a.items[0]!.id, qty: 1 }],
+      reasonCode: 'damaged',
+    });
+    expect(req.statusCode, req.body).toBe(201);
+    return { a, returnRequestId: req.json().returnRequestId as string };
+  }
+
+  /** المرتجع استُلم مرة واحدة: قطعة واحدة عادت، واسترداد واحد، وسطر واحد صار مردوداً */
+  async function receivedOnce(subOrderId: string, variantId: string, stockBefore: number) {
+    expect(await stock(variantId)).toBe(stockBefore + 1);
+    expect(await prisma.inventoryMovement.count({ where: { variantId, reason: 'return', refId: subOrderId } })).toBe(1);
+    const refunds = await prisma.refund.findMany({ where: { subOrderId } });
+    expect(refunds).toHaveLength(1);
+    // قيود الردّ في الدفترين لاسترداد واحد — لا قيدان لردّين
+    const platform = await prisma.platformLedgerEntry.findMany({ where: { subOrderId, refundId: { not: null } }, select: { refundId: true } });
+    expect(new Set(platform.map((e) => e.refundId))).toEqual(new Set([refunds[0]!.id]));
+    expect((await prisma.orderItem.findFirstOrThrow({ where: { subOrderId } })).refundedQty).toBe(1);
+    expect(await prisma.returnRequest.count({ where: { subOrderId, status: 'received' } })).toBe(1);
+  }
+
+  it('«استلمت المرتجع» من تبويبين معاً: واحد يمرّ، وقطعة واحدة تعود واسترداد واحد (VOPS-046)', async () => {
+    if (!dbUp) return;
+    const { a, returnRequestId } = await returnRequested();
+    const before = await stock(vendors[0]!.variantId);
+    const results = await Promise.all([
+      vendorMove(0, a.id, 'returned', { returnRequestId }),
+      vendorMove(0, a.id, 'returned', { returnRequestId }),
+    ]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    expect(results.find((r) => r.statusCode === 409)!.json().message).toMatch(RACED);
+    await receivedOnce(a.id, vendors[0]!.variantId, before);
+  });
+
+  it('البائع والإدارة يستلمان المرتجع نفسه معاً: استلام واحد وردّ واحد، والإعادة بلا أثر (ADM-077)', async () => {
+    if (!dbUp) return;
+    const { a, returnRequestId } = await returnRequested();
+    const before = await stock(vendors[0]!.variantId);
+    const byAdmin = () => call('POST', `/admin/orders/stores/${a.id}/transition`, admin.token, { to: 'returned', returnRequestId });
+    const results = await Promise.all([vendorMove(0, a.id, 'returned', { returnRequestId }), byAdmin()]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    expect(results.find((r) => r.statusCode === 409)!.json().message).toMatch(RACED);
+
+    // بعد أن استُلم ورُدّ: طلب الإدارة نفسه ثانيةً يُرفض بالانتقال، بلا قطعة ولا ردّ آخر
+    const again = await byAdmin();
+    expect(again.statusCode).toBe(409);
+    expect(again.json().message).toBe('لا يمكن نقل الطلب من «مُسترَد» إلى «مُرجَع»: حالة نهائية.');
+    await receivedOnce(a.id, vendors[0]!.variantId, before);
+  });
+
+  it('إلغاء الإدارة وشحن البائع في اللحظة نفسها: ينجح أحدهما وحده، بأثره وحده (ADM-063)', async () => {
+    if (!dbUp) return;
+    // ثلاث جولات: الفائز يتبدّل، وكل جولة تُفحص على من فاز فيها
+    for (let round = 0; round < 3; round++) {
+      const { a } = await placeOrder([1, 1]);
+      for (const to of ['accepted', 'preparing', 'ready_to_ship']) expect((await vendorMove(0, a.id, to)).statusCode).toBe(200);
+      const [cancel, ship] = await Promise.all([
+        call('POST', `/admin/orders/stores/${a.id}/cancel`, admin.token, { reason: 'احتيال مشتبه' }),
+        // توصيل ذاتي برقم يكتبه البائع: لا بوليصة قبله، فالشحنة لا تُكتب إلا إن فاز الشحن
+        vendorMove(0, a.id, 'shipped', { tracking: `SELF-${round}-${SUFFIX}` }),
+      ]);
+      expect([cancel.statusCode, ship.statusCode].sort()).toEqual([200, 409]);
+      const loser = cancel.statusCode === 409 ? cancel : ship;
+      expect(loser.json().message).toMatch(RACED);
+
+      const history = await prisma.subOrderStatusHistory.findMany({ where: { subOrderId: a.id }, select: { toStatus: true } });
+      const audit = await prisma.auditLog.count({
+        where: { entityId: a.id, action: { in: ['sub_order.shipped', 'sub_order.canceled_by_admin'] } },
+      });
+      expect(audit).toBe(1);
+      if (cancel.statusCode === 200) {
+        expect(await statusOf(a.id)).toBe('refunded');
+        expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(1);
+        expect(await prisma.shipment.count({ where: { subOrderId: a.id } })).toBe(0);
+        expect(history.filter((h) => h.toStatus === 'shipped')).toHaveLength(0);
+        expect(history.filter((h) => h.toStatus === 'canceled_by_admin')).toHaveLength(1);
+      } else {
+        expect(await statusOf(a.id)).toBe('shipped');
+        expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(0);
+        expect(await prisma.shipment.count({ where: { subOrderId: a.id } })).toBe(1);
+        expect(history.filter((h) => h.toStatus === 'canceled_by_admin')).toHaveLength(0);
+        expect(history.filter((h) => h.toStatus === 'shipped')).toHaveLength(1);
+      }
+    }
+  });
+
+  it('قبول البائع والإلغاء الآلي في آخر ثانية: واحد يفوز، والمهمة تتخطّى بتحذير لا بخطأ (VOPS-020)', async () => {
+    if (!dbUp) return;
+    const warn = vi.spyOn(Logger.prototype, 'warn');
+    try {
+      for (let round = 0; round < 3; round++) {
+        const { a } = await placeOrder([1, 1]);
+        // ما تفعله دورة المهمة لكل طلب فاتت مهلته — على هذا الطلب وحده، لا على طلبات القاعدة كلها
+        const job = scheduler as unknown as { attempt(id: string, fn: () => Promise<void>): Promise<number> };
+        const [accept, canceled] = await Promise.all([
+          vendorMove(0, a.id, 'accepted'),
+          job.attempt(a.id, () =>
+            lifecycle.transition(a.id, 'canceled_by_admin', { kind: 'system', userId: null }, { reason: 'لم يقبله البائع خلال 48 ساعة' }),
+          ),
+        ]);
+        const history = (await prisma.subOrderStatusHistory.findMany({ where: { subOrderId: a.id }, select: { toStatus: true } })).map((h) => h.toStatus);
+        if (accept.statusCode === 200) {
+          expect(canceled).toBe(0);
+          expect(warn.mock.calls.some(([m]) => String(m).startsWith(`تخطّي ${a.id}:`))).toBe(true);
+          expect(await statusOf(a.id)).toBe('accepted');
+          expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(0);
+          expect(history).not.toContain('canceled_by_admin');
+        } else {
+          expect(canceled).toBe(1);
+          expect(accept.statusCode).toBe(409);
+          expect(accept.json().message).toMatch(RACED);
+          expect(await statusOf(a.id)).toBe('refunded');
+          expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(1);
+          expect(history).not.toContain('accepted');
+        }
+      }
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('حسمان متزامنان للنزاع نفسه من مديرين: قرار واحد، واسترداد واحد إن فاز المشتري (ADM-074)', async () => {
+    if (!dbUp) return;
+    const second = await user('resolver', 'admin', ['disputes.resolve']);
+    try {
+      const other = await login(second.email, generateSync({ strategy: 'totp', secret: adminTotpSecret, crypto: totpCrypto, base32: totpBase32 }));
+      for (let round = 0; round < 2; round++) {
+        const { a } = await placeOrder([1, 1]);
+        await deliver(0, a.id);
+        const opened = await call('POST', '/me/disputes', buyer.token, { subOrderId: a.id, reasonCode: 'damaged', message: 'وصل الكوب مكسوراً' });
+        expect(opened.statusCode, opened.body).toBe(201);
+        const id = opened.json().id as string;
+        expect((await call('POST', `/me/disputes/${id}/escalate`, buyer.token)).statusCode).toBe(204);
+
+        const [forBuyer, forVendor] = await Promise.all([
+          call('POST', `/admin/disputes/${id}/resolve`, admin.token, { outcome: 'customer', resolution: 'الصور تثبت الكسر' }),
+          call('POST', `/admin/disputes/${id}/resolve`, other, { outcome: 'vendor', resolution: 'التغليف سليم في الصور' }),
+        ]);
+        expect([forBuyer.statusCode, forVendor.statusCode].sort()).toEqual([204, 409]);
+        expect((forBuyer.statusCode === 409 ? forBuyer : forVendor).json().message).toBe('النزاع مغلق أو غير موجود.');
+
+        const d = await prisma.dispute.findUniqueOrThrow({ where: { id } });
+        expect(await prisma.auditLog.count({ where: { entityId: id, action: 'dispute.resolve' } })).toBe(1);
+        if (forBuyer.statusCode === 204) {
+          expect(d.status).toBe('resolved_customer');
+          expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(1);
+          expect(await statusOf(a.id)).toBe('refunded');
+          // ولا تحرير للبائع: مال الفرعي كله رُدّ، فلا يبقى له معلّق يُنقل للمتاح
+          const pending = (await prisma.ledgerEntry.findMany({ where: { refId: a.id, bucket: 'pending' } })).reduce(
+            (s, e) => s + (e.direction === 'credit' ? e.amountMinorUnits : -e.amountMinorUnits),
+            0n,
+          );
+          expect(pending).toBe(0n);
+        } else {
+          expect(d.status).toBe('resolved_vendor');
+          expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(0);
+          expect(await statusOf(a.id)).toBe('delivered');
+        }
+      }
+    } finally {
+      await prisma.user.update({ where: { id: second.id }, data: { status: 'suspended' } });
     }
   });
 });
