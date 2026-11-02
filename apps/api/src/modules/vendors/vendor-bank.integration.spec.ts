@@ -193,6 +193,31 @@ describe('VD-20 · إضافة حساب بنكي', () => {
     const withCode = await call('POST', '/vendor/bank-accounts', guarded.token, account({ code: totpNow(secret) }));
     expect(withCode.statusCode, withCode.body).toBe(201);
   });
+
+  // موجة «يُؤتمت» الثالثة (2 نوفمبر 2026): فحوص الشكل قبل إعادة المصادقة — VON-069
+  it('آيبان بخانتين مقلوبتين لا يحرق رمز التطبيق، والاسم الفارغ يُرفض قبل كلمة المرور', async () => {
+    if (!dbUp) return;
+    const secret = generateSecret();
+    const guarded = await makeVendor('typo', { totpSecret: secret });
+    await prisma.user.update({ where: { id: guarded.userId }, data: { totpLastStep: null } });
+    const good = iban();
+    // أول خانتين متجاورتين مختلفتين بعد رمز البلد والمجموع — قلبهما يُفسد المجموع دائماً
+    const i = [...good].findIndex((c, k) => k >= 4 && k + 1 < good.length && c !== good[k + 1]);
+    const typo = `${good.slice(0, i)}${good[i + 1]}${good[i]}${good.slice(i + 2)}`;
+    const code = totpNow(secret);
+
+    const first = await call('POST', '/vendor/bank-accounts', guarded.token, account({ iban: typo, code }));
+    expect(first.statusCode, first.body).toBe(400);
+    expect(first.json().message).toBe('رقم الآيبان غير صحيح. راجعه كما هو مكتوب في كشف حسابك.');
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: guarded.userId } })).totpLastStep).toBeNull();
+
+    const second = await call('POST', '/vendor/bank-accounts', guarded.token, account({ iban: good, code }));
+    expect(second.statusCode, second.body).toBe(201);
+
+    const blank = await call('POST', '/vendor/bank-accounts', guarded.token, account({ holderName: '   ', password: 'خطأ-خطأ-خطأ', code }));
+    expect(blank.statusCode, blank.body).toBe(400);
+    expect(blank.json().message).toBe('اسم صاحب الحساب كما هو لدى البنك.');
+  });
 });
 
 describe('VD-20 · الافتراضي والتوثيق والأرشفة', () => {
