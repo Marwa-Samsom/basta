@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Fragment, createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { cartApi } from '@/lib/cart';
 import type { ProductPage } from '@/lib/storefront';
 
@@ -34,6 +35,7 @@ export function ProductSelection({ initial, children }: { initial: string; child
  * — تبقى ظاهرة حين ينفد الخيار أيضاً.
  */
 export function VariantPicker({ variants, actions }: { variants: Variant[]; actions?: ReactNode }) {
+  const t = useT();
   // داخل ProductSelection يشارك المعرضَ اختيارَه (فيقفز إلى صورة اللون)، وخارجه حالة محلية
   const shared = useContext(SelectionContext);
   const [own, setOwn] = useState<string>(variants[0]?.id ?? '');
@@ -99,7 +101,7 @@ export function VariantPicker({ variants, actions }: { variants: Variant[]; acti
         {current.originalPrice ? (
           // ما سعّر به المتجر — المحوَّل أعلاه بسعر صرف اليوم، وهو ما يُدفع
           <span className="sd-price__store">
-            <span className="num">{current.originalPrice.formatted}</span> بعملة المتجر
+            <span className="num">{current.originalPrice.formatted}</span> {t('بعملة المتجر', "in the shop's currency")}
           </span>
         ) : null}
       </div>
@@ -126,10 +128,10 @@ export function VariantPicker({ variants, actions }: { variants: Variant[]; acti
                     type="button"
                     className="sd-swatch"
                     aria-pressed={on}
-                    aria-label={reachable ? value.valueAr : `${value.valueAr} — نفد`}
+                    aria-label={reachable ? value.valueAr : t(`${value.valueAr} — نفد`, `${value.valueAr} — sold out`)}
                     data-unavailable={!reachable}
                     onClick={() => pick(attributeId, valueId)}
-                    title={reachable ? value.valueAr : `${value.valueAr} — نفد`}
+                    title={reachable ? value.valueAr : t(`${value.valueAr} — نفد`, `${value.valueAr} — sold out`)}
                     style={{ background: value.hexColor }}
                   >
                     {on ? (
@@ -146,7 +148,7 @@ export function VariantPicker({ variants, actions }: { variants: Variant[]; acti
                     aria-pressed={on}
                     data-unavailable={!reachable}
                     onClick={() => pick(attributeId, valueId)}
-                    title={reachable ? value.valueAr : `${value.valueAr} — نفد`}
+                    title={reachable ? value.valueAr : t(`${value.valueAr} — نفد`, `${value.valueAr} — sold out`)}
                   >
                     {value.hexColor ? (
                       <span className="sd-size__dot" style={{ background: value.hexColor }} aria-hidden />
@@ -163,20 +165,20 @@ export function VariantPicker({ variants, actions }: { variants: Variant[]; acti
       <p className="sd-stock" data-tone={stockTone} role="status">
         <span className="sd-stock__dot" aria-hidden />
         {soldOut
-          ? 'هذا الخيار نفد'
+          ? t('هذا الخيار نفد', 'This option is sold out')
           : current.available <= LOW_STOCK
-            ? `بقي ${current.available} فقط`
-            : 'متوفّر في المخزون'}
+            ? t(`بقي ${current.available} فقط`, `Only ${current.available} left`)
+            : t('متوفّر في المخزون', 'In stock')}
       </p>
 
       <AddToCart key={current.id} variantId={current.id} available={current.available} actions={actions} />
 
       {others.length > 0 ? (
         <p className="sd-others">
-          متوفّر الآن:{' '}
+          {t('متوفّر الآن:', 'Available now:')}{' '}
           {others.map((v, i) => (
             <Fragment key={v.id}>
-              {i > 0 ? '، ' : null}
+              {i > 0 ? t('، ', ', ') : null}
               {/* الخيار معزول: «S» اللاتينية كانت تسحب «(5)» إلى مقطعها فيُقرأ العدد قبل المقاس (DISC-053) */}
               <bdi>{v.options.map((o) => o.valueAr).join(' · ')}</bdi> ({v.available})
             </Fragment>
@@ -196,6 +198,7 @@ function AddToCart({
   available: number;
   actions?: ReactNode;
 }) {
+  const t = useT();
   const [state, setState] = useState<'idle' | 'busy' | 'added' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
@@ -209,7 +212,7 @@ function AddToCart({
       setState('added');
     } catch (err) {
       setState('error');
-      setMessage(err instanceof Error ? err.message : 'تعذّرت الإضافة إلى السلة.');
+      setMessage(err instanceof Error ? err.message : t('تعذّرت الإضافة إلى السلة.', "Couldn't add to cart."));
     }
   }
 
@@ -217,11 +220,11 @@ function AddToCart({
     <div className="sd-buy">
       <div className="sd-buy__row">
         {disabled ? null : (
-          <div className="sd-qty" role="group" aria-label="الكمية">
+          <div className="sd-qty" role="group" aria-label={t('الكمية', 'Quantity')}>
             <button
               type="button"
               className="sd-qty__btn"
-              aria-label="أنقص"
+              aria-label={t('أنقص', 'Decrease')}
               disabled={qty <= 1}
               onClick={() => setQty((n) => Math.max(1, n - 1))}
             >
@@ -233,7 +236,7 @@ function AddToCart({
             <button
               type="button"
               className="sd-qty__btn"
-              aria-label="زد"
+              aria-label={t('زد', 'Increase')}
               disabled={qty >= available}
               onClick={() => setQty((n) => Math.min(available, n + 1))}
             >
@@ -248,20 +251,21 @@ function AddToCart({
           onClick={() => void add()}
         >
           <Icon name="cart" size={19} />
-          {disabled ? 'نفد من المخزون' : state === 'busy' ? 'جارٍ الإضافة…' : 'أضف إلى السلة'}
+          {disabled ? t('نفد من المخزون', 'Out of stock') : state === 'busy' ? t('جارٍ الإضافة…', 'Adding…') : t('أضف إلى السلة', 'Add to cart')}
         </button>
         {actions}
       </div>
       {!disabled && qty >= available && available > 1 ? (
         <p className="sd-buy__hint">
           <Icon name="info" size={14} />
-          بلغت الحد المتاح
+          {t('بلغت الحد المتاح', "You've reached the available limit")}
         </p>
       ) : null}
       {state === 'added' ? (
         <p className="sd-buy__done" role="status">
           <Icon name="check-circle" size={15} />
-          أُضيف إلى سلّتك. <Link href="/cart">اذهب إلى السلة</Link>
+          {t('أُضيف إلى سلّتك. ', 'Added to your cart. ')}
+          <Link href="/cart">{t('اذهب إلى السلة', 'Go to cart')}</Link>
         </p>
       ) : null}
       {message ? (
@@ -331,6 +335,7 @@ export function ProductGallery({
   /** قيم خيارات كل متغيّر — لمطابقة صورة القيمة بالمتغيّر المختار */
   variantValues?: Readonly<Record<string, readonly string[]>>;
 }) {
+  const t = useT();
   const [index, setIndex] = useState(0);
   const shared = useContext(SelectionContext);
   const [seen, setSeen] = useState(shared?.selected ?? '');
@@ -345,14 +350,14 @@ export function ProductGallery({
   return (
     <div className={images.length > 1 ? 'sd-gallery sd-gallery--thumbs' : 'sd-gallery'}>
       {images.length > 1 ? (
-        <div className="sd-gallery__thumbs" role="group" aria-label="صور المنتج">
+        <div className="sd-gallery__thumbs" role="group" aria-label={t('صور المنتج', 'Product images')}>
           {images.map((img, i) => (
             <button
               key={img.id}
               type="button"
               className="sd-gallery__thumb"
               aria-pressed={i === index}
-              aria-label={`صورة ${i + 1} من ${images.length}`}
+              aria-label={t(`صورة ${i + 1} من ${images.length}`, `Image ${i + 1} of ${images.length}`)}
               onClick={() => setIndex(i)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -387,7 +392,7 @@ export function ProductGallery({
             {name.slice(0, 1)}
           </span>
         )}
-        {soldOut ? <span className="sd-gallery__flag">نفد من المخزون</span> : null}
+        {soldOut ? <span className="sd-gallery__flag">{t('نفد من المخزون', 'Out of stock')}</span> : null}
         {images.length > 1 ? (
           <span className="num sd-gallery__count" aria-hidden>
             {index + 1} / {images.length}

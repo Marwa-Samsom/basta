@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { digitsOnly } from '@/lib/digits';
 import { TextInput } from '@/components/ui';
 import { api, session, type Tokens } from '@/lib/api';
@@ -30,6 +31,7 @@ function savedEmail(): string {
 }
 
 function ResetForm() {
+  const t = useT();
   const router = useRouter();
   const next = internalPath(useSearchParams().get('next'));
   // البريد من خطوة «نسيت» إن وُجد — الخادم يصيّر فارغاً والمتصفّح يقرؤه بلا تعارض
@@ -51,10 +53,10 @@ function ResetForm() {
     if (!ready) {
       setError(
         password.length < MIN_PASSWORD
-          ? 'كلمة المرور ثمانية أحرف على الأقل.'
+          ? t('كلمة المرور ثمانية أحرف على الأقل.', 'The password must be at least eight characters.')
           : mismatch
-            ? 'الكلمتان غير متطابقتين.'
-            : 'اكتب البريد والرمز المكوّن من ستة أرقام.',
+            ? t('الكلمتان غير متطابقتين.', "The passwords don't match.")
+            : t('اكتب البريد والرمز المكوّن من ستة أرقام.', 'Enter your email and the six-digit code.'),
       );
       return;
     }
@@ -63,7 +65,7 @@ function ResetForm() {
     try {
       await api('/auth/password/reset', { method: 'POST', auth: false, body: { email: email.trim(), code, newPassword: password } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر تعيين كلمة المرور.');
+      setError(err instanceof Error ? err.message : t('تعذّر تعيين كلمة المرور.', "Couldn't set the password."));
       setBusy(false);
       return;
     }
@@ -96,20 +98,27 @@ function ResetForm() {
       <div className="ac-auth__box">
         <header className="ac-auth__head">
           <Link href="/" className="ac-wordmark">
-            بسطة
+            {t('بسطة', 'Basta')}
           </Link>
-          <h1 className="ac-auth__title">كلمة مرور جديدة</h1>
-          <p className="ac-auth__sub">اكتب الرمز الذي وصلك بالبريد، ثم كلمتك الجديدة مرتين.</p>
+          <h1 className="ac-auth__title">{t('كلمة مرور جديدة', 'New password')}</h1>
+          <p className="ac-auth__sub">
+            {t('اكتب الرمز الذي وصلك بالبريد، ثم كلمتك الجديدة مرتين.', 'Enter the code we emailed you, then your new password twice.')}
+          </p>
         </header>
 
         {done ? (
           <section className="ac-auth__card">
             <div className="alert alert--success ac-note" role="status">
               <Icon name="check-circle" size={16} />
-              <span>حُدّثت كلمة المرور، وأُنهيت كل الجلسات المفتوحة على حسابك.</span>
+              <span>
+                {t(
+                  'حُدّثت كلمة المرور، وأُنهيت كل الجلسات المفتوحة على حسابك.',
+                  'Your password was updated, and all open sessions on your account were signed out.',
+                )}
+              </span>
             </div>
             <Link href={withNext('/login', next)} className="btn btn--primary btn--block ac-auth__cta">
-              ادخل بكلمتك الجديدة
+              {t('ادخل بكلمتك الجديدة', 'Sign in with your new password')}
             </Link>
           </section>
         ) : (
@@ -122,7 +131,7 @@ function ResetForm() {
             ) : null}
 
             <TextInput
-              label="البريد الإلكتروني"
+              label={t('البريد الإلكتروني', 'Email')}
               type="email"
               autoComplete="email"
               inputMode="email"
@@ -132,8 +141,8 @@ function ResetForm() {
               onChange={(e) => setEmail(e.target.value)}
             />
             <TextInput
-              label="رمز الاستعادة"
-              hint="ستة أرقام وصلتك بالبريد، صالحة عشر دقائق."
+              label={t('رمز الاستعادة', 'Reset code')}
+              hint={t('ستة أرقام وصلتك بالبريد، صالحة عشر دقائق.', 'Six digits sent to your email, valid for ten minutes.')}
               className="field__control ac-otp"
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -144,27 +153,27 @@ function ResetForm() {
               value={code}
               onChange={(e) => setCode(digitsOnly(e.target.value))}
             />
-            <NewPasswordField label="كلمة المرور الجديدة" value={password} onChange={setPassword} />
+            <NewPasswordField label={t('كلمة المرور الجديدة', 'New password')} value={password} onChange={setPassword} />
             <TextInput
-              label="أعد كتابتها"
+              label={t('أعد كتابتها', 'Type it again')}
               type="password"
               autoComplete="new-password"
               dir="ltr"
               required
               value={confirm}
-              error={mismatch ? 'الكلمتان غير متطابقتين.' : null}
+              error={mismatch ? t('الكلمتان غير متطابقتين.', "The passwords don't match.") : null}
               onChange={(e) => setConfirm(e.target.value)}
             />
 
             <button className="btn btn--primary btn--block ac-auth__cta" type="submit" disabled={busy}>
-              {busy ? 'جارٍ الحفظ…' : 'احفظ كلمة المرور وادخل'}
+              {busy ? t('جارٍ الحفظ…', 'Saving…') : t('احفظ كلمة المرور وادخل', 'Save password and sign in')}
             </button>
           </form>
         )}
 
         <p className="ac-auth__foot">
-          <span>لم يصلك رمز؟</span>
-          <Link href={withNext('/forgot', next)}>اطلب رمزاً جديداً</Link>
+          <span>{t('لم يصلك رمز؟', "Didn't get a code?")}</span>
+          <Link href={withNext('/forgot', next)}>{t('اطلب رمزاً جديداً', 'Request a new code')}</Link>
         </p>
       </div>
     </main>

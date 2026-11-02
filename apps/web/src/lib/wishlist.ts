@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react';
 import { api, session } from './api';
 import { displayCurrency } from './currency';
+import type { Locale } from './i18n';
 
 /**
  * المفضّلة في المتصفّح — ST-23 والقلب في صفحة المنتج وبطاقته.
@@ -43,7 +44,8 @@ export interface WishlistView {
 }
 
 /** «منتج واحد محفوظ» · «منتجان محفوظان» · «3 منتجات محفوظة» · «11 منتجاً محفوظاً» */
-export function savedCount(n: number): string {
+export function savedCount(n: number, locale: Locale = 'ar'): string {
+  if (locale === 'en') return n === 1 ? '1 saved item' : `${n} saved items`;
   if (n === 1) return 'منتج واحد محفوظ';
   if (n === 2) return 'منتجان محفوظان';
   if (n >= 3 && n <= 10) return `${n} منتجات محفوظة`;

@@ -9,6 +9,8 @@ import { TONE, useAction, useAdminList } from '@/lib/admin';
 import { ORDERS, counted } from '@/lib/arabic-count';
 import { money, when } from '@/lib/orders';
 import { ClearableInput } from '@/components/ui';
+import { useLocale, useT } from '@/components/locale';
+import { localized } from '@/lib/i18n';
 
 interface Payout {
   id: string;
@@ -25,12 +27,20 @@ interface Payout {
 }
 
 const STATUS: Record<string, string> = { requested: 'بانتظار الموافقة', approved: 'موافَق — للتحويل', paid: 'حُوِّل', rejected: 'مرفوض' };
+const STATUS_EN: Record<string, string> = { requested: 'Awaiting approval', approved: 'Approved — to transfer', paid: 'Transferred', rejected: 'Rejected' };
 
 const EMPTY: Record<string, string> = {
   requested: 'تظهر الطلبات هنا عندما يطلب تاجر سحب رصيده المتاح.',
   approved: 'لا تحويلات موافَقاً عليها تنتظر التنفيذ.',
   paid: 'لا تحويلات مسجَّلة بعد.',
   rejected: 'لا طلبات مرفوضة.',
+};
+
+const EMPTY_EN: Record<string, string> = {
+  requested: 'Requests appear here when a seller asks to withdraw their available balance.',
+  approved: 'No approved transfers are waiting to be made.',
+  paid: 'No transfers recorded yet.',
+  rejected: 'No rejected requests.',
 };
 
 /**
@@ -42,6 +52,9 @@ const EMPTY: Record<string, string> = {
  * متاجر الاختبار لا يُوجد (J-11). البحث باسم المتجر أو رابطه أو مرجع التحويل.
  */
 export default function AdminPayoutsPage() {
+  const t = useT();
+  const locale = useLocale();
+  const statusLabel = localized(locale, STATUS, STATUS_EN);
   const [status, setStatus] = useState('requested');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortOrder>('newest');
@@ -53,7 +66,11 @@ export default function AdminPayoutsPage() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="طلبات التحويل" count={data ? counted(data.total, ORDERS) : undefined} hint="تحتاج صلاحية payouts.approve — هذه الصفحة تحرّك مالاً.">
+      <AdminHeader
+        title={t('طلبات التحويل', 'Payout requests')}
+        count={data ? t(counted(data.total, ORDERS), `${data.total} ${data.total === 1 ? 'request' : 'requests'}`) : undefined}
+        hint={t('تحتاج صلاحية payouts.approve — هذه الصفحة تحرّك مالاً.', 'Requires the payouts.approve permission — this page moves money.')}
+      >
         <button
           type="button"
           className="btn btn--secondary btn--sm"
@@ -62,18 +79,23 @@ export default function AdminPayoutsPage() {
             void act.run(async () => {
               await api('/admin/finance/release-due', { method: 'POST' });
               reload();
-            }, 'شُغّل تحرير الأرصدة المستحقة (الشروط نفسها: انقضاء التعليق بلا نزاع ولا إرجاع).')
+            }, t('شُغّل تحرير الأرصدة المستحقة (الشروط نفسها: انقضاء التعليق بلا نزاع ولا إرجاع).', 'Release of due balances has run (same conditions: hold period over with no dispute or return).'))
           }
         >
           <Icon name="refresh" size={14} />
-          تحرير المستحق الآن
+          {t('تحرير المستحق الآن', 'Release due now')}
         </button>
       </AdminHeader>
       <Feedback error={act.error} notice={act.notice} />
       <div className="toolbar">
-        <Tabs value={status} onChange={setStatus} label="حالة الطلب" options={Object.entries(STATUS).map(([key, label]) => ({ key, label }))} />
+        <Tabs value={status} onChange={setStatus} label={t('حالة الطلب', 'Request status')} options={Object.entries(statusLabel).map(([key, label]) => ({ key, label }))} />
         <div className="toolbar__end">
-          <SearchBox value={search} onChange={setSearch} placeholder="اسم المتجر أو رابطه أو مرجع التحويل" label="بحث في طلبات التحويل" />
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            placeholder={t('اسم المتجر أو رابطه أو مرجع التحويل', 'Shop name, link, or transfer reference')}
+            label={t('بحث في طلبات التحويل', 'Search payout requests')}
+          />
           <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
@@ -83,18 +105,18 @@ export default function AdminPayoutsPage() {
         search.trim() ? (
           <Empty
             icon="search"
-            title="لا طلبات بهذا البحث"
+            title={t('لا طلبات بهذا البحث', 'No requests match this search')}
             actions={
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
-                أزل التصفية
+                {t('أزل التصفية', 'Clear filters')}
               </button>
             }
           >
-            جرّب اسماً آخر أو حالة أخرى من الرقائق أعلاه.
+            {t('جرّب اسماً آخر أو حالة أخرى من الرقائق أعلاه.', 'Try another name or another status from the chips above.')}
           </Empty>
         ) : (
-          <Empty icon="wallet" title="لا طلبات تحويل هنا">
-            {EMPTY[status]}
+          <Empty icon="wallet" title={t('لا طلبات تحويل هنا', 'No payout requests here')}>
+            {localized(locale, EMPTY, EMPTY_EN)[status]}
           </Empty>
         )
       ) : (
@@ -102,13 +124,13 @@ export default function AdminPayoutsPage() {
           <table className="table ao-table">
             <thead>
               <tr>
-                <th>المتجر</th>
-                <th className="end">المبلغ</th>
-                <th>الحساب</th>
-                <th>الطلب</th>
-                <th>الحالة</th>
+                <th>{t('المتجر', 'Shop')}</th>
+                <th className="end">{t('المبلغ', 'Amount')}</th>
+                <th>{t('الحساب', 'Account')}</th>
+                <th>{t('الطلب', 'Requested')}</th>
+                <th>{t('الحالة', 'Status')}</th>
                 <th className="end">
-                  <span className="visually-hidden">الإجراء</span>
+                  <span className="visually-hidden">{t('الإجراء', 'Action')}</span>
                 </th>
               </tr>
             </thead>
@@ -123,15 +145,15 @@ export default function AdminPayoutsPage() {
                       <span className="ao-shop__text">
                         <span className="ao-shop__name">{p.vendor}</span>
                         <span className="ao-shop__sub">
-                          عملة التسوية <span className="num">{p.currency}</span>
+                          {t('عملة التسوية', 'Settlement currency')} <span className="num">{p.currency}</span>
                         </span>
                       </span>
                     </span>
                   </td>
-                  <td data-label="المبلغ" className="end">
-                    <span className="money num ao-amount">{money(p.amountMinorUnits, p.currency)}</span>
+                  <td data-label={t('المبلغ', 'Amount')} className="end">
+                    <span className="money num ao-amount">{money(p.amountMinorUnits, p.currency, locale)}</span>
                   </td>
-                  <td data-label="الحساب">
+                  <td data-label={t('الحساب', 'Account')}>
                     <span className="ao-stack">
                       <span>
                         {p.bank.bankName} · <span className="num">••{p.bank.ibanLast4}</span>
@@ -139,14 +161,14 @@ export default function AdminPayoutsPage() {
                       <span className="ao-stack__sub">{p.bank.holderName}</span>
                     </span>
                   </td>
-                  <td data-label="الطلب" className="ao-date">
-                    {when(p.requestedAt)}
+                  <td data-label={t('الطلب', 'Requested')} className="ao-date">
+                    {when(p.requestedAt, locale)}
                   </td>
-                  <td data-label="الحالة">
+                  <td data-label={t('الحالة', 'Status')}>
                     <span className="ao-stack">
-                      <span className={`badge ${TONE[p.status] ?? ''}`}>{STATUS[p.status] ?? p.status}</span>
+                      <span className={`badge ${TONE[p.status] ?? ''}`}>{statusLabel[p.status] ?? p.status}</span>
                       {p.transferReference ? <span className="ao-stack__sub num">{p.transferReference}</span> : null}
-                      {p.rejectReason ? <span className="ao-stack__sub">«{p.rejectReason}»</span> : null}
+                      {p.rejectReason ? <span className="ao-stack__sub">{t('«', '“')}{p.rejectReason}{t('»', '”')}</span> : null}
                     </span>
                   </td>
                   <td data-label="" className="end">
@@ -160,22 +182,22 @@ export default function AdminPayoutsPage() {
                             void act.run(async () => {
                               await api(`/admin/finance/payouts/${p.id}/approve`, { method: 'POST' });
                               reload();
-                            }, 'وافقت. سجّل التحويل بعد تنفيذه من البنك.')
+                            }, t('وافقت. سجّل التحويل بعد تنفيذه من البنك.', 'Approved. Record the transfer once the bank has made it.'))
                           }
                         >
                           <Icon name="check" size={14} />
-                          موافقة
+                          {t('موافقة', 'Approve')}
                         </button>
                       ) : null}
                       {p.status === 'approved' ? (
                         <>
                           <ClearableInput
                             className="field__control ao-ref"
-                            placeholder="مرجع التحويل"
+                            placeholder={t('مرجع التحويل', 'Transfer reference')}
                             dir="ltr"
                             value={refs[p.id] ?? ''}
                             onChange={(e) => setRefs({ ...refs, [p.id]: e.target.value })}
-                            aria-label="مرجع التحويل"
+                            aria-label={t('مرجع التحويل', 'Transfer reference')}
                           />
                           <button
                             type="button"
@@ -185,23 +207,23 @@ export default function AdminPayoutsPage() {
                               void act.run(async () => {
                                 await api(`/admin/finance/payouts/${p.id}/paid`, { method: 'POST', body: { transferReference: refs[p.id] } });
                                 reload();
-                              }, 'سُجّل التحويل وأُبلغ البائع.')
+                              }, t('سُجّل التحويل وأُبلغ البائع.', 'Transfer recorded and the seller notified.'))
                             }
                           >
-                            تسجيل التحويل
+                            {t('تسجيل التحويل', 'Record transfer')}
                           </button>
                         </>
                       ) : null}
                       {p.status === 'requested' || p.status === 'approved' ? (
                         <ReasonButton
-                          label="رفض"
-                          hint="يعود المبلغ إلى متاح البائع فوراً بقيد معاكس، ويصله السبب."
+                          label={t('رفض', 'Reject')}
+                          hint={t('يعود المبلغ إلى متاح البائع فوراً بقيد معاكس، ويصله السبب.', "The amount returns to the seller's available balance at once by a reversing entry, and they receive the reason.")}
                           disabled={act.busy}
                           onSubmit={(r) =>
                             act.run(async () => {
                               await api(`/admin/finance/payouts/${p.id}/reject`, { method: 'POST', body: { reason: r } });
                               reload();
-                            }, 'رُفض وعاد المبلغ إلى رصيد البائع.')
+                            }, t('رُفض وعاد المبلغ إلى رصيد البائع.', "Rejected; the amount is back in the seller's balance."))
                           }
                         />
                       ) : null}

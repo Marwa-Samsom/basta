@@ -4,11 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from '@/components/icons';
+import { LanguageToggle, useT } from '@/components/locale';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 export interface DashNavItem {
   href: string;
   label: string;
+  /** الاسم حين يكون الموقع بالإنجليزية — بلا ترجمة يبقى العربي */
+  en?: string;
   icon: IconName;
   /** عدّاد ما ينتظر — يظهر حين يكون أكبر من صفر */
   count?: number | undefined;
@@ -18,6 +21,7 @@ export interface DashNavItem {
 
 export interface DashNavGroup {
   label?: string;
+  en?: string | undefined;
   items: DashNavItem[];
 }
 
@@ -60,6 +64,8 @@ export function DashShell({
   density?: 'compact' | 'comfortable';
   children: ReactNode;
 }) {
+  const t = useT();
+  const name = (x: { label: string; en?: string | undefined }) => t(x.label, x.en ?? x.label);
   const pathname = usePathname();
   // الدرج مفتوح على المسار الذي فُتح فيه وحده: الانتقال يغلقه بلا تأثير
   const [openAt, setOpenAt] = useState<string | null>(null);
@@ -67,7 +73,8 @@ export function DashShell({
   const setOpen = (next: boolean | ((v: boolean) => boolean)) =>
     setOpenAt((typeof next === 'function' ? next(open) : next) ? pathname : null);
   const current = activeHref(pathname, groups);
-  const title = groups.flatMap((g) => g.items).find((i) => i.href === current)?.label ?? '';
+  const titled = groups.flatMap((g) => g.items).find((i) => i.href === current);
+  const title = titled ? name(titled) : '';
 
   // و Esc يغلقه
   useEffect(() => {
@@ -81,10 +88,10 @@ export function DashShell({
     <div className="dash" data-density={density}>
       <aside className="dash__side" data-open={open} id="dash-side">
         {ident}
-        <nav className="dash__nav" aria-label="أقسام اللوحة">
+        <nav className="dash__nav" aria-label={t('أقسام اللوحة', 'Dashboard sections')}>
           {groups.map((g, gi) => (
             <div key={g.label ?? gi} className="dash__nav">
-              {g.label ? <span className="dash__group">{g.label}</span> : null}
+              {g.label ? <span className="dash__group">{name({ label: g.label, en: g.en })}</span> : null}
               {g.items.map((item) => {
                 const active = item.href === current;
                 return (
@@ -96,7 +103,7 @@ export function DashShell({
                     {...(active ? { 'aria-current': 'page' as const } : {})}
                   >
                     <Icon name={item.icon} size={17} />
-                    <span className="dash__link-label">{item.label}</span>
+                    <span className="dash__link-label">{name(item)}</span>
                     {item.count ? <span className="dash__count">{item.count}</span> : null}
                   </Link>
                 );
@@ -113,7 +120,7 @@ export function DashShell({
           <button
             type="button"
             className="icon-btn dash__menu"
-            aria-label="القائمة"
+            aria-label={t('القائمة', 'Menu')}
             aria-expanded={open}
             aria-controls="dash-side"
             onClick={() => setOpen((v) => !v)}
@@ -122,6 +129,7 @@ export function DashShell({
           </button>
           <span className="dash__title">{title}</span>
           <div className="dash__tools">
+            <LanguageToggle />
             <ThemeToggle />
             {tools}
             {user ? (
@@ -133,7 +141,7 @@ export function DashShell({
               </span>
             ) : null}
             {exitHref ? (
-              <Link href={exitHref} className="icon-btn" aria-label="الخروج من اللوحة" title="الخروج من اللوحة">
+              <Link href={exitHref} className="icon-btn" aria-label={t('الخروج من اللوحة', 'Leave dashboard')} title={t('الخروج من اللوحة', 'Leave dashboard')}>
                 <Icon name="x" size={18} />
               </Link>
             ) : null}

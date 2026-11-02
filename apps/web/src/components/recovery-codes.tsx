@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 
 /**
  * رموز الاستعادة — تُعرض **مرة واحدة** بعد التفعيل أو التجديد، ولا سبيل
@@ -17,6 +18,7 @@ export function RecoveryCodes({
   onDone: () => void;
   doneLabel: string;
 }) {
+  const t = useT();
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const checkId = useId();
@@ -27,9 +29,12 @@ export function RecoveryCodes({
   };
 
   const download = () => {
-    const note =
+    const note = t(
       'رموز استعادة حسابك في بسطة — كلٌّ يفتح الحساب مرة واحدة بدل رمز تطبيق المصادقة.\n' +
-      'احفظها في مكان آمن بعيداً عن هاتفك.\n\n';
+        'احفظها في مكان آمن بعيداً عن هاتفك.\n\n',
+      'Your Basta account recovery codes — each one opens your account once instead of an authenticator app code.\n' +
+        'Keep them somewhere safe, away from your phone.\n\n',
+    );
     const url = URL.createObjectURL(new Blob([note + text + '\n'], { type: 'text/plain;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
@@ -41,14 +46,16 @@ export function RecoveryCodes({
   return (
     <div className="rc">
       <div className="alert alert--warning" role="status">
-        <p className="alert__title">احفظ هذه الرموز الآن — لن تظهر مرة أخرى</p>
+        <p className="alert__title">{t('احفظ هذه الرموز الآن — لن تظهر مرة أخرى', "Save these codes now — they won't be shown again")}</p>
         <p>
-          إن أضعت هاتفك فكل رمز منها يفتح حسابك مرة واحدة بدل رمز التطبيق. احفظها بعيداً عن الهاتف: ورقة أو مدير
-          كلمات مرور.
+          {t(
+            'إن أضعت هاتفك فكل رمز منها يفتح حسابك مرة واحدة بدل رمز التطبيق. احفظها بعيداً عن الهاتف: ورقة أو مدير كلمات مرور.',
+            'If you lose your phone, each code opens your account once instead of the app code. Keep them away from your phone: on paper or in a password manager.',
+          )}
         </p>
       </div>
 
-      <ol className="rc__list num" aria-label="رموز الاستعادة">
+      <ol className="rc__list num" aria-label={t('رموز الاستعادة', 'Recovery codes')}>
         {codes.map((c) => (
           <li key={c} className="rc__code">
             {c}
@@ -59,17 +66,17 @@ export function RecoveryCodes({
       <div className="rc__actions">
         <button type="button" className="btn btn--secondary" onClick={copy}>
           <Icon name={copied ? 'check' : 'copy'} size={16} />
-          {copied ? 'نُسخت الرموز' : 'انسخ الرموز'}
+          {copied ? t('نُسخت الرموز', 'Codes copied') : t('انسخ الرموز', 'Copy codes')}
         </button>
         <button type="button" className="btn btn--secondary" onClick={download}>
           <Icon name="download" size={16} />
-          نزّلها ملفاً
+          {t('نزّلها ملفاً', 'Download as a file')}
         </button>
       </div>
 
       <label className="rc__confirm" htmlFor={checkId}>
         <input id={checkId} type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-        حفظت الرموز في مكان آمن
+        {t('حفظت الرموز في مكان آمن', "I've saved the codes somewhere safe")}
       </label>
 
       <button type="button" className="btn btn--primary btn--block" disabled={!saved} onClick={onDone}>

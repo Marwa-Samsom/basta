@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 
 /** حدث beforeinstallprompt — ليس في أنواع DOM القياسية بعد */
 interface InstallPromptEvent extends Event {
@@ -42,6 +43,7 @@ const standalone = (): boolean =>
  * الزرّ يستدعي نافذة التثبيت الأصلية للمتصفّح؛ لا وعد بشيء لا يحدث.
  */
 export function InstallPrompt() {
+  const t = useT();
   const [event, setEvent] = useState<InstallPromptEvent | null>(null);
 
   useEffect(() => {
@@ -84,35 +86,35 @@ export function InstallPrompt() {
       <span className="sx-install__grip" aria-hidden />
       <div className="sx-install__head">
         <span className="sx-install__icon" aria-hidden>
-          ب
+          {t('ب', 'B')}
         </span>
         <span className="sx-install__text">
           <span id="sx-install-title" className="sx-install__title">
-            ثبّت بسطة على شاشتك
+            {t('ثبّت بسطة على شاشتك', 'Install Basta on your screen')}
           </span>
-          <span className="sx-install__sub">كتطبيق على هاتفك، دون متجر تطبيقات</span>
+          <span className="sx-install__sub">{t('كتطبيق على هاتفك، دون متجر تطبيقات', 'Like an app on your phone, no app store needed')}</span>
         </span>
-        <button type="button" className="icon-btn icon-btn--sm sx-install__close" aria-label="إغلاق" onClick={later}>
+        <button type="button" className="icon-btn icon-btn--sm sx-install__close" aria-label={t('إغلاق', 'Close')} onClick={later}>
           <Icon name="x" size={16} />
         </button>
       </div>
       <ul className="sx-install__points">
         <li>
           <Icon name="check" size={14} />
-          يفتح من شاشتك الرئيسية بنقرة
+          {t('يفتح من شاشتك الرئيسية بنقرة', 'Opens from your home screen with one tap')}
         </li>
         <li>
           <Icon name="check" size={14} />
-          الصفحات التي زرتها تبقى متاحة عند انقطاع الاتصال
+          {t('الصفحات التي زرتها تبقى متاحة عند انقطاع الاتصال', 'Pages you visited stay available when you go offline')}
         </li>
       </ul>
       <div className="sx-install__actions">
         <button type="button" className="btn btn--primary btn--block" onClick={() => void install()}>
           <Icon name="download" size={17} />
-          ثبّت الآن
+          {t('ثبّت الآن', 'Install now')}
         </button>
         <button type="button" className="btn btn--secondary btn--block" onClick={later}>
-          لاحقاً
+          {t('لاحقاً', 'Later')}
         </button>
       </div>
     </aside>

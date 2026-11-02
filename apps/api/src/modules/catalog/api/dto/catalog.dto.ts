@@ -31,6 +31,13 @@ export class VendorCategoryDto {
   @IsString({ message: 'اكتب اسم الفئة.' })
   @Length(1, 80, { message: 'اسم الفئة من حرف إلى 80 حرفاً.' })
   nameAr!: string;
+
+  /** يراه المشتري حين يكون الموقع بالإنجليزية — فارغاً يُمحى */
+  @ApiPropertyOptional({ example: "Men's clothing" })
+  @IsOptional()
+  @IsString({ message: 'الاسم الإنجليزي للفئة نصّ.' })
+  @MaxLength(80, { message: 'الاسم الإنجليزي للفئة 80 حرفاً على الأكثر.' })
+  nameEn?: string | null;
 }
 
 export class ReorderVendorCategoriesDto {

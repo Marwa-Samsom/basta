@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { use, useEffect, useState, useSyncExternalStore } from 'react';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { plainAmount, TransferInstructions, type TransferInstructionsView } from '@/components/transfer-instructions';
 import { Alert, Spinner } from '@/components/ui';
 import { api, session } from '@/lib/api';
+import { pick, type Bilingual, type Locale } from '@/lib/i18n';
 import { orderKeyHeaders } from '@/lib/order-key';
 
 interface OrderResult {
@@ -20,20 +22,26 @@ interface OrderResult {
 }
 
 /** طلب تحويل أُغلق قبل أن يُدفع — لا «جرّب بطاقة أخرى» لمن لم يستعمل بطاقة */
-const TRANSFER_FAILURES: Record<string, { title: string; text: string }> = {
+const TRANSFER_FAILURES: Record<string, { title: Bilingual; text: Bilingual }> = {
   transfer_expired: {
-    title: 'أُلغي الطلب — لم يصل التحويل',
-    text: 'لم يصلنا تحويلك خلال المهلة، فأُلغي الطلب وعادت القطع للمتاجر. إن كنت حوّلت فعلاً فراسلنا بمرجع التحويل لنردّه لك، أو اطلب من جديد.',
+    title: { ar: 'أُلغي الطلب — لم يصل التحويل', en: "Order canceled — the transfer didn't arrive" },
+    text: {
+      ar: 'لم يصلنا تحويلك خلال المهلة، فأُلغي الطلب وعادت القطع للمتاجر. إن كنت حوّلت فعلاً فراسلنا بمرجع التحويل لنردّه لك، أو اطلب من جديد.',
+      en: "Your transfer didn't reach us within the time limit, so the order was canceled and the items went back to the shops. If you did transfer, message us with the transfer reference so we can return it to you, or order again.",
+    },
   },
   canceled_by_customer: {
-    title: 'ألغيت الطلب',
-    text: 'ألغيت الطلب قبل التحويل، فلم نأخذ شيئاً وعادت القطع للمتاجر.',
+    title: { ar: 'ألغيت الطلب', en: 'You canceled the order' },
+    text: {
+      ar: 'ألغيت الطلب قبل التحويل، فلم نأخذ شيئاً وعادت القطع للمتاجر.',
+      en: 'You canceled the order before transferring, so we took nothing and the items went back to the shops.',
+    },
   },
 };
 
-const format = (minor: string, currency: string): string => {
+const format = (minor: string, currency: string, locale: Locale): string => {
   const digits = ['JOD', 'KWD', 'BHD', 'OMR'].includes(currency) ? 3 : 2;
-  return new Intl.NumberFormat('ar-JO-u-nu-latn', {
+  return new Intl.NumberFormat(locale === 'en' ? 'en-GB' : 'ar-JO-u-nu-latn', {
     style: 'currency',
     currency,
     minimumFractionDigits: digits,
@@ -42,7 +50,8 @@ const format = (minor: string, currency: string): string => {
 };
 
 /** تمييز العدد بالعربية يتغيّر بالعدد نفسه: «2 متاجر» خطأ، والصواب «متجرين» */
-function stores(n: number): string {
+function stores(n: number, locale: Locale): string {
+  if (locale === 'en') return n === 1 ? 'the seller' : `${n} shops`;
   if (n === 1) return 'البائع';
   if (n === 2) return 'متجرين';
   if (n <= 10) return `${n} متاجر`;
@@ -50,10 +59,16 @@ function stores(n: number): string {
 }
 
 /** أسباب الرفض الشائعة — نصائح عامة للمشتري لا بيانات من البوابة */
-const FAIL_TIPS = [
-  'رصيد غير كافٍ أو حدّ شرائي يومي على البطاقة.',
-  'البطاقة غير مُفعّلة للشراء عبر الإنترنت — فعّلها من تطبيق بنكك.',
-  'بيانات البطاقة غير مطابقة: تحقّق من الرقم وتاريخ الانتهاء وCVV.',
+const FAIL_TIPS: Bilingual[] = [
+  { ar: 'رصيد غير كافٍ أو حدّ شرائي يومي على البطاقة.', en: 'Insufficient balance or a daily spending limit on the card.' },
+  {
+    ar: 'البطاقة غير مُفعّلة للشراء عبر الإنترنت — فعّلها من تطبيق بنكك.',
+    en: "The card isn't enabled for online purchases — enable it from your banking app.",
+  },
+  {
+    ar: 'بيانات البطاقة غير مطابقة: تحقّق من الرقم وتاريخ الانتهاء وCVV.',
+    en: "The card details don't match: check the number, expiry date and CVV.",
+  },
 ];
 
 /**
@@ -73,6 +88,8 @@ const SLOW_MS = 15_000;
 export default function OrderResultPage({ params }: { params: Promise<{ number: string }> }) {
   const { number } = use(params);
   const ask = useConfirm();
+  const t = useT();
+  const locale = useLocale();
   const [order, setOrder] = useState<OrderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -103,7 +120,7 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
       } catch (err) {
         if (!alive) return;
         // التحميل الأول يعرض خطأه؛ أثناء «نتحقّق» لا يمحو انقطاعٌ عابر الصفحة، ويُعاد السؤال في موعده
-        if (attempt === 0) setError(err instanceof Error ? err.message : 'تعذّر تحميل الطلب.');
+        if (attempt === 0) setError(err instanceof Error ? err.message : t('تعذّر تحميل الطلب.', "Couldn't load the order."));
         else schedule(attempt);
         return;
       }
@@ -116,12 +133,12 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
       alive = false;
       if (timer) clearTimeout(timer);
     };
-  }, [number]);
+  }, [number, t]);
 
   if (error) return <Alert tone="danger">{error}</Alert>;
-  if (!order) return <Spinner label="جارٍ تحميل طلبك…" />;
+  if (!order) return <Spinner label={t('جارٍ تحميل طلبك…', 'Loading your order…')} />;
 
-  const total = format(order.total.minorUnits, order.total.currency);
+  const total = format(order.total.minorUnits, order.total.currency, locale);
 
   const copy = () => {
     void navigator.clipboard
@@ -132,13 +149,13 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
 
   const orderNo = (
     <p className="sp-orderno">
-      <span>رقم الطلب</span>
+      <span>{t('رقم الطلب', 'Order number')}</span>
       <span className="sp-orderno__no num">{order.orderNumber}</span>
-      <button type="button" className="icon-btn" aria-label="انسخ رقم الطلب" onClick={copy}>
+      <button type="button" className="icon-btn" aria-label={t('انسخ رقم الطلب', 'Copy order number')} onClick={copy}>
         <Icon name={copied ? 'check' : 'copy'} size={16} />
       </button>
       <span className="visually-hidden" role="status">
-        {copied ? 'نُسخ رقم الطلب' : ''}
+        {copied ? t('نُسخ رقم الطلب', 'Order number copied') : ''}
       </span>
     </p>
   );
@@ -150,18 +167,22 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
           <span className="sp-hero__icon" aria-hidden>
             <Icon name="check-circle" size={28} />
           </span>
-          <h1 className="sp-hero__title">تمّ طلبك</h1>
+          <h1 className="sp-hero__title">{t('تمّ طلبك', 'Your order is placed')}</h1>
           <p className="sp-hero__text">
-            وصل طلبك إلى {stores(order.subOrderCount)}، وكل متجر يؤكّد ويشحن وحده. نبلغك عند كل خطوة.
+            {t(
+              `وصل طلبك إلى ${stores(order.subOrderCount, locale)}، وكل متجر يؤكّد ويشحن وحده. نبلغك عند كل خطوة.`,
+              `Your order has reached ${stores(order.subOrderCount, locale)}, and each shop confirms and ships on its own. We'll let you know at every step.`,
+            )}
           </p>
           <p className="sp-orderno">
-            <span>الإجمالي</span>
+            <span>{t('الإجمالي', 'Total')}</span>
             <span className="sp-orderno__total money num">{total}</span>
           </p>
           {order.coupon ? (
             <p className="sp-hero__text">
-              وفّرت{' '}
-              <span className="money num">{format(order.coupon.discount.minorUnits, order.coupon.discount.currency)}</span> بكوبون{' '}
+              {t('وفّرت', 'You saved')}{' '}
+              <span className="money num">{format(order.coupon.discount.minorUnits, order.coupon.discount.currency, locale)}</span>{' '}
+              {t('بكوبون', 'with coupon')}{' '}
               <bdi className="num">{order.coupon.code}</bdi>
             </p>
           ) : null}
@@ -171,11 +192,11 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
           {signedIn ? (
             <Link className="btn btn--secondary" href={`/account/orders/${encodeURIComponent(order.orderNumber)}`}>
               <Icon name="truck" size={16} />
-              تابع الطلب
+              {t('تابع الطلب', 'Track order')}
             </Link>
           ) : null}
           <Link className="btn btn--primary" href="/">
-            تابع التسوّق
+            {t('تابع التسوّق', 'Continue shopping')}
           </Link>
         </div>
       </div>
@@ -185,9 +206,9 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
   if (order.outcome === 'awaiting_transfer' && order.transfer) {
     const cancel = async () => {
       const sure = await ask({
-        title: 'تلغي الطلب؟',
-        body: 'تعود القطع للمتاجر ولا يُؤخذ منك شيء.',
-        confirmLabel: 'ألغِ الطلب',
+        title: t('تلغي الطلب؟', 'Cancel the order?'),
+        body: t('تعود القطع للمتاجر ولا يُؤخذ منك شيء.', 'The items go back to the shops and nothing is taken from you.'),
+        confirmLabel: t('ألغِ الطلب', 'Cancel order'),
         danger: true,
       });
       if (!sure) return;
@@ -196,7 +217,7 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
       try {
         setOrder(await api<OrderResult>(`/checkout/orders/${encodeURIComponent(order.orderNumber)}/cancel`, { method: 'POST' }));
       } catch (err) {
-        setActionError(err instanceof Error ? err.message : 'تعذّر إلغاء الطلب.');
+        setActionError(err instanceof Error ? err.message : t('تعذّر إلغاء الطلب.', "Couldn't cancel the order."));
       } finally {
         setCanceling(false);
       }
@@ -207,9 +228,12 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
           <span className="sp-hero__icon" aria-hidden>
             <Icon name="clock" size={28} />
           </span>
-          <h1 className="sp-hero__title">حجزنا طلبك — بقي التحويل</h1>
+          <h1 className="sp-hero__title">{t('حجزنا طلبك — بقي التحويل', "We've reserved your order — the transfer is next")}</h1>
           <p className="sp-hero__text">
-            لم نأخذ منك شيئاً بعد. حوّل المبلغ كما هو أدناه، وحين يصلنا نؤكّده ونرسل طلبك إلى المتاجر.
+            {t(
+              'لم نأخذ منك شيئاً بعد. حوّل المبلغ كما هو أدناه، وحين يصلنا نؤكّده ونرسل طلبك إلى المتاجر.',
+              "We haven't taken anything from you yet. Transfer the exact amount below, and once it reaches us we'll confirm it and send your order to the shops.",
+            )}
           </p>
           {orderNo}
         </section>
@@ -223,11 +247,11 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
           {signedIn ? (
             <Link className="btn btn--primary" href={`/account/orders/${encodeURIComponent(order.orderNumber)}`}>
               <Icon name="package" size={16} />
-              طلباتي
+              {t('طلباتي', 'My orders')}
             </Link>
           ) : null}
           <button type="button" className="btn btn--ghost" disabled={canceling} onClick={() => void cancel()}>
-            {canceling ? 'جارٍ الإلغاء…' : 'ألغِ الطلب'}
+            {canceling ? t('جارٍ الإلغاء…', 'Canceling…') : t('ألغِ الطلب', 'Cancel order')}
           </button>
         </div>
       </div>
@@ -242,14 +266,14 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
           <span className="sp-hero__icon" aria-hidden>
             <Icon name="alert" size={28} />
           </span>
-          <h1 className="sp-hero__title">{transferFailure.title}</h1>
+          <h1 className="sp-hero__title">{pick(locale, transferFailure.title)}</h1>
           <p className="sp-hero__text" role="alert">
-            {transferFailure.text}
+            {pick(locale, transferFailure.text)}
           </p>
           {orderNo}
           <div className="sp-hero__actions">
             <Link className="btn btn--primary" href="/">
-              تابع التسوّق
+              {t('تابع التسوّق', 'Continue shopping')}
             </Link>
           </div>
         </section>
@@ -264,32 +288,35 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
           <span className="sp-hero__icon" aria-hidden>
             <Icon name="alert" size={28} />
           </span>
-          <h1 className="sp-hero__title">لم يكتمل الدفع</h1>
+          <h1 className="sp-hero__title">{t('لم يكتمل الدفع', "Payment didn't go through")}</h1>
           <p className="sp-hero__text" role="alert">
-            {order.failure?.message ?? 'رفضت البوابة الدفع.'} لم يُخصم شيء، ولم تُحجز القطع باسمك. سلّتك كما هي — جرّب
-            بطاقة أخرى.
+            {order.failure?.message ?? t('رفضت البوابة الدفع.', 'The gateway declined the payment.')}{' '}
+            {t(
+              'لم يُخصم شيء، ولم تُحجز القطع باسمك. سلّتك كما هي — جرّب بطاقة أخرى.',
+              'Nothing was charged, and no items were reserved in your name. Your cart is as it was — try another card.',
+            )}
           </p>
           <span className="sp-pill">
             <Icon name="check-circle" size={14} />
-            لم نأخذ أي مبلغ
+            {t('لم نأخذ أي مبلغ', "We didn't take any money")}
           </span>
           <div className="sp-hero__actions">
             <Link className="btn btn--primary" href="/checkout">
               <Icon name="return" size={16} />
-              أعد المحاولة
+              {t('أعد المحاولة', 'Try again')}
             </Link>
             <Link className="btn btn--secondary" href="/cart">
-              عُد إلى السلة
+              {t('عُد إلى السلة', 'Back to cart')}
             </Link>
           </div>
         </section>
         <section className="card sp-reasons">
-          <h2 className="sp-reasons__title">أسباب شائعة للرفض</h2>
+          <h2 className="sp-reasons__title">{t('أسباب شائعة للرفض', 'Common reasons for a decline')}</h2>
           <ul>
-            {FAIL_TIPS.map((t) => (
-              <li key={t}>
+            {FAIL_TIPS.map((tip) => (
+              <li key={tip.ar}>
                 <Icon name="info" size={15} />
-                {t}
+                {pick(locale, tip)}
               </li>
             ))}
           </ul>
@@ -304,22 +331,28 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
         <span className="sp-hero__icon" aria-hidden>
           <Icon name="clock" size={28} />
         </span>
-        <h1 className="sp-hero__title">نتحقّق من الدفع</h1>
+        <h1 className="sp-hero__title">{t('نتحقّق من الدفع', "We're checking the payment")}</h1>
         <p className="sp-hero__text">
-          انقطع الاتصال بالبوابة أثناء الدفع، فنسألها الآن عن النتيجة. <strong>لا تدفع ثانيةً</strong> — القطع محجوزة
-          لك، والصفحة تتحدّث وحدها.
+          {t(
+            'انقطع الاتصال بالبوابة أثناء الدفع، فنسألها الآن عن النتيجة.',
+            'The connection to the gateway dropped during payment, so we are asking it for the result now.',
+          )}{' '}
+          <strong>{t('لا تدفع ثانيةً', "Don't pay again")}</strong>{' '}
+          {t('— القطع محجوزة لك، والصفحة تتحدّث وحدها.', '— the items are reserved for you, and the page updates by itself.')}
         </p>
         {orderNo}
-        <Spinner label="بانتظار ردّ البوابة…" />
+        <Spinner label={t('بانتظار ردّ البوابة…', 'Waiting for the gateway…')} />
         {late ? (
           <>
             <p className="sp-hero__text" role="status">
-              يطول التحقّق أكثر من المعتاد. ما زلنا نسأل البوابة وتتحدّث الصفحة حين تصل النتيجة، ولك أن تغلقها: إن تمّ
-              الدفع يصلك تأكيد الطلب، وإن لم يتمّ فلا شيء عليك.
+              {t(
+                'يطول التحقّق أكثر من المعتاد. ما زلنا نسأل البوابة وتتحدّث الصفحة حين تصل النتيجة، ولك أن تغلقها: إن تمّ الدفع يصلك تأكيد الطلب، وإن لم يتمّ فلا شيء عليك.',
+                "Checking is taking longer than usual. We're still asking the gateway, and the page will update when the result arrives — you can also close it: if the payment went through you'll get the order confirmation, and if not, you owe nothing.",
+              )}
             </p>
             <div className="sp-hero__actions">
               <Link className="btn btn--secondary" href="/">
-                تابع التسوّق
+                {t('تابع التسوّق', 'Continue shopping')}
               </Link>
             </div>
           </>

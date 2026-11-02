@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { cartApi, CART_EVENT } from '@/lib/cart';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
+import { nameIn } from '@/lib/i18n';
 
 /**
  * زرّ السلة في رأس المتجر — ST-01. العدد من الخادم لا من ذاكرة المتصفّح:
@@ -12,6 +14,7 @@ import { Icon } from '@/components/icons';
  * (حدث `CART_EVENT`) وعند العودة إلى التبويب.
  */
 export function CartButton() {
+  const t = useT();
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -32,7 +35,7 @@ export function CartButton() {
   }, []);
 
   return (
-    <Link href="/cart" className="icon-btn" aria-label={count ? `السلة — ${count}` : 'السلة'}>
+    <Link href="/cart" className="icon-btn" aria-label={count ? `${t('السلة', 'Cart')} — ${count}` : t('السلة', 'Cart')}>
       <Icon name="cart" size={19} />
       {count > 0 ? <span className="icon-btn__count">{count > 99 ? '99+' : count}</span> : null}
     </Link>
@@ -43,7 +46,8 @@ export function CartButton() {
  * رقائق المتاجر تحت الرأس — المتجر المفتوح بلون العلامة الخفيف. كانت رقائق أقسام
  * عامة، وسقطت الأقسام العامة حين صارت الفئات لكل متجر (14 أكتوبر 2026).
  */
-export function ShopStrip({ shops }: { shops: { slug: string; nameAr: string }[] }) {
+export function ShopStrip({ shops }: { shops: { slug: string; nameAr: string; nameEn?: string | null }[] }) {
+  const locale = useLocale();
   const pathname = usePathname();
   return (
     <>
@@ -57,7 +61,7 @@ export function ShopStrip({ shops }: { shops: { slug: string; nameAr: string }[]
             className="store__cat"
             {...(active ? { 'aria-current': 'page' as const } : {})}
           >
-            {c.nameAr}
+            {nameIn(locale, c)}
           </Link>
         );
       })}

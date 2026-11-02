@@ -4,14 +4,16 @@ import { useMemo, useRef, useState, type DragEvent } from 'react';
 import { api, mediaUrl } from '@/lib/api';
 import { Alert } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { num, type ProductImage, type Variant } from '@/lib/catalog';
+import type { Translate } from '@/lib/i18n';
 
 /**
  * قيم الربط من الخيارات المحفوظة: كل قيمة لكل محور («اللون: أحمر»، «المقاس: M») —
  * الصورة لقيمة تظهر مع كل متغيّر يحملها، أحمر بأي مقاس. بلا محاور (منتج بسعر واحد)
  * لا ربط.
  */
-function linkOptions(variants: readonly Variant[]) {
+function linkOptions(variants: readonly Variant[], t: Translate) {
   const values: { valueId: string; label: string }[] = [];
   const seen = new Set<string>();
   for (const v of variants) {
@@ -23,7 +25,9 @@ function linkOptions(variants: readonly Variant[]) {
   }
   const variantLabel = (id: string): string => {
     const v = variants.find((x) => x.id === id);
-    return v ? `${v.options.map((o) => o.valueAr).join(' / ') || v.sku} فقط` : 'خيار لم يعد موجوداً';
+    if (!v) return t('خيار لم يعد موجوداً', 'An option that no longer exists');
+    const label = v.options.map((o) => o.valueAr).join(' / ') || v.sku;
+    return t(`${label} فقط`, `${label} only`);
   };
   return { values, variantLabel };
 }
@@ -59,7 +63,9 @@ export function ProductImages({
   variants?: readonly Variant[];
   onChanged: () => Promise<void>;
 }) {
-  const links = useMemo(() => linkOptions(variants), [variants]);
+  const t = useT();
+  const locale = useLocale();
+  const links = useMemo(() => linkOptions(variants, t), [variants, t]);
   const input = useRef<HTMLInputElement>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
@@ -82,8 +88,11 @@ export function ProductImages({
     if (files.length > room) {
       found.push(
         room <= 0
-          ? 'وصلت الحد: عشر صور للمنتج. احذف صورة قبل إضافة أخرى.'
-          : `الحد عشر صور للمنتج — رُفعت أول ${num(room)} وتُركت ${num(files.length - room)}.`,
+          ? t('وصلت الحد: عشر صور للمنتج. احذف صورة قبل إضافة أخرى.', "You've reached the limit of ten images per product. Delete one before adding another.")
+          : t(
+              `الحد عشر صور للمنتج — رُفعت أول ${num(room)} وتُركت ${num(files.length - room)}.`,
+              `The limit is ten images per product — the first ${num(room, locale)} were uploaded and ${num(files.length - room, locale)} were skipped.`,
+            ),
       );
     }
     const chosen = files.slice(0, Math.max(room, 0));
@@ -92,14 +101,17 @@ export function ProductImages({
     for (const [i, file] of chosen.entries()) {
       // نوع فارغ (بعض صيغ الهواتف على ويندوز) يُترك للخادم: يقرأ المحتوى لا الامتداد
       if (file.type && !ACCEPTED.includes(file.type)) {
-        found.push(`${file.name}: الصيغ المقبولة JPEG و PNG و WebP و AVIF.`);
+        found.push(
+          t(`${file.name}: الصيغ المقبولة JPEG و PNG و WebP و AVIF.`, `${file.name}: accepted formats are JPEG, PNG, WebP and AVIF.`),
+        );
       } else if (file.size > MAX_BYTES) {
-        found.push(`${file.name}: الحجم ${(file.size / (1024 * 1024)).toFixed(1)} م.ب والحد 10 م.ب.`);
+        const size = (file.size / (1024 * 1024)).toFixed(1);
+        found.push(t(`${file.name}: الحجم ${size} م.ب والحد 10 م.ب.`, `${file.name}: the size is ${size} MB and the limit is 10 MB.`));
       } else {
         try {
           await api(`/vendor/products/${productId}/images`, { method: 'POST', file });
         } catch (err) {
-          found.push(`${file.name}: ${err instanceof Error ? err.message : 'تعذّر رفع الصورة.'}`);
+          found.push(`${file.name}: ${err instanceof Error ? err.message : t('تعذّر رفع الصورة.', "Couldn't upload the image.")}`);
         }
       }
       setUploading({ done: i + 1, total: chosen.length });
@@ -117,7 +129,7 @@ export function ProductImages({
       await api(`/vendor/products/${productId}/images/${image.id}`, { method: 'DELETE' });
       await onChanged();
     } catch (err) {
-      setProblems([err instanceof Error ? err.message : 'تعذّر حذف الصورة.']);
+      setProblems([err instanceof Error ? err.message : t('تعذّر حذف الصورة.', "Couldn't delete the image.")]);
     } finally {
       setWorking(false);
     }
@@ -139,7 +151,7 @@ export function ProductImages({
       });
       await onChanged();
     } catch (err) {
-      setProblems([err instanceof Error ? err.message : 'تعذّر ربط الصورة.']);
+      setProblems([err instanceof Error ? err.message : t('تعذّر ربط الصورة.', "Couldn't link the image.")]);
     } finally {
       setWorking(false);
     }
@@ -157,7 +169,7 @@ export function ProductImages({
       });
       await onChanged();
     } catch (err) {
-      setProblems([err instanceof Error ? err.message : 'تعذّر حفظ الترتيب.']);
+      setProblems([err instanceof Error ? err.message : t('تعذّر حفظ الترتيب.', "Couldn't save the order.")]);
       // 409: تغيّرت الصور منذ فُتحت الصفحة — تُقرأ من جديد بدل ترتيب نصفه قديم
       await onChanged().catch(() => undefined);
     } finally {
@@ -188,14 +200,18 @@ export function ProductImages({
       {productId ? (
         <p className="vp-images__hint">
           <Icon name="grip" size={14} />
-          الصورة الأولى هي الرئيسية — اسحب البطاقات لإعادة الترتيب.
-          {links.values.length > 0 ? ' واختر تحت كل صورة اللون الذي تُظهره، لتظهر لمن يختاره.' : ''}
+          {t('الصورة الأولى هي الرئيسية — اسحب البطاقات لإعادة الترتيب.', 'The first image is the main one — drag the cards to reorder.')}
+          {links.values.length > 0
+            ? t(' واختر تحت كل صورة اللون الذي تُظهره، لتظهر لمن يختاره.', ' Under each image, choose the color it shows, so it appears to buyers who pick it.')
+            : ''}
         </p>
       ) : (
-        <Alert tone="info">احفظ المنتج أولاً — الصور تُرفع إلى منتج محفوظ، والمسودة تكفي.</Alert>
+        <Alert tone="info">
+          {t('احفظ المنتج أولاً — الصور تُرفع إلى منتج محفوظ، والمسودة تكفي.', 'Save the product first — images are uploaded to a saved product, and a draft is enough.')}
+        </Alert>
       )}
 
-      <ul className="vp-images" aria-label="صور المنتج">
+      <ul className="vp-images" aria-label={t('صور المنتج', 'Product images')}>
         {list.map((image, i) => {
           const src = mediaUrl(image.urls['thumb.webp'] ?? image.urls['medium.webp']);
           const main = i === 0;
@@ -229,12 +245,12 @@ export function ProductImages({
                 {src ? (
                   // مصغّرة من خادم الرفع مباشرةً؛ next/image يحتاج إعداد مضيف بعيد
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={src} alt={image.altAr ?? `صورة المنتج ${num(i + 1)}`} draggable={false} />
+                  <img src={src} alt={image.altAr ?? t(`صورة المنتج ${num(i + 1)}`, `Product image ${num(i + 1, locale)}`)} draggable={false} />
                 ) : (
                   <Icon name="image" size={24} />
                 )}
                 {/* الخط الأحادي للأرقام وحدها — يفكّك حروف «الرئيسية» */}
-                <span className={main ? 'vp-image__badge' : 'vp-image__badge num'}>{main ? 'الرئيسية' : String(i + 1).padStart(2, '0')}</span>
+                <span className={main ? 'vp-image__badge' : 'vp-image__badge num'}>{main ? t('الرئيسية', 'Main') : String(i + 1).padStart(2, '0')}</span>
               </div>
               <div className="vp-image__foot">
                 {main ? (
@@ -249,13 +265,13 @@ export function ProductImages({
                     onClick={() => void reorder(move(image.id, list[0]!.id))}
                   >
                     <Icon name="star" size={12} />
-                    اجعلها الرئيسية
+                    {t('اجعلها الرئيسية', 'Make main')}
                   </button>
                 )}
                 <button
                   type="button"
                   className="vp-image__remove"
-                  aria-label={`احذف الصورة ${num(i + 1)}`}
+                  aria-label={t(`احذف الصورة ${num(i + 1)}`, `Delete image ${num(i + 1, locale)}`)}
                   disabled={disabled}
                   onClick={() => void remove(image)}
                 >
@@ -264,15 +280,15 @@ export function ProductImages({
               </div>
               {links.values.length > 0 ? (
                 <label className="vp-image__link">
-                  <span className="vp-image__link-label">تظهر مع</span>
+                  <span className="vp-image__link-label">{t('تظهر مع', 'Shows with')}</span>
                   <select
                     className="vp-image__select"
                     value={choiceOf(image)}
                     disabled={disabled}
-                    aria-label={`الصورة ${num(i + 1)} تظهر مع`}
+                    aria-label={t(`الصورة ${num(i + 1)} تظهر مع`, `Image ${num(i + 1, locale)} shows with`)}
                     onChange={(e) => void relink(image, e.target.value)}
                   >
-                    <option value="">كل الخيارات</option>
+                    <option value="">{t('كل الخيارات', 'All options')}</option>
                     {links.values.map((v) => (
                       <option key={v.valueId} value={`value:${v.valueId}`}>
                         {v.label}
@@ -321,7 +337,7 @@ export function ProductImages({
               }}
             >
               <Icon name="upload" size={20} />
-              <span>أضف صورة</span>
+              <span>{t('أضف صورة', 'Add image')}</span>
             </button>
           </li>
         ) : null}
@@ -333,7 +349,7 @@ export function ProductImages({
         accept={ACCEPTED.join(',')}
         multiple
         hidden
-        aria-label="اختر صور المنتج"
+        aria-label={t('اختر صور المنتج', 'Choose product images')}
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           // يُفرَّغ كي يعمل اختيار الملف نفسه ثانيةً بعد حذفه
@@ -343,12 +359,17 @@ export function ProductImages({
       />
 
       <p className="visually-hidden" aria-live="polite">
-        {uploading ? `جارٍ رفع الصور: ${num(uploading.done)} من ${num(uploading.total)}` : ''}
+        {uploading
+          ? t(
+              `جارٍ رفع الصور: ${num(uploading.done)} من ${num(uploading.total)}`,
+              `Uploading images: ${num(uploading.done, locale)} of ${num(uploading.total, locale)}`,
+            )
+          : ''}
       </p>
 
       {problems.length === 1 ? <Alert tone="danger">{problems[0]}</Alert> : null}
       {problems.length > 1 ? (
-        <Alert tone="danger" title="بعض الصور لم تُرفع">
+        <Alert tone="danger" title={t('بعض الصور لم تُرفع', "Some images weren't uploaded")}>
           <ul className="vp-images__problems">
             {problems.map((p, i) => (
               <li key={i}>{p}</li>

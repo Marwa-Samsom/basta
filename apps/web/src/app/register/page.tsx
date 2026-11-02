@@ -6,6 +6,7 @@ import { Suspense, useState } from 'react';
 import { api, session, type Tokens } from '@/lib/api';
 import { syncAccountCurrency } from '@/lib/currency';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { TextInput } from '@/components/ui';
 import { internalPath, withNext } from '@/lib/safe-path';
 import { NewPasswordField } from '../reset/new-password-field';
@@ -19,6 +20,7 @@ import { NewPasswordField } from '../reset/new-password-field';
  * إلى نموذج فتح متجر.
  */
 function RegisterForm() {
+  const t = useT();
   const router = useRouter();
   const next = internalPath(useSearchParams().get('next'));
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '' });
@@ -52,7 +54,7 @@ function RegisterForm() {
       await syncAccountCurrency();
       router.push(withNext('/verify', next ?? '/account'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر إنشاء الحساب.');
+      setError(err instanceof Error ? err.message : t('تعذّر إنشاء الحساب.', "Couldn't create the account."));
     } finally {
       setBusy(false);
     }
@@ -63,10 +65,15 @@ function RegisterForm() {
       <div className="ac-auth__box ac-auth__box--wide">
         <header className="ac-auth__head">
           <Link href="/" className="ac-wordmark">
-            بسطة
+            {t('بسطة', 'Basta')}
           </Link>
-          <h1 className="ac-auth__title">أنشئ حسابك</h1>
-          <p className="ac-auth__sub">دقيقة واحدة، ثم نرسل إلى بريدك رمز تأكيد من ست خانات.</p>
+          <h1 className="ac-auth__title">{t('أنشئ حسابك', 'Create your account')}</h1>
+          <p className="ac-auth__sub">
+            {t(
+              'دقيقة واحدة، ثم نرسل إلى بريدك رمز تأكيد من ست خانات.',
+              'It takes a minute, then we email you a six-digit confirmation code.',
+            )}
+          </p>
         </header>
 
         <form className="ac-auth__card" onSubmit={submit} noValidate>
@@ -77,9 +84,15 @@ function RegisterForm() {
             </div>
           ) : null}
 
-          <TextInput label="الاسم الكامل" autoComplete="name" required value={form.fullName} onChange={set('fullName')} />
           <TextInput
-            label="البريد الإلكتروني"
+            label={t('الاسم الكامل', 'Full name')}
+            autoComplete="name"
+            required
+            value={form.fullName}
+            onChange={set('fullName')}
+          />
+          <TextInput
+            label={t('البريد الإلكتروني', 'Email')}
             type="email"
             dir="ltr"
             autoComplete="email"
@@ -89,13 +102,13 @@ function RegisterForm() {
           />
 
           <NewPasswordField
-            label="كلمة المرور"
+            label={t('كلمة المرور', 'Password')}
             value={form.password}
             onChange={(password) => setForm((f) => ({ ...f, password }))}
           />
 
           <TextInput
-            label="رقم الجوال"
+            label={t('رقم الجوال', 'Mobile number')}
             optional
             type="tel"
             dir="ltr"
@@ -108,13 +121,13 @@ function RegisterForm() {
           />
 
           <button className="btn btn--primary btn--block ac-auth__cta" type="submit" disabled={busy}>
-            {busy ? 'جارٍ الإنشاء…' : 'أنشئ الحساب'}
+            {busy ? t('جارٍ الإنشاء…', 'Creating…') : t('أنشئ الحساب', 'Create account')}
           </button>
         </form>
 
         <p className="ac-auth__foot">
-          <span>لديك حساب بالفعل؟</span>
-          <Link href={withNext('/login', next)}>ادخل</Link>
+          <span>{t('لديك حساب بالفعل؟', 'Already have an account?')}</span>
+          <Link href={withNext('/login', next)}>{t('ادخل', 'Sign in')}</Link>
         </p>
       </div>
     </main>

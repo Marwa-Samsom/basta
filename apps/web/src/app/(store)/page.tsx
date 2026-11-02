@@ -8,6 +8,8 @@ import { ProductGrid } from '@/components/product-card';
 import { RecentSection } from '@/components/recent';
 import { EmptyState } from '@/components/ui';
 import { pageCurrency } from '@/lib/currency-server';
+import { intlLocale, nameIn, translator, type Locale } from '@/lib/i18n';
+import { pageLocale } from '@/lib/i18n-server';
 import { internalPath } from '@/lib/safe-path';
 import { getBanners, getCampaigns, getFeatured, getShops, imageUrl, listProducts, type Campaign } from '@/lib/storefront';
 
@@ -23,13 +25,15 @@ export const dynamic = 'force-dynamic';
  */
 const SHOP_TILES = 6;
 
-const endDate = (iso: string) => new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long' }).format(new Date(iso));
+const endDate = (iso: string, locale: Locale) =>
+  new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'long' }).format(new Date(iso));
 
 /**
  * حملة جارية (AD-17): اسمها وموعد انتهائها، والكوبون المُعلَن إن كان صالحاً
  * الآن، ومنتجاتها بترتيب الإدارة بالبطاقة نفسها — بلا صورة إضافية تثقل الرسم.
  */
-function CampaignSection({ campaign }: { campaign: Campaign }) {
+function CampaignSection({ campaign, locale }: { campaign: Campaign; locale: Locale }) {
+  const t = translator(locale);
   const titleId = `sd-campaign-${campaign.id}`;
   return (
     <section className="sd-section sd-campaign" aria-labelledby={titleId}>
@@ -38,19 +42,19 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
           {campaign.nameAr}
         </h2>
         <span className="sd-section__note">
-          حتى <time dateTime={campaign.endsAt}>{endDate(campaign.endsAt)}</time>
+          {t('حتى', 'Until')} <time dateTime={campaign.endsAt}>{endDate(campaign.endsAt, locale)}</time>
         </span>
         {campaign.couponCode ? (
           <span className="sd-campaign__coupon">
             <Icon name="star" size={14} />
-            استعمل الرمز
+            {t('استعمل الرمز', 'Use code')}
             <span className="sd-campaign__code num" dir="ltr">
               {campaign.couponCode}
             </span>
           </span>
         ) : null}
       </div>
-      <ProductGrid products={campaign.products} />
+      <ProductGrid products={campaign.products} locale={locale} />
     </section>
   );
 }
@@ -60,13 +64,14 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
  * الإدارة شيئاً يبقى ما هو حقيقي: المتاجر وأحدث المنشور — لا صور مصطنعة.
  */
 export default async function HomePage() {
-  const currency = await pageCurrency();
+  const [currency, locale] = await Promise.all([pageCurrency(), pageLocale()]);
+  const t = translator(locale);
   const [shopsPage, latest, banners, featured, campaigns] = await Promise.all([
     getShops().catch(() => ({ items: [] })),
-    listProducts({ sort: 'newest', pageSize: '12' }, currency),
+    listProducts({ sort: 'newest', pageSize: '12' }, currency, locale),
     getBanners('home_hero'),
-    getFeatured(currency),
-    getCampaigns(currency),
+    getFeatured(currency, locale),
+    getCampaigns(currency, locale),
   ]);
 
   const banner = banners[0];
@@ -83,23 +88,34 @@ export default async function HomePage() {
       {/* البطل — لوحة بلون العلامة وصورة البانر بجانبها إن وُجد */}
       <section className={bannerSrc ? 'sd-hero sd-hero--media' : 'sd-hero'}>
         <div className="sd-hero__panel">
-          <span className="sd-hero__kicker">{isEmpty ? 'منصّة جديدة' : 'سوق المتاجر المستقلة'}</span>
+          <span className="sd-hero__kicker">
+            {isEmpty ? t('منصّة جديدة', 'A new platform') : t('سوق المتاجر المستقلة', 'The marketplace of independent shops')}
+          </span>
           <h1 className="sd-hero__title">
-            {banner?.titleAr ?? (isEmpty ? 'بسطة تبدأ الآن' : 'كل المتاجر المستقلة في سوق واحد')}
+            {banner?.titleAr ??
+              (isEmpty
+                ? t('بسطة تبدأ الآن', 'Basta starts now')
+                : t('كل المتاجر المستقلة في سوق واحد', 'All independent shops in one marketplace'))}
           </h1>
           <p className="sd-hero__body">
             {isEmpty
-              ? 'أول المتاجر تنضم هذه الأيام. تصفّح المتاجر لترى ما وصل، وسجّل متجرك إن كنت تاجراً.'
-              : 'اشترِ من بائعين حقيقيين، بعملة بلدك، وتابع كل طلب من متجره.'}
+              ? t(
+                  'أول المتاجر تنضم هذه الأيام. تصفّح المتاجر لترى ما وصل، وسجّل متجرك إن كنت تاجراً.',
+                  "The first shops are joining these days. Browse the shops to see what's arrived, and register your shop if you're a seller.",
+                )
+              : t(
+                  'اشترِ من بائعين حقيقيين، بعملة بلدك، وتابع كل طلب من متجره.',
+                  "Buy from real sellers, in your country's currency, and track each order from its shop.",
+                )}
           </p>
           {bannerHref ? (
             <Link href={bannerHref} className="btn btn--on-brand btn--lg sd-hero__cta">
-              تسوّق الآن
+              {t('تسوّق الآن', 'Shop now')}
               <Icon name="next" size={17} mirror />
             </Link>
           ) : (
             <Link href="/shops" className="btn btn--on-brand btn--lg sd-hero__cta">
-              تصفّح المتاجر
+              {t('تصفّح المتاجر', 'Browse shops')}
               <Icon name="next" size={17} mirror />
             </Link>
           )}
@@ -107,7 +123,7 @@ export default async function HomePage() {
         {bannerSrc ? (
           <div className="sd-hero__media">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={bannerSrc} alt={banner?.titleAr ?? 'عرض'} />
+            <img src={bannerSrc} alt={banner?.titleAr ?? t('عرض', 'Offer')} />
           </div>
         ) : null}
       </section>
@@ -116,10 +132,10 @@ export default async function HomePage() {
         <section className="sd-section" aria-labelledby="sd-shops-title">
           <div className="sd-section__head">
             <h2 id="sd-shops-title" className="sd-section__title">
-              تصفّح المتاجر
+              {t('تصفّح المتاجر', 'Browse shops')}
             </h2>
             <Link href="/shops" className="sd-section__link">
-              كل المتاجر
+              {t('كل المتاجر', 'All shops')}
               <Icon name="chev-end" size={14} mirror />
             </Link>
           </div>
@@ -129,7 +145,7 @@ export default async function HomePage() {
                 <span className="sd-tile__icon" aria-hidden>
                   <Icon name="store" size={21} />
                 </span>
-                <span className="sd-tile__label">{c.nameAr}</span>
+                <span className="sd-tile__label">{nameIn(locale, c)}</span>
               </Link>
             ))}
           </div>
@@ -137,17 +153,17 @@ export default async function HomePage() {
       ) : null}
 
       {topCampaigns.map((c) => (
-        <CampaignSection key={c.id} campaign={c} />
+        <CampaignSection key={c.id} campaign={c} locale={locale} />
       ))}
 
       {featured.length > 0 ? (
         <section className="sd-section" aria-labelledby="sd-featured-title">
           <div className="sd-section__head">
             <h2 id="sd-featured-title" className="sd-section__title">
-              مختارات
+              {t('مختارات', 'Featured')}
             </h2>
           </div>
-          <ProductGrid products={featured} />
+          <ProductGrid products={featured} locale={locale} />
         </section>
       ) : null}
 
@@ -155,13 +171,13 @@ export default async function HomePage() {
       <RecentSection />
 
       {middleCampaigns.map((c) => (
-        <CampaignSection key={c.id} campaign={c} />
+        <CampaignSection key={c.id} campaign={c} locale={locale} />
       ))}
 
       <section className="sd-section" aria-labelledby="sd-latest-title">
         <div className="sd-section__head">
           <h2 id="sd-latest-title" className="sd-section__title">
-            وصل حديثاً
+            {t('وصل حديثاً', 'New arrivals')}
           </h2>
         </div>
         {!isEmpty ? (
@@ -169,14 +185,14 @@ export default async function HomePage() {
         ) : (
           <EmptyState
             icon="store"
-            title="لا منتجات لعرضها"
+            title={t('لا منتجات لعرضها', 'No products to show')}
             actions={
               <Link className="btn btn--secondary" href="/vendor/register">
-                افتح متجرك
+                {t('افتح متجرك', 'Open your shop')}
               </Link>
             }
           >
-            لا منتجات منشورة بعد. أول البائعين يجهّزون متاجرهم الآن.
+            {t('لا منتجات منشورة بعد. أول البائعين يجهّزون متاجرهم الآن.', 'No published products yet. The first sellers are setting up their shops now.')}
           </EmptyState>
         )}
       </section>

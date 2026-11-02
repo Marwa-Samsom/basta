@@ -7,8 +7,11 @@ import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { toLatinDigits } from '@/lib/digits';
+import type { Locale } from '@/lib/i18n';
 import { daysAr, when } from '@/lib/orders';
 import { ClearableInput } from '@/components/ui';
+import { useLocale, useT } from '@/components/locale';
+import { COUNTRIES as COUNTRY_NAMES } from '@/lib/vendor';
 
 interface Setting {
   key: string;
@@ -52,8 +55,14 @@ function intValue(s: Setting, raw: string): number | null {
  * يحرّره عند التسليم. كانت النافذة تعرض الجملة العامة وحدها، فيُحفظ الصفر ولا شيء يقول
  * ما يعنيه (SYS-022، 2 نوفمبر 2026).
  */
-function holdWarning(days: number, returnDays: number): string | null {
+function holdWarning(days: number, returnDays: number, locale: Locale): string | null {
   if (days >= returnDays) return null;
+  if (locale === 'en') {
+    const window = `the return window (${daysAr(returnDays, locale)})`;
+    return days === 0
+      ? `Zero: the seller's money is released when delivery is confirmed, in the first release run, before ${window} ends — a refund may be requested for money already paid out.`
+      : `Shorter than ${window}: the seller's money is released while the buyer can still return — a refund may be requested for money already paid out.`;
+  }
   const returns = `مهلة الإرجاع (${daysAr(returnDays)})`;
   return days === 0
     ? `صفر: مال البائع يتحرّر عند تأكيد التسليم، بأول دورة تحرير، قبل أن تنتهي ${returns} — فقد يُطلب ردّ مالٍ صُرف.`
@@ -76,6 +85,10 @@ function brokenStored(s: Setting): string | null {
  * يعيد ذكره في التأكيد. كل تغيير في السجل بقيمته قبل وبعد.
  */
 export default function AdminSettingsPage() {
+  const t = useT();
+  const locale = useLocale();
+  const countryLabel = (code: string): string =>
+    locale === 'en' ? (COUNTRY_NAMES.find((c) => c.code === code)?.nameEn ?? code) : (COUNTRIES[code] ?? code);
   const { data, error, forbidden, reload } = useAdminData<{ settings: Setting[]; taxes: Tax[] }>('/admin/settings');
   const act = useAction();
   const ask = useConfirm();
@@ -88,9 +101,9 @@ export default function AdminSettingsPage() {
     const value = s.kind === 'int' ? intValue(s, raw) : raw;
     if (value === null) return;
     const returnDays = Number(data.settings.find((x) => x.key === 'return_window_days')?.value ?? 0);
-    const warning = s.key === 'hold_period_days' && typeof value === 'number' ? holdWarning(value, returnDays) : null;
+    const warning = s.key === 'hold_period_days' && typeof value === 'number' ? holdWarning(value, returnDays, locale) : null;
     const sure = await ask({
-      title: `تغيّر «${s.labelAr}»؟`,
+      title: t(`تغيّر «${s.labelAr}»؟`, `Change “${s.labelAr}”?`),
       body: (
         <>
           <p>
@@ -104,22 +117,22 @@ export default function AdminSettingsPage() {
           ) : null}
         </>
       ),
-      confirmLabel: 'احفظ الإعداد',
+      confirmLabel: t('احفظ الإعداد', 'Save setting'),
     });
     if (!sure) return;
     void act.run(async () => {
       await api(`/admin/settings/${s.key}`, { method: 'PUT', body: { value } });
       setDraft(({ [s.key]: _, ...rest }) => rest);
       reload();
-    }, 'حُفظ الإعداد.');
+    }, t('حُفظ الإعداد.', 'Setting saved.'));
   };
 
   // بيانات التحويل معاً: ما يراه المشتري بعد «أكّد الطلب» — المستفيد ووجهة واحدة على الأقل شرطٌ لقبول الطلبات
   const isTransfer = (s: Setting) => s.key.startsWith('transfer_');
   const groups = [
-    { title: 'الدفع بالتحويل', rows: data.settings.filter(isTransfer) },
-    { title: 'إعدادات مالية', rows: data.settings.filter((s) => s.financial && !isTransfer(s)) },
-    { title: 'إعدادات التشغيل', rows: data.settings.filter((s) => !s.financial && !isTransfer(s)) },
+    { title: t('الدفع بالتحويل', 'Payment by transfer'), rows: data.settings.filter(isTransfer) },
+    { title: t('إعدادات مالية', 'Financial settings'), rows: data.settings.filter((s) => s.financial && !isTransfer(s)) },
+    { title: t('إعدادات التشغيل', 'Operational settings'), rows: data.settings.filter((s) => !s.financial && !isTransfer(s)) },
   ].filter((g) => g.rows.length > 0);
   const dirty = Object.entries(draft).some(([k, v]) => String(data.settings.find((s) => s.key === k)?.value ?? '') !== v);
 
@@ -163,44 +176,47 @@ export default function AdminSettingsPage() {
             <select className="field__control ac2-setting__select" value={draft[s.key] ?? String(s.value ?? '')} onChange={(e) => setDraft({ ...draft, [s.key]: e.target.value })} aria-label={s.labelAr}>
               {(s.options ?? []).map((o) => (
                 <option key={o} value={o}>
-                  {o === 'platform' ? 'المنصة' : o === 'vendor' ? 'البائع' : o}
+                  {o === 'platform' ? t('المنصة', 'Platform') : o === 'vendor' ? t('البائع', 'Seller') : o}
                 </option>
               ))}
             </select>
           )}
           <button type="button" className={`btn btn--sm ${changed && !invalid ? 'btn--primary' : 'btn--secondary'}`} disabled={act.busy || !changed || invalid} onClick={() => void save(s)}>
-            حفظ
+            {t('حفظ', 'Save')}
           </button>
         </div>
         {invalid ? (
           <span id={`${s.key}-error`} className="field__error" role="alert">
-            اكتب رقماً صحيحاً من <bdi className="num">{s.min}</bdi> إلى <bdi className="num">{s.max}</bdi>.
+            {t('اكتب رقماً صحيحاً من', 'Enter a whole number from')} <bdi className="num">{s.min}</bdi> {t('إلى', 'to')} <bdi className="num">{s.max}</bdi>.
           </span>
         ) : null}
         <span className="ac2-setting__now">
-          الحالي:{' '}
+          {t('الحالي:', 'Current:')}{' '}
           {stored !== null ? (
             <bdi>«{stored}»</bdi>
           ) : (
             <>
-              <span className="num">{s.key.endsWith('_bps') ? pct(Number(s.value)) : String(s.value ?? '—')}</span> {s.unit ?? ''}
+              <span className="num">{s.key.endsWith('_bps') ? pct(Number(s.value), locale) : String(s.value ?? '—')}</span> {s.unit ?? ''}
             </>
           )}
-          {s.updatedAt ? ` · عُدِّل ${when(s.updatedAt)}` : ''}
+          {s.updatedAt ? t(` · عُدِّل ${when(s.updatedAt, locale)}`, ` · edited ${when(s.updatedAt, locale)}`) : ''}
         </span>
         {stored !== null ? (
           <span className="alert alert--danger ac2-callout ac2-callout--sm" role="alert">
             <Icon name="alert" size={14} />
             <span>
-              القيمة المحفوظة «<bdi>{stored}</bdi>»{' '}
+              {t('القيمة المحفوظة', 'The stored value')} «<bdi>{stored}</bdi>»{' '}
               {/^\d+$/.test(toLatinDigits(stored).trim()) ? (
                 <>
-                  خارج حدود اللوحة (<bdi className="num">{s.min}</bdi>–<bdi className="num">{s.max}</bdi>)
+                  {t('خارج حدود اللوحة', 'is outside the panel limits')} (<bdi className="num">{s.min}</bdi>–<bdi className="num">{s.max}</bdi>)
                 </>
               ) : (
-                'ليست رقماً صحيحاً'
+                t('ليست رقماً صحيحاً', 'is not a whole number')
               )}{' '}
-              — كُتبت من خارج اللوحة، وقد يتجاهلها النظام ويعمل بقيمته الافتراضية. احفظ قيمة صحيحة.
+              {t(
+                '— كُتبت من خارج اللوحة، وقد يتجاهلها النظام ويعمل بقيمته الافتراضية. احفظ قيمة صحيحة.',
+                '— it was written outside the panel, and the system may ignore it and use its default. Save a valid value.',
+              )}
             </span>
           </span>
         ) : null}
@@ -216,7 +232,13 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="ac2-page">
-      <AdminHeader title="إعدادات المنصّة والضرائب" hint="الإعداد المالي يذكر أثره قبل الحفظ، وكل تغيير يُسجَّل في سجلّ التدقيق بقيمته قبل وبعد." />
+      <AdminHeader
+        title={t('إعدادات المنصّة والضرائب', 'Platform settings and taxes')}
+        hint={t(
+          'الإعداد المالي يذكر أثره قبل الحفظ، وكل تغيير يُسجَّل في سجلّ التدقيق بقيمته قبل وبعد.',
+          'A financial setting states its effect before saving, and every change is recorded in the audit log with its before and after values.',
+        )}
+      />
       <Feedback error={act.error} notice={act.notice} />
 
       <div className="ac2-split">
@@ -232,42 +254,47 @@ export default function AdminSettingsPage() {
           {dirty ? (
             <span className="ac2-switch-row ac2-note-warning">
               <span className="dot" aria-hidden />
-              تغييرات غير محفوظة — كل إعداد يُحفظ بزرّه.
+              {t('تغييرات غير محفوظة — كل إعداد يُحفظ بزرّه.', 'Unsaved changes — each setting is saved with its own button.')}
             </span>
           ) : null}
         </div>
 
-        <section className="card card--flush ac2-sticky" aria-label="الضرائب لكل بلد">
+        <section className="card card--flush ac2-sticky" aria-label={t('الضرائب لكل بلد', 'Taxes by country')}>
           <header className="card__head">
-            <h2 className="ac2-title">الضرائب لكل بلد</h2>
+            <h2 className="ac2-title">{t('الضرائب لكل بلد', 'Taxes by country')}</h2>
           </header>
-          <p className="ac2-section-empty">النسبة الجديدة تُنهي السابقة بتاريخ ولا تحذفها — الطلبات السابقة على لقطتها.</p>
+          <p className="ac2-section-empty">
+            {t(
+              'النسبة الجديدة تُنهي السابقة بتاريخ ولا تحذفها — الطلبات السابقة على لقطتها.',
+              'A new rate ends the previous one on a date without deleting it — earlier orders keep their snapshot.',
+            )}
+          </p>
           {data.taxes.length ? (
             <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
-                    <th scope="col">البلد</th>
-                    <th scope="col">النسبة</th>
+                    <th scope="col">{t('البلد', 'Country')}</th>
+                    <th scope="col">{t('النسبة', 'Rate')}</th>
                     <th scope="col" className="end">
-                      منذ
+                      {t('منذ', 'Since')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.taxes.map((t) => (
-                    <tr key={t.id}>
+                  {data.taxes.map((tx) => (
+                    <tr key={tx.id}>
                       <td>
                         <span className="ac2-cell">
-                          <span className="ac2-cell__main">{COUNTRIES[t.country] ?? t.country}</span>
-                          <span className="ac2-cell__sub">{t.isPriceInclusive ? 'شاملة في السعر' : 'مضافة إلى السعر'}</span>
+                          <span className="ac2-cell__main">{countryLabel(tx.country)}</span>
+                          <span className="ac2-cell__sub">{tx.isPriceInclusive ? t('شاملة في السعر', 'Included in the price') : t('مضافة إلى السعر', 'Added to the price')}</span>
                         </span>
                       </td>
-                      <td className="num ac2-rate" data-label="النسبة">
-                        {pct(t.rateBps)}
+                      <td className="num ac2-rate" data-label={t('النسبة', 'Rate')}>
+                        {pct(tx.rateBps, locale)}
                       </td>
-                      <td className="end ac2-muted-cell" data-label="منذ">
-                        {when(t.effectiveFrom)}
+                      <td className="end ac2-muted-cell" data-label={t('منذ', 'Since')}>
+                        {when(tx.effectiveFrom, locale)}
                       </td>
                     </tr>
                   ))}
@@ -278,22 +305,22 @@ export default function AdminSettingsPage() {
           <div className="card__body">
             <div className="ac2-form">
               <label className="field">
-                <span className="field__label">البلد</span>
+                <span className="field__label">{t('البلد', 'Country')}</span>
                 <select className="field__control" value={tax.country} onChange={(e) => setTax({ ...tax, country: e.target.value })}>
-                  {Object.entries(COUNTRIES).map(([k, v]) => (
+                  {Object.keys(COUNTRIES).map((k) => (
                     <option key={k} value={k}>
-                      {v}
+                      {countryLabel(k)}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="field">
-                <span className="field__label">النسبة %</span>
+                <span className="field__label">{t('النسبة %', 'Rate %')}</span>
                 <ClearableInput className="field__control num" dir="ltr" inputMode="decimal" value={tax.rate} onChange={(e) => setTax({ ...tax, rate: e.target.value })} />
               </label>
             </div>
             <label className="ac2-check">
-              <input type="checkbox" checked={tax.inclusive} onChange={(e) => setTax({ ...tax, inclusive: e.target.checked })} /> شاملة في السعر
+              <input type="checkbox" checked={tax.inclusive} onChange={(e) => setTax({ ...tax, inclusive: e.target.checked })} /> {t('شاملة في السعر', 'Included in the price')}
             </label>
             <button
               type="button"
@@ -301,19 +328,22 @@ export default function AdminSettingsPage() {
               disabled={act.busy || tax.rate === '' || Number.isNaN(Number(tax.rate))}
               onClick={async () => {
                 const sure = await ask({
-                  title: `تعتمد ضريبة ${COUNTRIES[tax.country]} ${tax.rate}% ${tax.inclusive ? 'شاملة في السعر' : 'مضافة على السعر'}؟`,
-                  body: 'تسري على الطلبات الجديدة فقط.',
-                  confirmLabel: 'اعتمد الضريبة',
+                  title: t(
+                    `تعتمد ضريبة ${COUNTRIES[tax.country]} ${tax.rate}% ${tax.inclusive ? 'شاملة في السعر' : 'مضافة على السعر'}؟`,
+                    `Apply a ${tax.rate}% tax for ${countryLabel(tax.country)}, ${tax.inclusive ? 'included in the price' : 'added to the price'}?`,
+                  ),
+                  body: t('تسري على الطلبات الجديدة فقط.', 'It applies to new orders only.'),
+                  confirmLabel: t('اعتمد الضريبة', 'Apply tax'),
                 });
                 if (!sure) return;
                 void act.run(async () => {
                   await api(`/admin/taxes/${tax.country}`, { method: 'PUT', body: { rateBps: Math.round(Number(tax.rate) * 100), isPriceInclusive: tax.inclusive } });
                   setTax({ ...tax, rate: '' });
                   reload();
-                }, 'سُجّلت الضريبة الجديدة.');
+                }, t('سُجّلت الضريبة الجديدة.', 'New tax recorded.'));
               }}
             >
-              اعتماد
+              {t('اعتماد', 'Apply')}
             </button>
           </div>
         </section>

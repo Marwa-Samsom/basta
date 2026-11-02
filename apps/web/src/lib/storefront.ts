@@ -8,6 +8,7 @@
  */
 
 import { notFound } from 'next/navigation';
+import { intlLocale, type Locale } from './i18n';
 
 export const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://127.0.0.1:4000/api/v1';
 
@@ -30,7 +31,7 @@ export interface ProductCard {
   nameEn: string | null;
   price: Price;
   compareAtPrice: Price | null;
-  vendor: { id: string; slug: string; nameAr: string };
+  vendor: { id: string; slug: string; nameAr: string; nameEn?: string | null };
   thumbnail: string | null;
   available: number;
   isSoldOut: boolean;
@@ -65,17 +66,19 @@ export interface ProductPage {
   nameAr: string;
   nameEn: string | null;
   descriptionAr: string | null;
+  descriptionEn?: string | null;
   /** عملة الأسعار المعروضة — عملة المشتري، أو عملة المتجر إن تعذّر الصرف */
   currency: string;
   /** العملة التي سعّر بها المتجر */
   storeCurrency: string;
   /** فئة المنتج في متجره — null إن لم يضعه البائع في فئة */
-  storeCategory: { id: string; nameAr: string } | null;
+  storeCategory: { id: string; nameAr: string; nameEn?: string | null } | null;
   brand: { id: string; nameAr: string } | null;
   vendor: {
     id: string;
     slug: string;
     nameAr: string;
+    nameEn?: string | null;
     shippingPolicyAr: string | null;
     returnPolicyAr: string | null;
     ratingAvg: number;
@@ -120,6 +123,7 @@ export interface ShopPage {
     nameAr: string;
     nameEn: string | null;
     descriptionAr: string | null;
+    descriptionEn?: string | null;
     shippingPolicyAr: string | null;
     returnPolicyAr: string | null;
     ratingAvg: number;
@@ -128,7 +132,7 @@ export interface ShopPage {
     isSuspended: boolean;
   };
   /** فئات المتجر التي فيها معروض — أزرار التصفية بترتيب البائع */
-  categories: { id: string; nameAr: string; count: number }[];
+  categories: { id: string; nameAr: string; nameEn?: string | null; count: number }[];
   products: ProductCard[];
   page: number;
   pageSize: number;
@@ -140,11 +144,15 @@ export interface ShopCard {
   id: string;
   slug: string;
   nameAr: string;
+  nameEn?: string | null;
   descriptionAr: string | null;
+  descriptionEn?: string | null;
   ratingAvg: number;
   ratingCount: number;
   productCount: number;
   categories: string[];
+  /** الفئات نفسها بأسمائها الإنجليزية (والعربي لفئة بلا اسم إنجليزي) */
+  categoriesEn?: string[];
 }
 
 /**
@@ -152,9 +160,11 @@ export interface ShopCard {
  * دقيقةً، فلا يضرب كل زائر قاعدة البيانات. والسعر والمخزون أحدث من دقيقة
  * في السلة والدفع لا هنا — صفحة المنتج تعرض، لا تحجز.
  */
-async function get<T>(path: string, revalidate = 60, currency?: string): Promise<T> {
-  // عملة العرض في العنوان: التخزين مفتاحه العنوان، فلكل عملة نسختها
-  const url = currency ? `${path}${path.includes('?') ? '&' : '?'}currency=${currency}` : path;
+async function get<T>(path: string, revalidate = 60, currency?: string, lang?: Locale): Promise<T> {
+  // عملة العرض واللغة في العنوان: التخزين مفتاحه العنوان، فلكل عملة ولغة نسختها. والعربية
+  // بلا معامل — عنوانها كما كان قبل زرّ اللغة
+  const query = [currency ? `currency=${currency}` : '', lang === 'en' ? 'lang=en' : ''].filter(Boolean).join('&');
+  const url = query ? `${path}${path.includes('?') ? '&' : '?'}${query}` : path;
   const res = await fetch(`${API_BASE}${url}`, { next: { revalidate } });
   if (res.status === 404) notFound();
   if (!res.ok) throw new Error(`تعذّر تحميل ${path}: ${res.status}`);
@@ -176,8 +186,8 @@ export function decodeParam(value: string): string {
 
 const slugPath = (slug: string): string => encodeURIComponent(decodeParam(slug));
 
-export const getProduct = (slug: string, currency?: string): Promise<ProductPage> =>
-  get(`/storefront/products/${slugPath(slug)}`, 60, currency);
+export const getProduct = (slug: string, currency?: string, lang?: Locale): Promise<ProductPage> =>
+  get(`/storefront/products/${slugPath(slug)}`, 60, currency, lang);
 
 /** مراجعة موثّقة كما تُعرض — الاسم الأول وحده، والمتغيّر الذي اشتُري */
 export interface ProductReview {
@@ -214,18 +224,19 @@ export const getProductReviews = (productId: string): Promise<ProductReviews> =>
  */
 export function getShop(
   slug: string,
-  opts: { category?: string | undefined; page?: number | undefined; currency?: string | undefined } = {},
+  opts: { category?: string | undefined; page?: number | undefined; currency?: string | undefined; lang?: Locale | undefined } = {},
 ): Promise<ShopPage> {
   const query = new URLSearchParams();
   if (opts.category) query.set('category', opts.category);
   if (opts.page && opts.page > 1) query.set('page', String(opts.page));
   const qs = query.toString();
-  return get(`/storefront/shops/${slugPath(slug)}${qs ? `?${qs}` : ''}`, 0, opts.currency);
+  return get(`/storefront/shops/${slugPath(slug)}${qs ? `?${qs}` : ''}`, 0, opts.currency, opts.lang);
 }
 
 export interface CurrencyOption {
   code: string;
   nameAr: string;
+  nameEn: string;
   symbol: string;
 }
 
@@ -274,8 +285,8 @@ export interface ContentPage {
 export const getBanners = (placement: string): Promise<Banner[]> =>
   get<Banner[]>(`/storefront/banners?placement=${placement}`, 60).catch(() => []);
 
-export const getFeatured = (currency?: string): Promise<ProductCard[]> =>
-  get<ProductCard[]>('/storefront/featured', 60, currency).catch(() => []);
+export const getFeatured = (currency?: string, lang?: Locale): Promise<ProductCard[]> =>
+  get<ProductCard[]>('/storefront/featured', 60, currency, lang).catch(() => []);
 
 /** حملة جارية في الرئيسية (AD-17) — بطاقاتها بمخطّط المميّز نفسه */
 export interface Campaign {
@@ -288,8 +299,8 @@ export interface Campaign {
 }
 
 /** الخطأ يعني «لا حملات» لا صفحة ساقطة — والبناء لا يحتاج خادماً حيّاً */
-export const getCampaigns = (currency?: string): Promise<Campaign[]> =>
-  get<Campaign[]>('/storefront/campaigns', 60, currency).catch(() => []);
+export const getCampaigns = (currency?: string, lang?: Locale): Promise<Campaign[]> =>
+  get<Campaign[]>('/storefront/campaigns', 60, currency, lang).catch(() => []);
 
 export const getPage = (slug: string): Promise<ContentPage> => get(`/pages/${slugPath(slug)}`, 300);
 
@@ -333,11 +344,11 @@ export function listParams(raw: Record<string, string | string[] | undefined>): 
   return out;
 }
 
-export function listProducts(params: Record<string, string | undefined>, currency?: string): Promise<ListResult> {
+export function listProducts(params: Record<string, string | undefined>, currency?: string, lang?: Locale): Promise<ListResult> {
   const query = new URLSearchParams(listParams(params));
   // البحث لا يُخزَّن: كل كلمة استعلام جديد، والتخزين يملأ الذاكرة بلا فائدة
-  return get(`/storefront/products?${query.toString()}`, params['q'] ? 0 : 60, currency);
+  return get(`/storefront/products?${query.toString()}`, params['q'] ? 0 : 60, currency, lang);
 }
 
-export const num = (value: number): string =>
-  new Intl.NumberFormat('ar-JO-u-nu-latn').format(value);
+export const num = (value: number, locale: Locale = 'ar'): string =>
+  new Intl.NumberFormat(locale === 'en' ? intlLocale(locale) : 'ar-JO-u-nu-latn').format(value);

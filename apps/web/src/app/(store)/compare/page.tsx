@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 import '@/styles/screens/storefront-extra.css';
 import { CompareView } from '@/components/compare';
+import { serverT } from '@/lib/i18n-server';
 
-export const metadata: Metadata = { title: 'قارن المنتجات', robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t('قارن المنتجات', 'Compare products'), robots: { index: false } };
+}
 
 /**
  * ST-10 — المقارنة. القائمة في هذا الجهاز (التخزين المحلي)، والأسعار

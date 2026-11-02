@@ -326,7 +326,7 @@ export class VendorCatalogController {
   @Post('categories')
   @ApiOperation({ summary: 'فئة جديدة في آخر القائمة — بلا مراجعة إدارية' })
   createCategory(@CurrentActor() actor: Actor, @Body() dto: VendorCategoryDto) {
-    return this.categories.create(scopeOf(actor), dto.nameAr);
+    return this.categories.create(scopeOf(actor), dto.nameAr, dto.nameEn);
   }
 
   @Put('categories/order')
@@ -338,7 +338,7 @@ export class VendorCatalogController {
   @Patch('categories/:id')
   @ApiOperation({ summary: 'إعادة تسمية فئة' })
   renameCategory(@CurrentActor() actor: Actor, @Param('id', uuidParam) id: string, @Body() dto: VendorCategoryDto) {
-    return this.categories.rename(scopeOf(actor), id, dto.nameAr);
+    return this.categories.rename(scopeOf(actor), id, dto.nameAr, dto.nameEn);
   }
 
   @Delete('categories/:id')

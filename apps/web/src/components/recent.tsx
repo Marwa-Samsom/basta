@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { ProductGrid } from '@/components/product-card';
 import { EmptyState, PageHead, Spinner } from '@/components/ui';
 import { priceLabel, useProductPages, type Fetched } from '@/lib/compare';
+import { intlLocale, translator, type Locale } from '@/lib/i18n';
 import { clearRecent, recordView, useHydrated, useRecent, type RecentItem } from '@/lib/recent';
 import { imageUrl, type ProductCard, type ProductPage } from '@/lib/storefront';
 import { productCount } from '@/components/compare';
@@ -39,6 +41,8 @@ function toCard(p: ProductPage): ProductCard {
 const HOME_RECENT = 4;
 
 export function RecentSection() {
+  const t = useT();
+  const locale = useLocale();
   const recent = useRecent();
   const top = recent.slice(0, HOME_RECENT);
   const pages = useProductPages(top.map((x) => x.slug));
@@ -53,14 +57,14 @@ export function RecentSection() {
     <section className="sd-section" aria-labelledby="sx-recent-title">
       <div className="sd-section__head">
         <h2 id="sx-recent-title" className="sd-section__title">
-          شوهد مؤخراً
+          {t('شوهد مؤخراً', 'Recently viewed')}
         </h2>
         <Link href="/account/recent" className="sd-section__link">
-          السجلّ كاملاً
+          {t('السجلّ كاملاً', 'Full history')}
           <Icon name="chev-end" size={14} mirror />
         </Link>
       </div>
-      <ProductGrid products={cards} />
+      <ProductGrid products={cards} locale={locale} />
     </section>
   );
 }
@@ -75,28 +79,31 @@ const startOfDay = (t: number): number => {
   return d.getTime();
 };
 
-function groupOf(viewedAt: number, today: number): string {
-  if (viewedAt >= today) return 'اليوم';
-  if (viewedAt >= today - DAY) return 'أمس';
-  return 'أقدم';
+function groupOf(viewedAt: number, today: number, locale: Locale): string {
+  const t = translator(locale);
+  if (viewedAt >= today) return t('اليوم', 'Today');
+  if (viewedAt >= today - DAY) return t('أمس', 'Yesterday');
+  return t('أقدم', 'Earlier');
 }
 
-const rtf = new Intl.RelativeTimeFormat('ar-u-nu-latn', { numeric: 'auto' });
-const clock = new Intl.DateTimeFormat('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', hour12: false });
-const date = new Intl.DateTimeFormat('ar-u-nu-latn', { day: 'numeric', month: 'long' });
-
-function whenOf(viewedAt: number, now: number, today: number): string {
+function whenOf(viewedAt: number, now: number, today: number, locale: Locale): string {
+  const t = translator(locale);
+  const rtf = new Intl.RelativeTimeFormat(intlLocale(locale), { numeric: 'auto' });
+  const clock = new Intl.DateTimeFormat(intlLocale(locale), { hour: '2-digit', minute: '2-digit', hour12: false });
+  const date = new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'long' });
   const mins = Math.round((now - viewedAt) / 60000);
   if (viewedAt >= today) {
-    if (mins < 1) return 'الآن';
+    if (mins < 1) return t('الآن', 'Just now');
     if (mins < 60) return rtf.format(-mins, 'minute');
     return rtf.format(-Math.round(mins / 60), 'hour');
   }
-  if (viewedAt >= today - DAY) return `أمس · ${clock.format(viewedAt)}`;
+  if (viewedAt >= today - DAY) return t(`أمس · ${clock.format(viewedAt)}`, `Yesterday · ${clock.format(viewedAt)}`);
   return date.format(viewedAt);
 }
 
 export function RecentView() {
+  const t = useT();
+  const locale = useLocale();
   const hydrated = useHydrated();
   const recent = useRecent();
   const pages = useProductPages(recent.map((x) => x.slug));
@@ -116,8 +123,8 @@ export function RecentView() {
   if (!hydrated) {
     return (
       <div className="sx-page">
-        <PageHead title="شوهدت مؤخّراً" />
-        <Spinner label="جارٍ فتح سجلّ المشاهدة…" />
+        <PageHead title={t('شوهدت مؤخّراً', 'Recently viewed')} />
+        <Spinner label={t('جارٍ فتح سجلّ المشاهدة…', 'Opening your viewing history…')} />
       </div>
     );
   }
@@ -125,7 +132,7 @@ export function RecentView() {
   const today = startOfDay(now);
   const groups: { label: string; items: RecentItem[] }[] = [];
   for (const item of recent) {
-    const label = groupOf(item.viewedAt, today);
+    const label = groupOf(item.viewedAt, today, locale);
     const g = groups.find((x) => x.label === label);
     if (g) g.items.push(item);
     else groups.push({ label, items: [item] });
@@ -134,8 +141,8 @@ export function RecentView() {
   return (
     <div className="sx-page">
       <PageHead
-        title="شوهدت مؤخّراً"
-        count={recent.length ? productCount(recent.length) : undefined}
+        title={t('شوهدت مؤخّراً', 'Recently viewed')}
+        count={recent.length ? productCount(recent.length, locale) : undefined}
         actions={
           <button
             type="button"
@@ -144,14 +151,14 @@ export function RecentView() {
             onClick={() => setAsking(true)}
           >
             <Icon name="trash" size={15} />
-            امسح السجلّ
+            {t('امسح السجلّ', 'Clear history')}
           </button>
         }
       />
 
       {done ? (
         <p className="alert alert--success" role="status">
-          مُسح سجلّ المشاهدة من هذا الجهاز.
+          {t('مُسح سجلّ المشاهدة من هذا الجهاز.', 'Your viewing history was cleared from this device.')}
         </p>
       ) : null}
 
@@ -159,14 +166,17 @@ export function RecentView() {
         <div className="card">
           <EmptyState
             icon="history"
-            title="لا سجلّ مشاهدة بعد"
+            title={t('لا سجلّ مشاهدة بعد', 'No viewing history yet')}
             actions={
               <Link className="btn btn--primary" href="/">
-                تصفّح المتجر
+                {t('تصفّح المتجر', 'Browse the store')}
               </Link>
             }
           >
-            ما تتصفّحه يظهر هنا لتعود إليه بسرعة. السجلّ محفوظ على جهازك ويمكنك مسحه في أي وقت.
+            {t(
+              'ما تتصفّحه يظهر هنا لتعود إليه بسرعة. السجلّ محفوظ على جهازك ويمكنك مسحه في أي وقت.',
+              'What you browse shows up here so you can get back to it quickly. The history is saved on your device and you can clear it at any time.',
+            )}
           </EmptyState>
         </div>
       ) : (
@@ -176,7 +186,7 @@ export function RecentView() {
             <ul className="sx-recent__grid">
               {g.items.map((item) => (
                 <li key={item.slug}>
-                  <RecentCard item={item} page={pages[item.slug]} when={whenOf(item.viewedAt, now, today)} />
+                  <RecentCard item={item} page={pages[item.slug]} when={whenOf(item.viewedAt, now, today, locale)} />
                 </li>
               ))}
             </ul>
@@ -187,13 +197,18 @@ export function RecentView() {
       <dialog ref={dialog} className="sx-dialog" aria-labelledby="sx-recent-ask" onClose={() => setAsking(false)}>
         <div className="sx-dialog__body">
           <h2 id="sx-recent-ask" className="sx-dialog__title">
-            امسح سجلّ المشاهدة؟
+            {t('امسح سجلّ المشاهدة؟', 'Clear viewing history?')}
           </h2>
-          <p>يُحذف سجلّ المنتجات التي تصفّحتها على هذا الجهاز. لا يؤثّر على سلّتك ولا على طلباتك.</p>
+          <p>
+            {t(
+              'يُحذف سجلّ المنتجات التي تصفّحتها على هذا الجهاز. لا يؤثّر على سلّتك ولا على طلباتك.',
+              "The list of products you browsed on this device will be deleted. It doesn't affect your cart or your orders.",
+            )}
+          </p>
         </div>
         <div className="sx-dialog__foot">
           <button type="button" className="btn btn--secondary" onClick={() => setAsking(false)}>
-            إلغاء
+            {t('إلغاء', 'Cancel')}
           </button>
           <button
             type="button"
@@ -205,7 +220,7 @@ export function RecentView() {
             }}
           >
             <Icon name="trash" size={16} />
-            امسح السجلّ
+            {t('امسح السجلّ', 'Clear history')}
           </button>
         </div>
       </dialog>
@@ -214,10 +229,12 @@ export function RecentView() {
 }
 
 function RecentCard({ item, page, when }: { item: RecentItem; page: Fetched; when: string }) {
+  const t = useT();
+  const locale = useLocale();
   const live = page && page !== 'error' ? page : null;
   const src = imageUrl(live?.images[0]?.urls['thumb'] ?? item.thumb);
-  const name = live?.nameAr ?? item.nameAr;
-  const price = live ? priceLabel(live) : null;
+  const name = (locale === 'en' ? live?.nameEn : null) ?? live?.nameAr ?? item.nameAr;
+  const price = live ? priceLabel(live, locale) : null;
 
   const body = (
     <>
@@ -239,9 +256,9 @@ function RecentCard({ item, page, when }: { item: RecentItem; page: Fetched; whe
         ) : page === undefined ? (
           <span className="skeleton sx-rcard__skel" aria-hidden />
         ) : page === null ? (
-          <span className="sx-rcard__gone">لم يعد معروضاً</span>
+          <span className="sx-rcard__gone">{t('لم يعد معروضاً', 'No longer listed')}</span>
         ) : null}
-        {live?.isSoldOut ? <span className="sx-rcard__gone">نفد من المخزون</span> : null}
+        {live?.isSoldOut ? <span className="sx-rcard__gone">{t('نفد من المخزون', 'Out of stock')}</span> : null}
         <span className="sx-rcard__when">{when}</span>
       </span>
     </>

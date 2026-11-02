@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api, API_BASE, ApiError } from './api';
+import { intlLocale, type Locale } from './i18n';
 
 export interface Me {
   userId: string;
@@ -180,8 +181,8 @@ export function useAction(): {
   return { busy, error, notice, run, clear: () => (setError(null), setNotice(null)) };
 }
 
-export const pct = (bps: number | null | undefined): string =>
-  bps === null || bps === undefined ? '—' : `${(bps / 100).toLocaleString('ar-u-nu-latn', { maximumFractionDigits: 2 })}%`;
+export const pct = (bps: number | null | undefined, locale: Locale = 'ar'): string =>
+  bps === null || bps === undefined ? '—' : `${(bps / 100).toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 })}%`;
 
 export const VENDOR_STATUS: Record<string, string> = {
   pending: 'مسوّدة',
@@ -192,11 +193,27 @@ export const VENDOR_STATUS: Record<string, string> = {
   banned: 'محظور',
 };
 
+export const VENDOR_STATUS_EN: Record<string, string> = {
+  pending: 'Draft',
+  in_review: 'In review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  suspended: 'Suspended',
+  banned: 'Banned',
+};
+
 export const PRODUCT_STATUS: Record<string, string> = {
   draft: 'مسوّدة',
   active: 'منشور',
   rejected: 'موقوف',
   archived: 'مؤرشف',
+};
+
+export const PRODUCT_STATUS_EN: Record<string, string> = {
+  draft: 'Draft',
+  active: 'Published',
+  rejected: 'Taken down',
+  archived: 'Archived',
 };
 
 export const PARENT_STATUS: Record<string, string> = {
@@ -207,6 +224,16 @@ export const PARENT_STATUS: Record<string, string> = {
   completed: 'مكتمل',
   canceled: 'ملغى',
   refunded: 'مُسترَد',
+};
+
+export const PARENT_STATUS_EN: Record<string, string> = {
+  pending_payment: 'Awaiting payment',
+  payment_failed: 'Payment failed',
+  processing: 'Processing',
+  partially_completed: 'Partially completed',
+  completed: 'Completed',
+  canceled: 'Canceled',
+  refunded: 'Refunded',
 };
 
 export const TONE: Record<string, string> = {

@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { api, apiBase, ApiError, session } from '@/lib/api';
 import { Icon } from '@/components/icons';
 import { num } from '@/lib/catalog';
+import { useLocale, useT } from '@/components/locale';
 import { csvCell } from '@/lib/csv';
 
 interface RejectedLine {
@@ -26,15 +27,32 @@ interface ImportReport {
 }
 
 /** دليل الأعمدة — بأسماء رؤوس القالب كما يقرؤها الخادم (import-plan) */
-const COLUMN_GUIDE: readonly { col: string; desc: string }[] = [
+const COLUMN_GUIDE: readonly { col: string; desc: string; en: string }[] = [
   {
     col: 'رمز_المنتج',
     desc: 'يجمع متغيّرات المنتج الواحد: أسطر بالرمز نفسه تصير منتجاً واحداً بعدّة متغيّرات.',
+    en: 'Groups the variants of one product: rows with the same code become one product with several variants.',
   },
-  { col: 'SKU', desc: 'رمز المتغيّر. SKU موجود يُحدَّث سعره وكميته، والجديد يُنشأ مسوّدة.' },
-  { col: 'الفئة', desc: 'إلزامية — اسم فئة من فئات متجرك (مثل «أزياء وملابس»)، وتُنشأ إن لم تكن موجودة.' },
-  { col: 'الخيار_1 · قيمة_الخيار_1', desc: 'الخيارات بأسمائها العربية — مثال «اللون» و«أحمر».' },
-  { col: 'السعر · الكمية', desc: 'أرقام. الكمية إلزامية — اكتب 0 إن لم يتوفّر مخزون.' },
+  {
+    col: 'SKU',
+    desc: 'رمز المتغيّر. SKU موجود يُحدَّث سعره وكميته، والجديد يُنشأ مسوّدة.',
+    en: 'The variant code. An existing SKU gets its price and quantity updated; a new one is created as a draft.',
+  },
+  {
+    col: 'الفئة',
+    desc: 'إلزامية — اسم فئة من فئات متجرك (مثل «أزياء وملابس»)، وتُنشأ إن لم تكن موجودة.',
+    en: "Required — the name of one of your shop categories (e.g. «أزياء وملابس»); it is created if it doesn't exist.",
+  },
+  {
+    col: 'الخيار_1 · قيمة_الخيار_1',
+    desc: 'الخيارات بأسمائها العربية — مثال «اللون» و«أحمر».',
+    en: 'Options by their Arabic names — e.g. «اللون» and «أحمر».',
+  },
+  {
+    col: 'السعر · الكمية',
+    desc: 'أرقام. الكمية إلزامية — اكتب 0 إن لم يتوفّر مخزون.',
+    en: 'Numbers. Quantity is required — enter 0 if out of stock.',
+  },
 ];
 
 /**
@@ -45,6 +63,8 @@ const COLUMN_GUIDE: readonly { col: string; desc: string }[] = [
  * وعمودها وسببها، وتُنزَّل وحدها ليصلحها ويعيد رفعها.
  */
 export default function ImportPage() {
+  const t = useT();
+  const locale = useLocale();
   const input = useRef<HTMLInputElement>(null);
   const [report, setReport] = useState<ImportReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +83,7 @@ export default function ImportPage() {
       setReport(await api<ImportReport>('/vendor/catalog/import', { method: 'POST', file: chosen }));
     } catch (err) {
       // رفض الملف كله (عمود مجهول مثلاً) يأتي برسالة واحدة تقول ما العمل
-      setError(err instanceof ApiError ? err.message : 'تعذّر استيراد الملف.');
+      setError(err instanceof ApiError ? err.message : t('تعذّر استيراد الملف.', "Couldn't import the file."));
     } finally {
       setBusy(false);
     }
@@ -86,7 +106,7 @@ export default function ImportPage() {
   function downloadRejected(): void {
     if (!report) return;
     const rows = [
-      ['السطر', 'SKU', 'العمود', 'السبب'],
+      [t('السطر', 'Line'), 'SKU', t('العمود', 'Column'), t('السبب', 'Reason')],
       ...report.rejected.flatMap((r) =>
         r.reasons.map((reason) => [
           String(r.line),
@@ -135,9 +155,9 @@ export default function ImportPage() {
       <div className="page-head">
         <Link className="btn btn--secondary btn--sm vp-back" href="/vendor/products">
           <Icon name="back" size={14} mirror />
-          المنتجات
+          {t('المنتجات', 'Products')}
         </Link>
-        <h1>الاستيراد الجماعي</h1>
+        <h1>{t('الاستيراد الجماعي', 'Bulk import')}</h1>
       </div>
 
       <ol className="vp-steps">
@@ -146,12 +166,14 @@ export default function ImportPage() {
             <span className="vp-step__n num" aria-hidden>
               1
             </span>
-            نزّل القالب
+            {t('نزّل القالب', 'Download the template')}
           </span>
-          <span className="vp-step__body">ملف CSV عربي بأعمدته الجاهزة. استخدم رؤوسه كما هي.</span>
+          <span className="vp-step__body">
+            {t('ملف CSV عربي بأعمدته الجاهزة. استخدم رؤوسه كما هي.', 'An Arabic CSV file with its columns ready. Keep its headers as they are.')}
+          </span>
           <button type="button" className="btn btn--secondary btn--sm vp-step__btn" onClick={() => void downloadTemplate()}>
             <Icon name="download" size={14} />
-            نزّل القالب
+            {t('نزّل القالب', 'Download the template')}
           </button>
         </li>
         <li className="card vp-step">
@@ -159,10 +181,13 @@ export default function ImportPage() {
             <span className="vp-step__n num" aria-hidden>
               2
             </span>
-            املأه
+            {t('املأه', 'Fill it in')}
           </span>
           <span className="vp-step__body">
-            سطر لكل متغيّر. رمز المنتج يجمع متغيّرات المنتج الواحد، والخيارات بأسمائها العربية.
+            {t(
+              'سطر لكل متغيّر. رمز المنتج يجمع متغيّرات المنتج الواحد، والخيارات بأسمائها العربية.',
+              'One row per variant. The product code groups the variants of one product, and options use their Arabic names.',
+            )}
           </span>
         </li>
         <li className="card vp-step">
@@ -170,9 +195,9 @@ export default function ImportPage() {
             <span className="vp-step__n num" aria-hidden data-state={state === 'done' ? 'done' : undefined}>
               3
             </span>
-            ارفعه
+            {t('ارفعه', 'Upload it')}
           </span>
-          <span className="vp-step__body">CSV أو Excel، حتى 5 ميغابايت و5000 سطر.</span>
+          <span className="vp-step__body">{t('CSV أو Excel، حتى 5 ميغابايت و5000 سطر.', 'CSV or Excel, up to 5 MB and 5000 rows.')}</span>
         </li>
       </ol>
 
@@ -196,8 +221,10 @@ export default function ImportPage() {
             }}
           >
             <Icon name="upload" size={30} className="vp-drop__icon" />
-            <span className="vp-drop__title">اسحب ملفك إلى هنا أو اختر ملفاً</span>
-            <span className="vp-drop__hint">CSV أو XLSX · حتى 5 ميغابايت · 5000 سطر كحد أقصى</span>
+            <span className="vp-drop__title">{t('اسحب ملفك إلى هنا أو اختر ملفاً', 'Drag your file here or choose a file')}</span>
+            <span className="vp-drop__hint">
+              {t('CSV أو XLSX · حتى 5 ميغابايت · 5000 سطر كحد أقصى', 'CSV or XLSX · up to 5 MB · 5000 rows max')}
+            </span>
           </button>
         ) : null}
 
@@ -219,7 +246,7 @@ export default function ImportPage() {
             </span>
             <span className="row small muted">
               <span className="spinner" aria-hidden />
-              جارٍ الاستيراد…
+              {t('جارٍ الاستيراد…', 'Importing…')}
             </span>
           </div>
         ) : null}
@@ -231,17 +258,19 @@ export default function ImportPage() {
                 <Icon name="alert" size={18} />
               </span>
               <div className="vp-banner__text">
-                <p className="vp-banner__title">رُفض الملف كاملاً — لم يُكتب أي سطر</p>
+                <p className="vp-banner__title">
+                  {t('رُفض الملف كاملاً — لم يُكتب أي سطر', 'The whole file was rejected — no rows were written')}
+                </p>
                 <p>{error}</p>
               </div>
             </div>
             <div className="row">
               <button type="button" className="btn btn--primary" onClick={() => void downloadTemplate()}>
                 <Icon name="download" size={16} />
-                نزّل القالب
+                {t('نزّل القالب', 'Download the template')}
               </button>
               <button type="button" className="btn btn--secondary" onClick={reset}>
-                جرّب ملفاً آخر
+                {t('جرّب ملفاً آخر', 'Try another file')}
               </button>
             </div>
           </div>
@@ -256,11 +285,12 @@ export default function ImportPage() {
               <Icon name={report.rejectedCount === 0 ? 'check' : 'alert'} size={18} />
             </span>
             <div className="vp-banner__text">
-              <p className="vp-banner__title">اكتمل الاستيراد</p>
+              <p className="vp-banner__title">{t('اكتمل الاستيراد', 'Import complete')}</p>
               <p>
-                استُورد <span className="num">{num(report.imported)}</span> من{' '}
-                <span className="num">{num(report.totalRows)}</span> سطراً ·{' '}
-                <span className="num">{num(report.rejectedCount)}</span> مرفوضاً.
+                {t('استُورد', 'Imported')} <span className="num">{num(report.imported, locale)}</span> {t('من', 'of')}{' '}
+                <span className="num">{num(report.totalRows, locale)}</span>{' '}
+                {t('سطراً', report.totalRows === 1 ? 'row' : 'rows')} ·{' '}
+                <span className="num">{num(report.rejectedCount, locale)}</span> {t('مرفوضاً', 'rejected')}.
               </p>
             </div>
             <button
@@ -269,7 +299,7 @@ export default function ImportPage() {
               onClick={() => input.current?.click()}
             >
               <Icon name="upload" size={14} />
-              ارفع ملفاً آخر
+              {t('ارفع ملفاً آخر', 'Upload another file')}
             </button>
           </div>
         ) : null}
@@ -292,36 +322,37 @@ export default function ImportPage() {
       {report ? (
         <section className="vp-report" aria-labelledby="vp-report-title">
           <div className="vp-report__head">
-            <h2 id="vp-report-title">تقرير الاستيراد</h2>
+            <h2 id="vp-report-title">{t('تقرير الاستيراد', 'Import report')}</h2>
             <span className="num vp-faint">{report.importId}</span>
           </div>
 
           <div className="stats">
             <div className="stat vp-stat--ok">
-              <span className="stat__label">أسطر مستوردة</span>
-              <span className="stat__value num">{num(report.imported)}</span>
+              <span className="stat__label">{t('أسطر مستوردة', 'Rows imported')}</span>
+              <span className="stat__value num">{num(report.imported, locale)}</span>
               <span className="stat__note">
-                من <span className="num">{num(report.totalRows)}</span> سطر في الملف
+                {t('من', 'of')} <span className="num">{num(report.totalRows, locale)}</span>{' '}
+                {t('سطر في الملف', report.totalRows === 1 ? 'row in the file' : 'rows in the file')}
               </span>
             </div>
             <div className="stat vp-stat--bad">
-              <span className="stat__label">أسطر مرفوضة</span>
-              <span className="stat__value num">{num(report.rejectedCount)}</span>
-              <span className="stat__note">لم تُكتب — صحّحها وأعد الرفع</span>
+              <span className="stat__label">{t('أسطر مرفوضة', 'Rows rejected')}</span>
+              <span className="stat__value num">{num(report.rejectedCount, locale)}</span>
+              <span className="stat__note">{t('لم تُكتب — صحّحها وأعد الرفع', 'Not written — fix them and upload again')}</span>
             </div>
             <div className="stat">
-              <span className="stat__label">منتجات أُنشئت</span>
-              <span className="stat__value num">{num(report.productsCreated)}</span>
-              <span className="stat__note">كمسوّدات — تُرسل للنشر بعد مراجعتك</span>
+              <span className="stat__label">{t('منتجات أُنشئت', 'Products created')}</span>
+              <span className="stat__value num">{num(report.productsCreated, locale)}</span>
+              <span className="stat__note">{t('كمسوّدات — تُرسل للنشر بعد مراجعتك', 'As drafts — publish them once you have reviewed them')}</span>
             </div>
             <div className="stat">
-              <span className="stat__label">متغيّرات أُنشئت</span>
-              <span className="stat__value num">{num(report.variantsCreated)}</span>
+              <span className="stat__label">{t('متغيّرات أُنشئت', 'Variants created')}</span>
+              <span className="stat__value num">{num(report.variantsCreated, locale)}</span>
             </div>
             <div className="stat">
-              <span className="stat__label">متغيّرات حُدّثت</span>
-              <span className="stat__value num">{num(report.variantsUpdated)}</span>
-              <span className="stat__note">السعر والكمية على SKU موجود</span>
+              <span className="stat__label">{t('متغيّرات حُدّثت', 'Variants updated')}</span>
+              <span className="stat__value num">{num(report.variantsUpdated, locale)}</span>
+              <span className="stat__note">{t('السعر والكمية على SKU موجود', 'Price and quantity on an existing SKU')}</span>
             </div>
           </div>
 
@@ -329,29 +360,29 @@ export default function ImportPage() {
             {report.rejectedCount > 0 ? (
               <button type="button" className="btn btn--primary" onClick={downloadRejected}>
                 <Icon name="download" size={16} />
-                نزّل الأسطر المرفوضة للتصحيح
+                {t('نزّل الأسطر المرفوضة للتصحيح', 'Download rejected rows to fix')}
               </button>
             ) : null}
             <Link className="btn btn--secondary" href="/vendor/products?status=draft">
               <Icon name="package" size={16} />
-              راجع المنتجات المستوردة
+              {t('راجع المنتجات المستوردة', 'Review imported products')}
             </Link>
           </div>
 
           {report.rejectedCount > 0 ? (
             <section className="card card--flush">
               <div className="card__head">
-                <h2>الأسطر المرفوضة</h2>
+                <h2>{t('الأسطر المرفوضة', 'Rejected rows')}</h2>
                 {columns.length > 1 ? (
-                  <div className="tabs vp-filter" role="group" aria-label="تصفية بالعمود">
+                  <div className="tabs vp-filter" role="group" aria-label={t('تصفية بالعمود', 'Filter by column')}>
                     <button
                       type="button"
                       className="tabs__tab"
                       aria-pressed={columnFilter === ''}
                       onClick={() => setColumnFilter('')}
                     >
-                      الكل
-                      <span className="tabs__count">{num(report.rejected.length)}</span>
+                      {t('الكل', 'All')}
+                      <span className="tabs__count">{num(report.rejected.length, locale)}</span>
                     </button>
                     {columns.map((c) => (
                       <button
@@ -362,7 +393,7 @@ export default function ImportPage() {
                         onClick={() => setColumnFilter(c)}
                       >
                         {c}
-                        <span className="tabs__count">{num(columnCount(c))}</span>
+                        <span className="tabs__count">{num(columnCount(c), locale)}</span>
                       </button>
                     ))}
                   </div>
@@ -373,10 +404,10 @@ export default function ImportPage() {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th scope="col">السطر</th>
+                      <th scope="col">{t('السطر', 'Line')}</th>
                       <th scope="col">SKU</th>
-                      <th scope="col">العمود</th>
-                      <th scope="col">السبب</th>
+                      <th scope="col">{t('العمود', 'Column')}</th>
+                      <th scope="col">{t('السبب', 'Reason')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -384,15 +415,15 @@ export default function ImportPage() {
                       r.reasons.map((reason, i) => (
                         <tr key={`${r.line}-${i}`}>
                           <td>
-                            سطر <span className="num">{num(r.line)}</span>
+                            {t('سطر', 'Line')} <span className="num">{num(r.line, locale)}</span>
                           </td>
                           <td className="num" data-label="SKU">
                             {r.sku ?? '—'}
                           </td>
-                          <td data-label="العمود">
+                          <td data-label={t('العمود', 'Column')}>
                             <span className="badge badge--pending">{reason.column ?? '—'}</span>
                           </td>
-                          <td className="wrap" data-label="السبب">
+                          <td className="wrap" data-label={t('السبب', 'Reason')}>
                             {reason.message}
                           </td>
                         </tr>
@@ -408,13 +439,13 @@ export default function ImportPage() {
 
       <section className="card card--flush">
         <div className="card__head">
-          <h2>دليل الأعمدة</h2>
+          <h2>{t('دليل الأعمدة', 'Column guide')}</h2>
         </div>
         <dl className="vp-guide">
           {COLUMN_GUIDE.map((c) => (
             <div key={c.col} className="vp-guide__row">
               <dt className="vp-guide__col">{c.col}</dt>
-              <dd>{c.desc}</dd>
+              <dd>{t(c.desc, c.en)}</dd>
             </div>
           ))}
         </dl>

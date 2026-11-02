@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { Alert, PageHead, Spinner, TextArea } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { useOnboarding, type Onboarding } from '@/lib/vendor';
+import { useT } from '@/components/locale';
 
 const MAX = 2000;
 
@@ -15,6 +16,7 @@ const MAX = 2000;
  * لا في صفحة أخرى: ما يُكتب هنا يظهر هناك.
  */
 export default function StorePage() {
+  const t = useT();
   const { data, loading, missing, error, set } = useOnboarding();
   const [form, setForm] = useState<{
     descriptionAr: string;
@@ -50,7 +52,7 @@ export default function StorePage() {
   if (error || !data) {
     return (
       <div className="vo-store">
-        <Alert tone="danger">{error ?? 'تعذّر تحميل ملف المتجر.'}</Alert>
+        <Alert tone="danger">{error ?? t('تعذّر تحميل ملف المتجر.', "Couldn't load the shop profile.")}</Alert>
       </div>
     );
   }
@@ -63,7 +65,7 @@ export default function StorePage() {
       set(await api<Onboarding>('/vendor/onboarding/profile', { method: 'PATCH', body: values }));
       setSaved(true);
     } catch (err) {
-      setFailure(err instanceof Error ? err.message : 'تعذّر حفظ ملف المتجر.');
+      setFailure(err instanceof Error ? err.message : t('تعذّر حفظ ملف المتجر.', "Couldn't save the shop profile."));
     } finally {
       setBusy(false);
     }
@@ -74,30 +76,35 @@ export default function StorePage() {
   return (
     <div className="vo-store">
       <PageHead
-        title="ملف المتجر"
+        title={t('ملف المتجر', 'Shop profile')}
         meta={<span className="num">basta.com/s/{data.slug}</span>}
         actions={
           <a className="btn btn--secondary" href={`/s/${data.slug}`} target="_blank" rel="noopener noreferrer">
             <Icon name="eye" size={16} />
-            عاين صفحة متجري
+            {t('عاين صفحة متجري', 'Preview my shop page')}
           </a>
         }
       />
-      <p className="vo-store__lead">هذا ما يراه المشتري في صفحة متجرك، والمعاينة بجانب الحقول تتحدّث أثناء الكتابة.</p>
+      <p className="vo-store__lead">
+        {t(
+          'هذا ما يراه المشتري في صفحة متجرك، والمعاينة بجانب الحقول تتحدّث أثناء الكتابة.',
+          'This is what buyers see on your shop page, and the preview next to the fields updates as you type.',
+        )}
+      </p>
 
       <div className="vo-store__grid">
         <form className="vo-col" onSubmit={save} noValidate>
           {failure ? <Alert tone="danger">{failure}</Alert> : null}
-          {saved && !failure ? <Alert tone="success">حُفظ ملف المتجر.</Alert> : null}
+          {saved && !failure ? <Alert tone="success">{t('حُفظ ملف المتجر.', 'Shop profile saved.')}</Alert> : null}
 
           <section className="card" aria-labelledby="store-texts">
             <h2 className="vo-side-title" id="store-texts">
-              الوصف والسياسات
+              {t('الوصف والسياسات', 'Description and policies')}
             </h2>
 
             <div className="vo-count" data-near={values.descriptionAr.length > MAX * 0.9}>
               <TextArea
-                label="الوصف بالعربية"
+                label={t('الوصف بالعربية', 'Description in Arabic')}
                 hint={`${values.descriptionAr.length} / ${MAX}`}
                 maxLength={MAX}
                 rows={3}
@@ -107,7 +114,7 @@ export default function StorePage() {
             </div>
 
             <TextArea
-              label="الوصف بالإنجليزية"
+              label={t('الوصف بالإنجليزية', 'Description in English')}
               optional
               dir="ltr"
               maxLength={MAX}
@@ -118,33 +125,38 @@ export default function StorePage() {
 
             <div className="grid-2">
               <TextArea
-                label="سياسة الشحن"
+                label={t('سياسة الشحن', 'Shipping policy')}
                 maxLength={MAX}
                 rows={2}
                 value={values.shippingPolicyAr}
                 onChange={(e) => setForm({ ...values, shippingPolicyAr: e.target.value })}
               />
               <TextArea
-                label="سياسة الإرجاع"
+                label={t('سياسة الإرجاع', 'Return policy')}
                 maxLength={MAX}
                 rows={2}
                 value={values.returnPolicyAr}
                 onChange={(e) => setForm({ ...values, returnPolicyAr: e.target.value })}
               />
             </div>
-            <p className="card__hint">تظهر السياستان للمشتري قبل الشراء وتقلّلان الأسئلة والنزاعات.</p>
+            <p className="card__hint">
+              {t(
+                'تظهر السياستان للمشتري قبل الشراء وتقلّلان الأسئلة والنزاعات.',
+                'Buyers see both policies before they buy, which cuts down on questions and disputes.',
+              )}
+            </p>
 
             <div className="vo-actions">
               <button className="btn btn--primary" type="submit" disabled={busy}>
                 {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
-                {busy ? 'جارٍ الحفظ…' : 'حفظ الملف'}
+                {busy ? t('جارٍ الحفظ…', 'Saving…') : t('حفظ الملف', 'Save profile')}
               </button>
             </div>
           </section>
         </form>
 
-        <aside className="vo-preview" aria-label="معاينة صفحة المتجر">
-          <span className="vo-preview__eyebrow eyebrow">معاينة حيّة</span>
+        <aside className="vo-preview" aria-label={t('معاينة صفحة المتجر', 'Shop page preview')}>
+          <span className="vo-preview__eyebrow eyebrow">{t('معاينة حيّة', 'Live preview')}</span>
           <div className="vo-preview__card" data-density="comfortable">
             <div className="vo-preview__cover" aria-hidden />
             <div className="vo-preview__body">
@@ -158,7 +170,7 @@ export default function StorePage() {
                     {data.status === 'approved' ? (
                       <span className="badge badge--success">
                         <Icon name="shield" size={12} />
-                        موثّق
+                        {t('موثّق', 'Verified')}
                       </span>
                     ) : null}
                   </span>
@@ -167,37 +179,41 @@ export default function StorePage() {
                     {data.nameEn ? ' · ' : ''}
                     {since ? (
                       <>
-                        على بسطة منذ {since} ·{' '}
+                        {t(`على بسطة منذ ${since}`, `On Basta since ${since}`)} ·{' '}
                       </>
                     ) : null}
-                    عملة المتجر <span className="num">{data.settlementCurrency}</span>
+                    {t('عملة المتجر', 'Shop currency')} <span className="num">{data.settlementCurrency}</span>
                   </span>
                 </div>
               </div>
 
               <p className="vo-preview__desc" data-empty={!values.descriptionAr || undefined}>
-                {values.descriptionAr || 'أضف وصفاً عربياً ليعرف المشتري ماذا تبيع ومن أين تشحن.'}
+                {values.descriptionAr ||
+                  t(
+                    'أضف وصفاً عربياً ليعرف المشتري ماذا تبيع ومن أين تشحن.',
+                    'Add an Arabic description so buyers know what you sell and where you ship from.',
+                  )}
               </p>
 
               <div className="vo-preview__policies">
                 <p className="vo-preview__policy" data-empty={!values.shippingPolicyAr || undefined}>
                   <Icon name="package" size={14} />
                   <span>
-                    <span className="visually-hidden">الشحن: </span>
-                    {values.shippingPolicyAr || 'لم تُكتب سياسة شحن.'}
+                    <span className="visually-hidden">{t('الشحن: ', 'Shipping: ')}</span>
+                    {values.shippingPolicyAr || t('لم تُكتب سياسة شحن.', 'No shipping policy written.')}
                   </span>
                 </p>
                 <p className="vo-preview__policy" data-empty={!values.returnPolicyAr || undefined}>
                   <Icon name="refresh" size={14} />
                   <span>
-                    <span className="visually-hidden">الإرجاع: </span>
-                    {values.returnPolicyAr || 'لم تُكتب سياسة إرجاع.'}
+                    <span className="visually-hidden">{t('الإرجاع: ', 'Returns: ')}</span>
+                    {values.returnPolicyAr || t('لم تُكتب سياسة إرجاع.', 'No return policy written.')}
                   </span>
                 </p>
               </div>
             </div>
           </div>
-          <p className="vo-preview__foot">هكذا يظهر رأس صفحة متجرك للمشترين.</p>
+          <p className="vo-preview__foot">{t('هكذا يظهر رأس صفحة متجرك للمشترين.', 'This is how the top of your shop page looks to buyers.')}</p>
         </aside>
       </div>
     </div>

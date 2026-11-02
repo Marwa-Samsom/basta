@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { RegionSelect } from '@/components/region-select';
 import { Alert, EmptyState, Field, PageHead, TextInput } from '@/components/ui';
 import { api, session } from '@/lib/api';
@@ -13,6 +14,7 @@ import {
   addressTitle,
   type SavedAddress,
 } from '@/lib/addresses';
+import type { Translate } from '@/lib/i18n';
 
 const PHONE = /^\+?[0-9 ]{7,20}$/;
 const UNDO_MS = 6_000;
@@ -65,13 +67,14 @@ const fromAddress = (a: SavedAddress): FormState => ({
 type Errors = Partial<Record<keyof FormState, string>>;
 
 /** التحقق نفسه في الخادم؛ هنا ليظهر الخطأ تحت حقله قبل الإرسال */
-function validate(f: FormState): Errors {
+function validate(f: FormState, t: Translate): Errors {
   const e: Errors = {};
-  if (f.recipientName.trim().length < 2) e.recipientName = 'اكتب اسم من يستلم الطلب.';
-  if (!PHONE.test(f.phone.trim())) e.phone = 'رقم الهاتف غير مكتمل — أرقام فقط، مثل +962 79 123 4567.';
-  if (!f.region.trim()) e.region = 'اكتب المحافظة أو المنطقة.';
-  if (!f.city.trim()) e.city = 'اكتب المدينة.';
-  if (f.street.trim().length < 2) e.street = 'اكتب الشارع — يحتاجه المندوب ليصل.';
+  if (f.recipientName.trim().length < 2) e.recipientName = t('اكتب اسم من يستلم الطلب.', 'Enter the name of the person receiving the order.');
+  if (!PHONE.test(f.phone.trim()))
+    e.phone = t('رقم الهاتف غير مكتمل — أرقام فقط، مثل +962 79 123 4567.', 'The phone number is incomplete — digits only, like +962 79 123 4567.');
+  if (!f.region.trim()) e.region = t('اكتب المحافظة أو المنطقة.', 'Choose the governorate or region.');
+  if (!f.city.trim()) e.city = t('اكتب المدينة.', 'Enter the city.');
+  if (f.street.trim().length < 2) e.street = t('اكتب الشارع — يحتاجه المندوب ليصل.', 'Enter the street — the courier needs it to reach you.');
   return e;
 }
 
@@ -83,6 +86,8 @@ function validate(f: FormState): Errors {
  * الافتراضي يُعيَّن فوراً في الواجهة ثم يُثبَّت في الخادم، ويرتدّ إن فشل.
  */
 export default function AddressesPage() {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [items, setItems] = useState<SavedAddress[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,9 +103,9 @@ export default function AddressesPage() {
       setItems(d.items);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذّر جلب عناوينك.');
+      setError(e instanceof Error ? e.message : t('تعذّر جلب عناوينك.', "Couldn't load your addresses."));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!session.read()) {
@@ -129,11 +134,11 @@ export default function AddressesPage() {
     setBusyId(a.id);
     try {
       await api(`/me/addresses/${a.id}/default`, { method: 'POST' });
-      setStatus(`صار «${addressTitle(a)}» العنوان الافتراضي.`);
+      setStatus(t(`صار «${addressTitle(a)}» العنوان الافتراضي.`, `“${addressTitle(a)}” is now your default address.`));
       await load();
     } catch (e) {
       setItems(before);
-      setError(e instanceof Error ? e.message : 'تعذّر تعيين العنوان الافتراضي.');
+      setError(e instanceof Error ? e.message : t('تعذّر تعيين العنوان الافتراضي.', "Couldn't set the default address."));
     } finally {
       setBusyId(null);
     }
@@ -149,7 +154,7 @@ export default function AddressesPage() {
       setStatus('');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذّر حذف العنوان.');
+      setError(e instanceof Error ? e.message : t('تعذّر حذف العنوان.', "Couldn't delete the address."));
     } finally {
       setBusyId(null);
     }
@@ -162,10 +167,10 @@ export default function AddressesPage() {
     setUndo(null);
     try {
       await api(`/me/addresses/${u.id}/restore`, { method: 'POST' });
-      setStatus(`استُرجع العنوان «${u.label}».`);
+      setStatus(t(`استُرجع العنوان «${u.label}».`, `Address “${u.label}” restored.`));
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذّر استرجاع العنوان.');
+      setError(e instanceof Error ? e.message : t('تعذّر استرجاع العنوان.', "Couldn't restore the address."));
     }
   }
 
@@ -174,12 +179,12 @@ export default function AddressesPage() {
   return (
     <div className="aa-page">
       <PageHead
-        title="العناوين"
-        {...(items && count > 0 ? { count: addressCount(count) } : {})}
+        title={t('العناوين', 'Addresses')}
+        {...(items && count > 0 ? { count: addressCount(count, locale) } : {})}
         actions={
           <button type="button" className="btn btn--primary" onClick={() => setEditing({ address: null })}>
             <Icon name="plus" size={16} />
-            أضف عنواناً
+            {t('أضف عنواناً', 'Add an address')}
           </button>
         }
       />
@@ -191,22 +196,22 @@ export default function AddressesPage() {
       {undo ? (
         <div className="aa-undo" role="status">
           <Icon name="trash" size={17} />
-          <span className="aa-undo__text">حُذف العنوان «{undo.label}»</span>
+          <span className="aa-undo__text">{t(`حُذف العنوان «${undo.label}»`, `Address “${undo.label}” deleted`)}</span>
           <button type="button" className="aa-undo__btn" onClick={() => void restore()}>
-            تراجع
+            {t('تراجع', 'Undo')}
           </button>
         </div>
       ) : null}
 
       {error ? (
-        <Alert tone="danger" title="لم يكتمل الطلب">
+        <Alert tone="danger" title={t('لم يكتمل الطلب', "The request didn't go through")}>
           {error}
         </Alert>
       ) : null}
 
       {!items && !error ? (
         <div className="aa-skel" role="status">
-          <span className="visually-hidden">جارٍ جلب عناوينك…</span>
+          <span className="visually-hidden">{t('جارٍ جلب عناوينك…', 'Loading your addresses…')}</span>
           <span className="skeleton aa-skel__card" aria-hidden />
           <span className="skeleton aa-skel__card" aria-hidden />
         </div>
@@ -215,14 +220,17 @@ export default function AddressesPage() {
       {items && count === 0 ? (
         <EmptyState
           icon="pin"
-          title="لا عناوين محفوظة"
+          title={t('لا عناوين محفوظة', 'No saved addresses')}
           actions={
             <button type="button" className="btn btn--primary" onClick={() => setEditing({ address: null })}>
-              أضف عنواناً
+              {t('أضف عنواناً', 'Add an address')}
             </button>
           }
         >
-          أضف عنواناً الآن ليكون جاهزاً عند الدفع، أو أضفه أثناء إتمام الطلب.
+          {t(
+            'أضف عنواناً الآن ليكون جاهزاً عند الدفع، أو أضفه أثناء إتمام الطلب.',
+            "Add an address now so it's ready at checkout, or add one while placing your order.",
+          )}
         </EmptyState>
       ) : null}
 
@@ -241,13 +249,13 @@ export default function AddressesPage() {
                     {a.isDefault ? (
                       <span className="aa-tag aa-tag--brand">
                         <Icon name="check" size={13} />
-                        الافتراضي
+                        {t('الافتراضي', 'Default')}
                       </span>
                     ) : null}
                   </div>
                   <span className="aa-addr__name">{a.recipientName}</span>
                   <span className="aa-addr__lines">
-                    {addressLine(a)}
+                    {addressLine(a, locale)}
                     {a.landmark ? (
                       <>
                         <br />
@@ -266,26 +274,26 @@ export default function AddressesPage() {
                         disabled={busyId === a.id}
                         onClick={() => void makeDefault(a)}
                       >
-                        اجعله الافتراضي
+                        {t('اجعله الافتراضي', 'Make default')}
                       </button>
                     ) : null}
                     <button
                       type="button"
                       className="btn btn--secondary btn--sm"
-                      aria-label={`حرّر «${title}»`}
+                      aria-label={t(`حرّر «${title}»`, `Edit “${title}”`)}
                       onClick={() => setEditing({ address: a })}
                     >
-                      حرّر
+                      {t('حرّر', 'Edit')}
                     </button>
                     <button
                       type="button"
                       className="btn btn--danger btn--sm"
-                      aria-label={`احذف «${title}»`}
+                      aria-label={t(`احذف «${title}»`, `Delete “${title}”`)}
                       disabled={busyId === a.id}
                       onClick={() => void remove(a)}
                     >
                       <Icon name="trash" size={13} />
-                      احذف
+                      {t('احذف', 'Delete')}
                     </button>
                   </div>
                 </article>
@@ -303,7 +311,11 @@ export default function AddressesPage() {
           onSaved={async (saved) => {
             setEditing(null);
             setError(null);
-            setStatus(editing.address ? `حُفظت تعديلات «${addressTitle(saved)}».` : `أُضيف العنوان «${addressTitle(saved)}».`);
+            setStatus(
+              editing.address
+                ? t(`حُفظت تعديلات «${addressTitle(saved)}».`, `Changes to “${addressTitle(saved)}” saved.`)
+                : t(`أُضيف العنوان «${addressTitle(saved)}».`, `Address “${addressTitle(saved)}” added.`),
+            );
             await load();
           }}
         />
@@ -324,6 +336,8 @@ function AddressDrawer({
   onClose: () => void;
   onSaved: (a: SavedAddress) => void | Promise<void>;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [form, setForm] = useState<FormState>(() => (address ? fromAddress(address) : EMPTY));
@@ -343,19 +357,19 @@ function AddressDrawer({
       const value = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
       const next = { ...form, [key]: value };
       setForm(next);
-      if (submitted) setErrors(validate(next));
+      if (submitted) setErrors(validate(next, t));
     };
 
   /** المحافظة من القائمة؛ وتغيير البلد يفرغها — محافظة بلد آخر لا تبقى مختارة */
   const setRegion = (region: string, country = form.country) => {
     const next = { ...form, country, region };
     setForm(next);
-    if (submitted) setErrors(validate(next));
+    if (submitted) setErrors(validate(next, t));
   };
 
   /** الخطأ يظهر عند مغادرة الحقل، لا أثناء الكتابة */
   const blur = (key: keyof FormState) => () => {
-    const e = validate(form)[key];
+    const e = validate(form, t)[key];
     setErrors((prev) => {
       const next = { ...prev };
       if (e) next[key] = e;
@@ -367,7 +381,7 @@ function AddressDrawer({
   async function submit(ev: FormEvent): Promise<void> {
     ev.preventDefault();
     setSubmitted(true);
-    const e = validate(form);
+    const e = validate(form, t);
     setErrors(e);
     if (Object.keys(e).length > 0) return;
     setBusy(true);
@@ -383,7 +397,7 @@ function AddressDrawer({
         : await api<SavedAddress>('/me/addresses', { method: 'POST', body });
       await onSaved(saved);
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'تعذّر حفظ العنوان.');
+      setServerError(err instanceof Error ? err.message : t('تعذّر حفظ العنوان.', "Couldn't save the address."));
     } finally {
       setBusy(false);
     }
@@ -404,8 +418,8 @@ function AddressDrawer({
     >
       <form className="aa-drawer__form" noValidate onSubmit={(e) => void submit(e)}>
         <header className="aa-drawer__head">
-          <h2 id={titleId}>{address ? 'حرّر العنوان' : 'عنوان جديد'}</h2>
-          <button type="button" className="icon-btn icon-btn--sm" aria-label="إغلاق" onClick={onClose}>
+          <h2 id={titleId}>{address ? t('حرّر العنوان', 'Edit address') : t('عنوان جديد', 'New address')}</h2>
+          <button type="button" className="icon-btn icon-btn--sm" aria-label={t('إغلاق', 'Close')} onClick={onClose}>
             <Icon name="x" size={17} />
           </button>
         </header>
@@ -418,16 +432,16 @@ function AddressDrawer({
           ) : null}
           <div className="aa-drawer__wide">
             <TextInput
-              label="تسمية العنوان"
+              label={t('تسمية العنوان', 'Address label')}
               optional
-              hint="مثل: المنزل، العمل — تظهر على البطاقة وعند الدفع."
+              hint={t('مثل: المنزل، العمل — تظهر على البطاقة وعند الدفع.', 'For example: Home, Work — shown on the card and at checkout.')}
               maxLength={40}
               value={form.label}
               onChange={set('label')}
             />
           </div>
           <TextInput
-            label="اسم المستلم"
+            label={t('اسم المستلم', 'Recipient name')}
             autoComplete="name"
             maxLength={120}
             value={form.recipientName}
@@ -436,7 +450,7 @@ function AddressDrawer({
             onBlur={blur('recipientName')}
           />
           <TextInput
-            label="الهاتف"
+            label={t('الهاتف', 'Phone')}
             dir="ltr"
             inputMode="tel"
             autoComplete="tel"
@@ -446,12 +460,12 @@ function AddressDrawer({
             onChange={set('phone')}
             onBlur={blur('phone')}
           />
-          <Field label="البلد">
+          <Field label={t('البلد', 'Country')}>
             {(props) => (
               <select className="field__control" {...props} value={form.country} onChange={(e) => setRegion('', e.target.value)}>
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
-                    {c.name}
+                    {locale === 'en' ? c.nameEn : c.name}
                   </option>
                 ))}
               </select>
@@ -459,7 +473,7 @@ function AddressDrawer({
           </Field>
           <RegionSelect country={form.country} value={form.region} error={errors.region} onChange={(v) => setRegion(v)} onBlur={blur('region')} />
           <TextInput
-            label="المدينة"
+            label={t('المدينة', 'City')}
             autoComplete="address-level2"
             maxLength={80}
             value={form.city}
@@ -467,10 +481,10 @@ function AddressDrawer({
             onChange={set('city')}
             onBlur={blur('city')}
           />
-          <TextInput label="الحي" optional maxLength={80} value={form.area} onChange={set('area')} />
+          <TextInput label={t('الحي', 'Area')} optional maxLength={80} value={form.area} onChange={set('area')} />
           <div className="aa-drawer__wide">
             <TextInput
-              label="الشارع"
+              label={t('الشارع', 'Street')}
               autoComplete="address-line1"
               maxLength={160}
               value={form.street}
@@ -479,13 +493,13 @@ function AddressDrawer({
               onBlur={blur('street')}
             />
           </div>
-          <TextInput label="المبنى" optional maxLength={40} value={form.building} onChange={set('building')} />
-          <TextInput label="الطابق" optional maxLength={20} value={form.floor} onChange={set('floor')} />
+          <TextInput label={t('المبنى', 'Building')} optional maxLength={40} value={form.building} onChange={set('building')} />
+          <TextInput label={t('الطابق', 'Floor')} optional maxLength={20} value={form.floor} onChange={set('floor')} />
           <div className="aa-drawer__wide">
             <TextInput
-              label="علامة مميّزة"
+              label={t('علامة مميّزة', 'Landmark')}
               optional
-              hint="ما يساعد المندوب على الوصول: قرب مسجد، مقابل صيدلية…"
+              hint={t('ما يساعد المندوب على الوصول: قرب مسجد، مقابل صيدلية…', 'Anything that helps the courier find you: near a mosque, opposite a pharmacy…')}
               maxLength={200}
               value={form.landmark}
               onChange={set('landmark')}
@@ -493,23 +507,25 @@ function AddressDrawer({
           </div>
           {address?.isDefault || firstAddress ? (
             <p className="aa-drawer__wide field__hint">
-              {address?.isDefault ? 'هذا عنوانك الافتراضي.' : 'أول عنوان تحفظه يصير الافتراضي تلقائياً.'}
+              {address?.isDefault
+                ? t('هذا عنوانك الافتراضي.', 'This is your default address.')
+                : t('أول عنوان تحفظه يصير الافتراضي تلقائياً.', 'The first address you save becomes your default automatically.')}
             </p>
           ) : (
             <label className="aa-check aa-drawer__wide">
               <input type="checkbox" checked={form.isDefault} onChange={set('isDefault')} />
-              اجعله العنوان الافتراضي
+              {t('اجعله العنوان الافتراضي', 'Make this my default address')}
             </label>
           )}
         </div>
 
         <footer className="aa-drawer__foot">
           <button type="button" className="btn btn--secondary" onClick={onClose}>
-            إلغاء
+            {t('إلغاء', 'Cancel')}
           </button>
           <button type="submit" className="btn btn--primary" disabled={busy}>
             {busy ? <span className="spinner" aria-hidden /> : null}
-            {address ? 'احفظ التعديلات' : 'احفظ العنوان'}
+            {address ? t('احفظ التعديلات', 'Save changes') : t('احفظ العنوان', 'Save address')}
           </button>
         </footer>
       </form>

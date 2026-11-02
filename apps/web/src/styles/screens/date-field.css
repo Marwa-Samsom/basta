@@ -1,0 +1,66 @@
+/* خانة التاريخ بلغة الموقع — components/date-field */
+
+.date-field { position: relative; display: inline-block; min-inline-size: 11rem; }
+.date-field__btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: start;
+  cursor: pointer;
+}
+.date-field__value { flex: 1; white-space: nowrap; }
+.date-field__value[data-empty] { color: var(--text-faint); }
+
+.date-pop {
+  position: absolute;
+  z-index: 40;
+  inset-block-start: calc(100% + var(--space-1));
+  inset-inline-start: 0;
+  inline-size: 18.5rem;
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-strong);
+}
+.date-pop__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-block-end: var(--space-2); }
+.date-pop__month { font-size: var(--text-sm); }
+/* السابق نفس سهم «التالي» مقلوباً — والأيقونة نفسها تنقلب في RTL */
+.date-pop__prev .icon { rotate: 180deg; }
+
+.date-pop__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.date-pop__weekday { padding-block: var(--space-1); color: var(--text-muted); font-size: var(--text-xs); text-align: center; }
+.date-pop__day {
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-body);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.date-pop__day:hover:not(:disabled) { background: var(--surface-sunken); color: var(--text-strong); }
+.date-pop__day[aria-current='date'] { border-color: var(--brand-border); }
+.date-pop__day[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); }
+.date-pop__day:disabled { color: var(--text-faint); cursor: not-allowed; opacity: 0.5; }
+
+.date-pop__time { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-block-start: var(--space-3); font-size: var(--text-sm); }
+.date-pop__hm { display: inline-flex; align-items: center; gap: var(--space-1); font-variant-numeric: tabular-nums; }
+.date-pop__hm select {
+  min-block-size: var(--ctrl-h);
+  padding-inline: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-strong);
+  font: inherit;
+}
+.date-pop__foot { display: flex; justify-content: flex-end; gap: var(--space-2); margin-block-start: var(--space-3); }
+
+@media (max-width: 480px) {
+  .date-field { display: block; }
+  .date-pop { inline-size: min(18.5rem, calc(100vw - 2 * var(--space-4))); }
+}

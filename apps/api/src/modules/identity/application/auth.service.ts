@@ -256,17 +256,17 @@ export class AuthService {
     submitted: string | undefined,
     meta: RequestMeta,
   ): Promise<void> {
-    if (!submitted || !user.totpSecretEnc) throw new UnauthorizedException('رمز التحقق الثنائي مطلوب وصحيح.');
+    if (!submitted || !user.totpSecretEnc) throw new UnauthorizedException({ code: 'TOTP_REQUIRED', message: 'رمز التحقق الثنائي مطلوب وصحيح.' });
     if (isDevFixedCode(submitted)) return;
     if (looksLikeRecoveryCode(submitted)) {
       if (!(await this.useRecoveryCode(user.id, submitted, meta))) {
-        throw new UnauthorizedException('رمز الاستعادة غير صحيح أو استُعمل من قبل.');
+        throw new UnauthorizedException({ code: 'TOTP_REQUIRED', message: 'رمز الاستعادة غير صحيح أو استُعمل من قبل.' });
       }
       return;
     }
     const secret = openTotpSecret(user.totpSecretEnc, user.id);
     const step = verifyTotpStep(submitted, secret, user.totpLastStep);
-    if (step === null) throw new UnauthorizedException('رمز التحقق الثنائي مطلوب وصحيح.');
+    if (step === null) throw new UnauthorizedException({ code: 'TOTP_REQUIRED', message: 'رمز التحقق الثنائي مطلوب وصحيح.' });
     // الحجز شرطيّ: دخولان متزامنان بالرمز نفسه لا ينجحان معاً (المرحلة 12)
     const claimed = await this.prisma.user.updateMany({
       where: { id: user.id, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] },
@@ -276,7 +276,7 @@ export class AuthService {
         ...(isLegacyPlain(user.totpSecretEnc) ? { totpSecretEnc: sealTotpSecret(secret, user.id) } : {}),
       },
     });
-    if (claimed.count === 0) throw new UnauthorizedException('رمز التحقق الثنائي استُعمل. انتظر الرمز التالي.');
+    if (claimed.count === 0) throw new UnauthorizedException({ code: 'TOTP_REQUIRED', message: 'رمز التحقق الثنائي استُعمل. انتظر الرمز التالي.' });
   }
 
   /**
