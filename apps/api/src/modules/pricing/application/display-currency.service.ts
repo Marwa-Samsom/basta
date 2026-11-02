@@ -9,6 +9,8 @@ const FALLBACK = 'JOD';
 export interface CurrencyOption {
   readonly code: string;
   readonly nameAr: string;
+  /** لزرّ العملة حين يكون الموقع بالإنجليزية */
+  readonly nameEn: string;
   readonly symbol: string;
 }
 
@@ -103,7 +105,7 @@ export class DisplayCurrencyService {
       this.prisma.currency.findMany({
         where: { isActive: true },
         orderBy: [{ sort: 'asc' }, { code: 'asc' }],
-        select: { code: true, nameAr: true, symbol: true },
+        select: { code: true, nameAr: true, nameEn: true, symbol: true },
       }),
       this.usdRates(at),
       this.prisma.setting.findMany({ where: { key: { in: ['default_display_currency', 'fx_spread_bps'] } } }),

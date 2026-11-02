@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { ClearableInput, EmptyState } from '@/components/ui';
+import { DateField } from '@/components/date-field';
 import { api } from '@/lib/api';
 import { media, useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -207,14 +208,14 @@ export default function AdminCampaignsPage() {
                 ))}
               </select>
             </label>
-            <label className="field">
+            <div className="field">
               <span className="field__label">تبدأ</span>
-              <input type="datetime-local" className="field__control" value={form.v.startsAt} onChange={(e) => setForm({ ...form, v: { ...form.v, startsAt: e.target.value } })} />
-            </label>
-            <label className="field">
+              <DateField withTime label="تبدأ" value={form.v.startsAt} onChange={(v) => setForm({ ...form, v: { ...form.v, startsAt: v } })} />
+            </div>
+            <div className="field">
               <span className="field__label">تنتهي</span>
-              <input type="datetime-local" className="field__control" value={form.v.endsAt} onChange={(e) => setForm({ ...form, v: { ...form.v, endsAt: e.target.value } })} />
-            </label>
+              <DateField withTime label="تنتهي" value={form.v.endsAt} onChange={(v) => setForm({ ...form, v: { ...form.v, endsAt: v } })} />
+            </div>
             <div className="field ac2-form__wide">
               <span className="field__label" id="campaign-coupon">
                 كوبون يُعلَن (اختياري)

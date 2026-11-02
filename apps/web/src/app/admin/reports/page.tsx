@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 import { AdminHeader, Loading } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { Alert, EmptyState } from '@/components/ui';
+import { DateField } from '@/components/date-field';
 import { apiBlob } from '@/lib/api';
 import { downloadName, useAdminData } from '@/lib/admin';
 import { money } from '@/lib/orders';
@@ -128,14 +129,14 @@ export default function AdminReportsPage() {
           ))}
         </div>
         <span className="ac2-dates">
-          <label className="ac2-inline ac2-hint">
+          <span className="ac2-inline ac2-hint">
             من
-            <input type="date" className="field__control" value={from} onChange={(e) => (setFrom(e.target.value), setPreset(null))} />
-          </label>
-          <label className="ac2-inline ac2-hint">
+            <DateField label="من" value={from} onChange={(v) => (setFrom(v), setPreset(null))} />
+          </span>
+          <span className="ac2-inline ac2-hint">
             إلى
-            <input type="date" className="field__control" value={to} onChange={(e) => (setTo(e.target.value), setPreset(null))} />
-          </label>
+            <DateField label="إلى" value={to} onChange={(v) => (setTo(v), setPreset(null))} />
+          </span>
         </span>
         <span className="toolbar__end">
           <button type="button" className="btn btn--secondary btn--sm" onClick={() => void download('xlsx')}>

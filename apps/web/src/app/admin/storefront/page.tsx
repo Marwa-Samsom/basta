@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { ClearableInput, EmptyState } from '@/components/ui';
+import { DateField } from '@/components/date-field';
 import { api } from '@/lib/api';
 import { media, useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -135,14 +136,14 @@ export default function AdminStorefrontPage() {
               <span className="field__label">الرابط (مسار داخلي)</span>
               <ClearableInput className="field__control num" dir="ltr" value={draft.linkUrl} onChange={(e) => setDraft({ ...draft, linkUrl: e.target.value })} />
             </label>
-            <label className="field">
+            <div className="field">
               <span className="field__label">يبدأ</span>
-              <input type="datetime-local" className="field__control" value={draft.startsAt} onChange={(e) => setDraft({ ...draft, startsAt: e.target.value })} />
-            </label>
-            <label className="field">
+              <DateField withTime clearable label="يبدأ" value={draft.startsAt} onChange={(v) => setDraft({ ...draft, startsAt: v })} />
+            </div>
+            <div className="field">
               <span className="field__label">ينتهي</span>
-              <input type="datetime-local" className="field__control" value={draft.endsAt} onChange={(e) => setDraft({ ...draft, endsAt: e.target.value })} />
-            </label>
+              <DateField withTime clearable label="ينتهي" value={draft.endsAt} onChange={(v) => setDraft({ ...draft, endsAt: v })} />
+            </div>
           </div>
           {draft.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element

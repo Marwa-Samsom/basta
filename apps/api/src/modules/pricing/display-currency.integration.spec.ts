@@ -145,11 +145,11 @@ afterAll(async () => {
 describe('عملة العرض — 18 أكتوبر 2026', () => {
   it('العملات المتاحة والافتراضية، والمجهولة تسقط إلى الافتراضية لا إلى خطأ', async () => {
     if (!dbUp) return;
-    const opts = (await call('GET', '/storefront/currencies')).json() as { defaultCurrency: string; currencies: { code: string; nameAr: string; symbol: string }[] };
+    const opts = (await call('GET', '/storefront/currencies')).json() as { defaultCurrency: string; currencies: { code: string; nameAr: string; nameEn: string; symbol: string }[] };
     const codes = opts.currencies.map((c) => c.code);
     expect(codes).toEqual(expect.arrayContaining(['JOD', 'SAR', 'USD']));
     expect(codes).toContain(opts.defaultCurrency);
-    expect(opts.currencies.every((c) => c.nameAr && c.symbol)).toBe(true);
+    expect(opts.currencies.every((c) => c.nameAr && c.nameEn && c.symbol)).toBe(true);
 
     const unknown = await call('GET', `/storefront/products/${sar.slug}?currency=xyz`);
     expect(unknown.statusCode).toBe(200);

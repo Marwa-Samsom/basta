@@ -4,6 +4,7 @@ import '@/styles/screens/vendor-extra.css';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Alert, EmptyState, PageHead } from '@/components/ui';
+import { DateField } from '@/components/date-field';
 import { Icon } from '@/components/icons';
 import { api, apiBlob } from '@/lib/api';
 import { labelOf, money, toneOf } from '@/lib/orders';
@@ -349,33 +350,33 @@ export default function ReportsPage() {
       />
 
       <div className="vx-range">
-        <label className="vx-range__dates">
+        <span className="vx-range__dates">
           من
-          <input
-            type="date"
+          <DateField
+            label="من"
             value={from}
             max={to}
-            onChange={(e) => {
-              if (!e.target.value) return;
+            onChange={(v) => {
+              if (!v) return;
               setPreset(null);
-              setFrom(e.target.value);
+              setFrom(v);
             }}
           />
-        </label>
-        <label className="vx-range__dates">
+        </span>
+        <span className="vx-range__dates">
           إلى
-          <input
-            type="date"
+          <DateField
+            label="إلى"
             value={to}
             min={from}
             max={today}
-            onChange={(e) => {
-              if (!e.target.value) return;
+            onChange={(v) => {
+              if (!v) return;
               setPreset(null);
-              setTo(e.target.value);
+              setTo(v);
             }}
           />
-        </label>
+        </span>
         {loading && data ? <span className="vx-range__dates">جارٍ التحديث…</span> : null}
       </div>
 

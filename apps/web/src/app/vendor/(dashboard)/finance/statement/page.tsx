@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Alert, EmptyState, PageHead } from '@/components/ui';
+import { DateField } from '@/components/date-field';
 import { Icon } from '@/components/icons';
 import { api, apiBlob } from '@/lib/api';
 import { money, when } from '@/lib/orders';
@@ -241,14 +242,14 @@ export default function StatementPage() {
                   ))}
                 </select>
               </label>
-              <label className="vm-filter">
+              <div className="vm-filter">
                 <span className="vm-filter__label">من</span>
-                <input type="date" className="field__control" value={from} onChange={(e) => setFrom(e.target.value)} />
-              </label>
-              <label className="vm-filter">
+                <DateField label="من" clearable value={from} onChange={setFrom} />
+              </div>
+              <div className="vm-filter">
                 <span className="vm-filter__label">إلى</span>
-                <input type="date" className="field__control" value={to} onChange={(e) => setTo(e.target.value)} />
-              </label>
+                <DateField label="إلى" clearable value={to} onChange={setTo} />
+              </div>
             </div>
           </header>
 

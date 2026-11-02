@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api, session } from '@/lib/api';
 import { when } from '@/lib/orders';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 
 interface Inbox {
   unread: number;
@@ -25,6 +26,7 @@ const subscribe = (cb: () => void) => {
  * صار له صندوقه (28 أكتوبر 2026).
  */
 export function NotificationBell({ allHref = '/account/notifications' }: { allHref?: string } = {}) {
+  const t = useT();
   const signedIn = useSyncExternalStore(subscribe, () => !!session.read(), () => false);
   const [inbox, setInbox] = useState<Inbox | null>(null);
   const [open, setOpen] = useState(false);
@@ -56,10 +58,10 @@ export function NotificationBell({ allHref = '/account/notifications' }: { allHr
         .then((d) => alive && setInbox(d))
         .catch(() => undefined);
     void load();
-    const t = setInterval(() => void load(), 60_000);
+    const timer = setInterval(() => void load(), 60_000);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [signedIn, version]);
 
@@ -76,7 +78,7 @@ export function NotificationBell({ allHref = '/account/notifications' }: { allHr
         type="button"
         className="icon-btn"
         aria-expanded={open}
-        aria-label={`الإشعارات${inbox?.unread ? ` — ${inbox.unread} غير مقروء` : ''}`}
+        aria-label={`${t('الإشعارات', 'Notifications')}${inbox?.unread ? ` — ${inbox.unread} ${t('غير مقروء', 'unread')}` : ''}`}
         onClick={() => {
           // الفتح يجلب الجديد: السؤال كل دقيقة، فإشعار وصل للتوّ كان يغيب عن القائمة حتى الدورة التالية (VOPS-040)
           if (!open) setVersion((v) => v + 1);
@@ -89,14 +91,14 @@ export function NotificationBell({ allHref = '/account/notifications' }: { allHr
       {open ? (
         <div className="bell__panel">
           <div className="bell__head">
-            <strong>الإشعارات</strong>
+            <strong>{t('الإشعارات', 'Notifications')}</strong>
             {inbox?.unread ? (
               <button type="button" className="btn btn--ghost btn--sm" onClick={() => void readAll()}>
-                تعليم الكل مقروءاً
+                {t('تعليم الكل مقروءاً', 'Mark all as read')}
               </button>
             ) : null}
           </div>
-          {!inbox || inbox.items.length === 0 ? <p className="bell__empty">لا إشعارات.</p> : null}
+          {!inbox || inbox.items.length === 0 ? <p className="bell__empty">{t('لا إشعارات.', 'No notifications.')}</p> : null}
           {inbox?.items.map((n) => (
             <div key={n.id} className="bell__item" data-unread={!n.readAt}>
               {n.link ? (
@@ -115,7 +117,7 @@ export function NotificationBell({ allHref = '/account/notifications' }: { allHr
               className="btn btn--ghost btn--sm btn--block"
               onClick={() => setOpen(false)}
             >
-              كل الإشعارات
+              {t('كل الإشعارات', 'All notifications')}
             </Link>
           </div>
         </div>
