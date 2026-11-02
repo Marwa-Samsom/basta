@@ -70,6 +70,8 @@ function rangeOf(from?: string, to?: string): Range {
 /** أطول فترة لتقرير أو لوحة أو تصدير */
 const MAX_REPORT_DAYS = 366;
 
+const BANNER_MAX_BYTES = 8 * 1024 * 1024;
+
 export class GrantDto {
   @NormalizeEmail()
   @IsString()
@@ -182,7 +184,8 @@ export class CouponDto implements CouponInput {
 }
 
 export class PageDto {
-  @Matches(/^[a-z0-9-]{2,60}$/)
+  // رسالة الخدمة الأوضح كانت لا تصل: هذا التحقق يسبقها فيقول «أحد الحقول: صيغة غير صحيحة.» (ACFG-056)
+  @Matches(/^[a-z0-9-]{2,60}$/, { message: 'المسار من 2 إلى 60 حرفاً: أحرف لاتينية صغيرة وأرقام وشرطات.' })
   slug!: string;
 
   @IsString()
@@ -510,9 +513,19 @@ export class AdminContentController {
   @Post('banners/image')
   @RequirePermission('content.manage')
   async bannerImage(@Req() req: FastifyRequest) {
-    const part = await req.file({ limits: { fileSize: 8 * 1024 * 1024, files: 1 } }).catch(() => undefined);
+    const part = await req.file({ limits: { fileSize: BANNER_MAX_BYTES, files: 1 } }).catch(() => undefined);
     if (!part) throw new InvalidInputError('أرفق الصورة في الحقل file.');
-    return this.content.uploadBannerImage(await part.toBuffer());
+    let buffer: Buffer;
+    try {
+      buffer = await part.toBuffer();
+    } catch (err) {
+      // كان يخرج 500 «حدث خلل غير متوقّع» — مسار صور المنتجات يترجمه ومسار البانر لا (ACFG-049)
+      if ((err as { code?: string }).code === 'FST_REQ_FILE_TOO_LARGE') {
+        throw new InvalidInputError(`حجم صورة البانر أكبر من ${BANNER_MAX_BYTES / (1024 * 1024)} م.ب.`);
+      }
+      throw err;
+    }
+    return this.content.uploadBannerImage(buffer);
   }
 
   @Post('banners')

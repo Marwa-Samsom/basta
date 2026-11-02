@@ -159,6 +159,9 @@ export class CheckoutService {
       throw new InvalidInputError('الضيف يحتاج بريداً أو هاتفاً لنبلغه بطلبه.');
     }
 
+    // رمز لا يعرفه المزوّد يُرفض هنا: استثناء الدفع بعد الطلب يُقرأ «لا نعرف» فيبقى الطلب معلّقاً بحجزه
+    this.provider.assertToken(input.paymentToken);
+
     if (this.provider.method === 'bank_transfer') await this.assertTransferOpen(input.userId);
 
     const cart = await this.carts.lines(input.cartToken, input.userId);

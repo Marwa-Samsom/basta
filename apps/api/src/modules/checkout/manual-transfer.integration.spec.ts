@@ -108,7 +108,11 @@ async function cartWith(items: { variantId: string; qty: number }[]): Promise<st
   return token;
 }
 
-async function order(items: { variantId: string; qty: number }[], who = buyer): Promise<{ res: Res; cart: string }> {
+async function order(
+  items: { variantId: string; qty: number }[],
+  who = buyer,
+  paymentToken = BANK_TRANSFER_TOKEN,
+): Promise<{ res: Res; cart: string }> {
   const cart = await cartWith(items);
   const q = await call('POST', '/checkout/quote', {
     body: { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city },
@@ -117,7 +121,7 @@ async function order(items: { variantId: string; qty: number }[], who = buyer): 
   expect(q.statusCode, q.body).toBe(200);
   const res = await call('POST', '/checkout', {
     token: who.token,
-    body: { address: ADDRESS, paymentToken: BANK_TRANSFER_TOKEN, expectedTotal: q.json().totals.total.minorUnits, expectedCurrency: q.json().currency },
+    body: { address: ADDRESS, paymentToken, expectedTotal: q.json().totals.total.minorUnits, expectedCurrency: q.json().currency },
     headers: { 'x-cart-token': cart, 'idempotency-key': randomUUID() },
   });
   return { res, cart };
@@ -398,6 +402,18 @@ describe('التحويل اليدوي · الحجز والتأكيد', () => {
     const { res } = await order([{ variantId: variantIds[0]!, qty: 1 }], who);
     expect(res.statusCode, res.body).toBe(409);
     expect(res.json().details.reason).toBe('TOO_MANY_OPEN_TRANSFERS');
+    expect(await stockOf(variantIds[0]!)).toEqual(before);
+  });
+
+  it('صفحة قديمة ترسل رمز بطاقة: 400 «حدّث الصفحة» بلا طلب ولا حجز (CHK-065)', async () => {
+    if (!dbUp) return;
+    await setTransferSettings(TRANSFER_SETTINGS);
+    const who = await account('oldpage');
+    const before = await stockOf(variantIds[0]!);
+    const { res } = await order([{ variantId: variantIds[0]!, qty: 1 }], who, 'tok_success');
+    expect(res.statusCode, res.body).toBe(400);
+    expect(res.json().message).toBe('وسيلة الدفع المتاحة التحويل البنكي — حدّث الصفحة.');
+    expect(await prisma.order.count({ where: { customerUserId: who.id } })).toBe(0);
     expect(await stockOf(variantIds[0]!)).toEqual(before);
   });
 });
