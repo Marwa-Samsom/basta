@@ -7,7 +7,7 @@ import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { pct, useAction, useAdminData } from '@/lib/admin';
 import { toLatinDigits } from '@/lib/digits';
-import { when } from '@/lib/orders';
+import { daysAr, when } from '@/lib/orders';
 import { ClearableInput } from '@/components/ui';
 
 interface Setting {
@@ -48,6 +48,30 @@ function intValue(s: Setting, raw: string): number | null {
 }
 
 /**
+ * التعليق أقصر من مهلة الإرجاع: مال البائع يتحرّر والمشتري ما زال يستطيع الإرجاع، والصفر
+ * يحرّره عند التسليم. كانت النافذة تعرض الجملة العامة وحدها، فيُحفظ الصفر ولا شيء يقول
+ * ما يعنيه (SYS-022، 2 نوفمبر 2026).
+ */
+function holdWarning(days: number, returnDays: number): string | null {
+  if (days >= returnDays) return null;
+  const returns = `مهلة الإرجاع (${daysAr(returnDays)})`;
+  return days === 0
+    ? `صفر: مال البائع يتحرّر عند تأكيد التسليم، بأول دورة تحرير، قبل أن تنتهي ${returns} — فقد يُطلب ردّ مالٍ صُرف.`
+    : `أقصر من ${returns}: مال البائع يتحرّر والمشتري ما زال يستطيع الإرجاع — فقد يُطلب ردّ مالٍ صُرف.`;
+}
+
+/**
+ * القيمة المحفوظة لإعداد رقمي إن كانت تالفة — كُتبت من خارج اللوحة (القاعدة مباشرة): نصّ
+ * أو كسر أو خارج الحدود. كانت اللوحة تعرضها «الحالي: خمسة دقيقة» كأنها السارية، والنظام
+ * يتجاهلها ويعمل بقيمته الافتراضية (SYS-002، 1 نوفمبر 2026).
+ */
+function brokenStored(s: Setting): string | null {
+  if (s.kind !== 'int' || s.value === null || s.value === undefined) return null;
+  const raw = String(s.value);
+  return intValue(s, raw) === null ? raw : null;
+}
+
+/**
  * AD-26 — الإعدادات والضرائب. الإعداد المالي يعرض أثره قبل الحفظ، والحفظ
  * يعيد ذكره في التأكيد. كل تغيير في السجل بقيمته قبل وبعد.
  */
@@ -63,6 +87,8 @@ export default function AdminSettingsPage() {
     const raw = draft[s.key] ?? '';
     const value = s.kind === 'int' ? intValue(s, raw) : raw;
     if (value === null) return;
+    const returnDays = Number(data.settings.find((x) => x.key === 'return_window_days')?.value ?? 0);
+    const warning = s.key === 'hold_period_days' && typeof value === 'number' ? holdWarning(value, returnDays) : null;
     const sure = await ask({
       title: `تغيّر «${s.labelAr}»؟`,
       body: (
@@ -71,6 +97,11 @@ export default function AdminSettingsPage() {
             <bdi className="num">{String(s.value ?? '—')}</bdi> ← <bdi className="num">{String(value) || '—'}</bdi>
           </p>
           {s.financial ? <p>{s.financial}</p> : null}
+          {warning ? (
+            <p>
+              <strong>{warning}</strong>
+            </p>
+          ) : null}
         </>
       ),
       confirmLabel: 'احفظ الإعداد',
@@ -95,6 +126,7 @@ export default function AdminSettingsPage() {
   const row = (s: Setting) => {
     const changed = draft[s.key] !== undefined && draft[s.key] !== String(s.value ?? '');
     const invalid = s.kind === 'int' && changed && intValue(s, draft[s.key] ?? '') === null;
+    const stored = brokenStored(s);
     return (
       <div key={s.key} className="ac2-setting">
         <div className="ac2-setting__row">
@@ -146,9 +178,32 @@ export default function AdminSettingsPage() {
           </span>
         ) : null}
         <span className="ac2-setting__now">
-          الحالي: <span className="num">{s.key.endsWith('_bps') ? pct(Number(s.value)) : String(s.value ?? '—')}</span> {s.unit ?? ''}
+          الحالي:{' '}
+          {stored !== null ? (
+            <bdi>«{stored}»</bdi>
+          ) : (
+            <>
+              <span className="num">{s.key.endsWith('_bps') ? pct(Number(s.value)) : String(s.value ?? '—')}</span> {s.unit ?? ''}
+            </>
+          )}
           {s.updatedAt ? ` · عُدِّل ${when(s.updatedAt)}` : ''}
         </span>
+        {stored !== null ? (
+          <span className="alert alert--danger ac2-callout ac2-callout--sm" role="alert">
+            <Icon name="alert" size={14} />
+            <span>
+              القيمة المحفوظة «<bdi>{stored}</bdi>»{' '}
+              {/^\d+$/.test(toLatinDigits(stored).trim()) ? (
+                <>
+                  خارج حدود اللوحة (<bdi className="num">{s.min}</bdi>–<bdi className="num">{s.max}</bdi>)
+                </>
+              ) : (
+                'ليست رقماً صحيحاً'
+              )}{' '}
+              — كُتبت من خارج اللوحة، وقد يتجاهلها النظام ويعمل بقيمته الافتراضية. احفظ قيمة صحيحة.
+            </span>
+          </span>
+        ) : null}
         {s.financial ? (
           <span className="alert alert--warning ac2-callout ac2-callout--sm">
             <Icon name="alert" size={14} />
