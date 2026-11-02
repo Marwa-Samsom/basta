@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { DashIdent, DashShell, type DashNavGroup, type DashNavItem } from '@/components/dash-shell';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { LogoutButton } from '@/components/logout-button';
 import { NotificationBell } from '@/components/notification-bell';
 import { api, session } from '@/lib/api';
@@ -11,14 +12,14 @@ import { NOTIFICATIONS_CHANGED } from '@/lib/addresses';
 /** ترتيب ملف التصميم: الطلبات، ثم المفضّلة والرسائل، ثم الباقي */
 const NAV: readonly DashNavItem[] = [
   // «حسابي» يطابق مساره وحده؛ البقية تطابق ما تحتها أيضاً (تفاصيل الطلب تحت «طلباتي»)
-  { href: '/account', label: 'حسابي', icon: 'user', exact: true },
-  { href: '/account/orders', label: 'طلباتي', icon: 'package' },
-  { href: '/account/wishlist', label: 'المفضّلة', icon: 'heart' },
-  { href: '/account/messages', label: 'رسائلي', icon: 'msg' },
-  { href: '/account/addresses', label: 'العناوين', icon: 'pin' },
-  { href: '/account/notifications', label: 'الإشعارات', icon: 'bell' },
-  { href: '/account/recent', label: 'شوهد مؤخراً', icon: 'history' },
-  { href: '/account/disputes', label: 'النزاعات', icon: 'shield' },
+  { href: '/account', label: 'حسابي', en: 'My account', icon: 'user', exact: true },
+  { href: '/account/orders', label: 'طلباتي', en: 'My orders', icon: 'package' },
+  { href: '/account/wishlist', label: 'المفضّلة', en: 'Wishlist', icon: 'heart' },
+  { href: '/account/messages', label: 'رسائلي', en: 'My messages', icon: 'msg' },
+  { href: '/account/addresses', label: 'العناوين', en: 'Addresses', icon: 'pin' },
+  { href: '/account/notifications', label: 'الإشعارات', en: 'Notifications', icon: 'bell' },
+  { href: '/account/recent', label: 'شوهد مؤخراً', en: 'Recently viewed', icon: 'history' },
+  { href: '/account/disputes', label: 'النزاعات', en: 'Disputes', icon: 'shield' },
 ];
 
 /**
@@ -26,8 +27,8 @@ const NAV: readonly DashNavItem[] = [
  * إلى لوحتيهما إلا بكتابة الرابط. الدور يُقرأ من الرمز للعرض وحده؛ اللوحة تفحصه بنفسها.
  */
 const PANELS: readonly { item: DashNavItem; roles: readonly string[] }[] = [
-  { item: { href: '/admin', label: 'لوحة الإدارة', icon: 'shield' }, roles: ['admin'] },
-  { item: { href: '/vendor', label: 'لوحة التاجر', icon: 'store' }, roles: ['vendor_owner', 'vendor_staff'] },
+  { item: { href: '/admin', label: 'لوحة الإدارة', en: 'Admin dashboard', icon: 'shield' }, roles: ['admin'] },
+  { item: { href: '/vendor', label: 'لوحة التاجر', en: 'Seller dashboard', icon: 'store' }, roles: ['vendor_owner', 'vendor_staff'] },
 ];
 
 const subscribe = (cb: () => void) => {
@@ -41,6 +42,7 @@ const subscribe = (cb: () => void) => {
  * ويتحدّث حين تعلّم صفحة الإشعارات شيئاً مقروءاً.
  */
 export function AccountShell({ children }: { children: ReactNode }) {
+  const t = useT();
   const signedIn = useSyncExternalStore(subscribe, () => !!session.read(), () => false);
   // نصّ لا مصفوفة: لقطة useSyncExternalStore تُقارَن بالمساواة، والمصفوفة جديدة كل قراءة
   const roles = useSyncExternalStore(subscribe, () => session.roles().join(','), () => '').split(',');
@@ -68,7 +70,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
         item.href === '/account/notifications' && signedIn && unread > 0 ? { ...item, count: unread } : item,
       ),
     },
-    ...(panels.length > 0 ? [{ label: 'لوحاتك', items: panels }] : []),
+    ...(panels.length > 0 ? [{ label: 'لوحاتك', en: 'Your dashboards', items: panels }] : []),
   ];
 
   return (
@@ -77,8 +79,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
       ident={
         <DashIdent
           href="/account"
-          name="حسابي"
-          sub="بسطة"
+          name={t('حسابي', 'My account')}
+          sub={t('بسطة', 'Basta')}
           mark={
             <span className="tile-icon" aria-hidden>
               <Icon name="user" size={18} />
@@ -92,7 +94,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
       sideFoot={
         signedIn ? (
           <LogoutButton className="btn btn--ghost btn--sm btn--block" next="/">
-            خروج
+            {t('خروج', 'Sign out')}
           </LogoutButton>
         ) : null
       }

@@ -93,5 +93,13 @@ export function paymentProviderContract(name: string, make: () => ContractHarnes
       expect(e.intentId).toBe(r.intentId);
       expect(e.amountMinor).toBe(7_700n);
     });
+
+    it('7 · رمز لا يعرفه المزوّد يُرفض قبل الدفع برسالة — والمعروف يمرّ (CHK-065)', () => {
+      const h = make();
+      expect(() => h.provider.assertToken(h.tokens.success)).not.toThrow();
+      expect(() => h.provider.assertToken(h.tokens.decline)).not.toThrow();
+      expect(() => h.provider.assertToken(`tok_${randomUUID()}`)).toThrow(/[؀-ۿ]/);
+      expect(() => h.provider.assertToken('')).toThrow();
+    });
   });
 }

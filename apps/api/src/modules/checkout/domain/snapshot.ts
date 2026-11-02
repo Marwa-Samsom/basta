@@ -55,6 +55,7 @@ export function toSnapshot(cart: PricedCart): Snapshot {
     subOrders: cart.subOrders.map((so) => ({
       vendorId: so.vendorId,
       vendorNameAr: so.vendorNameAr,
+      vendorNameEn: so.vendorNameEn ?? null,
       currency: so.currency,
       vendor: breakdown(so.vendor),
       charge: breakdown(so.charge),
@@ -68,6 +69,7 @@ export function toSnapshot(cart: PricedCart): Snapshot {
         productId: l.productId,
         vendorId: l.vendorId,
         nameAr: l.nameAr,
+        nameEn: l.nameEn ?? null,
         variantLabel: l.variantLabel,
         sku: l.sku,
         imageKey: l.imageKey,

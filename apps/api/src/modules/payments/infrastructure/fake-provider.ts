@@ -25,6 +25,15 @@ import type {
  */
 const DEV_WEBHOOK_SECRET = 'basta-fake-webhook-secret';
 
+const TOKENS: ReadonlySet<string> = new Set([
+  'tok_success',
+  'tok_decline',
+  'tok_insufficient',
+  'tok_3ds',
+  'tok_timeout',
+  'tok_timeout_fail',
+]);
+
 /** يُقرأ عند كل توقيع لا عند التحميل، ليرى الاختبار الذي يبدّل البيئة قيمتَه */
 function webhookSecret(): string {
   return process.env['PAYMENT_WEBHOOK_SECRET'] || DEV_WEBHOOK_SECRET;
@@ -47,6 +56,10 @@ export class FakePaymentProvider implements PaymentProvider {
   private readonly intents = new Map<string, ChargeOutcome>();
   /** عدم التكرار عند المزوّد: المفتاح نفسه يعيد النتيجة نفسها لا خصماً ثانياً */
   private readonly byKey = new Map<string, ChargeOutcome>();
+
+  assertToken(paymentToken: string): void {
+    if (!TOKENS.has(paymentToken)) throw new InvalidInputError('وسيلة دفع غير معروفة.', { token: paymentToken });
+  }
 
   async charge(request: ChargeRequest): Promise<ChargeOutcome> {
     const seen = this.byKey.get(request.idempotencyKey);

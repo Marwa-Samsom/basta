@@ -135,7 +135,7 @@ export class ContentService {
   }
 
   async savePage(actorId: string, input: { id?: string; slug: string; titleAr: string; bodyAr: string; isPublished: boolean }) {
-    if (!/^[a-z0-9-]{2,60}$/.test(input.slug)) throw new InvalidInputError('المسار بأحرف لاتينية صغيرة وأرقام وشرطات.');
+    if (!/^[a-z0-9-]{2,60}$/.test(input.slug)) throw new InvalidInputError('المسار من 2 إلى 60 حرفاً: أحرف لاتينية صغيرة وأرقام وشرطات.');
     try {
       const page = input.id
         ? await this.prisma.cmsPage.update({ where: { id: input.id }, data: { slug: input.slug, titleAr: input.titleAr.trim(), bodyAr: input.bodyAr, isPublished: input.isPublished, updatedBy: actorId } })

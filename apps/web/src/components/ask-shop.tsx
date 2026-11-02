@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { Alert } from '@/components/ui';
 import { api, session } from '@/lib/api';
 
@@ -33,10 +34,10 @@ export function AskShop({
   thumb,
   triggerLabel,
   triggerClassName = 'btn btn--secondary ms-ask-trigger',
-  title = 'اسأل المتجر',
-  fieldLabel = 'سؤالك',
+  title,
+  fieldLabel,
   iconSize = 17,
-  placeholder = 'مثال: هل القطن مصري أصلي؟ وهل يتوفّر مقاس XL خلال الأسبوع؟',
+  placeholder,
 }: {
   context: AskContext;
   shopName: string;
@@ -50,6 +51,7 @@ export function AskShop({
   iconSize?: number;
   placeholder?: string;
 }) {
+  const t = useT();
   const pathname = usePathname();
   const signedIn = useSyncExternalStore(subscribe, () => !!session.read(), () => false);
   const [open, setOpen] = useState(false);
@@ -89,10 +91,10 @@ export function AskShop({
   const ok = signedIn && trimmed >= ASK_MIN;
   const tooShort = text.length > 0 && trimmed < ASK_MIN;
   const hint = !signedIn
-    ? 'ادخل إلى حسابك لإرسال السؤال.'
+    ? t('ادخل إلى حسابك لإرسال السؤال.', 'Sign in to your account to send the question.')
     : ok
-      ? 'يُرسل السؤال إلى المتجر ويظهر ردّه في رسائلك.'
-      : 'اكتب سؤالاً من عشرة أحرف على الأقل.';
+      ? t('يُرسل السؤال إلى المتجر ويظهر ردّه في رسائلك.', 'The question goes to the shop, and its reply appears in your messages.')
+      : t('اكتب سؤالاً من عشرة أحرف على الأقل.', 'Write a question of at least ten characters.');
   const tone = ok ? 'ok' : text.length ? 'bad' : 'muted';
 
   async function submit(): Promise<void> {
@@ -104,7 +106,7 @@ export function AskShop({
       setSentId(r.id);
       setText('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذّر إرسال السؤال.');
+      setError(e instanceof Error ? e.message : t('تعذّر إرسال السؤال.', "Couldn't send the question."));
     } finally {
       setBusy(false);
     }
@@ -122,9 +124,9 @@ export function AskShop({
       <dialog ref={dialog} className="ms-dialog" aria-labelledby={titleId} onClose={() => setOpen(false)} onClick={onBackdrop}>
         <div className="ms-dialog__head">
           <h2 id={titleId} className="ms-dialog__title">
-            {title}
+            {title ?? t('اسأل المتجر', 'Ask the shop')}
           </h2>
-          <button type="button" className="icon-btn" aria-label="إغلاق" onClick={() => setOpen(false)}>
+          <button type="button" className="icon-btn" aria-label={t('إغلاق', 'Close')} onClick={() => setOpen(false)}>
             <Icon name="x" size={18} />
           </button>
         </div>
@@ -134,21 +136,24 @@ export function AskShop({
             <div className="ms-dialog__body">
               <div className="ms-ask__done" role="status">
                 <h3 ref={doneRef} tabIndex={-1} className="ms-ask__done-title">
-                  أُرسل سؤالك إلى {shopName}
+                  {t(`أُرسل سؤالك إلى ${shopName}`, `Your question was sent to ${shopName}`)}
                 </h3>
                 <p className="ms-ask__note">
                   <Icon name="msg" size={14} />
-                  يردّ المتجر عادةً في رسائلك خلال يوم عمل، ونُعلمك حين يصل الردّ.
+                  {t(
+                    'يردّ المتجر عادةً في رسائلك خلال يوم عمل، ونُعلمك حين يصل الردّ.',
+                    "The shop usually replies in your messages within one business day, and we'll let you know when the reply arrives.",
+                  )}
                 </p>
               </div>
             </div>
             <div className="ms-dialog__foot">
               <button type="button" className="btn btn--secondary" onClick={() => setOpen(false)}>
-                إغلاق
+                {t('إغلاق', 'Close')}
               </button>
               <Link href={`/account/messages?c=${sentId}`} className="btn btn--primary">
                 <Icon name="msg" size={16} />
-                افتح المحادثة
+                {t('افتح المحادثة', 'Open the conversation')}
               </Link>
             </div>
           </>
@@ -168,17 +173,17 @@ export function AskShop({
                   <span className="ms-subject__name">{subjectName}</span>
                   {subjectSub ? <span className="ms-subject__sub">{subjectSub}</span> : null}
                 </span>
-                <span className="badge badge--brand">مُرفق تلقائياً</span>
+                <span className="badge badge--brand">{t('مُرفق تلقائياً', 'Attached automatically')}</span>
               </div>
 
               {!signedIn ? (
                 <div className="ms-guest">
                   <p className="ms-guest__text">
                     <Icon name="info" size={16} />
-                    تحتاج إلى الدخول أولاً حتى يصل ردّ المتجر إلى رسائلك.
+                    {t('تحتاج إلى الدخول أولاً حتى يصل ردّ المتجر إلى رسائلك.', "You need to sign in first so the shop's reply reaches your messages.")}
                   </p>
                   <Link href={loginHref} className="btn btn--primary btn--sm">
-                    ادخل إلى حسابك
+                    {t('ادخل إلى حسابك', 'Sign in to your account')}
                   </Link>
                 </div>
               ) : null}
@@ -187,14 +192,20 @@ export function AskShop({
 
               <div className="ms-ask__field">
                 <label className="ms-ask__label" htmlFor={fieldId}>
-                  {fieldLabel}
+                  {fieldLabel ?? t('سؤالك', 'Your question')}
                 </label>
                 <textarea
                   id={fieldId}
                   className="field__control"
                   rows={4}
                   maxLength={ASK_MAX}
-                  placeholder={placeholder}
+                  placeholder={
+                    placeholder ??
+                    t(
+                      'مثال: هل القطن مصري أصلي؟ وهل يتوفّر مقاس XL خلال الأسبوع؟',
+                      'Example: Is the cotton genuine Egyptian? And will size XL be available this week?',
+                    )
+                  }
                   value={text}
                   aria-describedby={hintId}
                   aria-invalid={tooShort}
@@ -212,16 +223,16 @@ export function AskShop({
 
               <p className="ms-ask__note">
                 <Icon name="msg" size={14} />
-                يردّ المتجر عادةً في رسائلك خلال يوم عمل.
+                {t('يردّ المتجر عادةً في رسائلك خلال يوم عمل.', 'The shop usually replies in your messages within one business day.')}
               </p>
             </div>
             <div className="ms-dialog__foot">
               <button type="button" className="btn btn--secondary" onClick={() => setOpen(false)}>
-                إلغاء
+                {t('إلغاء', 'Cancel')}
               </button>
               <button type="button" className="btn btn--primary" disabled={!ok || busy} onClick={() => void submit()}>
                 {busy ? <span className="spinner" aria-hidden /> : <Icon name="msg" size={16} />}
-                أرسل السؤال
+                {t('أرسل السؤال', 'Send question')}
               </button>
             </div>
           </>

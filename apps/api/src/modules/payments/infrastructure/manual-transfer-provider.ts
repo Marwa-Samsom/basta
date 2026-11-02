@@ -26,10 +26,14 @@ export class ManualTransferProvider implements PaymentProvider {
   readonly name = 'manual';
   readonly method = 'bank_transfer' as const;
 
-  async charge(request: ChargeRequest): Promise<ChargeOutcome> {
-    if (request.paymentToken !== BANK_TRANSFER_TOKEN) {
-      throw new InvalidInputError('وسيلة الدفع المتاحة التحويل البنكي — حدّث الصفحة.', { token: request.paymentToken });
+  assertToken(paymentToken: string): void {
+    if (paymentToken !== BANK_TRANSFER_TOKEN) {
+      throw new InvalidInputError('وسيلة الدفع المتاحة التحويل البنكي — حدّث الصفحة.', { token: paymentToken });
     }
+  }
+
+  async charge(request: ChargeRequest): Promise<ChargeOutcome> {
+    this.assertToken(request.paymentToken);
     if (request.amountMinor <= 0n) throw new InvalidInputError('مبلغ الطلب موجب.');
     return { status: 'awaiting_transfer', intentId: `mt_${request.orderId}` };
   }

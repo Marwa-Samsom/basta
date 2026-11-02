@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api, API_BASE, ApiError } from './api';
+import { intlLocale, type Locale } from './i18n';
 
 export interface Me {
   userId: string;
@@ -11,16 +12,18 @@ export interface Me {
 
 /**
  * يجلب بيانات صفحة إدارية ويعيد تحميلها عند الطلب. الخطأ نصّ جاهز للعرض،
- * و403 يُميَّز: الصفحة تقول «تحتاج صلاحية كذا» لا «حدث خطأ».
+ * و403 يُميَّز: الصفحة تقول «تحتاج صلاحية كذا» لا «حدث خطأ». و400 مدخل رفضه الخادم
+ * (فترة مقلوبة مثلاً): رسالته وحدها تكفي، لا «حدث خلل غير متوقّع» فوقها (ACFG-090).
  */
 export function useAdminData<T>(path: string | null): {
   data: T | null;
   error: string | null;
   forbidden: boolean;
+  invalid: boolean;
   reload: () => void;
 } {
   const [data, setData] = useState<T | null>(null);
-  const [failure, setFailure] = useState<{ path: string; message: string; forbidden: boolean } | null>(null);
+  const [failure, setFailure] = useState<{ path: string; message: string; forbidden: boolean; invalid: boolean } | null>(null);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -35,7 +38,12 @@ export function useAdminData<T>(path: string | null): {
         }
       } catch (e) {
         if (!alive) return;
-        setFailure({ path, message: (e as Error).message, forbidden: e instanceof ApiError && e.status === 403 });
+        setFailure({
+          path,
+          message: (e as Error).message,
+          forbidden: e instanceof ApiError && e.status === 403,
+          invalid: e instanceof ApiError && e.status === 400,
+        });
       }
     })();
     return () => {
@@ -50,7 +58,13 @@ export function useAdminData<T>(path: string | null): {
    * وأثناء التحميل تبقى السابقة حتى تصل التالية، فلا ترمش القائمة مع كل حرف.
    */
   const failed = failure?.path === path ? failure : null;
-  return { data: failed ? null : data, error: failed?.message ?? null, forbidden: failed?.forbidden ?? false, reload };
+  return {
+    data: failed ? null : data,
+    error: failed?.message ?? null,
+    forbidden: failed?.forbidden ?? false,
+    invalid: failed?.invalid ?? false,
+    reload,
+  };
 }
 
 /**
@@ -167,8 +181,8 @@ export function useAction(): {
   return { busy, error, notice, run, clear: () => (setError(null), setNotice(null)) };
 }
 
-export const pct = (bps: number | null | undefined): string =>
-  bps === null || bps === undefined ? '—' : `${(bps / 100).toLocaleString('ar-u-nu-latn', { maximumFractionDigits: 2 })}%`;
+export const pct = (bps: number | null | undefined, locale: Locale = 'ar'): string =>
+  bps === null || bps === undefined ? '—' : `${(bps / 100).toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 })}%`;
 
 export const VENDOR_STATUS: Record<string, string> = {
   pending: 'مسوّدة',
@@ -179,11 +193,27 @@ export const VENDOR_STATUS: Record<string, string> = {
   banned: 'محظور',
 };
 
+export const VENDOR_STATUS_EN: Record<string, string> = {
+  pending: 'Draft',
+  in_review: 'In review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  suspended: 'Suspended',
+  banned: 'Banned',
+};
+
 export const PRODUCT_STATUS: Record<string, string> = {
   draft: 'مسوّدة',
   active: 'منشور',
   rejected: 'موقوف',
   archived: 'مؤرشف',
+};
+
+export const PRODUCT_STATUS_EN: Record<string, string> = {
+  draft: 'Draft',
+  active: 'Published',
+  rejected: 'Taken down',
+  archived: 'Archived',
 };
 
 export const PARENT_STATUS: Record<string, string> = {
@@ -194,6 +224,16 @@ export const PARENT_STATUS: Record<string, string> = {
   completed: 'مكتمل',
   canceled: 'ملغى',
   refunded: 'مُسترَد',
+};
+
+export const PARENT_STATUS_EN: Record<string, string> = {
+  pending_payment: 'Awaiting payment',
+  payment_failed: 'Payment failed',
+  processing: 'Processing',
+  partially_completed: 'Partially completed',
+  completed: 'Completed',
+  canceled: 'Canceled',
+  refunded: 'Refunded',
 };
 
 export const TONE: Record<string, string> = {

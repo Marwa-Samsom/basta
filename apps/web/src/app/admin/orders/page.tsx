@@ -6,10 +6,23 @@ import { AdminHeader, Empty, Feedback, Loading, MoreButton, ReasonButton, Search
 import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { Alert } from '@/components/ui';
+import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
-import { PARENT_STATUS, useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { ORDERS, counted } from '@/lib/arabic-count';
-import { historyReason, labelOf, money, PAYMENT_STATUS, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
+import { localized } from '@/lib/i18n';
+import { PARENT_STATUS, PARENT_STATUS_EN, useAction, useAdminData, useAdminList } from '@/lib/admin';
+import {
+  historyReason,
+  labelOf,
+  money,
+  PAYMENT_STATUS,
+  PAYMENT_STATUS_EN,
+  REFUND_STATUS,
+  REFUND_STATUS_EN,
+  toneOf,
+  when,
+  type SubOrderView,
+} from '@/lib/orders';
 
 interface Row {
   orderNumber: string;
@@ -57,6 +70,9 @@ const PARENT_TONE: Record<string, string> = {
  * `?due=acceptance` من بطاقة اللوحة: ما قاربت مهلة قبوله وحده، بالقاعدة نفسها التي تعدّه بها.
  */
 function OrdersInner() {
+  const t = useT();
+  const locale = useLocale();
+  const parentStatus = localized(locale, PARENT_STATUS, PARENT_STATUS_EN);
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -90,27 +106,40 @@ function OrdersInner() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="الطلبات" count={data ? counted(data.total, ORDERS) : undefined} />
+      <AdminHeader
+        title={t('الطلبات', 'Orders')}
+        count={data ? t(counted(data.total, ORDERS), `${data.total} ${data.total === 1 ? 'order' : 'orders'}`) : undefined}
+      />
       <div className="toolbar">
         <Tabs
           value={status}
           onChange={(v) => setFilter({ status: v, due: false })}
-          label="حالة الطلب"
-          options={[{ key: '', label: 'الكل' }, ...['processing', 'partially_completed', 'completed', 'canceled', 'refunded', 'payment_failed'].map((k) => ({ key: k, label: PARENT_STATUS[k]! }))]}
+          label={t('حالة الطلب', 'Order status')}
+          options={[
+            { key: '', label: t('الكل', 'All') },
+            ...['processing', 'partially_completed', 'completed', 'canceled', 'refunded', 'payment_failed'].map((k) => ({ key: k, label: parentStatus[k]! })),
+          ]}
         />
         <div className="toolbar__end">
-          <SearchBox value={search} onChange={setSearch} placeholder="رقم الطلب، بريد العميل، أو المتجر" label="بحث في الطلبات" />
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            placeholder={t('رقم الطلب، بريد العميل، أو المتجر', 'Order number, customer email, or shop')}
+            label={t('بحث في الطلبات', 'Search orders')}
+          />
           <SortButton value={sort} onChange={setSort} />
         </div>
       </div>
       {due ? (
-        <Alert tone="warning" title="طلبات قاربت مهلة القبول">
+        <Alert tone="warning" title={t('طلبات قاربت مهلة القبول', 'Orders near their acceptance deadline')}>
           <p>
-            متاجر لم تقبل طلبها وبقي على انقضاء مهلتها أقل من 12 ساعة — بعدها يُلغى آلياً ويُردّ المبلغ. ذكّر المتجر أو
-            ألغِ بنفسك.
+            {t(
+              'متاجر لم تقبل طلبها وبقي على انقضاء مهلتها أقل من 12 ساعة — بعدها يُلغى آلياً ويُردّ المبلغ. ذكّر المتجر أو ألغِ بنفسك.',
+              'Shops that have not accepted their order with less than 12 hours left — after that it is canceled automatically and the amount refunded. Remind the shop or cancel it yourself.',
+            )}
           </p>
           <button type="button" className="btn btn--secondary btn--sm" onClick={() => setFilter({ due: false })}>
-            اعرض كل الطلبات
+            {t('اعرض كل الطلبات', 'Show all orders')}
           </button>
         </Alert>
       ) : null}
@@ -119,7 +148,7 @@ function OrdersInner() {
       ) : data.items.length === 0 ? (
         <Empty
           icon="truck"
-          title={due ? 'لا طلب قاربت مهلة قبوله' : 'لا طلبات بهذه التصفية'}
+          title={due ? t('لا طلب قاربت مهلة قبوله', 'No order is near its acceptance deadline') : t('لا طلبات بهذه التصفية', 'No orders match this filter')}
           actions={
             search.trim() || status || due ? (
               <button
@@ -130,26 +159,26 @@ function OrdersInner() {
                   setFilter({ status: '', due: false });
                 }}
               >
-                أزل التصفية
+                {t('أزل التصفية', 'Clear filters')}
               </button>
             ) : undefined
           }
         >
-          وسّع التصفية أو ابحث برقم آخر.
+          {t('وسّع التصفية أو ابحث برقم آخر.', 'Widen the filter or search for another number.')}
         </Empty>
       ) : (
         <div className="table-wrap">
           <table className="table ao-table">
             <thead>
               <tr>
-                <th>الطلب</th>
-                <th>العميل</th>
-                <th>المتاجر</th>
-                <th>الحالة</th>
-                <th className="end">الإجمالي</th>
-                <th>التاريخ</th>
+                <th>{t('الطلب', 'Order')}</th>
+                <th>{t('العميل', 'Customer')}</th>
+                <th>{t('المتاجر', 'Shops')}</th>
+                <th>{t('الحالة', 'Status')}</th>
+                <th className="end">{t('الإجمالي', 'Total')}</th>
+                <th>{t('التاريخ', 'Date')}</th>
                 <th className="end">
-                  <span className="visually-hidden">الإجراء</span>
+                  <span className="visually-hidden">{t('الإجراء', 'Action')}</span>
                 </th>
               </tr>
             </thead>
@@ -160,31 +189,31 @@ function OrdersInner() {
                   <Fragment key={o.orderNumber}>
                     <tr data-open={open}>
                       <td className="num ao-strong">{o.orderNumber}</td>
-                      <td data-label="العميل">
+                      <td data-label={t('العميل', 'Customer')}>
                         <span className="ao-stack">
-                          <span className="ao-strong">{o.customer?.fullName ?? o.guestEmail ?? 'ضيف'}</span>
-                          <span className="ao-stack__sub">{o.subOrders.map((s) => s.vendor.nameAr).join('، ')}</span>
+                          <span className="ao-strong">{o.customer?.fullName ?? o.guestEmail ?? t('ضيف', 'Guest')}</span>
+                          <span className="ao-stack__sub">{o.subOrders.map((s) => s.vendor.nameAr).join(t('، ', ', '))}</span>
                           {o.subOrders
                             .filter((s) => s.acceptanceDue && s.acceptBy)
                             .map((s) => (
                               <span key={s.id} className="ao-stack__sub ao-due">
                                 <Icon name="clock" size={12} />
-                                {s.vendor.nameAr}: يُلغى آلياً <span className="num">{when(s.acceptBy!)}</span>
+                                {s.vendor.nameAr}: {t('يُلغى آلياً', 'auto-cancels')} <span className="num">{when(s.acceptBy!, locale)}</span>
                               </span>
                             ))}
                         </span>
                       </td>
-                      <td data-label="المتاجر" className="num">
+                      <td data-label={t('المتاجر', 'Shops')} className="num">
                         {o.subOrders.length}
                       </td>
-                      <td data-label="الحالة">
-                        <span className={`badge ${PARENT_TONE[o.status] ?? 'badge--pending'}`}>{PARENT_STATUS[o.status] ?? o.status}</span>
+                      <td data-label={t('الحالة', 'Status')}>
+                        <span className={`badge ${PARENT_TONE[o.status] ?? 'badge--pending'}`}>{parentStatus[o.status] ?? o.status}</span>
                       </td>
-                      <td data-label="الإجمالي" className="end">
-                        <span className="money num">{money(o.grandTotalMinorUnits, o.currency)}</span>
+                      <td data-label={t('الإجمالي', 'Total')} className="end">
+                        <span className="money num">{money(o.grandTotalMinorUnits, o.currency, locale)}</span>
                       </td>
-                      <td data-label="التاريخ" className="ao-date">
-                        {when(o.placedAt)}
+                      <td data-label={t('التاريخ', 'Date')} className="ao-date">
+                        {when(o.placedAt, locale)}
                       </td>
                       <td data-label="" className="end">
                         <button
@@ -194,7 +223,7 @@ function OrdersInner() {
                           aria-controls={`order-${o.orderNumber}`}
                           onClick={() => setOpenNumber(open ? null : o.orderNumber)}
                         >
-                          {open ? 'أغلق' : 'افتح'}
+                          {open ? t('أغلق', 'Close') : t('افتح', 'Open')}
                           <Icon name="chev-down" size={14} className={open ? 'ao-flip' : ''} />
                         </button>
                       </td>
@@ -219,15 +248,19 @@ function OrdersInner() {
 }
 
 function OrderDetail({ number, onChange }: { number: string; onChange: () => void }) {
+  const t = useT();
+  const locale = useLocale();
   const { data, error, reload } = useAdminData<Detail>(`/admin/orders/${number}`);
   const act = useAction();
   if (!data) return <Loading error={error} inline />;
+  const paymentStatus = localized(locale, PAYMENT_STATUS, PAYMENT_STATUS_EN);
+  const refundStatus = localized(locale, REFUND_STATUS, REFUND_STATUS_EN);
   return (
     <div className="ao-order">
       <Feedback error={act.error} notice={act.notice} />
       <p className="ao-order__pay">
         <Icon name="card" size={14} />
-        الدفع: {data.paymentStatus ? (PAYMENT_STATUS[data.paymentStatus] ?? data.paymentStatus) : '—'}
+        {t('الدفع:', 'Payment:')} {data.paymentStatus ? (paymentStatus[data.paymentStatus] ?? data.paymentStatus) : '—'}
       </p>
       <div className="ao-subs">
         {data.stores.map((s) => (
@@ -242,32 +275,32 @@ function OrderDetail({ number, onChange }: { number: string; onChange: () => voi
                   <span className="ao-shop__sub num">{s.number}</span>
                 </span>
               </span>
-              <span className={`badge ${toneOf(s.status)}`}>{labelOf(s.status)}</span>
+              <span className={`badge ${toneOf(s.status)}`}>{labelOf(s.status, locale)}</span>
             </header>
             <ol className="ao-timeline">
               {s.history.map((h, i) => (
                 <li key={i}>
-                  <span className="ao-timeline__what">{h.toLabel}</span>
-                  <span className="ao-timeline__when">{when(h.createdAt)}</span>
-                  {h.reason ? <span className="ao-timeline__why">«{historyReason(h)}»</span> : null}
+                  <span className="ao-timeline__what">{locale === 'en' ? labelOf(h.toStatus, locale) : h.toLabel}</span>
+                  <span className="ao-timeline__when">{when(h.createdAt, locale)}</span>
+                  {h.reason ? <span className="ao-timeline__why">{t('«', '“')}{historyReason(h, locale)}{t('»', '”')}</span> : null}
                 </li>
               ))}
             </ol>
             {s.shipment ? (
               <p className="ao-sub__line">
                 <Icon name="truck" size={14} />
-                التتبّع: <span className="num">{s.shipment.trackingNumber}</span>
+                {t('التتبّع:', 'Tracking:')} <span className="num">{s.shipment.trackingNumber}</span>
               </p>
             ) : null}
             {s.refunds.length ? (
               <p className="ao-sub__line">
                 <Icon name="return" size={14} />
                 <span>
-                  استردادات:{' '}
+                  {t('استردادات:', 'Refunds:')}{' '}
                   {s.refunds.map((r, i) => (
                     <Fragment key={i}>
-                      {i ? '، ' : ''}
-                      <span className="money num">{money(r.amountMinorUnits, data.currency)}</span> ({REFUND_STATUS[r.status] ?? r.status})
+                      {i ? t('، ', ', ') : ''}
+                      <span className="money num">{money(r.amountMinorUnits, data.currency, locale)}</span> ({refundStatus[r.status] ?? r.status})
                     </Fragment>
                   ))}
                 </span>
@@ -276,15 +309,19 @@ function OrderDetail({ number, onChange }: { number: string; onChange: () => voi
             {s.actions.includes('canceled_by_admin') ? (
               <div className="ao-sub__actions">
                 <ReasonButton
-                  label="إلغاء هذا المتجر ورد المبلغ"
-                  presets={['نفاد المخزون لدى البائع', 'احتيال مشتبه في الطلب', 'البائع لا يستجيب']}
+                  label={t('إلغاء هذا المتجر ورد المبلغ', 'Cancel this shop and refund')}
+                  presets={[
+                    t('نفاد المخزون لدى البائع', 'Seller is out of stock'),
+                    t('احتيال مشتبه في الطلب', 'Suspected fraud on the order'),
+                    t('البائع لا يستجيب', 'Seller is not responding'),
+                  ]}
                   disabled={act.busy}
                   onSubmit={(r) =>
                     act.run(async () => {
                       await api(`/admin/orders/stores/${s.id}/cancel`, { method: 'POST', body: { reason: r } });
                       reload();
                       onChange();
-                    }, 'أُلغي ويُردّ المبلغ للمشتري.')
+                    }, t('أُلغي ويُردّ المبلغ للمشتري.', 'Canceled; the amount is being refunded to the buyer.'))
                   }
                 />
               </div>

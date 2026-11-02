@@ -1,9 +1,13 @@
 import type { Metadata } from 'next';
 import '@/styles/screens/wishlist.css';
+import { serverT } from '@/lib/i18n-server';
 import { getShops } from '@/lib/storefront';
 import { WishlistView } from './wishlist-view';
 
-export const metadata: Metadata = { title: 'المفضّلة', robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t('المفضّلة', 'Wishlist'), robots: { index: false } };
+}
 
 /** المتاجر تُقرأ عند الطلب لا وقت البناء — البناء لا يحتاج خادماً حيّاً */
 export const dynamic = 'force-dynamic';

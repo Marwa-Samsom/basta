@@ -370,6 +370,8 @@ model VendorCategory {
   id        String   @id @default(uuid()) @db.Uuid
   vendorId  String   @db.Uuid
   nameAr    String
+  /// يراه المشتري حين يكون الموقع بالإنجليزية — بلا قيمة يرى العربي (زرّ اللغة، 2 نوفمبر 2026)
+  nameEn    String?
   sort      Int      @default(0)
   createdAt DateTime @default(now()) @db.Timestamptz
   updatedAt DateTime @updatedAt @db.Timestamptz

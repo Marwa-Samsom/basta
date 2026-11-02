@@ -6,6 +6,9 @@ import { mkdirSync } from 'node:fs';
 import { isIP } from 'node:net';
 import { loadEnv, type TrustProxy } from './common/config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { LocalizeResponseInterceptor } from './common/i18n/localize-response.interceptor';
+import { currentLocale, runWithLocale, takeRequestLocale } from './common/i18n/request-locale';
+import { localize } from './common/i18n/translate';
 import { arabicValidationPipe } from './common/validation-messages';
 import { IMAGE_MAX_BYTES, ProductImageGate, UPLOADS_ROOT, UPLOADS_URL_PREFIX } from './modules/catalog/public';
 
@@ -60,6 +63,14 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
   // رسائل التحقق بالعربية — whitelist و forbidNonWhitelisted و transform كما كانت
   app.useGlobalPipes(arabicValidationPipe());
   app.useGlobalFilters(new AllExceptionsFilter());
+  // لغة الطلب أولاً: كل ما بعده — المبالغ المنسّقة ورسائل الردّ — بلغة زرّ اللغة في الموقع
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onRequest', (req: { headers: Record<string, string | string[] | undefined>; query?: unknown }, _reply: unknown, done: () => void) =>
+      runWithLocale(takeRequestLocale(req), done),
+    );
+  app.useGlobalInterceptors(new LocalizeResponseInterceptor());
   // أول خطّاف: كل ما بعده (حدّ المعدّل، التدقيق) يقرأ req.ip بعد أن يُحسم
   trustEdgeProxy(app, process.env['EDGE_PROXY_SECRET']);
   /**
@@ -85,7 +96,7 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     // رمز السلة ومفتاح عدم التكرار ترويستان مخصّصتان — غيابهما هنا يُسقط الدفع من المتصفّح وحده
-    allowedHeaders: ['authorization', 'content-type', 'x-cart-token', 'idempotency-key', 'x-order-key'],
+    allowedHeaders: ['authorization', 'content-type', 'x-cart-token', 'idempotency-key', 'x-order-key', 'accept-language'],
   });
 
   // الحد العام أعلى حدود المسارات؛ كل مسار يضيّقه لنفسه (الاستيراد 5 م.ب)
@@ -99,7 +110,7 @@ export async function configureApp(app: NestFastifyApplication): Promise<void> {
   const gate = app.get(ProductImageGate, { strict: false });
   app.getHttpAdapter().getInstance().addHook('onRequest', async (req: { url: string }, reply: { code: (c: number) => { send: (b: unknown) => unknown } }) => {
     if ((await gate.allows(req.url)) === false) {
-      return reply.code(404).send({ code: 'NOT_FOUND', message: 'الصورة غير موجودة.' });
+      return reply.code(404).send({ code: 'NOT_FOUND', message: localize('الصورة غير موجودة.', currentLocale()) });
     }
   });
 

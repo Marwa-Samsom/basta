@@ -23,6 +23,8 @@ export interface PricedLineInput {
   readonly productId: string;
   readonly vendorId: string;
   readonly nameAr: string;
+  /** حين يكون الموقع بالإنجليزية — بلا قيمة يُعرض العربي */
+  readonly nameEn?: string | null;
   readonly variantLabel: string | null;
   readonly sku: string;
   readonly imageKey: string | null;
@@ -36,6 +38,7 @@ export interface PricedLineInput {
 export interface VendorContext {
   readonly vendorId: string;
   readonly nameAr: string;
+  readonly nameEn?: string | null;
   readonly currency: string;
   readonly currencyDigits: number;
 }
@@ -97,6 +100,7 @@ export interface PricedLine extends PricedLineInput {
 export interface PricedSubOrder {
   readonly vendorId: string;
   readonly vendorNameAr: string;
+  readonly vendorNameEn?: string | null;
   readonly currency: string;
   readonly lines: readonly PricedLine[];
   /** بعملة البائع — ما يُقيَّد له وما تُحسب منه عمولته */
@@ -378,6 +382,7 @@ export function priceCart(input: {
     subOrders.push({
       vendorId,
       vendorNameAr: vendor.nameAr,
+      vendorNameEn: vendor.nameEn ?? null,
       currency: vendor.currency,
       lines: priced,
       vendor: { items, discount, shipping: shippingMinor, tax, total },

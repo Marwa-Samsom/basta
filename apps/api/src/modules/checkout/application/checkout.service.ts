@@ -11,7 +11,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CartService } from '../../cart/public';
 import { LedgerService } from '../../finance/public';
 import { NotificationsService } from '../../notifications/public';
-import { format as formatMoney, money } from '../../../common/money/money';
+import { formatIn, format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
 import {
   PAYMENT_PROVIDER,
@@ -158,6 +158,9 @@ export class CheckoutService {
     if (!input.userId && !input.guestEmail && !input.guestPhone) {
       throw new InvalidInputError('الضيف يحتاج بريداً أو هاتفاً لنبلغه بطلبه.');
     }
+
+    // رمز لا يعرفه المزوّد يُرفض هنا: استثناء الدفع بعد الطلب يُقرأ «لا نعرف» فيبقى الطلب معلّقاً بحجزه
+    this.provider.assertToken(input.paymentToken);
 
     if (this.provider.method === 'bank_transfer') await this.assertTransferOpen(input.userId);
 
@@ -453,7 +456,7 @@ export class CheckoutService {
     }
     if (input.receivedMinor !== order.grandTotalMinorUnits) {
       throw new InvalidInputError(
-        `المبلغ الواصل لا يطابق الطلب (${formatMoney(money(order.grandTotalMinorUnits, order.currency))}). لا تؤكّد إلا تحويلاً بالمبلغ كاملاً.`,
+        `المبلغ الواصل لا يطابق الطلب (${formatIn(order.grandTotalMinorUnits, order.currency)}). لا تؤكّد إلا تحويلاً بالمبلغ كاملاً.`,
         { reason: 'AMOUNT_MISMATCH' },
       );
     }

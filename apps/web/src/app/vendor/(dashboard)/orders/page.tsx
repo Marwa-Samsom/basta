@@ -7,6 +7,7 @@ import { Icon } from '@/components/icons';
 import { useAdminList } from '@/lib/admin';
 import { counted, type Counted } from '@/lib/arabic-count';
 import { hoursAr, labelOf, money, toneOf, when } from '@/lib/orders';
+import { useLocale, useT } from '@/components/locale';
 
 /** «طلب واحد ينتظر قبولك»، «طلبان ينتظران قبولك»، «4 طلبات تنتظر قبولك»، «11 طلباً ينتظر قبولك» */
 const WAITING: Counted = {
@@ -35,12 +36,12 @@ interface Row {
  * تبويب — طلب في حالة بلا تبويب كان يُعدّ في «الكل» ولا يظهر في غيره. الحالات
  * الأربع التي يخرج بها الطلب ملغى أو مردود المال تجتمع في تبويب واحد.
  */
-const TABS: { statuses: string[]; label: string }[] = [
-  { statuses: [], label: 'الكل' },
+const TABS: { statuses: string[]; label: string; en: string }[] = [
+  { statuses: [], label: 'الكل', en: 'All' },
   ...(['awaiting_vendor', 'accepted', 'preparing', 'ready_to_ship', 'shipped', 'delivery_failed', 'delivered', 'return_requested', 'returned', 'completed'] as const).map(
-    (s) => ({ statuses: [s], label: labelOf(s) }),
+    (s) => ({ statuses: [s], label: labelOf(s), en: labelOf(s, 'en') }),
   ),
-  { statuses: ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'], label: 'ملغى أو مُسترَد' },
+  { statuses: ['rejected_by_vendor', 'canceled_by_customer', 'canceled_by_admin', 'refunded'], label: 'ملغى أو مُسترَد', en: 'Canceled or refunded' },
 ];
 
 /**
@@ -53,6 +54,8 @@ const TABS: { statuses: string[]; label: string }[] = [
  * والبحث برقم الطلب أو اسم المستلم أو منتج فيه.
  */
 export default function VendorOrdersPage() {
+  const t = useT();
+  const locale = useLocale();
   const [tab, setTab] = useState('');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortOrder>('newest');
@@ -69,13 +72,14 @@ export default function VendorOrdersPage() {
   return (
     <div className="vm-page">
       <PageHead
-        title="الطلبات"
+        title={t('الطلبات', 'Orders')}
         count={
-          data ? (
-            <>
-              الطلبات الفرعية {all} · بانتظار قبولك {waiting}
-            </>
-          ) : undefined
+          data
+            ? t(
+                `الطلبات الفرعية ${all} · بانتظار قبولك ${waiting}`,
+                `${all} shop ${all === 1 ? 'order' : 'orders'} · ${waiting} awaiting your acceptance`,
+              )
+            : undefined
         }
         actions={
           <>
@@ -84,10 +88,10 @@ export default function VendorOrdersPage() {
               <input
                 className="field__control"
                 type="search"
-                placeholder="رقم الطلب أو المستلم أو المنتج"
+                placeholder={t('رقم الطلب أو المستلم أو المنتج', 'Order number, recipient or product')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                aria-label="ابحث في الطلبات"
+                aria-label={t('ابحث في الطلبات', 'Search orders')}
               />
             </span>
             <SortButton value={sort} onChange={setSort} />
@@ -96,19 +100,28 @@ export default function VendorOrdersPage() {
       />
 
       {waiting > 0 ? (
-        <Alert tone="warning" title={counted(waiting, WAITING)}>
+        <Alert
+          tone="warning"
+          title={t(
+            counted(waiting, WAITING),
+            `${waiting} ${waiting === 1 ? 'order is' : 'orders are'} awaiting your acceptance`,
+          )}
+        >
           {/* المهلة كما تضبطها الإدارة لا «48» ثابتة (VOPS-019) */}
-          الطلب الذي لا يُقبل خلال {hoursAr(data?.acceptanceHours ?? 48)} يُلغى آلياً ويُردّ مال المشتري.
+          {t(
+            `الطلب الذي لا يُقبل خلال ${hoursAr(data?.acceptanceHours ?? 48)} يُلغى آلياً ويُردّ مال المشتري.`,
+            `An order not accepted within ${hoursAr(data?.acceptanceHours ?? 48, locale)} is canceled automatically and the buyer is refunded.`,
+          )}
         </Alert>
       ) : null}
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       <section className="card card--flush">
-        <div className="tabs vm-tabs" role="tablist" aria-label="حالة الطلب">
-          {TABS.map((t) => {
-            const key = t.statuses.join(',');
-            const count = t.statuses.length ? t.statuses.reduce((n, s) => n + (data?.counts[s] ?? 0), 0) : all;
+        <div className="tabs vm-tabs" role="tablist" aria-label={t('حالة الطلب', 'Order status')}>
+          {TABS.map((tb) => {
+            const key = tb.statuses.join(',');
+            const count = tb.statuses.length ? tb.statuses.reduce((n, s) => n + (data?.counts[s] ?? 0), 0) : all;
             return (
               <button
                 key={key}
@@ -118,7 +131,7 @@ export default function VendorOrdersPage() {
                 aria-selected={tab === key}
                 onClick={() => setTab(key)}
               >
-                {t.label}
+                {t(tb.label, tb.en)}
                 {data ? <span className="tabs__count">{count}</span> : null}
               </button>
             );
@@ -127,7 +140,7 @@ export default function VendorOrdersPage() {
 
         {!data && !error ? (
           <div className="vm-loading" role="status">
-            <span className="visually-hidden">جارٍ جلب الطلبات…</span>
+            <span className="visually-hidden">{t('جارٍ جلب الطلبات…', 'Loading orders…')}</span>
             <span className="skeleton vm-loading__row" />
             <span className="skeleton vm-loading__row" />
             <span className="skeleton vm-loading__row" />
@@ -138,7 +151,7 @@ export default function VendorOrdersPage() {
           data.items.length === 0 ? (
             <EmptyState
               icon="truck"
-              title={filtered ? 'لا طلبات في هذه المرحلة' : 'لا طلبات بعد'}
+              title={filtered ? t('لا طلبات في هذه المرحلة', 'No orders at this stage') : t('لا طلبات بعد', 'No orders yet')}
               actions={
                 filtered ? (
                   <button
@@ -149,54 +162,57 @@ export default function VendorOrdersPage() {
                       setSearch('');
                     }}
                   >
-                    أزل التصفية
+                    {t('أزل التصفية', 'Clear filters')}
                   </button>
                 ) : undefined
               }
             >
               {filtered
-                ? 'جرّب مرحلة أخرى من الأعلى، أو ابحث برقم أو اسم آخر.'
-                : 'تصلك الطلبات هنا فور شراء أحدهم من متجرك، والجديد منها أولاً مع مهلة القبول.'}
+                ? t('جرّب مرحلة أخرى من الأعلى، أو ابحث برقم أو اسم آخر.', 'Try another stage above, or search for a different number or name.')
+                : t(
+                    'تصلك الطلبات هنا فور شراء أحدهم من متجرك، والجديد منها أولاً مع مهلة القبول.',
+                    'Orders arrive here as soon as someone buys from your shop, newest first, with their acceptance deadline.',
+                  )}
             </EmptyState>
           ) : (
             <div className="table-wrap">
               <table className="table vm-table">
                 <thead>
                   <tr>
-                    <th>الطلب الفرعي</th>
-                    <th>التاريخ</th>
-                    <th>المستلم</th>
-                    <th className="end">القطع</th>
-                    <th className="end">الإجمالي</th>
-                    <th className="end">صافيك</th>
-                    <th>الحالة</th>
+                    <th>{t('الطلب الفرعي', 'Shop order')}</th>
+                    <th>{t('التاريخ', 'Date')}</th>
+                    <th>{t('المستلم', 'Recipient')}</th>
+                    <th className="end">{t('القطع', 'Items')}</th>
+                    <th className="end">{t('الإجمالي', 'Total')}</th>
+                    <th className="end">{t('صافيك', 'Your net')}</th>
+                    <th>{t('الحالة', 'Status')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {list.items.map((r) => (
                     <tr key={r.id} data-status={r.status}>
-                      <td data-label="الطلب الفرعي">
+                      <td data-label={t('الطلب الفرعي', 'Shop order')}>
                         <Link href={`/vendor/orders/${r.id}`} className="num vm-order-link">
                           {r.number}
                         </Link>
                       </td>
-                      <td data-label="التاريخ" className="vm-muted">
-                        {when(r.placedAt)}
+                      <td data-label={t('التاريخ', 'Date')} className="vm-muted">
+                        {when(r.placedAt, locale)}
                       </td>
-                      <td data-label="المستلم" className="vm-strong">
+                      <td data-label={t('المستلم', 'Recipient')} className="vm-strong">
                         {r.buyer ?? '—'}
                       </td>
-                      <td data-label="القطع" className="num end">
+                      <td data-label={t('القطع', 'Items')} className="num end">
                         {r.itemCount}
                       </td>
-                      <td data-label="الإجمالي" className="money num end">
-                        {money(r.totalMinorUnits, r.currency)}
+                      <td data-label={t('الإجمالي', 'Total')} className="money num end">
+                        {money(r.totalMinorUnits, r.currency, locale)}
                       </td>
-                      <td data-label="صافيك" className="money num end">
-                        {money(r.netMinorUnits, r.currency)}
+                      <td data-label={t('صافيك', 'Your net')} className="money num end">
+                        {money(r.netMinorUnits, r.currency, locale)}
                       </td>
-                      <td data-label="الحالة">
-                        <span className={`badge ${toneOf(r.status)}`}>{labelOf(r.status)}</span>
+                      <td data-label={t('الحالة', 'Status')}>
+                        <span className={`badge ${toneOf(r.status)}`}>{labelOf(r.status, locale)}</span>
                       </td>
                     </tr>
                   ))}

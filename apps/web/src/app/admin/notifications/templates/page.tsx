@@ -3,10 +3,12 @@
 import { useRef, useState } from 'react';
 import { AdminHeader, Feedback, Loading } from '@/components/admin';
 import { Icon, type IconName } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { ClearableInput, TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAction, useAdminData } from '@/lib/admin';
 import { counted, type Counted } from '@/lib/arabic-count';
+import { localized } from '@/lib/i18n';
 import { when } from '@/lib/orders';
 
 /** «متغيّر واحد مجهول…»، «متغيّران مجهولان…»، «3 متغيّرات مجهولة…» — لا «3 متغيّر مجهول» */
@@ -45,13 +47,16 @@ interface Matrix {
 }
 
 /** حالة الخانة في المصفوفة — لونها ونصّها وأيقونتها */
-const CELL: Record<'empty' | 'off' | 'reviewed' | 'unreviewed' | 'locked', { label: string; icon: IconName }> = {
-  empty: { label: 'أضف', icon: 'plus' },
-  off: { label: 'موقوف', icon: 'minus' },
-  reviewed: { label: 'مراجَع', icon: 'check' },
-  unreviewed: { label: 'بلا مراجعة', icon: 'alert' },
-  locked: { label: 'مقفول', icon: 'lock' },
+const CELL: Record<'empty' | 'off' | 'reviewed' | 'unreviewed' | 'locked', { label: string; en: string; icon: IconName }> = {
+  empty: { label: 'أضف', en: 'Add', icon: 'plus' },
+  off: { label: 'موقوف', en: 'Off', icon: 'minus' },
+  reviewed: { label: 'مراجَع', en: 'Reviewed', icon: 'check' },
+  unreviewed: { label: 'بلا مراجعة', en: 'Not reviewed', icon: 'alert' },
+  locked: { label: 'مقفول', en: 'Locked', icon: 'lock' },
 };
+
+/** أسماء القنوات بالإنجليزية — الخادم يرسلها بالعربية وحدها (CHANNEL_LABELS) */
+const CHANNEL_EN: Record<string, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp', push: 'Browser push', in_app: 'On-site' };
 
 /**
  * AD-20 — قوالب الإشعارات: حدث × قناة. المحرّر بمتغيّرات تُدرج بالنقر،
@@ -60,31 +65,49 @@ const CELL: Record<'empty' | 'off' | 'reviewed' | 'unreviewed' | 'locked', { lab
  */
 /** لمن يصل الحدث — admin: من يحمل صلاحيته من المديرين وحدهم */
 const AUDIENCE_AR: Record<string, string> = { customer: 'للمشتري', vendor: 'للبائع', admin: 'للإدارة' };
+const AUDIENCE_EN: Record<string, string> = { customer: 'For buyers', vendor: 'For sellers', admin: 'For admins' };
 
 export default function AdminNotificationsPage() {
+  const t = useT();
+  const locale = useLocale();
+  const audience = localized(locale, AUDIENCE_AR, AUDIENCE_EN);
   const { data, error, forbidden, reload } = useAdminData<Matrix>('/admin/notifications/templates');
   const [sel, setSel] = useState<{ code: string; channel: string } | null>(null);
 
   if (!data) return <Loading error={error} forbidden={forbidden} />;
-  const unreviewed = data.events.flatMap((e) => e.templates).filter((t) => !t.reviewedAt).length;
+  const unreviewed = data.events.flatMap((e) => e.templates).filter((x) => !x.reviewedAt).length;
+  const channelLabel = (c: { code: string; label: string }) => (locale === 'en' ? (CHANNEL_EN[c.code] ?? c.label) : c.label);
 
   return (
     <div className="ac2-page">
-      <AdminHeader title="قوالب الإشعارات" hint={unreviewed ? `${unreviewed} قالب بلا مراجعة لغوية` : 'كل القوالب مراجَعة'} />
-      <section className="card card--flush" aria-label="مصفوفة الحدث × القناة">
+      <AdminHeader
+        title={t('قوالب الإشعارات', 'Notification templates')}
+        hint={
+          unreviewed
+            ? t(`${unreviewed} قالب بلا مراجعة لغوية`, `${unreviewed} ${unreviewed === 1 ? 'template' : 'templates'} without a language review`)
+            : t('كل القوالب مراجَعة', 'All templates reviewed')
+        }
+      />
+      <section className="card card--flush" aria-label={t('مصفوفة الحدث × القناة', 'Event × channel matrix')}>
         <header className="card__head">
-          <h2 className="ac2-title">مصفوفة الحدث × القناة</h2>
-          <span className="ac2-hint">اضغط خانة لتحرير قالبها.</span>
-          <span className="ac2-end">{unreviewed ? <span className="badge badge--warning">{unreviewed} بلا مراجعة</span> : <span className="badge badge--success">كلها مراجَعة</span>}</span>
+          <h2 className="ac2-title">{t('مصفوفة الحدث × القناة', 'Event × channel matrix')}</h2>
+          <span className="ac2-hint">{t('اضغط خانة لتحرير قالبها.', 'Click a cell to edit its template.')}</span>
+          <span className="ac2-end">
+            {unreviewed ? (
+              <span className="badge badge--warning">{t(`${unreviewed} بلا مراجعة`, `${unreviewed} not reviewed`)}</span>
+            ) : (
+              <span className="badge badge--success">{t('كلها مراجَعة', 'All reviewed')}</span>
+            )}
+          </span>
         </header>
         <div className="table-wrap">
           <table className="table ac2-matrix">
             <thead>
               <tr>
-                <th scope="col">الحدث</th>
+                <th scope="col">{t('الحدث', 'Event')}</th>
                 {data.channels.map((c) => (
                   <th key={c.code} scope="col">
-                    {c.label}
+                    {channelLabel(c)}
                   </th>
                 ))}
               </tr>
@@ -95,35 +118,35 @@ export default function AdminNotificationsPage() {
                   <td>
                     <span className="ac2-cell">
                       <span className="ac2-cell__main">{e.labelAr}</span>
-                      <span className="ac2-cell__sub">{AUDIENCE_AR[e.audience] ?? e.audience}</span>
+                      <span className="ac2-cell__sub">{audience[e.audience] ?? e.audience}</span>
                     </span>
                   </td>
                   {data.channels.map((c) => {
-                    const t = e.templates.find((x) => x.channel === c.code);
+                    const tpl = e.templates.find((x) => x.channel === c.code);
                     // قالب مقفول بلا هذه القناة: لا خانة تُضاف — القنوات من الكود
-                    if (e.locked && !t) {
+                    if (e.locked && !tpl) {
                       return (
-                        <td key={c.code} data-label={c.label}>
-                          <span className="ac2-faint" aria-label={`${e.labelAr} · ${c.label}: غير متاح`}>
+                        <td key={c.code} data-label={channelLabel(c)}>
+                          <span className="ac2-faint" aria-label={t(`${e.labelAr} · ${c.label}: غير متاح`, `${e.labelAr} · ${channelLabel(c)}: not available`)}>
                             —
                           </span>
                         </td>
                       );
                     }
-                    const state = e.locked ? 'locked' : !t ? 'empty' : !t.isEnabled ? 'off' : t.reviewedAt ? 'reviewed' : 'unreviewed';
+                    const state = e.locked ? 'locked' : !tpl ? 'empty' : !tpl.isEnabled ? 'off' : tpl.reviewedAt ? 'reviewed' : 'unreviewed';
                     const pressed = sel?.code === e.code && sel.channel === c.code;
                     return (
-                      <td key={c.code} data-label={c.label}>
+                      <td key={c.code} data-label={channelLabel(c)}>
                         <button
                           type="button"
                           className="ac2-cellbtn"
                           data-state={state}
                           aria-pressed={pressed}
-                          aria-label={`${e.labelAr} · ${c.label}: ${CELL[state].label}`}
+                          aria-label={t(`${e.labelAr} · ${c.label}: ${CELL[state].label}`, `${e.labelAr} · ${channelLabel(c)}: ${CELL[state].en}`)}
                           onClick={() => setSel({ code: e.code, channel: c.code })}
                         >
                           <Icon name={CELL[state].icon} size={12} />
-                          {pressed ? 'محدّد' : CELL[state].label}
+                          {pressed ? t('محدّد', 'Selected') : t(CELL[state].label, CELL[state].en)}
                         </button>
                       </td>
                     );
@@ -139,7 +162,7 @@ export default function AdminNotificationsPage() {
           key={`${sel.code}:${sel.channel}`}
           event={data.events.find((e) => e.code === sel.code)!}
           channel={data.channels.find((c) => c.code === sel.channel)!}
-          template={data.events.find((e) => e.code === sel.code)!.templates.find((t) => t.channel === sel.channel) ?? null}
+          template={data.events.find((e) => e.code === sel.code)!.templates.find((x) => x.channel === sel.channel) ?? null}
           onSaved={reload}
         />
       ) : null}
@@ -148,6 +171,9 @@ export default function AdminNotificationsPage() {
 }
 
 function Editor({ event, channel, template, onSaved }: { event: Matrix['events'][number]; channel: { code: string; label: string }; template: Template | null; onSaved: () => void }) {
+  const t = useT();
+  const locale = useLocale();
+  const channelName = locale === 'en' ? (CHANNEL_EN[channel.code] ?? channel.label) : channel.label;
   const act = useAction();
   const locked = event.locked === true;
   const [subject, setSubject] = useState(template?.subject ?? '');
@@ -157,7 +183,7 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
   const [sent, setSent] = useState<{ status: string; recipient: string | null; deliveryRef: string | null; error: string | null } | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const render = (t: string) => t.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (_, v: string) => event.sample[v] ?? `{{${v}}}`);
+  const render = (text: string) => text.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (_, v: string) => event.sample[v] ?? `{{${v}}}`);
   const insert = (v: string) => {
     const el = bodyRef.current;
     const token = `{{${v}}}`;
@@ -179,20 +205,33 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
 
   return (
     <div className="ac2-split ac2-split--half">
-      <section className="card ac2-editor" aria-label={`قالب ${event.labelAr} · ${channel.label}`}>
+      <section className="card ac2-editor" aria-label={t(`قالب ${event.labelAr} · ${channel.label}`, `Template ${event.labelAr} · ${channelName}`)}>
         <div className="ac2-inline">
           <h2 className="ac2-title">{event.labelAr}</h2>
-          <span className="badge badge--pending">{channel.label}</span>
-          {template ? template.reviewedAt ? <span className="badge badge--success">مراجَع</span> : <span className="badge badge--warning">بلا مراجعة</span> : <span className="badge">جديد</span>}
+          <span className="badge badge--pending">{channelName}</span>
+          {template ? (
+            template.reviewedAt ? (
+              <span className="badge badge--success">{t('مراجَع', 'Reviewed')}</span>
+            ) : (
+              <span className="badge badge--warning">{t('بلا مراجعة', 'Not reviewed')}</span>
+            )
+          ) : (
+            <span className="badge">{t('جديد', 'New')}</span>
+          )}
         </div>
         <Feedback error={act.error} notice={act.notice} />
         {locked ? (
           <div className="alert alert--info ac2-callout ac2-callout--sm" role="note">
             <Icon name="lock" size={14} />
-            <span>قالب رمز أمان: نصّه وقنواته مثبّتة في الكود ولا تُحرَّر من اللوحة، والرمز يُمحى من السجل بعد الإرسال — فلا يقرؤه أحد غير صاحب الحساب.</span>
+            <span>
+              {t(
+                'قالب رمز أمان: نصّه وقنواته مثبّتة في الكود ولا تُحرَّر من اللوحة، والرمز يُمحى من السجل بعد الإرسال — فلا يقرؤه أحد غير صاحب الحساب.',
+                'Security code template: its text and channels are fixed in the code and cannot be edited from the dashboard, and the code is erased from the log after sending — so no one but the account owner can read it.',
+              )}
+            </span>
           </div>
         ) : (
-          <div className="ac2-vars" role="group" aria-label="المتغيّرات">
+          <div className="ac2-vars" role="group" aria-label={t('المتغيّرات', 'Variables')}>
             {event.variables.map((v) => (
               <button key={v} type="button" className="ac2-var" onClick={() => insert(v)}>
                 {`{{${v}}}`}
@@ -200,24 +239,45 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
             ))}
           </div>
         )}
-        {channel.code === 'email' || channel.code === 'push' ? <TextInput label={channel.code === 'email' ? 'العنوان' : 'العنوان (اختياري)'} value={subject} readOnly={locked} onChange={(e) => setSubject(e.target.value)} /> : null}
+        {channel.code === 'email' || channel.code === 'push' ? (
+          <TextInput
+            label={channel.code === 'email' ? t('العنوان', 'Subject') : t('العنوان (اختياري)', 'Title (optional)')}
+            value={subject}
+            readOnly={locked}
+            onChange={(e) => setSubject(e.target.value)}
+          />
+        ) : null}
         <div className="field">
           <span className="ac2-labelrow">
             <label className="field__label" htmlFor={bodyId}>
-              النص
+              {t('النص', 'Text')}
             </label>
             <span className="ac2-counter">{render(body).length}</span>
           </span>
           <textarea id={bodyId} ref={bodyRef} className="field__control" rows={channel.code === 'email' ? 10 : 6} value={body} readOnly={locked} onChange={(e) => setBody(e.target.value)} />
-          {channel.code === 'sms' ? <span className="field__hint">{render(body).length} حرفاً — الرسالة النصية الواحدة نحو 70 حرفاً عربياً.</span> : null}
+          {channel.code === 'sms' ? (
+            <span className="field__hint">
+              {t(
+                `${render(body).length} حرفاً — الرسالة النصية الواحدة نحو 70 حرفاً عربياً.`,
+                `${render(body).length} characters — one text message holds about 70 Arabic characters.`,
+              )}
+            </span>
+          ) : null}
         </div>
         {locked ? null : (
           <div className="ac2-setting__row">
             <span className="ac2-setting__label">
-              <span className="field__label">مفعّل</span>
-              <span className="ac2-fine">{event.mandatory ? 'تنبيه أمن إلزامي — يُحرَّر نصّه ولا يُوقف، فإيقافه يُخفي عن صاحب الحساب أن حسابه في خطر.' : 'الموقوف لا يُرسل على هذه القناة.'}</span>
+              <span className="field__label">{t('مفعّل', 'Enabled')}</span>
+              <span className="ac2-fine">
+                {event.mandatory
+                  ? t(
+                      'تنبيه أمن إلزامي — يُحرَّر نصّه ولا يُوقف، فإيقافه يُخفي عن صاحب الحساب أن حسابه في خطر.',
+                      'Mandatory security alert — its text can be edited but it cannot be turned off, since that would hide from the account owner that their account is at risk.',
+                    )
+                  : t('الموقوف لا يُرسل على هذه القناة.', 'When off, nothing is sent on this channel.')}
+              </span>
             </span>
-            <button type="button" role="switch" className="ac2-switch" aria-checked={enabled} aria-label="مفعّل" disabled={event.mandatory} onClick={() => setEnabled(!enabled)} />
+            <button type="button" role="switch" className="ac2-switch" aria-checked={enabled} aria-label={t('مفعّل', 'Enabled')} disabled={event.mandatory} onClick={() => setEnabled(!enabled)} />
           </div>
         )}
         <div className="ac2-form__actions">
@@ -230,10 +290,10 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
                 void act.run(async () => {
                   await api(`/admin/notifications/templates/${event.code}/${channel.code}`, { method: 'PUT', body: { subject: subject || undefined, body, isEnabled: enabled } });
                   onSaved();
-                }, 'حُفظ القالب — يحتاج مراجعة لغوية قبل اعتماده.')
+                }, t('حُفظ القالب — يحتاج مراجعة لغوية قبل اعتماده.', 'Template saved — it needs a language review before it is approved.'))
               }
             >
-              احفظ القالب
+              {t('احفظ القالب', 'Save template')}
             </button>
           )}
           <button
@@ -247,21 +307,35 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
             }
           >
             <Icon name="send" size={15} />
-            أرسل تجربة لي
+            {t('أرسل تجربة لي', 'Send me a test')}
           </button>
         </div>
         {sent ? (
           <div className={`alert ac2-callout ac2-callout--sm ${sent.status === 'sent' ? 'alert--success' : 'alert--danger'}`} role="status">
             <Icon name={sent.status === 'sent' ? 'check-circle' : 'alert'} size={14} />
-            <span>{sent.status === 'sent' ? `وصلت إلى ${sent.recipient} — ${sent.deliveryRef}` : `لم تُرسل: ${sent.error}`}</span>
+            <span>
+              {sent.status === 'sent'
+                ? t(`وصلت إلى ${sent.recipient} — ${sent.deliveryRef}`, `Delivered to ${sent.recipient} — ${sent.deliveryRef}`)
+                : t(`لم تُرسل: ${sent.error}`, `Not sent: ${sent.error}`)}
+            </span>
           </div>
         ) : null}
         {template ? (
           <div className="ac2-divider">
-            <span className="ac2-fine">{template.reviewedAt ? `راجعه لغوياً: ${template.reviewedBy} · ${when(template.reviewedAt)}` : 'لم يُراجَع لغوياً بعد.'}</span>
+            <span className="ac2-fine">
+              {template.reviewedAt
+                ? t(`راجعه لغوياً: ${template.reviewedBy} · ${when(template.reviewedAt, locale)}`, `Language review: ${template.reviewedBy} · ${when(template.reviewedAt, locale)}`)
+                : t('لم يُراجَع لغوياً بعد.', 'No language review yet.')}
+            </span>
             {!template.reviewedAt ? (
               <div className="ac2-inline">
-                <ClearableInput className="field__control" aria-label="اسم المراجِع" placeholder="اسم المراجِع" value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
+                <ClearableInput
+                  className="field__control"
+                  aria-label={t('اسم المراجِع', 'Reviewer name')}
+                  placeholder={t('اسم المراجِع', 'Reviewer name')}
+                  value={reviewer}
+                  onChange={(e) => setReviewer(e.target.value)}
+                />
                 <button
                   type="button"
                   className="btn btn--secondary btn--sm"
@@ -270,11 +344,11 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
                     void act.run(async () => {
                       await api(`/admin/notifications/templates/${event.code}/${channel.code}/review`, { method: 'POST', body: { reviewer: reviewer.trim() } });
                       onSaved();
-                    }, 'سُجّلت المراجعة.')
+                    }, t('سُجّلت المراجعة.', 'Review recorded.'))
                   }
                 >
                   <Icon name="check" size={14} />
-                  راجعتُ النص لغوياً
+                  {t('راجعتُ النص لغوياً', 'I reviewed the language')}
                 </button>
               </div>
             ) : null}
@@ -282,12 +356,12 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
         ) : null}
       </section>
 
-      <section className="card ac2-sticky" aria-label="معاينة">
-        <span className="ac2-eyebrow">معاينة · ببيانات مثال</span>
+      <section className="card ac2-sticky" aria-label={t('معاينة', 'Preview')}>
+        <span className="ac2-eyebrow">{t('معاينة · ببيانات مثال', 'Preview · with sample data')}</span>
         <div className="ac2-preview">
           {subject ? <span className="ac2-preview__subject">{render(subject)}</span> : null}
           <div className="ac2-preview__body">
-            {segments.length === 0 ? <span className="ac2-faint">النص فارغ.</span> : null}
+            {segments.length === 0 ? <span className="ac2-faint">{t('النص فارغ.', 'The text is empty.')}</span> : null}
             {segments.map((s, i) =>
               s.token ? (
                 <span key={i} className="ac2-token" data-unknown={s.unknown}>
@@ -299,7 +373,11 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
             )}
           </div>
         </div>
-        <p className={unknown ? 'ac2-fine ac2-note-danger' : 'ac2-fine'}>{unknown ? `${counted(unknown, UNKNOWN)} عند الإرسال.` : 'كل المتغيّرات معروفة وستُستبدل ببيانات الطلب.'}</p>
+        <p className={unknown ? 'ac2-fine ac2-note-danger' : 'ac2-fine'}>
+          {unknown
+            ? t(`${counted(unknown, UNKNOWN)} عند الإرسال.`, `${unknown} unknown ${unknown === 1 ? 'variable' : 'variables'} will not be replaced when sending.`)
+            : t('كل المتغيّرات معروفة وستُستبدل ببيانات الطلب.', 'All variables are known and will be replaced with the order data.')}
+        </p>
       </section>
     </div>
   );

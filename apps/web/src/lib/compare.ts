@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from './api';
 import { displayCurrency } from './currency';
+import type { Locale } from './i18n';
 import { localList, useLocalList } from './recent';
 import type { ProductPage } from './storefront';
 
@@ -103,14 +104,15 @@ export function useProductPages(slugs: readonly string[], attempt = 0): Record<s
 // ---------------------------------------------------------- مساعدات العرض
 
 /** السعر الأدنى، و«من» قبله حين تختلف أسعار المتغيّرات */
-export function priceLabel(p: ProductPage): { prefix: string | null; formatted: string } {
+export function priceLabel(p: ProductPage, locale: Locale = 'ar'): { prefix: string | null; formatted: string } {
   const prices = new Set(p.variants.map((v) => v.price.minorUnits));
-  return { prefix: prices.size > 1 ? 'من' : null, formatted: p.priceFrom.formatted };
+  return { prefix: prices.size > 1 ? (locale === 'en' ? 'From' : 'من') : null, formatted: p.priceFrom.formatted };
 }
 
 /** «متوفّر» · «بقي N فقط» · «نفد» — بعتبة صفحة المنتج نفسها */
-export function stockOf(p: ProductPage): { tone: 'success' | 'warning' | 'danger'; label: string } {
-  if (p.isSoldOut || p.available <= 0) return { tone: 'danger', label: 'نفد من المخزون' };
-  if (p.available <= 3) return { tone: 'warning', label: `بقي ${p.available} فقط` };
-  return { tone: 'success', label: 'متوفّر' };
+export function stockOf(p: ProductPage, locale: Locale = 'ar'): { tone: 'success' | 'warning' | 'danger'; label: string } {
+  const en = locale === 'en';
+  if (p.isSoldOut || p.available <= 0) return { tone: 'danger', label: en ? 'Out of stock' : 'نفد من المخزون' };
+  if (p.available <= 3) return { tone: 'warning', label: en ? `Only ${p.available} left` : `بقي ${p.available} فقط` };
+  return { tone: 'success', label: en ? 'In stock' : 'متوفّر' };
 }

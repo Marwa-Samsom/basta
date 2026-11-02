@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
+import { intlLocale, type Locale } from '@/lib/i18n';
 import { minorUnitDigits } from '@/lib/money';
 
 export interface TransferInstructionsView {
@@ -14,10 +16,12 @@ export interface TransferInstructionsView {
   cliqAlias: string | null;
 }
 
-const DEADLINE = new Intl.DateTimeFormat('ar-u-nu-latn', { dateStyle: 'full', timeStyle: 'short' });
+const deadline = (iso: string, locale: Locale): string =>
+  new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: 'full', timeStyle: 'short' }).format(new Date(iso));
 
 /** سطر يُنسخ بضغطة — المبلغ والاسم المستعار والآيبان ورقم الطلب تُلصق في تطبيق البنك كما هي */
 function CopyRow({ label, value, hint, latin = true }: { label: string; value: string; hint?: string; latin?: boolean }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const copy = () => {
     void navigator.clipboard
@@ -41,11 +45,11 @@ function CopyRow({ label, value, hint, latin = true }: { label: string; value: s
         )}
         {hint ? <span className="sp-transfer__hint">{hint}</span> : null}
       </dd>
-      <button type="button" className="icon-btn" aria-label={`انسخ ${label}`} onClick={copy}>
+      <button type="button" className="icon-btn" aria-label={t(`انسخ ${label}`, `Copy: ${label}`)} onClick={copy}>
         <Icon name={copied ? 'check' : 'copy'} size={16} />
       </button>
       <span className="visually-hidden" role="status">
-        {copied ? `نُسخ ${label}` : ''}
+        {copied ? t(`نُسخ ${label}`, `Copied: ${label}`) : ''}
       </span>
     </div>
   );
@@ -58,7 +62,7 @@ function CopyRow({ label, value, hint, latin = true }: { label: string; value: s
  * التحويل (به نعرف أنه له)، والموعد (بعده يُلغى ويعود المخزون).
  */
 export function TransferInstructions({
-  transfer: t,
+  transfer: tr,
   amount,
   amountMinor,
 }: {
@@ -68,37 +72,47 @@ export function TransferInstructions({
   /** المبلغ كما يُكتب في تطبيق البنك — أرقام بفاصلة عشرية */
   amountMinor: string;
 }) {
+  const t = useT();
+  const locale = useLocale();
   return (
     <section className="sp-transfer" aria-labelledby="transfer-title">
       <h2 className="sp-transfer__title" id="transfer-title">
-        حوّل المبلغ إلى
+        {t('حوّل المبلغ إلى', 'Transfer the amount to')}
       </h2>
       <dl className="sp-transfer__rows">
-        <CopyRow label="المبلغ بالضبط" value={amountMinor} hint={amount} />
-        {t.cliqAlias ? <CopyRow label="كليك — الاسم المستعار" value={t.cliqAlias} /> : null}
-        {t.iban ? <CopyRow label="IBAN" value={t.iban} /> : null}
-        {t.beneficiary ? <CopyRow label="اسم المستفيد" value={t.beneficiary} latin={false} /> : null}
-        {t.bank ? (
+        <CopyRow label={t('المبلغ بالضبط', 'Exact amount')} value={amountMinor} hint={amount} />
+        {tr.cliqAlias ? <CopyRow label={t('كليك — الاسم المستعار', 'CliQ — alias')} value={tr.cliqAlias} /> : null}
+        {tr.iban ? <CopyRow label="IBAN" value={tr.iban} /> : null}
+        {tr.beneficiary ? <CopyRow label={t('اسم المستفيد', 'Beneficiary name')} value={tr.beneficiary} latin={false} /> : null}
+        {tr.bank ? (
           <div className="sp-transfer__row">
-            <dt>البنك</dt>
+            <dt>{t('البنك', 'Bank')}</dt>
             <dd>
-              <span className="sp-transfer__value">{t.bank}</span>
+              <span className="sp-transfer__value">{tr.bank}</span>
             </dd>
           </div>
         ) : null}
-        <CopyRow label="اكتب في ملاحظة التحويل" value={t.reference} hint="رقم طلبك — به نعرف أن التحويل لك" />
+        <CopyRow
+          label={t('اكتب في ملاحظة التحويل', 'Write in the transfer note')}
+          value={tr.reference}
+          hint={t('رقم طلبك — به نعرف أن التحويل لك', 'Your order number — it tells us the transfer is yours')}
+        />
       </dl>
       <ol className="sp-transfer__steps">
-        <li>حوّل المبلغ نفسه من تطبيق بنكك — تحويل ناقص لا نستطيع تأكيده.</li>
-        <li>اكتب رقم الطلب في ملاحظة التحويل.</li>
-        <li>نؤكّد وصوله ونرسل الطلب إلى المتاجر، ونبلغك حينها.</li>
+        <li>{t('حوّل المبلغ نفسه من تطبيق بنكك — تحويل ناقص لا نستطيع تأكيده.', "Transfer the exact amount from your bank app — we can't confirm a short transfer.")}</li>
+        <li>{t('اكتب رقم الطلب في ملاحظة التحويل.', 'Write the order number in the transfer note.')}</li>
+        <li>{t('نؤكّد وصوله ونرسل الطلب إلى المتاجر، ونبلغك حينها.', 'We confirm it arrived, send the order to the shops, and let you know.')}</li>
       </ol>
-      {t.expiresAt ? (
+      {tr.expiresAt ? (
         <p className="sp-transfer__deadline" role="note">
           <Icon name="clock" size={15} />
           <span>
-            القطع محجوزة لك حتى <strong>{DEADLINE.format(new Date(t.expiresAt))}</strong>. إن لم يصل التحويل حتى ذلك الموعد
-            يُلغى الطلب تلقائياً.
+            {t('القطع محجوزة لك حتى ', 'Your items are reserved until ')}
+            <strong>{deadline(tr.expiresAt, locale)}</strong>
+            {t(
+              '. إن لم يصل التحويل حتى ذلك الموعد يُلغى الطلب تلقائياً.',
+              ". If the transfer hasn't arrived by then, the order is cancelled automatically.",
+            )}
           </span>
         </p>
       ) : null}

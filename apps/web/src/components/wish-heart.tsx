@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import '@/styles/screens/wish-heart.css';
 import { Icon } from '@/components/icons';
+import { useT } from '@/components/locale';
 import { ApiError, session } from '@/lib/api';
 import { ensureToastRegion, setSaved, useWishlistIds, wishToast } from '@/lib/wishlist';
 
@@ -24,6 +25,7 @@ export function WishHeart({
   name: string;
   variant: 'pdp' | 'card';
 }) {
+  const t = useT();
   const ids = useWishlistIds();
   const saved = ids?.has(productId) ?? false;
   const [busy, setBusy] = useState(false);
@@ -48,13 +50,13 @@ export function WishHeart({
     setBusy(true);
     try {
       await setSaved(productId, next);
-      wishToast(next ? 'أُضيف إلى المفضّلة' : 'أُزيل من المفضّلة');
+      wishToast(next ? t('أُضيف إلى المفضّلة', 'Added to wishlist') : t('أُزيل من المفضّلة', 'Removed from wishlist'));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         toLogin();
         return;
       }
-      wishToast(err instanceof Error ? err.message : 'تعذّر تحديث المفضّلة. حاول مرة أخرى.');
+      wishToast(err instanceof Error ? err.message : t('تعذّر تحديث المفضّلة. حاول مرة أخرى.', "Couldn't update your wishlist. Try again."));
     } finally {
       setBusy(false);
     }
@@ -63,11 +65,11 @@ export function WishHeart({
   const label =
     variant === 'pdp'
       ? saved
-        ? 'أزل من المفضّلة'
-        : 'احفظ في المفضّلة'
+        ? t('أزل من المفضّلة', 'Remove from wishlist')
+        : t('احفظ في المفضّلة', 'Save to wishlist')
       : saved
-        ? `أزل «${name}» من المفضّلة`
-        : `احفظ «${name}» في المفضّلة`;
+        ? t(`أزل «${name}» من المفضّلة`, `Remove “${name}” from wishlist`)
+        : t(`احفظ «${name}» في المفضّلة`, `Save “${name}” to wishlist`);
 
   return (
     <button
@@ -75,7 +77,7 @@ export function WishHeart({
       className={`wish-heart wish-heart--${variant}`}
       aria-pressed={saved}
       aria-label={label}
-      title={saved ? 'أزل من المفضّلة' : 'احفظ في المفضّلة'}
+      title={saved ? t('أزل من المفضّلة', 'Remove from wishlist') : t('احفظ في المفضّلة', 'Save to wishlist')}
       aria-busy={busy}
       onClick={() => void toggle()}
     >

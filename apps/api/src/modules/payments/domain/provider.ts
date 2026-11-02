@@ -61,6 +61,11 @@ export type PaymentMethod = 'card' | 'bank_transfer';
 export interface PaymentProvider {
   readonly name: string;
   readonly method: PaymentMethod;
+  /**
+   * يرفض رمز وسيلة دفع لا يعرفه المزوّد — يُسأل قبل الحجز والطلب. استثناء `charge` معناه
+   * «لا نعرف»، فكان الرمز الخاطئ يُنشئ طلباً «نتحقّق من الدفع» يحبس المخزون حتى المهلة (CHK-065)
+   */
+  assertToken(paymentToken: string): void;
   charge(request: ChargeRequest): Promise<ChargeOutcome>;
   /** سؤال المزوّد عن حقيقة تفويض — للمصالحة بعد «لا نعرف» */
   retrieve(intentId: string): Promise<ChargeOutcome>;

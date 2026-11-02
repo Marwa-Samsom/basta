@@ -10,7 +10,22 @@ export interface Range {
   to: Date;
 }
 
-type Row = Record<string, string | number | null>;
+type Cell = string | number | null;
+/** عمود في ورقة التصدير: عنوانه، وقيمته من سطر القسم */
+type Column<T> = readonly [label: string, value: (x: T) => Cell];
+interface Section {
+  name: string;
+  head: string[];
+  rows: Cell[][];
+}
+
+/**
+ * العناوين من تعريف الأعمدة لا من أول سطر: قسم بلا سطور (فترة بلا مبيعات) كان يُخرج ورقة
+ * بلا أعمدة، فيسقط Excel بـ 500 ويخرج CSV بلا عناوين (ACFG-090، 2 نوفمبر 2026)
+ */
+function section<T>(name: string, items: readonly T[], columns: readonly Column<T>[]): Section {
+  return { name, head: columns.map(([label]) => label), rows: items.map((x) => columns.map(([, value]) => value(x))) };
+}
 
 const s = (v: bigint | number | null | undefined) => (v === null || v === undefined ? '0' : v.toString());
 
@@ -148,28 +163,21 @@ export class ReportsService {
 
   // ------------------------------------------------------------- التصدير
 
-  private flatten(report: Awaited<ReturnType<ReportsService['financial']>>): { name: string; rows: Row[] }[] {
+  private flatten(report: Awaited<ReturnType<ReportsService['financial']>>): Section[] {
     return [
-      {
-        name: 'المبيعات',
-        rows: report.sales.map((x) => ({
-          'العملة': x.currency, 'الطلبات': x.orders, 'المقبوض': x.grossMinorUnits, 'المُسترد': x.refundedMinorUnits,
-          'متوسط الطلب': x.averageOrderMinorUnits, 'هامش الصرف': x.fxSpreadMinorUnits,
-        })),
-      },
-      {
-        name: 'الدفتر',
-        rows: report.ledger.map((x) => ({
-          'العملة': x.currency, 'العمولة': x.commissionMinorUnits, 'ضريبة محصّلة': x.taxHeldMinorUnits,
-          'دعم الخصم': x.discountSubsidyMinorUnits, 'فرق التقريب': x.roundingMinorUnits, 'صافي المنصة': x.platformNetMinorUnits,
-          'مبيعات البائعين': x.vendorSalesMinorUnits, 'استردادات البائعين': x.vendorRefundsMinorUnits,
-          'صافي مستحقات البائعين': x.vendorDuesNetMinorUnits, 'سحوبات محوَّلة': x.payoutsPaidMinorUnits,
-        })),
-      },
-      {
-        name: 'موحّد بالدولار',
-        rows: report.usd.rows.map((x) => ({ 'المؤشّر': x.metric, 'العملة': x.currency, 'السعر المستعمل': x.rate, 'بالدولار': x.usd })),
-      },
+      section('المبيعات', report.sales, [
+        ['العملة', (x) => x.currency], ['الطلبات', (x) => x.orders], ['المقبوض', (x) => x.grossMinorUnits],
+        ['المُسترد', (x) => x.refundedMinorUnits], ['متوسط الطلب', (x) => x.averageOrderMinorUnits], ['هامش الصرف', (x) => x.fxSpreadMinorUnits],
+      ]),
+      section('الدفتر', report.ledger, [
+        ['العملة', (x) => x.currency], ['العمولة', (x) => x.commissionMinorUnits], ['ضريبة محصّلة', (x) => x.taxHeldMinorUnits],
+        ['دعم الخصم', (x) => x.discountSubsidyMinorUnits], ['فرق التقريب', (x) => x.roundingMinorUnits], ['صافي المنصة', (x) => x.platformNetMinorUnits],
+        ['مبيعات البائعين', (x) => x.vendorSalesMinorUnits], ['استردادات البائعين', (x) => x.vendorRefundsMinorUnits],
+        ['صافي مستحقات البائعين', (x) => x.vendorDuesNetMinorUnits], ['سحوبات محوَّلة', (x) => x.payoutsPaidMinorUnits],
+      ]),
+      section('موحّد بالدولار', report.usd.rows, [
+        ['المؤشّر', (x) => x.metric], ['العملة', (x) => x.currency], ['السعر المستعمل', (x) => x.rate], ['بالدولار', (x) => x.usd],
+      ]),
     ];
   }
 
@@ -177,9 +185,7 @@ export class ReportsService {
     const esc = csvCell;
     const parts: string[] = [`${esc('الفترة')},${esc(r.from.toISOString())},${esc(r.to.toISOString())}`, esc('المبالغ بالوحدات الصغرى لكل عملة')];
     for (const sec of this.flatten(await this.financial(r))) {
-      parts.push('', esc(sec.name));
-      const head = Object.keys(sec.rows[0] ?? {});
-      if (head.length) parts.push(head.map(esc).join(','), ...sec.rows.map((row) => head.map((h) => esc(row[h])).join(',')));
+      parts.push('', esc(sec.name), sec.head.map(esc).join(','), ...sec.rows.map((row) => row.map(esc).join(',')));
     }
     return `﻿${parts.join('\r\n')}\r\n`;
   }
@@ -189,9 +195,8 @@ export class ReportsService {
     wb.creator = 'Basta';
     for (const sec of this.flatten(await this.financial(r))) {
       const ws = wb.addWorksheet(sec.name, { views: [{ rightToLeft: true }] });
-      const head = Object.keys(sec.rows[0] ?? {});
-      ws.addRow(head).font = { bold: true };
-      for (const row of sec.rows) ws.addRow(head.map((h) => row[h]));
+      ws.addRow(sec.head).font = { bold: true };
+      for (const row of sec.rows) ws.addRow(row);
       ws.columns.forEach((c) => (c.width = 18));
     }
     return Buffer.from(await wb.xlsx.writeBuffer());

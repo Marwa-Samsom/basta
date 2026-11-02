@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { ApiError, session } from '@/lib/api';
 import { cartApi } from '@/lib/cart';
@@ -13,11 +14,11 @@ import { getWishlist, savedCount, setSaved, type WishlistItem } from '@/lib/wish
 /** «بقي N فقط» عند هذا العدد أو أقل — الحدّ نفسه في الخادم وبطاقة المنتج */
 const LOW_STOCK = 3;
 
-const FLAG: Partial<Record<WishlistItem['state'], { label: string; tone: string }>> = {
-  sold_out: { label: 'نفد', tone: 'badge--pending' },
-  unavailable: { label: 'غير متاح', tone: 'badge--pending' },
-  drop: { label: 'انخفض السعر', tone: 'badge--success' },
-  rise: { label: 'ارتفع السعر', tone: 'badge--warning' },
+const FLAG: Partial<Record<WishlistItem['state'], { label: string; en: string; tone: string }>> = {
+  sold_out: { label: 'نفد', en: 'Sold out', tone: 'badge--pending' },
+  unavailable: { label: 'غير متاح', en: 'Unavailable', tone: 'badge--pending' },
+  drop: { label: 'انخفض السعر', en: 'Price dropped', tone: 'badge--success' },
+  rise: { label: 'ارتفع السعر', en: 'Price went up', tone: 'badge--warning' },
 };
 
 /**
@@ -29,6 +30,8 @@ const FLAG: Partial<Record<WishlistItem['state'], { label: string; tone: string 
  * المنتج لاختيار المقاس أو اللون — لا نخمّن خياراً عن المشتري.
  */
 export function WishlistView({ suggestions }: { suggestions: { slug: string; nameAr: string }[] }) {
+  const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [items, setItems] = useState<WishlistItem[] | null>(null);
   const [max, setMax] = useState(200);
@@ -56,12 +59,12 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
           router.replace('/login?next=/account/wishlist');
           return;
         }
-        setError(e instanceof Error ? e.message : 'تعذّر جلب مفضّلتك.');
+        setError(e instanceof Error ? e.message : t('تعذّر جلب مفضّلتك.', "Couldn't load your wishlist."));
       });
     return () => {
       alive = false;
     };
-  }, [router]);
+  }, [router, t]);
 
   /** البطاقة تختفي، والتركيز ينتقل إلى زرّ الإزالة في البطاقة التالية لا إلى أول الصفحة */
   function dropItem(productId: string): void {
@@ -81,10 +84,10 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
     try {
       await setSaved(item.productId, false);
       setMoved(null);
-      setStatus(`أُزيل «${item.nameAr}» من المفضّلة.`);
+      setStatus(t(`أُزيل «${item.nameAr}» من المفضّلة.`, `“${item.nameAr}” was removed from your wishlist.`));
       dropItem(item.productId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذّرت الإزالة من المفضّلة.');
+      setError(e instanceof Error ? e.message : t('تعذّرت الإزالة من المفضّلة.', "Couldn't remove it from your wishlist."));
     } finally {
       setBusyId(null);
     }
@@ -97,7 +100,7 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
     try {
       await cartApi.add(item.variantId, 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذّرت الإضافة إلى السلة.');
+      setError(e instanceof Error ? e.message : t('تعذّرت الإضافة إلى السلة.', "Couldn't add it to the cart."));
       setBusyId(null);
       return;
     }
@@ -108,7 +111,12 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
       setStatus('');
     } catch {
       // في السلة فعلاً؛ بقاؤه في المفضّلة لا يضرّ — يُقال ولا يُعاد
-      setError(`أُضيف «${item.nameAr}» إلى سلّتك، لكن تعذّرت إزالته من المفضّلة. أزله يدوياً إن شئت.`);
+      setError(
+        t(
+          `أُضيف «${item.nameAr}» إلى سلّتك، لكن تعذّرت إزالته من المفضّلة. أزله يدوياً إن شئت.`,
+          `“${item.nameAr}” was added to your cart, but we couldn't remove it from your wishlist. Remove it yourself if you like.`,
+        ),
+      );
     } finally {
       setBusyId(null);
     }
@@ -119,9 +127,11 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
   return (
     <div className="aa-page">
       <PageHead
-        title="المفضّلة"
-        {...(items && count > 0 ? { count: savedCount(count) } : {})}
-        {...(items && count >= max ? { meta: `بلغت الحد (${max}) — أزل منتجاً لتحفظ غيره` } : {})}
+        title={t('المفضّلة', 'Wishlist')}
+        {...(items && count > 0 ? { count: savedCount(count, locale) } : {})}
+        {...(items && count >= max
+          ? { meta: t(`بلغت الحد (${max}) — أزل منتجاً لتحفظ غيره`, `You've reached the limit (${max}) — remove an item to save another`) }
+          : {})}
       />
 
       <p className="visually-hidden" role="status">
@@ -132,20 +142,21 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
         <div className="alert alert--success wl-moved" role="status">
           <Icon name="check-circle" size={17} />
           <span>
-            نُقل «{moved}» إلى سلّتك. <Link href="/cart">اذهب إلى السلة</Link>
+            {t(`نُقل «${moved}» إلى سلّتك.`, `“${moved}” was moved to your cart.`)}{' '}
+            <Link href="/cart">{t('اذهب إلى السلة', 'Go to cart')}</Link>
           </span>
         </div>
       ) : null}
 
       {error ? (
-        <Alert tone="danger" title="لم يكتمل الطلب">
+        <Alert tone="danger" title={t('لم يكتمل الطلب', "The request didn't go through")}>
           {error}
         </Alert>
       ) : null}
 
       {!items && !error ? (
         <div className="wl-skel" role="status">
-          <span className="visually-hidden">جارٍ جلب مفضّلتك…</span>
+          <span className="visually-hidden">{t('جارٍ جلب مفضّلتك…', 'Loading your wishlist…')}</span>
           {[0, 1, 2, 3].map((i) => (
             <span key={i} className="skeleton wl-skel__card" aria-hidden />
           ))}
@@ -155,7 +166,7 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
       {items && count === 0 ? (
         <EmptyState
           icon="heart"
-          title="مفضّلتك فارغة"
+          title={t('مفضّلتك فارغة', 'Your wishlist is empty')}
           actions={
             suggestions.length > 0 ? (
               suggestions.map((c) => (
@@ -165,17 +176,20 @@ export function WishlistView({ suggestions }: { suggestions: { slug: string; nam
               ))
             ) : (
               <Link href="/" className="btn btn--primary">
-                تصفّح المتجر
+                {t('تصفّح المتجر', 'Browse the store')}
               </Link>
             )
           }
         >
-          احفظ ما يعجبك بضغطة على القلب، وتجده هنا بسعره الآن — ونقول لك إن تغيّر سعره منذ حفظته أو قارب النفاد.
+          {t(
+            'احفظ ما يعجبك بضغطة على القلب، وتجده هنا بسعره الآن — ونقول لك إن تغيّر سعره منذ حفظته أو قارب النفاد.',
+            "Save what you like with a tap on the heart and find it here at today's price — we'll tell you if its price has changed since you saved it or if it's running out.",
+          )}
         </EmptyState>
       ) : null}
 
       {items && count > 0 ? (
-        <ul className="wl-grid" ref={grid} tabIndex={-1} aria-label="المنتجات المحفوظة">
+        <ul className="wl-grid" ref={grid} tabIndex={-1} aria-label={t('المنتجات المحفوظة', 'Saved items')}>
           {items.map((item) => (
             <li key={item.productId}>
               <WishCard
@@ -203,6 +217,7 @@ function WishCard({
   onRemove: () => void;
   onMove: () => void;
 }) {
+  const t = useT();
   const gone = item.state === 'unavailable';
   const soldOut = item.state === 'sold_out';
   const src = imageUrl(item.image);
@@ -232,13 +247,13 @@ function WishCard({
             {media}
           </Link>
         )}
-        {flag ? <span className={`badge ${flag.tone} wl-card__flag`}>{flag.label}</span> : null}
+        {flag ? <span className={`badge ${flag.tone} wl-card__flag`}>{t(flag.label, flag.en)}</span> : null}
         <button
           type="button"
           className="wl-card__remove"
           data-wl-remove={item.productId}
-          aria-label={`أزل «${item.nameAr}» من المفضّلة`}
-          title="أزل من المفضّلة"
+          aria-label={t(`أزل «${item.nameAr}» من المفضّلة`, `Remove “${item.nameAr}” from wishlist`)}
+          title={t('أزل من المفضّلة', 'Remove from wishlist')}
           onClick={() => {
             if (!busy) onRemove();
           }}
@@ -259,35 +274,36 @@ function WishCard({
             <span className="money num">{item.currentPrice.formatted}</span>
             {changed ? (
               <s className="num">
-                <span className="visually-hidden">سعره عند الحفظ </span>
+                <span className="visually-hidden">{t('سعره عند الحفظ ', 'Price when saved ')}</span>
                 {item.savedPrice.formatted}
               </s>
             ) : null}
           </p>
         ) : null}
 
-        {gone ? <p className="wl-card__note">لم يعد معروضاً في المتجر</p> : null}
-        {soldOut ? <p className="wl-card__note">نفد من المتجر</p> : null}
+        {gone ? <p className="wl-card__note">{t('لم يعد معروضاً في المتجر', 'No longer listed in the shop')}</p> : null}
+        {soldOut ? <p className="wl-card__note">{t('نفد من المتجر', 'Sold out at the shop')}</p> : null}
         {changed && item.delta ? (
           <p className="wl-card__note" data-tone={item.state === 'drop' ? 'success' : 'warning'}>
-            {item.state === 'drop' ? 'انخفض' : 'ارتفع'} <span className="num">{item.delta.formatted}</span> منذ حفظه
+            {item.state === 'drop' ? t('انخفض', 'Dropped by') : t('ارتفع', 'Went up by')}{' '}
+            <span className="num">{item.delta.formatted}</span> {t('منذ حفظه', 'since you saved it')}
           </p>
         ) : null}
         {few && !soldOut && !gone ? (
           <p className="wl-card__note" data-tone="warning">
-            بقي <span className="num">{item.available}</span> فقط
+            {t('بقي', 'Only')} <span className="num">{item.available}</span> {t('فقط', 'left')}
           </p>
         ) : null}
 
         <div className="wl-card__action">
           {gone ? (
             <button type="button" className="btn btn--secondary wl-card__btn" disabled>
-              غير متاح
+              {t('غير متاح', 'Unavailable')}
             </button>
           ) : soldOut ? (
             <button type="button" className="btn btn--secondary wl-card__btn" disabled>
               <Icon name="cart" size={15} />
-              نفد
+              {t('نفد', 'Sold out')}
             </button>
           ) : item.variantId ? (
             <button
@@ -299,11 +315,11 @@ function WishCard({
               }}
             >
               <Icon name="cart" size={15} />
-              {busy ? 'جارٍ النقل…' : 'انقله إلى السلة'}
+              {busy ? t('جارٍ النقل…', 'Moving…') : t('انقله إلى السلة', 'Move to cart')}
             </button>
           ) : (
             <Link href={href} className="btn btn--primary wl-card__btn">
-              اختر الخيارات
+              {t('اختر الخيارات', 'Choose options')}
               <Icon name="chev-end" size={14} mirror />
             </Link>
           )}

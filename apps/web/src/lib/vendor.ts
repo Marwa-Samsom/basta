@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, session } from './api';
+import { documentLocale, intlLocale, type Locale } from './i18n';
 import { withNext } from './safe-path';
 import type { Blocker } from '@/components/ui';
 
@@ -50,6 +51,10 @@ export interface Onboarding {
  * حالة التأهيل مصدرها الخادم في كل قراءة — بما فيها الموانع.
  * حسابها في الواجهة يعني نسختين من القاعدة تفترقان أول ما تتغيّر واحدة.
  */
+/** رسالة احتياطية بلغة الصفحة حين لا يحمل الخطأ نصّاً */
+const loadFailed = (): string =>
+  documentLocale() === 'en' ? "Couldn't load your shop status." : 'تعذّر تحميل حالة المتجر.';
+
 export function useOnboarding(): {
   data: Onboarding | null;
   error: string | null;
@@ -79,7 +84,7 @@ export function useOnboarding(): {
       setMissing(false);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) setMissing(true);
-      else setError(err instanceof Error ? err.message : 'تعذّر تحميل حالة المتجر.');
+      else setError(err instanceof Error ? err.message : loadFailed());
     } finally {
       setLoading(false);
     }
@@ -111,7 +116,7 @@ export function useOnboarding(): {
       } catch (err) {
         if (!alive) return;
         if (err instanceof ApiError && err.status === 404) setMissing(true);
-        else setError(err instanceof Error ? err.message : 'تعذّر تحميل حالة المتجر.');
+        else setError(err instanceof Error ? err.message : loadFailed());
       } finally {
         if (alive) setLoading(false);
       }
@@ -133,31 +138,32 @@ export function useOnboarding(): {
   return { data, error, loading, missing, reload, set: setData };
 }
 
-export const CURRENCIES: readonly { code: string; nameAr: string; symbol: string; digits: number }[] = [
-  { code: 'JOD', nameAr: 'دينار أردني', symbol: 'د.أ', digits: 3 },
-  { code: 'SAR', nameAr: 'ريال سعودي', symbol: '﷼', digits: 2 },
-  { code: 'AED', nameAr: 'درهم إماراتي', symbol: 'د.إ', digits: 2 },
-  { code: 'KWD', nameAr: 'دينار كويتي', symbol: 'د.ك', digits: 3 },
-  { code: 'EGP', nameAr: 'جنيه مصري', symbol: 'ج.م', digits: 2 },
-  { code: 'USD', nameAr: 'دولار أمريكي', symbol: '$', digits: 2 },
-  { code: 'EUR', nameAr: 'يورو', symbol: '€', digits: 2 },
+/** `nameEn` و`symbolEn` للواجهة الإنجليزية — الرمز العربي يُكتب بالرمز الدولي هناك */
+export const CURRENCIES: readonly { code: string; nameAr: string; nameEn: string; symbol: string; symbolEn: string; digits: number }[] = [
+  { code: 'JOD', nameAr: 'دينار أردني', nameEn: 'Jordanian Dinar', symbol: 'د.أ', symbolEn: 'JOD', digits: 3 },
+  { code: 'SAR', nameAr: 'ريال سعودي', nameEn: 'Saudi Riyal', symbol: '﷼', symbolEn: 'SAR', digits: 2 },
+  { code: 'AED', nameAr: 'درهم إماراتي', nameEn: 'UAE Dirham', symbol: 'د.إ', symbolEn: 'AED', digits: 2 },
+  { code: 'KWD', nameAr: 'دينار كويتي', nameEn: 'Kuwaiti Dinar', symbol: 'د.ك', symbolEn: 'KWD', digits: 3 },
+  { code: 'EGP', nameAr: 'جنيه مصري', nameEn: 'Egyptian Pound', symbol: 'ج.م', symbolEn: 'EGP', digits: 2 },
+  { code: 'USD', nameAr: 'دولار أمريكي', nameEn: 'US Dollar', symbol: '$', symbolEn: '$', digits: 2 },
+  { code: 'EUR', nameAr: 'يورو', nameEn: 'Euro', symbol: '€', symbolEn: '€', digits: 2 },
 ];
 
-export const COUNTRIES: readonly { code: string; nameAr: string }[] = [
-  { code: 'JO', nameAr: 'الأردن' },
-  { code: 'SA', nameAr: 'السعودية' },
-  { code: 'AE', nameAr: 'الإمارات' },
-  { code: 'KW', nameAr: 'الكويت' },
-  { code: 'EG', nameAr: 'مصر' },
-  { code: 'QA', nameAr: 'قطر' },
-  { code: 'BH', nameAr: 'البحرين' },
-  { code: 'OM', nameAr: 'عُمان' },
+export const COUNTRIES: readonly { code: string; nameAr: string; nameEn: string }[] = [
+  { code: 'JO', nameAr: 'الأردن', nameEn: 'Jordan' },
+  { code: 'SA', nameAr: 'السعودية', nameEn: 'Saudi Arabia' },
+  { code: 'AE', nameAr: 'الإمارات', nameEn: 'United Arab Emirates' },
+  { code: 'KW', nameAr: 'الكويت', nameEn: 'Kuwait' },
+  { code: 'EG', nameAr: 'مصر', nameEn: 'Egypt' },
+  { code: 'QA', nameAr: 'قطر', nameEn: 'Qatar' },
+  { code: 'BH', nameAr: 'البحرين', nameEn: 'Bahrain' },
+  { code: 'OM', nameAr: 'عُمان', nameEn: 'Oman' },
 ];
 
 /** أرقام لاتينية دائماً، وخانات كل عملة كما هي — DESIGN-SYSTEM §7 */
-export function formatAmount(amount: number, currency: string): string {
+export function formatAmount(amount: number, currency: string, locale: Locale = 'ar'): string {
   const digits = CURRENCIES.find((c) => c.code === currency)?.digits ?? 2;
-  return new Intl.NumberFormat('ar-JO-u-nu-latn', {
+  return new Intl.NumberFormat(locale === 'en' ? intlLocale(locale) : 'ar-JO-u-nu-latn', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(amount);

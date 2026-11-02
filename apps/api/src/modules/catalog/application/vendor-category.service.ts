@@ -12,6 +12,7 @@ import { StorefrontService } from './storefront.service';
 export interface VendorCategoryView {
   readonly id: string;
   readonly nameAr: string;
+  readonly nameEn: string | null;
   readonly sort: number;
   /** منتجات المتجر فيها — المحذوفة لا تُعدّ */
   readonly productCount: number;
@@ -22,6 +23,10 @@ export const MAX_VENDOR_CATEGORIES = 200;
 
 /** فراغات موحّدة: «ملابس   رجالية » و «ملابس رجالية» اسم واحد */
 export const cleanCategoryName = (name: string): string => name.trim().replace(/\s+/g, ' ');
+
+/** الاسم الإنجليزي اختياري: غائب لا يغيّر شيئاً، وفارغ يمحوه — طوله يفحصه الـ DTO */
+const englishName = (name: string | null | undefined): string | null | undefined =>
+  name === undefined ? undefined : name === null ? null : cleanCategoryName(name) || null;
 
 /**
  * فئات المتجر — قرار صاحب المشروع 14 أكتوبر 2026: «كل متجر له فئاته ومنتجاته
@@ -49,16 +54,18 @@ export class VendorCategoryService {
       select: {
         id: true,
         nameAr: true,
+        nameEn: true,
         sort: true,
         _count: { select: { products: { where: { deletedAt: null } } } },
       },
-    })) as unknown as { id: string; nameAr: string; sort: number; _count: { products: number } }[];
-    return rows.map((r) => ({ id: r.id, nameAr: r.nameAr, sort: r.sort, productCount: r._count.products }));
+    })) as unknown as { id: string; nameAr: string; nameEn: string | null; sort: number; _count: { products: number } }[];
+    return rows.map((r) => ({ id: r.id, nameAr: r.nameAr, nameEn: r.nameEn, sort: r.sort, productCount: r._count.products }));
   }
 
   /** فئة جديدة في آخر القائمة */
-  async create(scope: VendorScope, nameAr: string): Promise<VendorCategoryView> {
+  async create(scope: VendorScope, nameAr: string, nameEn?: string | null): Promise<VendorCategoryView> {
     const name = this.validName(nameAr);
+    const en = englishName(nameEn);
     const id = randomUUID();
     await this.prisma.$transaction(async (tx) => {
       const repo = this.repo(scope, tx);
@@ -69,16 +76,18 @@ export class VendorCategoryService {
       const last = (await repo.findFirst({ orderBy: { sort: 'desc' }, select: { sort: true } })) as { sort: number } | null;
       await this.write(name, () =>
         tx.vendorCategory.create({
-          data: { id, vendorId: scope.vendorId, nameAr: name, sort: (last?.sort ?? -1) + 1 },
+          data: { id, vendorId: scope.vendorId, nameAr: name, nameEn: en ?? null, sort: (last?.sort ?? -1) + 1 },
         }),
       );
     });
     return this.one(scope, id);
   }
 
-  async rename(scope: VendorScope, id: string, nameAr: string): Promise<VendorCategoryView> {
+  /** `nameEn` غائباً يبقى كما هو، وفارغاً يُمحى */
+  async rename(scope: VendorScope, id: string, nameAr: string, nameEn?: string | null): Promise<VendorCategoryView> {
     const name = this.validName(nameAr);
-    await this.write(name, () => this.repo(scope).updateOwned(id, { nameAr: name }));
+    const en = englishName(nameEn);
+    await this.write(name, () => this.repo(scope).updateOwned(id, { nameAr: name, ...(en !== undefined ? { nameEn: en } : {}) }));
     // الاسم في وثيقة البحث يُبحث به — منتجات الفئة تُعاد فهرستها
     this.reindex(scope, id);
     return this.one(scope, id);

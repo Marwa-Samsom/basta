@@ -273,6 +273,47 @@ describe('بوابة 09 · البند 1 — الانتقال غير المسمو
     expect(await statusOf(a.id)).toBe('awaiting_vendor');
   });
 
+  /**
+   * الخادم يقبل «قيد التجهيز» أيضاً، والواجهة تعرض الزرّ عند «جاهز للشحن» وحده — الخادم أوسع
+   * من الواجهة ولا ضرر: لا تتغيّر الحالة بإصدار البوليصة
+   */
+  it('البوليصة: لقيد التجهيز والجاهز وحدهما، ولطلب البائع نفسه، وإعادتها تستبدل الرقم بلا تغيير حالة (VOPS-025)', async () => {
+    if (!dbUp) return;
+    const RULE = 'البوليصة تُصدر للطلب قيد التجهيز أو الجاهز للشحن أو الذي تعذّر توصيله.';
+    const waybill = (i: number, id: string) => call('POST', `/vendor/shipping/waybill/${id}`, vendors[i]!.token);
+    const { a, b } = await placeOrder([1, 1]);
+
+    expect((await vendorMove(0, a.id, 'accepted')).statusCode).toBe(200);
+    const early = await waybill(0, a.id);
+    expect(early.statusCode).toBe(409);
+    expect(early.json().message).toBe(RULE);
+    expect(await prisma.shipment.count({ where: { subOrderId: a.id } })).toBe(0);
+
+    expect((await vendorMove(0, a.id, 'preparing')).statusCode).toBe(200);
+    const first = await waybill(0, a.id);
+    expect(first.statusCode, first.body).toBe(201);
+    const second = await waybill(0, a.id);
+    expect(second.statusCode, second.body).toBe(201);
+    expect(second.json().trackingNumber).not.toBe(first.json().trackingNumber);
+    const shipments = await prisma.shipment.findMany({ where: { subOrderId: a.id } });
+    expect(shipments).toHaveLength(1);
+    expect(shipments[0]).toMatchObject({ trackingNumber: second.json().trackingNumber, status: 'created' });
+    expect(await statusOf(a.id)).toBe('preparing');
+
+    const foreign = await waybill(0, b.id);
+    expect(foreign.statusCode).toBe(404);
+    expect(foreign.json().message).toBe('الطلب غير موجود.');
+    expect(await prisma.shipment.count({ where: { subOrderId: b.id } })).toBe(0);
+
+    expect((await vendorMove(0, a.id, 'ready_to_ship')).statusCode).toBe(200);
+    const tracking = { tracking: second.json().trackingNumber, carrierCode: second.json().carrierCode };
+    expect((await vendorMove(0, a.id, 'shipped', tracking)).statusCode).toBe(200);
+    const late = await waybill(0, a.id);
+    expect(late.statusCode).toBe(409);
+    expect(late.json().message).toBe(RULE);
+    expect((await prisma.shipment.findUniqueOrThrow({ where: { subOrderId: a.id } })).trackingNumber).toBe(second.json().trackingNumber);
+  });
+
   it('قبولان متزامنان للطلب نفسه: واحد يمرّ، والآخر يُرفض، وسطر تاريخ واحد', async () => {
     if (!dbUp) return;
     const { a } = await placeOrder([1, 1]);

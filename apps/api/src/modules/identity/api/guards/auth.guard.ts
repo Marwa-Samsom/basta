@@ -75,9 +75,11 @@ export class AuthGuard implements CanActivate {
     // 1 · الرمز المحدود لا يفتح إلا ما سُمح له صراحةً
     const allowLimited = this.reflector.getAllAndOverride<boolean>(ALLOW_LIMITED, targets);
     if (claims.limited && !allowLimited) {
-      throw new ForbiddenException(
-        'فعّل التحقق الثنائي أولاً — إلزامي على الحسابات الإدارية قبل أي إجراء.',
-      );
+      // الرمز يقرؤه الموقع لا النصّ: النصّ يُترجم حين يكون الموقع بالإنجليزية
+      throw new ForbiddenException({
+        code: 'TOTP_SETUP_REQUIRED',
+        message: 'فعّل التحقق الثنائي أولاً — إلزامي على الحسابات الإدارية قبل أي إجراء.',
+      });
     }
 
     const actor: Actor = {

@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { CURRENCIES, formatAmount, useOnboarding, type Onboarding } from '@/lib/vendor';
 import { OnboardingError, OnboardingFrame, OnboardingHead, OnboardingLoading } from '../onboarding-chrome';
+import { useLocale, useT } from '@/components/locale';
 
 /**
  * VD-04 — عملة التسوية، الخطوة الثالثة: بعد بيانات المتجر وقبل المستندات.
@@ -18,6 +19,10 @@ import { OnboardingError, OnboardingFrame, OnboardingHead, OnboardingLoading } f
  * الإرسال بلا اختيار صريح: المقترحة من البلد اقتراح لا اختيار.
  */
 export default function CurrencyPage() {
+  const t = useT();
+  const locale = useLocale();
+  const nameOf = (c: (typeof CURRENCIES)[number]): string => (locale === 'en' ? c.nameEn : c.nameAr);
+  const symbolOf = (c: (typeof CURRENCIES)[number]): string => (locale === 'en' ? c.symbolEn : c.symbol);
   const router = useRouter();
   const { data, loading, missing, error, set, reload } = useOnboarding();
   const [picked, setPicked] = useState<string | null>(null);
@@ -50,7 +55,7 @@ export default function CurrencyPage() {
   if (error || !data) {
     return (
       <OnboardingFrame step={3}>
-        <OnboardingError message={error ?? 'تعذّر تحميل حالة المتجر.'} onRetry={() => void reload()} />
+        <OnboardingError message={error ?? t('تعذّر تحميل حالة المتجر.', "Couldn't load your shop status.")} onRetry={() => void reload()} />
       </OnboardingFrame>
     );
   }
@@ -62,17 +67,23 @@ export default function CurrencyPage() {
     // أُرسل الطلب أو اعتُمد: العملة لا تتغيّر من هنا — والوجهة التالية بحسب الحال
     const reviewing = data.status === 'in_review';
     const onward = reviewing
-      ? { href: '/vendor/onboarding/status', label: 'تابع حالة طلبك' }
+      ? { href: '/vendor/onboarding/status', label: t('تابع حالة طلبك', 'Track your application') }
       : data.status === 'approved' || data.status === 'suspended'
-        ? { href: '/vendor/store', label: 'جهّز ملف المتجر' }
-        : { href: '/vendor/onboarding/documents', label: 'المستندات' };
+        ? { href: '/vendor/store', label: t('جهّز ملف المتجر', 'Set up your shop profile') }
+        : { href: '/vendor/onboarding/documents', label: t('المستندات', 'Documents') };
     return (
       <OnboardingFrame step={reviewing ? 5 : 6} status={data.status}>
-        <OnboardingHead title="عملة التسوية" />
-        <Alert tone="info" title={`عملتك: ${currency.nameAr}`}>
+        <OnboardingHead title={t('عملة التسوية', 'Settlement currency')} />
+        <Alert tone="info" title={t(`عملتك: ${currency.nameAr}`, `Your currency: ${currency.nameEn}`)}>
           {reviewing
-            ? 'طلبك قيد المراجعة، والعملة لا تتغيّر أثناءها. يثبّتها اعتماد متجرك.'
-            : 'تُسعّر منتجاتك بها وتستلم مستحقاتك بها. تغييرها يتطلّب تسوية رصيدك الحالي — راسل الدعم عند الحاجة.'}
+            ? t(
+                'طلبك قيد المراجعة، والعملة لا تتغيّر أثناءها. يثبّتها اعتماد متجرك.',
+                "Your application is under review, and the currency can't change meanwhile. Approval of your shop locks it.",
+              )
+            : t(
+                'تُسعّر منتجاتك بها وتستلم مستحقاتك بها. تغييرها يتطلّب تسوية رصيدك الحالي — راسل الدعم عند الحاجة.',
+                'Your products are priced in it and your payouts are made in it. Changing it requires settling your current balance — contact support if needed.',
+              )}
         </Alert>
         <div className="vo-actions">
           <Link className="btn btn--primary" href={onward.href}>
@@ -97,7 +108,7 @@ export default function CurrencyPage() {
       setConfirming(false);
       router.push('/vendor/onboarding/documents');
     } catch (err) {
-      setFailure(err instanceof Error ? err.message : 'تعذّر حفظ العملة.');
+      setFailure(err instanceof Error ? err.message : t('تعذّر حفظ العملة.', "Couldn't save the currency."));
     } finally {
       setBusy(false);
     }
@@ -106,23 +117,31 @@ export default function CurrencyPage() {
   return (
     <OnboardingFrame step={3} status={data.status}>
       <OnboardingHead
-        title="اختر عملة التسوية"
-        lead="العملة التي تُسعّر بها منتجاتك وتستلم بها مستحقاتك. يرى المشتري السعر محوَّلاً إلى عملته، وتبقى مستحقاتك بعملتك."
+        title={t('اختر عملة التسوية', 'Choose your settlement currency')}
+        lead={t(
+          'العملة التي تُسعّر بها منتجاتك وتستلم بها مستحقاتك. يرى المشتري السعر محوَّلاً إلى عملته، وتبقى مستحقاتك بعملتك.',
+          'The currency you price your products in and receive your payouts in. Buyers see the price converted to their currency, and your payouts stay in yours.',
+        )}
       />
 
       <div className="vo-callout vo-callout--warning" role="note">
         <Icon name="alert" size={19} />
         <div className="vo-callout__text">
-          <p className="vo-callout__title">تُثبَّت العملة عند اعتماد متجرك — ولا تتغيّر بعده</p>
+          <p className="vo-callout__title">
+            {t('تُثبَّت العملة عند اعتماد متجرك — ولا تتغيّر بعده', 'The currency is locked when your shop is approved — and never changes after that')}
+          </p>
           <p className="vo-callout__body">
-            اختر العملة التي تتعامل بها فعلياً مع بنكك. تستطيع تغييرها حتى ترسل طلبك للمراجعة، ما لم تسعّر بها منتجاً أو شحناً.
+            {t(
+              'اختر العملة التي تتعامل بها فعلياً مع بنكك. تستطيع تغييرها حتى ترسل طلبك للمراجعة، ما لم تسعّر بها منتجاً أو شحناً.',
+              "Choose the currency you actually use with your bank. You can change it until you submit your application for review, as long as you haven't priced a product or shipping in it.",
+            )}
           </p>
         </div>
       </div>
 
       <section aria-labelledby="currency-pick">
         <h2 className="visually-hidden" id="currency-pick">
-          اختر عملتك
+          {t('اختر عملتك', 'Choose your currency')}
         </h2>
         <div className="vo-currs">
           {CURRENCIES.map((c) => (
@@ -135,12 +154,14 @@ export default function CurrencyPage() {
             >
               <span className="vo-cur__head">
                 <span className="vo-cur__dot" aria-hidden />
-                <span className="vo-cur__name">{c.nameAr}</span>
+                <span className="vo-cur__name">{nameOf(c)}</span>
               </span>
               <span className="vo-cur__meta">
                 <span className="vo-cur__code num">{c.code}</span>
-                <span className="vo-cur__symbol">{c.symbol}</span>
-                <span className="vo-cur__dec">{c.digits === 3 ? 'ثلاث خانات عشرية' : 'خانتان عشريتان'}</span>
+                <span className="vo-cur__symbol">{symbolOf(c)}</span>
+                <span className="vo-cur__dec">
+                  {c.digits === 3 ? t('ثلاث خانات عشرية', '3 decimal places') : t('خانتان عشريتان', '2 decimal places')}
+                </span>
               </span>
             </button>
           ))}
@@ -150,30 +171,33 @@ export default function CurrencyPage() {
       <div className="vo-split vo-split--currency">
         <section className="card vo-example" aria-labelledby="currency-example">
           <h3 className="vo-side-title" id="currency-example">
-            مثال حيّ
+            {t('مثال حيّ', 'Live example')}
           </h3>
           {/* «بـ» + اسم العملة يُنتج «بـ دينار كويتي». الاسم يُذكر مرة واحدة
               في صدر الجملة، والباقي إشارة إليه — فتستقيم مع كل عملة. */}
           <div className="vo-example__box">
             <span className="vo-example__row">
-              <span className="vo-example__label">سعرٌ تكتبه لمنتجك</span>
+              <span className="vo-example__label">{t('سعرٌ تكتبه لمنتجك', 'A price you enter for your product')}</span>
               <span className="vo-example__amount money num">
-                {formatAmount(79, currency.code)} {currency.symbol}
+                {formatAmount(79, currency.code, locale)} {symbolOf(currency)}
               </span>
             </span>
             <span className="vo-example__row vo-example__row--total">
-              <span className="vo-example__label">مستحقاتك تُحوَّل بعملة</span>
-              <span className="vo-example__payout">{currency.nameAr}</span>
+              <span className="vo-example__label">{t('مستحقاتك تُحوَّل بعملة', 'Your payouts are made in')}</span>
+              <span className="vo-example__payout">{nameOf(currency)}</span>
             </span>
           </div>
           <p className="vo-example__note">
-            يراه المشتري في بلده محوَّلاً إلى عملته، وتبقى مستحقاتك بالعملة نفسها. الخانات العشرية تتبع
-            العملة: <span className="num">{currency.code}</span> يُعرض بـ{' '}
-            <span className="num">{formatAmount(79, currency.code)}</span>.
+            {t(
+              'يراه المشتري في بلده محوَّلاً إلى عملته، وتبقى مستحقاتك بالعملة نفسها. الخانات العشرية تتبع العملة:',
+              'Buyers in their own country see it converted to their currency, and your payouts stay in the same currency. Decimal places follow the currency:',
+            )}{' '}
+            <span className="num">{currency.code}</span> {t('يُعرض بـ', 'is shown as')}{' '}
+            <span className="num">{formatAmount(79, currency.code, locale)}</span>.
           </p>
         </section>
 
-        <section className="card vo-commit" aria-label="التثبيت">
+        <section className="card vo-commit" aria-label={t('التثبيت', 'Confirmation')}>
           <label className="vo-ack" htmlFor="ack">
             <input
               id="ack"
@@ -185,7 +209,12 @@ export default function CurrencyPage() {
             <span className="vo-ack__box" aria-hidden>
               <Icon name="check" size={14} />
             </span>
-            <span>فهمت أن العملة تُثبَّت عند اعتماد متجري ولا تتغيّر بعده.</span>
+            <span>
+              {t(
+                'فهمت أن العملة تُثبَّت عند اعتماد متجري ولا تتغيّر بعده.',
+                "I understand the currency is locked when my shop is approved and can't change after that.",
+              )}
+            </span>
           </label>
 
           <button
@@ -194,19 +223,22 @@ export default function CurrencyPage() {
             disabled={!acknowledged}
             onClick={() => setConfirming(true)}
           >
-            اختر {currency.nameAr}
+            {t('اختر', 'Choose')} {nameOf(currency)}
             <Icon name="next" size={16} mirror />
           </button>
           <p className="vo-commit__hint">
             {data.settlementCurrencyChosen
-              ? `اخترت ${CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameAr ?? data.settlementCurrency} من قبل — تستطيع تغييرها حتى ترسل طلبك.`
+              ? t(
+                  `اخترت ${CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameAr ?? data.settlementCurrency} من قبل — تستطيع تغييرها حتى ترسل طلبك.`,
+                  `You chose ${CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameEn ?? data.settlementCurrency} earlier — you can change it until you submit your application.`,
+                )
               : acknowledged
-                ? 'تُسأل مرة واحدة فقط قبل التأكيد.'
-                : 'علّم «فهمت» لتتابع.'}
+                ? t('تُسأل مرة واحدة فقط قبل التأكيد.', "You'll be asked only once before confirming.")
+                : t('علّم «فهمت» لتتابع.', 'Tick “I understand” to continue.')}
           </p>
           <Link className="btn btn--secondary btn--block" href="/vendor/register">
             <Icon name="back" size={16} mirror />
-            رجوع إلى بيانات المتجر
+            {t('رجوع إلى بيانات المتجر', 'Back to shop details')}
           </Link>
         </section>
       </div>
@@ -219,12 +251,12 @@ export default function CurrencyPage() {
       >
         <div className="vo-dialog__head">
           <h2 className="vo-dialog__title" id="confirm-title">
-            تأكيد أخير
+            {t('تأكيد أخير', 'Final confirmation')}
           </h2>
           <button
             type="button"
             className="icon-btn icon-btn--sm"
-            aria-label="إغلاق"
+            aria-label={t('إغلاق', 'Close')}
             onClick={() => setConfirming(false)}
           >
             <Icon name="x" size={17} />
@@ -233,21 +265,24 @@ export default function CurrencyPage() {
         <div className="vo-dialog__body">
           <span className="badge badge--money vo-dialog__pill">
             <Icon name="wallet" size={15} />
-            {currency.nameAr} · {currency.symbol}
+            {nameOf(currency)} · {symbolOf(currency)}
           </span>
           <p>
-            ستكون <strong>{currency.nameAr}</strong> عملة متجرك. تستطيع تغييرها حتى ترسل طلبك، ويثبّتها اعتماد المتجر
-            فلا تتغيّر بعده.
+            {t('ستكون', 'Your shop currency will be')} <strong>{nameOf(currency)}</strong>{' '}
+            {t(
+              'عملة متجرك. تستطيع تغييرها حتى ترسل طلبك، ويثبّتها اعتماد المتجر فلا تتغيّر بعده.',
+              "— you can change it until you submit your application. Approval of your shop locks it, and it can't change after that.",
+            )}
           </p>
           {failure ? <Alert tone="danger">{failure}</Alert> : null}
         </div>
         <div className="vo-dialog__foot">
           <button className="btn btn--secondary" type="button" onClick={() => setConfirming(false)}>
-            رجوع
+            {t('رجوع', 'Back')}
           </button>
           <button className="btn btn--primary" type="button" disabled={busy} onClick={() => void confirm()}>
             {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
-            {busy ? 'جارٍ الحفظ…' : 'نعم، وتابع إلى المستندات'}
+            {busy ? t('جارٍ الحفظ…', 'Saving…') : t('نعم، وتابع إلى المستندات', 'Yes, continue to documents')}
           </button>
         </div>
       </dialog>

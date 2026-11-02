@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { ClearableInput, EmptyState } from '@/components/ui';
+import { DateField } from '@/components/date-field';
+import { useLocale, useT } from '@/components/locale';
+import { localized } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { media, useAction, useAdminData } from '@/lib/admin';
 import { when } from '@/lib/orders';
@@ -22,8 +25,10 @@ interface Banner {
 }
 
 const PLACEMENTS: Record<string, string> = { home_hero: 'أعلى الرئيسية', home_middle: 'وسط الرئيسية' };
+const PLACEMENTS_EN: Record<string, string> = { home_hero: 'Top of home page', home_middle: 'Middle of home page' };
 /** لافتات «أعلى صفحة التصنيف» القديمة — بلا صفحة تظهر فيها منذ صارت الفئات لكل متجر، فأُطفئت */
 const RETIRED: Record<string, string> = { category_top: 'أعلى صفحة التصنيف (أُلغي الموضع)' };
+const RETIRED_EN: Record<string, string> = { category_top: 'Top of category page (placement retired)' };
 
 /** المنتج درجةً أعلى في ترتيب المميّز */
 function up(ids: string[], id: string): string[] {
@@ -35,8 +40,8 @@ function up(ids: string[], id: string): string[] {
 }
 
 const FILTERS = [
-  { key: 'all', label: 'الكل', test: () => true },
-  { key: 'home', label: 'الرئيسية', test: (b: Banner) => b.placement.startsWith('home_') },
+  { key: 'all', label: 'الكل', en: 'All', test: () => true },
+  { key: 'home', label: 'الرئيسية', en: 'Home page', test: (b: Banner) => b.placement.startsWith('home_') },
 ];
 
 /**
@@ -48,6 +53,10 @@ const FILTERS = [
  * والاختيار من أحدث مئة منتج منشور، فما سواها يظهر بأول معرّفه ولا يُضاف.
  */
 export default function AdminStorefrontPage() {
+  const t = useT();
+  const locale = useLocale();
+  const placements = localized(locale, PLACEMENTS, PLACEMENTS_EN);
+  const retired = localized(locale, RETIRED, RETIRED_EN);
   const banners = useAdminData<Banner[]>('/admin/banners');
   const featured = useAdminData<{ id: string; nameAr: string | null; vendor: string | null; active: boolean }[]>('/admin/storefront/featured');
   const [productSearch, setProductSearch] = useState('');
@@ -63,14 +72,14 @@ export default function AdminStorefrontPage() {
     await act.run(async () => {
       const json = await api<{ imageKey: string; imageUrl: string }>('/admin/banners/image', { method: 'POST', file });
       setDraft((d) => ({ ...d, imageKey: json.imageKey, imageUrl: json.imageUrl }));
-    }, 'رُفعت الصورة.');
+    }, t('رُفعت الصورة.', 'Image uploaded.'));
   };
 
   const saveFeatured = (ids: string[]) =>
     act.run(async () => {
       await api('/admin/storefront/featured', { method: 'PUT', body: { productIds: ids } });
       featured.reload();
-    }, 'حُفظ المميّز.');
+    }, t('حُفظ المميّز.', 'Featured products saved.'));
 
   if (!banners.data) return <Loading error={banners.error} forbidden={banners.forbidden} />;
   const all = banners.data;
@@ -83,13 +92,16 @@ export default function AdminStorefrontPage() {
 
   return (
     <div className="ac2-page">
-      <AdminHeader title="الواجهة واللافتات" hint="اللافتات بمواضعها وجدولتها، والمنتجات المميّزة في الرئيسية." />
+      <AdminHeader
+        title={t('الواجهة واللافتات', 'Storefront and banners')}
+        hint={t('اللافتات بمواضعها وجدولتها، والمنتجات المميّزة في الرئيسية.', 'Banners with their placements and schedules, and the featured products on the home page.')}
+      />
 
       <div className="toolbar">
-        <div className="tabs" role="tablist" aria-label="تصفية اللافتات">
+        <div className="tabs" role="tablist" aria-label={t('تصفية اللافتات', 'Filter banners')}>
           {FILTERS.map((x) => (
             <button key={x.key} type="button" role="tab" className="tabs__tab" aria-selected={filter === x.key} onClick={() => setFilter(x.key)}>
-              {x.label}
+              {t(x.label, x.en)}
               <span className="tabs__count">{all.filter(x.test).length}</span>
             </button>
           ))}
@@ -97,11 +109,11 @@ export default function AdminStorefrontPage() {
         <div className="toolbar__end">
           <label className="input-icon ac2-search">
             <Icon name="search" size={15} />
-            <input type="search" className="field__control" placeholder="ابحث بعنوان اللافتة" aria-label="ابحث بعنوان اللافتة" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input type="search" className="field__control" placeholder={t('ابحث بعنوان اللافتة', 'Search by banner title')} aria-label={t('ابحث بعنوان اللافتة', 'Search by banner title')} value={q} onChange={(e) => setQ(e.target.value)} />
           </label>
           <button type="button" className="btn btn--primary" aria-expanded={showNew} onClick={() => setShowNew((v) => !v)}>
             <Icon name="plus" size={15} />
-            لافتة جديدة
+            {t('لافتة جديدة', 'New banner')}
           </button>
         </div>
       </div>
@@ -109,18 +121,23 @@ export default function AdminStorefrontPage() {
       <Feedback error={act.error} notice={act.notice} />
 
       {showNew ? (
-        <section className="card" aria-label="لافتة جديدة">
-          <h2 className="ac2-title">لافتة جديدة</h2>
-          <p className="ac2-hint">الصورة أولاً (600 بكسل عرضاً على الأقل)، ثم الموضع والعنوان والرابط والجدولة.</p>
+        <section className="card" aria-label={t('لافتة جديدة', 'New banner')}>
+          <h2 className="ac2-title">{t('لافتة جديدة', 'New banner')}</h2>
+          <p className="ac2-hint">
+            {t(
+              'الصورة أولاً (600 بكسل عرضاً على الأقل)، ثم الموضع والعنوان والرابط والجدولة.',
+              'Image first (at least 600 pixels wide), then placement, title, link, and schedule.',
+            )}
+          </p>
           <div className="ac2-form">
             <label className="field ac2-form__wide">
-              <span className="field__label">الصورة (600 بكسل عرضاً على الأقل)</span>
+              <span className="field__label">{t('الصورة (600 بكسل عرضاً على الأقل)', 'Image (at least 600 pixels wide)')}</span>
               <input type="file" accept="image/*" className="field__control" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
             </label>
             <label className="field">
-              <span className="field__label">الموضع</span>
+              <span className="field__label">{t('الموضع', 'Placement')}</span>
               <select className="field__control" value={draft.placement} onChange={(e) => setDraft({ ...draft, placement: e.target.value })}>
-                {Object.entries(PLACEMENTS).map(([k, v]) => (
+                {Object.entries(placements).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v}
                   </option>
@@ -128,25 +145,25 @@ export default function AdminStorefrontPage() {
               </select>
             </label>
             <label className="field">
-              <span className="field__label">العنوان</span>
+              <span className="field__label">{t('العنوان', 'Title')}</span>
               <ClearableInput className="field__control" value={draft.titleAr} onChange={(e) => setDraft({ ...draft, titleAr: e.target.value })} />
             </label>
             <label className="field">
-              <span className="field__label">الرابط (مسار داخلي)</span>
+              <span className="field__label">{t('الرابط (مسار داخلي)', 'Link (internal path)')}</span>
               <ClearableInput className="field__control num" dir="ltr" value={draft.linkUrl} onChange={(e) => setDraft({ ...draft, linkUrl: e.target.value })} />
             </label>
-            <label className="field">
-              <span className="field__label">يبدأ</span>
-              <input type="datetime-local" className="field__control" value={draft.startsAt} onChange={(e) => setDraft({ ...draft, startsAt: e.target.value })} />
-            </label>
-            <label className="field">
-              <span className="field__label">ينتهي</span>
-              <input type="datetime-local" className="field__control" value={draft.endsAt} onChange={(e) => setDraft({ ...draft, endsAt: e.target.value })} />
-            </label>
+            <div className="field">
+              <span className="field__label">{t('يبدأ', 'Starts')}</span>
+              <DateField withTime clearable label={t('يبدأ', 'Starts')} value={draft.startsAt} onChange={(v) => setDraft({ ...draft, startsAt: v })} />
+            </div>
+            <div className="field">
+              <span className="field__label">{t('ينتهي', 'Ends')}</span>
+              <DateField withTime clearable label={t('ينتهي', 'Ends')} value={draft.endsAt} onChange={(v) => setDraft({ ...draft, endsAt: v })} />
+            </div>
           </div>
           {draft.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={media(draft.imageUrl) ?? ''} alt="معاينة" className="ac2-preview-img" />
+            <img src={media(draft.imageUrl) ?? ''} alt={t('معاينة', 'Preview')} className="ac2-preview-img" />
           ) : null}
           <div className="ac2-form__actions">
             <button
@@ -170,10 +187,10 @@ export default function AdminStorefrontPage() {
                   });
                   setDraft({ ...draft, imageKey: '', imageUrl: '', titleAr: '' });
                   banners.reload();
-                }, 'نُشرت اللافتة.')
+                }, t('نُشرت اللافتة.', 'Banner published.'))
               }
             >
-              انشر اللافتة
+              {t('انشر اللافتة', 'Publish banner')}
             </button>
           </div>
         </section>
@@ -182,33 +199,35 @@ export default function AdminStorefrontPage() {
       {shown.length === 0 ? (
         <EmptyState
           icon="image"
-          title={all.length === 0 ? 'لا لافتات بعد' : 'لا لافتات بهذه التصفية'}
+          title={all.length === 0 ? t('لا لافتات بعد', 'No banners yet') : t('لا لافتات بهذه التصفية', 'No banners match this filter')}
           actions={
             all.length === 0 ? (
               <button type="button" className="btn btn--primary btn--sm" onClick={() => setShowNew(true)}>
                 <Icon name="plus" size={14} />
-                لافتة جديدة
+                {t('لافتة جديدة', 'New banner')}
               </button>
             ) : (
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => (setFilter('all'), setQ(''))}>
-                أزل التصفية
+                {t('أزل التصفية', 'Clear filters')}
               </button>
             )
           }
         >
-          {all.length === 0 ? 'ارفع صورة لافتة واختر موضعها في الواجهة.' : 'جرّب تصفية أخرى أو أضف لافتة.'}
+          {all.length === 0
+            ? t('ارفع صورة لافتة واختر موضعها في الواجهة.', 'Upload a banner image and choose its placement on the storefront.')
+            : t('جرّب تصفية أخرى أو أضف لافتة.', 'Try another filter or add a banner.')}
         </EmptyState>
       ) : (
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th scope="col">اللافتة</th>
-                <th scope="col">الموضع</th>
-                <th scope="col">الترتيب</th>
-                <th scope="col">الجدولة</th>
+                <th scope="col">{t('اللافتة', 'Banner')}</th>
+                <th scope="col">{t('الموضع', 'Placement')}</th>
+                <th scope="col">{t('الترتيب', 'Order')}</th>
+                <th scope="col">{t('الجدولة', 'Schedule')}</th>
                 <th scope="col" className="end">
-                  ظاهرة
+                  {t('ظاهرة', 'Visible')}
                 </th>
               </tr>
             </thead>
@@ -225,22 +244,22 @@ export default function AdminStorefrontPage() {
                       </span>
                     </span>
                   </td>
-                  <td className="ac2-muted-cell" data-label="الموضع">
-                    {PLACEMENTS[b.placement] ?? RETIRED[b.placement] ?? b.placement}
+                  <td className="ac2-muted-cell" data-label={t('الموضع', 'Placement')}>
+                    {placements[b.placement] ?? retired[b.placement] ?? b.placement}
                   </td>
-                  <td className="num" data-label="الترتيب">
+                  <td className="num" data-label={t('الترتيب', 'Order')}>
                     {b.sort}
                   </td>
-                  <td className="ac2-muted-cell" data-label="الجدولة">
-                    {b.startsAt ? when(b.startsAt) : 'الآن'} — {b.endsAt ? when(b.endsAt) : 'مفتوح'}
+                  <td className="ac2-muted-cell" data-label={t('الجدولة', 'Schedule')}>
+                    {b.startsAt ? when(b.startsAt, locale) : t('الآن', 'Now')} — {b.endsAt ? when(b.endsAt, locale) : t('مفتوح', 'Open-ended')}
                   </td>
-                  <td className="end" data-label="ظاهرة">
+                  <td className="end" data-label={t('ظاهرة', 'Visible')}>
                     <button
                       type="button"
                       role="switch"
                       className="ac2-switch"
                       aria-checked={b.isActive}
-                      aria-label={`إظهار ${b.titleAr ?? 'اللافتة'}`}
+                      aria-label={t(`إظهار ${b.titleAr ?? 'اللافتة'}`, `Show ${b.titleAr ?? 'banner'}`)}
                       disabled={act.busy}
                       onClick={() =>
                         void act.run(async () => {
@@ -260,14 +279,16 @@ export default function AdminStorefrontPage() {
         </div>
       )}
 
-      <section className="card card--flush" aria-label="المنتجات المميّزة في الرئيسية">
+      <section className="card card--flush" aria-label={t('المنتجات المميّزة في الرئيسية', 'Featured products on the home page')}>
         <header className="card__head">
-          <h2 className="ac2-title">المنتجات المميّزة في الرئيسية</h2>
-          <span className="ac2-hint">بالترتيب الظاهر — حتى 24 منتجاً منشوراً.</span>
+          <h2 className="ac2-title">{t('المنتجات المميّزة في الرئيسية', 'Featured products on the home page')}</h2>
+          <span className="ac2-hint">{t('بالترتيب الظاهر — حتى 24 منتجاً منشوراً.', 'In the order shown — up to 24 published products.')}</span>
           <span className="ac2-end num ac2-hint">{ids.length} / 24</span>
         </header>
         {rows.length === 0 ? (
-          <p className="ac2-section-empty">لا منتجات مميّزة بعد — أضف منتجاً منشوراً من القائمة أدناه.</p>
+          <p className="ac2-section-empty">
+            {t('لا منتجات مميّزة بعد — أضف منتجاً منشوراً من القائمة أدناه.', 'No featured products yet — add a published product from the list below.')}
+          </p>
         ) : (
           <ol className="ac2-rank">
             {rows.map((p, i) => (
@@ -276,13 +297,13 @@ export default function AdminStorefrontPage() {
                 <span className="ac2-rank__name">
                   {p.nameAr ?? p.id.slice(0, 8)}
                   {p.vendor ? <span className="ac2-hint"> — {p.vendor}</span> : null}
-                  {p.active ? null : <span className="badge badge--warning">لم يعد منشوراً — يسقط عند الحفظ</span>}
+                  {p.active ? null : <span className="badge badge--warning">{t('لم يعد منشوراً — يسقط عند الحفظ', 'No longer published — dropped on save')}</span>}
                 </span>
-                <button type="button" className="icon-btn icon-btn--sm" disabled={i === 0 || !p.active} onClick={() => void saveFeatured(up(ids, p.id))} aria-label="أعلى">
+                <button type="button" className="icon-btn icon-btn--sm" disabled={i === 0 || !p.active} onClick={() => void saveFeatured(up(ids, p.id))} aria-label={t('أعلى', 'Move up')}>
                   <Icon name="chev-down" size={14} className="ac2-flip" />
                 </button>
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => void saveFeatured(ids.filter((x) => x !== p.id))}>
-                  إزالة
+                  {t('إزالة', 'Remove')}
                 </button>
               </li>
             ))}
@@ -290,16 +311,25 @@ export default function AdminStorefrontPage() {
         )}
         <div className="card__body">
           <div className="ac2-pick">
-            <SearchBox value={productSearch} onChange={setProductSearch} placeholder="ابحث باسم المنتج أو المتجر" label="ابحث عن منتج منشور" className="ac2-search" />
-            <select className="field__control" value="" onChange={(e) => e.target.value && void saveFeatured([...ids, e.target.value])} aria-label="أضف منتجاً">
+            <SearchBox
+              value={productSearch}
+              onChange={setProductSearch}
+              placeholder={t('ابحث باسم المنتج أو المتجر', 'Search by product or shop name')}
+              label={t('ابحث عن منتج منشور', 'Search for a published product')}
+              className="ac2-search"
+            />
+            <select className="field__control" value="" onChange={(e) => e.target.value && void saveFeatured([...ids, e.target.value])} aria-label={t('أضف منتجاً', 'Add a product')}>
               <option value="">
                 {!products.data
                   ? '…'
                   : products.data.total > products.data.items.length
-                    ? `أضف منتجاً — أول ${products.data.items.length} من ${products.data.total}، ضيّق بالبحث`
+                    ? t(
+                        `أضف منتجاً — أول ${products.data.items.length} من ${products.data.total}، ضيّق بالبحث`,
+                        `Add a product — first ${products.data.items.length} of ${products.data.total}, narrow with search`,
+                      )
                     : products.data.total === 0
-                      ? 'لا منتج منشور بهذا البحث'
-                      : 'أضف منتجاً منشوراً…'}
+                      ? t('لا منتج منشور بهذا البحث', 'No published product matches this search')
+                      : t('أضف منتجاً منشوراً…', 'Add a published product…')}
               </option>
               {(products.data?.items ?? [])
                 .filter((p) => !ids.includes(p.id))

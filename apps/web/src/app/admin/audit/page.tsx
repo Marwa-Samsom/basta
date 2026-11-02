@@ -5,9 +5,11 @@ import { Fragment, Suspense, useState } from 'react';
 import { AdminHeader, Loading, MoreButton, SearchBox, SortButton } from '@/components/admin';
 import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { useLocale, useT } from '@/components/locale';
 import { ClearableInput, EmptyState } from '@/components/ui';
 import { useAdminList } from '@/lib/admin';
-import { ROLE_LABEL, STATUS_LABEL, type SubOrderStatus, when } from '@/lib/orders';
+import { localized, type Locale } from '@/lib/i18n';
+import { ROLE_LABEL, ROLE_LABEL_EN, labelOf, when } from '@/lib/orders';
 
 interface Entry {
   id: string;
@@ -50,6 +52,31 @@ const ENTITY_LABELS: Record<string, string> = {
   ShippingZone: 'منطقة شحن',
   Setting: 'إعداد',
   User: 'مستخدم',
+};
+
+const ENTITY_LABELS_EN: Record<string, string> = {
+  Order: 'Order',
+  SubOrder: 'Shop order',
+  Refund: 'Refund',
+  Dispute: 'Dispute',
+  Vendor: 'Shop',
+  VendorDocument: 'Shop document',
+  VendorBankAccount: 'Shop bank account',
+  PayoutRequest: 'Payout request',
+  Product: 'Product',
+  Attribute: 'Attribute',
+  Review: 'Review',
+  Coupon: 'Coupon',
+  Campaign: 'Campaign',
+  Banner: 'Banner',
+  CmsPage: 'Content page',
+  NotificationTemplate: 'Notification template',
+  CommissionRule: 'Commission rule',
+  TaxRate: 'Tax',
+  ExchangeRate: 'Exchange rate',
+  ShippingZone: 'Shipping zone',
+  Setting: 'Setting',
+  User: 'User',
 };
 
 /**
@@ -144,12 +171,99 @@ const ACTION_LABELS: Record<string, string> = {
   'vendor.suspend': 'تعليق متجر',
 };
 
-function actionLabel(code: string): string {
+const ACTION_LABELS_EN: Record<string, string> = {
+  'admin.bootstrap': 'Admin granted from terminal',
+  'admin.grant': 'Admin access granted',
+  'admin.ownership_transferred': 'Platform ownership transferred',
+  'admin.permissions': 'Admin permissions edited',
+  'admin.revoke': 'Admin access revoked',
+  'admin.totp_recovered': 'Admin verification recovered from terminal',
+  'attribute.archive': 'Attribute archived',
+  'attribute.create': 'Attribute added',
+  'attribute.delete': 'Attribute deleted',
+  'attribute.restore': 'Attribute restored',
+  'attribute.update': 'Attribute edited',
+  'attribute.value_add': 'Attribute value added',
+  'attribute.value_delete': 'Attribute value deleted',
+  'attribute.value_update': 'Attribute value corrected',
+  'auth.login': 'Sign-in',
+  'auth.login_failed': 'Failed sign-in attempt',
+  'auth.logout_all': 'Signed out of all devices',
+  'auth.password_change_failed': 'Failed password change attempt',
+  'auth.password_changed': 'Password changed',
+  'auth.password_reset': 'Password reset',
+  'auth.password_reset_requested': 'Password reset requested',
+  'auth.recovery_code_used': 'Signed in with a recovery code',
+  'auth.recovery_codes_regenerated': 'New recovery codes',
+  'auth.session_revoked': 'Session ended',
+  'auth.sessions_revoked_others': 'Other sessions ended',
+  'auth.totp_disabled': 'Two-step verification turned off',
+  'auth.totp_enabled': 'Two-step verification turned on',
+  'auth.totp_rotated': 'Two-step verification device changed',
+  'banner.save': 'Banner saved',
+  'campaign.create': 'Campaign created',
+  'campaign.pause': 'Campaign paused',
+  'campaign.products': 'Campaign products edited',
+  'campaign.resume': 'Campaign resumed',
+  'campaign.update': 'Campaign edited',
+  'commission.end': 'Commission rule ended',
+  'commission.set': 'Commission set',
+  'coupon.create': 'Coupon created',
+  'coupon.update': 'Coupon edited',
+  'customer.reinstate': 'Customer reinstated',
+  'customer.suspend': 'Customer suspended',
+  'customer.totp_reset': 'Customer verification reset',
+  'dispute.escalate': 'Dispute escalated',
+  'dispute.open': 'Dispute opened',
+  'dispute.resolve': 'Dispute resolved',
+  'fx.add': 'Exchange rate added',
+  'notification_template.review': 'Notification template reviewed',
+  'notification_template.save': 'Notification template saved',
+  'page.save': 'Content page saved',
+  'payment.late_capture': 'Late payment capture',
+  'payment.late_capture_refunded': 'Late-captured payment refunded',
+  'payment.transfer_confirmed': 'Transfer receipt confirmed',
+  'payout.approve': 'Payout request approved',
+  'payout.paid': 'Payout request paid',
+  'payout.reject': 'Payout request rejected',
+  'payout.request': 'Payout requested',
+  'product.reject': 'Product stopped',
+  'refund.transfer_recorded': 'Refund transfer recorded',
+  'review.published': 'Review published',
+  'review.rejected': 'Review hidden',
+  'setting.update': 'Setting edited',
+  'shipping_rate.create': 'Shipping rate added',
+  'shipping_rate.update': 'Shipping rate edited',
+  'shipping_zone.create': 'Shipping zone added',
+  'shipping_zone.delete': 'Shipping zone deleted',
+  'shipping_zone.update': 'Shipping zone edited',
+  'storefront.featured': 'Featured picks edited',
+  'tax.set': 'Tax set',
+  'user.email_verification_requested': 'Email confirmation requested',
+  'user.email_verified': 'Email confirmed',
+  'user.profile_update': 'Profile edited',
+  'user.register': 'Account registered',
+  'vendor.apply': 'Shop application',
+  'vendor.approve': 'Shop approved',
+  'vendor.bank_account_add': 'Bank account added',
+  'vendor.bank_account_archive': 'Bank account archived',
+  'vendor.bank_account_default': 'Default bank account set',
+  'vendor.bank_account_verify': 'Bank account verified',
+  'vendor.document.accept': 'Shop document accepted',
+  'vendor.document.reject': 'Shop document rejected',
+  'vendor.reinstate': 'Shop reinstated',
+  'vendor.reject': 'Shop rejected',
+  'vendor.submit': 'Shop submitted for review',
+  'vendor.suspend': 'Shop suspended',
+};
+
+function actionLabel(code: string, locale: Locale): string {
   if (code.startsWith('sub_order.')) {
-    const status = STATUS_LABEL[code.slice('sub_order.'.length) as SubOrderStatus];
-    if (status) return `طلب فرعي: ${status}`;
+    const to = code.slice('sub_order.'.length);
+    const status = labelOf(to, locale);
+    if (status !== to) return locale === 'en' ? `Sub-order: ${status}` : `طلب فرعي: ${status}`;
   }
-  return ACTION_LABELS[code] ?? code;
+  return localized(locale, ACTION_LABELS, ACTION_LABELS_EN)[code] ?? code;
 }
 
 /**
@@ -157,6 +271,10 @@ function actionLabel(code: string): string {
  * والقاعدة نفسها ترفض ذلك (ADR-005). التفاصيل: القيمة قبل وبعد.
  */
 function AuditInner() {
+  const t = useT();
+  const locale = useLocale();
+  const entityLabels = localized(locale, ENTITY_LABELS, ENTITY_LABELS_EN);
+  const roleLabel = localized(locale, ROLE_LABEL, ROLE_LABEL_EN);
   const params = useSearchParams();
   const [actor, setActor] = useState('');
   const [action, setAction] = useState('');
@@ -177,14 +295,31 @@ function AuditInner() {
 
   return (
     <div className="ac2-page">
-      <AdminHeader title="سجل التدقيق" hint={data ? `${data.total} سطر${entityId ? ' لهذا الكيان' : ''} — للقراءة فقط` : undefined} />
+      <AdminHeader
+        title={t('سجل التدقيق', 'Audit log')}
+        hint={
+          data
+            ? t(
+                `${data.total} سطر${entityId ? ' لهذا الكيان' : ''} — للقراءة فقط`,
+                `${data.total} ${data.total === 1 ? 'entry' : 'entries'}${entityId ? ' for this entity' : ''} — read-only`,
+              )
+            : undefined
+        }
+      />
 
       <div className="toolbar">
-        <SearchBox value={actor} onChange={setActor} placeholder="المنفّذ (بريد أو اسم)" label="المنفّذ" className="ac2-search" />
-        <ClearableInput className="field__control num ac2-search" placeholder="الإجراء، مثل payout." dir="ltr" value={action} onChange={(e) => setAction(e.target.value)} aria-label="الإجراء" />
-        <select className="field__control" value={entityType} onChange={(e) => setEntityType(e.target.value)} aria-label="نوع الكيان">
-          <option value="">كل الأنواع</option>
-          {Object.entries(ENTITY_LABELS).map(([code, label]) => (
+        <SearchBox value={actor} onChange={setActor} placeholder={t('المنفّذ (بريد أو اسم)', 'Actor (email or name)')} label={t('المنفّذ', 'Actor')} className="ac2-search" />
+        <ClearableInput
+          className="field__control num ac2-search"
+          placeholder={t('الإجراء، مثل payout.', 'Action, e.g. payout.')}
+          dir="ltr"
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          aria-label={t('الإجراء', 'Action')}
+        />
+        <select className="field__control" value={entityType} onChange={(e) => setEntityType(e.target.value)} aria-label={t('نوع الكيان', 'Entity type')}>
+          <option value="">{t('كل الأنواع', 'All types')}</option>
+          {Object.entries(entityLabels).map(([code, label]) => (
             <option key={code} value={code}>
               {label}
             </option>
@@ -194,7 +329,7 @@ function AuditInner() {
         {filtered ? (
           <span className="toolbar__end">
             <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setActor(''), setAction(''), setEntityType(''))}>
-              أزل التصفية
+              {t('أزل التصفية', 'Clear filter')}
             </button>
           </span>
         ) : null}
@@ -202,24 +337,29 @@ function AuditInner() {
 
       <div className="alert alert--info ac2-callout">
         <Icon name="shield" size={16} />
-        <span>سجلّ للقراءة فقط — لا يمكن تعديل أي سطر أو حذفه من أي حساب. اضغط سطراً لترى القيمة قبل وبعد.</span>
+        <span>
+          {t(
+            'سجلّ للقراءة فقط — لا يمكن تعديل أي سطر أو حذفه من أي حساب. اضغط سطراً لترى القيمة قبل وبعد.',
+            'A read-only log — no account can edit or delete any entry. Click an entry to see the value before and after.',
+          )}
+        </span>
       </div>
 
       {!data ? (
         <Loading error={error} forbidden={forbidden} />
       ) : data.items.length === 0 ? (
-        <EmptyState icon="shield" title={filtered ? 'لا سجلّات بهذه التصفية' : 'لا سجلّات بعد'}>
-          {filtered ? 'جرّب تصفية أخرى أو ابحث بكلمة أخرى.' : 'تظهر السطور هنا بمجرّد وجود نشاط.'}
+        <EmptyState icon="shield" title={filtered ? t('لا سجلّات بهذه التصفية', 'No entries match this filter') : t('لا سجلّات بعد', 'No entries yet')}>
+          {filtered ? t('جرّب تصفية أخرى أو ابحث بكلمة أخرى.', 'Try another filter or search for another word.') : t('تظهر السطور هنا بمجرّد وجود نشاط.', 'Entries appear here as soon as there is activity.')}
         </EmptyState>
       ) : (
         <div className="table-wrap">
           <table className="table ac2-audit">
             <thead>
               <tr>
-                <th scope="col">الوقت</th>
-                <th scope="col">المنفّذ</th>
-                <th scope="col">الإجراء</th>
-                <th scope="col">الكيان</th>
+                <th scope="col">{t('الوقت', 'Time')}</th>
+                <th scope="col">{t('المنفّذ', 'Actor')}</th>
+                <th scope="col">{t('الإجراء', 'Action')}</th>
+                <th scope="col">{t('الكيان', 'Entity')}</th>
                 <th scope="col" className="end">
                   IP
                 </th>
@@ -229,24 +369,24 @@ function AuditInner() {
               {list.items.map((e) => (
                 <Fragment key={e.id}>
                   <tr data-clickable="true" data-tone={open === e.id ? 'selected' : undefined} onClick={() => setOpen(open === e.id ? null : e.id)}>
-                    <td className="ac2-muted-cell">{when(e.createdAt)}</td>
-                    <td data-label="المنفّذ">
+                    <td className="ac2-muted-cell">{when(e.createdAt, locale)}</td>
+                    <td data-label={t('المنفّذ', 'Actor')}>
                       <span className="ac2-cell">
-                        <span className="ac2-cell__main">{e.actor?.fullName ?? (e.actorRole ? ROLE_LABEL[e.actorRole] : 'النظام')}</span>
+                        <span className="ac2-cell__main">{e.actor?.fullName ?? (e.actorRole ? roleLabel[e.actorRole] : t('النظام', 'System'))}</span>
                         {e.actor?.email ? <span className="ac2-cell__sub num">{e.actor.email}</span> : null}
                       </span>
                     </td>
-                    <td data-label="الإجراء">
+                    <td data-label={t('الإجراء', 'Action')}>
                       <span className="ac2-cell">
-                        <span className="ac2-cell__main">{actionLabel(e.action)}</span>
+                        <span className="ac2-cell__main">{actionLabel(e.action, locale)}</span>
                         <span className="ac2-cell__sub num" dir="ltr">
                           {e.action}
                         </span>
                       </span>
                     </td>
-                    <td data-label="الكيان">
+                    <td data-label={t('الكيان', 'Entity')}>
                       <span className="ac2-cell">
-                        <span className="small">{ENTITY_LABELS[e.entityType] ?? e.entityType}</span>
+                        <span className="small">{entityLabels[e.entityType] ?? e.entityType}</span>
                         {e.entityId ? <span className="ac2-cell__sub num">{e.entityId.slice(0, 12)}</span> : null}
                       </span>
                     </td>
@@ -259,11 +399,11 @@ function AuditInner() {
                       <td colSpan={5} data-label="">
                         <div className="ac2-diff">
                           <div className="ac2-diff__pane" data-side="before">
-                            <span className="ac2-eyebrow">قبل</span>
+                            <span className="ac2-eyebrow">{t('قبل', 'Before')}</span>
                             <pre dir="ltr">{JSON.stringify(e.beforeJson, null, 2) ?? '—'}</pre>
                           </div>
                           <div className="ac2-diff__pane" data-side="after">
-                            <span className="ac2-eyebrow">بعد</span>
+                            <span className="ac2-eyebrow">{t('بعد', 'After')}</span>
                             <pre dir="ltr">{JSON.stringify(e.afterJson, null, 2) ?? '—'}</pre>
                           </div>
                         </div>

@@ -56,9 +56,16 @@ describe('لا نقطتان بعد مبلغ ينتهي بنقطة', () => {
  */
 describe('صفحتا الإشعارات تعرفان كل إشعار داخل الموقع', () => {
   const page = (path: string) => readFileSync(join(__dirname, '../../../../../web/src/app', path), 'utf8');
-  // سطر الحدث في الخريطة بعنوان غير فارغ: «  code: { title: '…'»
+  // سطر الحدث في الخريطة بعنوان غير فارغ: «  code: { title: '…'»، أو باللغتين منذ زرّ اللغة
+  // «  code: { title: { ar: '…'» (لوحة البائع، 2 نوفمبر 2026)
   const titled = (src: string, code: string) =>
-    src.split('\n').some((line) => line.trimStart().startsWith(`${code}: { title: '`) && !line.includes(`title: ''`));
+    src.split('\n').some((line) => {
+      const l = line.trimStart();
+      return (
+        (l.startsWith(`${code}: { title: '`) && !l.includes(`title: ''`)) ||
+        (l.startsWith(`${code}: { title: { ar: '`) && !l.includes(`ar: ''`))
+      );
+    });
   const inApp = new Set(DEFAULT_TEMPLATES.filter((t) => t.channel === 'in_app').map((t) => t.code));
   const audienceOf = new Map(EVENTS.map((e) => [e.code, e.audience]));
 
