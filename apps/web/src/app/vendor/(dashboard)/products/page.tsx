@@ -346,15 +346,12 @@ function ProductsList() {
                   ? t(`لا نتائج تطابق «${search.trim()}»`, `No results for “${search.trim()}”`)
                   : t('لا منتجات تطابق هذا الفلتر.', 'No products match this filter.')}
               </p>
-              <p className="small muted">
-                {t('جرّب اسماً أو رمزاً أقصر، أو انتقل إلى تبويب آخر.', 'Try a shorter name or SKU, or switch to another tab.')}
-              </p>
               {/* النصيحة على قدر التصفية: «اسماً أقصر» للبحث وحده — كانت تظهر وتبويب «مؤرشف» فارغ ولا بحث */}
               <p className="small muted">
                 {search.trim()
                   ? t('جرّب اسماً أو رمزاً أقصر، أو انتقل إلى تبويب آخر.', 'Try a shorter name or code, or switch to another tab.')
                   : category
-                    ? 'جرّب فئة أخرى، أو انتقل إلى تبويب آخر.'
+                    ? t('جرّب فئة أخرى، أو انتقل إلى تبويب آخر.', 'Try another category, or switch to another tab.')
                     : t('لا منتج في هذه الحالة الآن — انتقل إلى تبويب آخر.', 'No products in this status right now — switch to another tab.')}
               </p>
               {search || category ? (
