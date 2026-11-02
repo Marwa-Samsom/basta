@@ -115,6 +115,9 @@ jobs:
       # لا .env في CI — اختبارات الواجهة البرمجية تُقلع التطبيق وتوقّع رموزاً فعلية
       JWT_ACCESS_SECRET: ci_access_secret_not_for_production_000
       JWT_REFRESH_SECRET: ci_refresh_secret_not_for_production_00
+      # روابط البريد كاملة بعنوان الموقع (site-links، #143) — كان في البناء وحده، فسقط
+      # اختبارها هنا أول ما رجعت الفحوصات بعد [skip ci] (2 نوفمبر 2026)
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
       NODE_ENV: test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

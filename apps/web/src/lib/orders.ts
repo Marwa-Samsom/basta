@@ -155,6 +155,16 @@ export function hoursAr(n: number, locale: Locale = 'ar'): string {
   return `${n} ساعة`;
 }
 
+/** عدد الأيام بتمييزه العربي: «يوم واحد»، «يومين»، «7 أيام»، «14 يوماً» */
+export function daysAr(n: number, locale: Locale = 'ar'): string {
+  // بالإنجليزية: «1 day»، «14 days»
+  if (locale === 'en') return `${n} ${n === 1 ? 'day' : 'days'}`;
+  if (n === 1) return 'يوم واحد';
+  if (n === 2) return 'يومين';
+  if (n >= 3 && n <= 10) return `${n} أيام`;
+  return `${n} يوماً`;
+}
+
 export const when = (iso: string | null | undefined, locale: Locale = 'ar'): string =>
   iso
     ? new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))

@@ -8,8 +8,8 @@ import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { ClearableInput, EmptyState } from '@/components/ui';
 import { useAdminList } from '@/lib/admin';
-import { localized } from '@/lib/i18n';
-import { ROLE_LABEL, ROLE_LABEL_EN, when } from '@/lib/orders';
+import { localized, type Locale } from '@/lib/i18n';
+import { ROLE_LABEL, ROLE_LABEL_EN, labelOf, when } from '@/lib/orders';
 
 interface Entry {
   id: string;
@@ -78,6 +78,193 @@ const ENTITY_LABELS_EN: Record<string, string> = {
   Setting: 'Setting',
   User: 'User',
 };
+
+/**
+ * الإجراءات بأسمائها العربية — الرمز يبقى تحته صغيراً لأن خانة «الإجراء» تبحث به. كانت عمود
+ * الإجراء رموزاً إنجليزية خاماً (product.reject بدل «إيقاف منتج»). كل إجراء جديد يكتبه الخادم
+ * يُضاف هنا، واختبار audit-labels.spec.ts يفشل إن نُسي. انتقالات الطلب الفرعي (`sub_order.<حالة>`)
+ * تأخذ اسم حالتها من STATUS_LABEL فلا تُكرَّر.
+ */
+const ACTION_LABELS: Record<string, string> = {
+  'admin.bootstrap': 'منح إدارة من الطرفية',
+  'admin.grant': 'منح صلاحية إدارة',
+  'admin.ownership_transferred': 'نقل ملكية المنصة',
+  'admin.permissions': 'تعديل صلاحيات مدير',
+  'admin.revoke': 'سحب الإدارة',
+  'admin.totp_recovered': 'استعادة تحقق مدير من الطرفية',
+  'attribute.archive': 'أرشفة خصيصة',
+  'attribute.create': 'إضافة خصيصة',
+  'attribute.delete': 'حذف خصيصة',
+  'attribute.restore': 'استرجاع خصيصة',
+  'attribute.update': 'تعديل خصيصة',
+  'attribute.value_add': 'إضافة قيمة لخصيصة',
+  'attribute.value_delete': 'حذف قيمة خصيصة',
+  'attribute.value_update': 'تصحيح قيمة خصيصة',
+  'auth.login': 'دخول',
+  'auth.login_failed': 'محاولة دخول فاشلة',
+  'auth.logout_all': 'خروج من كل الأجهزة',
+  'auth.password_change_failed': 'محاولة فاشلة لتغيير كلمة المرور',
+  'auth.password_changed': 'تغيير كلمة المرور',
+  'auth.password_reset': 'إعادة ضبط كلمة المرور',
+  'auth.password_reset_requested': 'طلب إعادة ضبط كلمة المرور',
+  'auth.recovery_code_used': 'دخول برمز استعادة',
+  'auth.recovery_codes_regenerated': 'رموز استعادة جديدة',
+  'auth.session_revoked': 'إنهاء جلسة',
+  'auth.sessions_revoked_others': 'إنهاء الجلسات الأخرى',
+  'auth.totp_disabled': 'إيقاف التحقق الثنائي',
+  'auth.totp_enabled': 'تفعيل التحقق الثنائي',
+  'auth.totp_rotated': 'تغيير جهاز التحقق الثنائي',
+  'banner.save': 'حفظ لافتة',
+  'campaign.create': 'إنشاء حملة',
+  'campaign.pause': 'إيقاف حملة مؤقتاً',
+  'campaign.products': 'تعديل منتجات حملة',
+  'campaign.resume': 'استئناف حملة',
+  'campaign.update': 'تعديل حملة',
+  'commission.end': 'إنهاء قاعدة عمولة',
+  'commission.set': 'ضبط عمولة',
+  'coupon.create': 'إنشاء كوبون',
+  'coupon.update': 'تعديل كوبون',
+  'customer.reinstate': 'إعادة تفعيل عميل',
+  'customer.suspend': 'تعليق عميل',
+  'customer.totp_reset': 'إعادة ضبط تحقق عميل',
+  'dispute.escalate': 'تصعيد نزاع',
+  'dispute.open': 'فتح نزاع',
+  'dispute.resolve': 'حسم نزاع',
+  'fx.add': 'إضافة سعر صرف',
+  'notification_template.review': 'مراجعة قالب إشعار',
+  'notification_template.save': 'حفظ قالب إشعار',
+  'page.save': 'حفظ صفحة محتوى',
+  'payment.late_capture': 'تحصيل دفعة متأخر',
+  'payment.late_capture_refunded': 'ردّ دفعة حُصّلت متأخرة',
+  'payment.transfer_confirmed': 'تأكيد استلام تحويل',
+  'payout.approve': 'اعتماد طلب سحب',
+  'payout.paid': 'صرف طلب سحب',
+  'payout.reject': 'رفض طلب سحب',
+  'payout.request': 'طلب سحب',
+  'product.reject': 'إيقاف منتج',
+  'refund.transfer_recorded': 'تسجيل تحويل استرداد',
+  'review.published': 'نشر تقييم',
+  'review.rejected': 'إخفاء تقييم',
+  'setting.update': 'تعديل إعداد',
+  'shipping_rate.create': 'إضافة سعر شحن',
+  'shipping_rate.update': 'تعديل سعر شحن',
+  'shipping_zone.create': 'إضافة منطقة شحن',
+  'shipping_zone.delete': 'حذف منطقة شحن',
+  'shipping_zone.update': 'تعديل منطقة شحن',
+  'storefront.featured': 'تعديل المختارات',
+  'tax.set': 'ضبط ضريبة',
+  'user.email_verification_requested': 'طلب تأكيد البريد',
+  'user.email_verified': 'تأكيد البريد',
+  'user.profile_update': 'تعديل الملف الشخصي',
+  'user.register': 'تسجيل حساب',
+  'vendor.apply': 'طلب فتح متجر',
+  'vendor.approve': 'اعتماد متجر',
+  'vendor.bank_account_add': 'إضافة حساب بنكي',
+  'vendor.bank_account_archive': 'أرشفة حساب بنكي',
+  'vendor.bank_account_default': 'تعيين الحساب البنكي الافتراضي',
+  'vendor.bank_account_verify': 'توثيق حساب بنكي',
+  'vendor.document.accept': 'قبول وثيقة متجر',
+  'vendor.document.reject': 'رفض وثيقة متجر',
+  'vendor.reinstate': 'إعادة تفعيل متجر',
+  'vendor.reject': 'رفض متجر',
+  'vendor.submit': 'إرسال المتجر للمراجعة',
+  'vendor.suspend': 'تعليق متجر',
+};
+
+const ACTION_LABELS_EN: Record<string, string> = {
+  'admin.bootstrap': 'Admin granted from terminal',
+  'admin.grant': 'Admin access granted',
+  'admin.ownership_transferred': 'Platform ownership transferred',
+  'admin.permissions': 'Admin permissions edited',
+  'admin.revoke': 'Admin access revoked',
+  'admin.totp_recovered': 'Admin verification recovered from terminal',
+  'attribute.archive': 'Attribute archived',
+  'attribute.create': 'Attribute added',
+  'attribute.delete': 'Attribute deleted',
+  'attribute.restore': 'Attribute restored',
+  'attribute.update': 'Attribute edited',
+  'attribute.value_add': 'Attribute value added',
+  'attribute.value_delete': 'Attribute value deleted',
+  'attribute.value_update': 'Attribute value corrected',
+  'auth.login': 'Sign-in',
+  'auth.login_failed': 'Failed sign-in attempt',
+  'auth.logout_all': 'Signed out of all devices',
+  'auth.password_change_failed': 'Failed password change attempt',
+  'auth.password_changed': 'Password changed',
+  'auth.password_reset': 'Password reset',
+  'auth.password_reset_requested': 'Password reset requested',
+  'auth.recovery_code_used': 'Signed in with a recovery code',
+  'auth.recovery_codes_regenerated': 'New recovery codes',
+  'auth.session_revoked': 'Session ended',
+  'auth.sessions_revoked_others': 'Other sessions ended',
+  'auth.totp_disabled': 'Two-step verification turned off',
+  'auth.totp_enabled': 'Two-step verification turned on',
+  'auth.totp_rotated': 'Two-step verification device changed',
+  'banner.save': 'Banner saved',
+  'campaign.create': 'Campaign created',
+  'campaign.pause': 'Campaign paused',
+  'campaign.products': 'Campaign products edited',
+  'campaign.resume': 'Campaign resumed',
+  'campaign.update': 'Campaign edited',
+  'commission.end': 'Commission rule ended',
+  'commission.set': 'Commission set',
+  'coupon.create': 'Coupon created',
+  'coupon.update': 'Coupon edited',
+  'customer.reinstate': 'Customer reinstated',
+  'customer.suspend': 'Customer suspended',
+  'customer.totp_reset': 'Customer verification reset',
+  'dispute.escalate': 'Dispute escalated',
+  'dispute.open': 'Dispute opened',
+  'dispute.resolve': 'Dispute resolved',
+  'fx.add': 'Exchange rate added',
+  'notification_template.review': 'Notification template reviewed',
+  'notification_template.save': 'Notification template saved',
+  'page.save': 'Content page saved',
+  'payment.late_capture': 'Late payment capture',
+  'payment.late_capture_refunded': 'Late-captured payment refunded',
+  'payment.transfer_confirmed': 'Transfer receipt confirmed',
+  'payout.approve': 'Payout request approved',
+  'payout.paid': 'Payout request paid',
+  'payout.reject': 'Payout request rejected',
+  'payout.request': 'Payout requested',
+  'product.reject': 'Product stopped',
+  'refund.transfer_recorded': 'Refund transfer recorded',
+  'review.published': 'Review published',
+  'review.rejected': 'Review hidden',
+  'setting.update': 'Setting edited',
+  'shipping_rate.create': 'Shipping rate added',
+  'shipping_rate.update': 'Shipping rate edited',
+  'shipping_zone.create': 'Shipping zone added',
+  'shipping_zone.delete': 'Shipping zone deleted',
+  'shipping_zone.update': 'Shipping zone edited',
+  'storefront.featured': 'Featured picks edited',
+  'tax.set': 'Tax set',
+  'user.email_verification_requested': 'Email confirmation requested',
+  'user.email_verified': 'Email confirmed',
+  'user.profile_update': 'Profile edited',
+  'user.register': 'Account registered',
+  'vendor.apply': 'Shop application',
+  'vendor.approve': 'Shop approved',
+  'vendor.bank_account_add': 'Bank account added',
+  'vendor.bank_account_archive': 'Bank account archived',
+  'vendor.bank_account_default': 'Default bank account set',
+  'vendor.bank_account_verify': 'Bank account verified',
+  'vendor.document.accept': 'Shop document accepted',
+  'vendor.document.reject': 'Shop document rejected',
+  'vendor.reinstate': 'Shop reinstated',
+  'vendor.reject': 'Shop rejected',
+  'vendor.submit': 'Shop submitted for review',
+  'vendor.suspend': 'Shop suspended',
+};
+
+function actionLabel(code: string, locale: Locale): string {
+  if (code.startsWith('sub_order.')) {
+    const to = code.slice('sub_order.'.length);
+    const status = labelOf(to, locale);
+    if (status !== to) return locale === 'en' ? `Sub-order: ${status}` : `طلب فرعي: ${status}`;
+  }
+  return localized(locale, ACTION_LABELS, ACTION_LABELS_EN)[code] ?? code;
+}
 
 /**
  * AD-24 — سجل التدقيق. للقراءة وحدها: لا زرّ تعديل ولا حذف في أي مكان،
@@ -189,8 +376,13 @@ function AuditInner() {
                         {e.actor?.email ? <span className="ac2-cell__sub num">{e.actor.email}</span> : null}
                       </span>
                     </td>
-                    <td className="num ac2-code" data-label={t('الإجراء', 'Action')}>
-                      {e.action}
+                    <td data-label={t('الإجراء', 'Action')}>
+                      <span className="ac2-cell">
+                        <span className="ac2-cell__main">{actionLabel(e.action, locale)}</span>
+                        <span className="ac2-cell__sub num" dir="ltr">
+                          {e.action}
+                        </span>
+                      </span>
                     </td>
                     <td data-label={t('الكيان', 'Entity')}>
                       <span className="ac2-cell">

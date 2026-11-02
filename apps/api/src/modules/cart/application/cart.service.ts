@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { formatIn } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { settingNumber } from '../../../common/setting-number';
 import { DisplayCurrencyService, PricingService, type Quote, type QuoteAddress } from '../../pricing/public';
 
 export const MAX_QTY_PER_LINE = 50;
@@ -391,6 +392,7 @@ export class CartService {
 
   private async expiryHours(): Promise<number> {
     const row = await this.prisma.setting.findUnique({ where: { key: 'cart_expiry_hours' } });
-    return Number(row?.valueJson ?? 168);
+    // نصٌّ تالف في القاعدة كان NaN فيفشل إنشاء كل سلة وتمديدها (2 نوفمبر 2026)
+    return settingNumber(row?.valueJson, 168, 1);
   }
 }
