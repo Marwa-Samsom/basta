@@ -1,20 +1,24 @@
 /**
- * الخروج من قفل الإدارة — admin:recover و admin:transfer-owner.
+ * الخروج من قفل الإدارة — admin:recover و admin:transfer-owner، والمدير الأول admin:grant.
  *
  * ما يُثبَت:
  *   · مدير أضاع الهاتف والرموز معاً: يُمسح تحققه ورموزه، وتُنهى جلساته، ويُكتب في
  *     التدقيق ويُبلَّغ — ودخوله التالي بكلمة المرور يُلزمه بتفعيل التحقق من جديد
  *   · لا يمسّ حساب عميل، ولا يعمل بلا سبب
  *   · الملكية تنتقل إلى مدير بتحقق مفعَّل وحده، والمالك يبقى واحداً
+ *   · admin:grant يمنح الحساب النشط وحده: الموقوف يُرفض من الأمر نفسه ولا يتغيّر شيء
  *
  * اختبار الملكية داخل معاملة يُتراجع عنها: المالك واحد في القاعدة كلها، واختبارات
  * أخرى تقرؤه في اللحظة نفسها.
  */
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { PrismaClient } from '@prisma/client';
+import { spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { RecoveryRefused, recoverAdminTotp, transferOwnership } from './application/owner-recovery';
+import { RecoveryRefused, grantAdmin, recoverAdminTotp, transferOwnership } from './application/owner-recovery';
+import { PERMISSION_CODES } from './domain/permissions';
 
 const prisma = new PrismaClient();
 let app: NestFastifyApplication;
@@ -148,5 +152,53 @@ describe('admin:transfer-owner — الملكية تنتقل ولا تضيع', (
     // لم يُلتزم شيء: المالك الأصلي باقٍ
     expect((await prisma.user.findUniqueOrThrow({ where: { id: heir.id } })).isPlatformOwner).toBe(false);
     if (original) expect((await prisma.user.findUniqueOrThrow({ where: { id: original.id } })).isPlatformOwner).toBe(true);
+  });
+});
+
+// كان الأمر يقرأ حالة الحساب ولا يفحصها: الموقوف يُمنح كل الصلاحيات (ومالكاً إن لم يوجد)
+// ويعمل بها لحظة يُعاد تفعيله (ACFG-101، 1 نوفمبر 2026)
+describe('admin:grant — المدير الأول، ولا إدارة لحساب موقوف', () => {
+  const API = join(__dirname, '../../..');
+  const TSX = join(API, '../../node_modules/tsx/dist/cli.mjs');
+
+  it('الأمر نفسه يرفض الحساب المعلَّق برمز 1، ولا دور ولا صلاحيات ولا ملكية ولا تدقيق', async () => {
+    if (!dbUp) return;
+    const suspended = await makeUser('grant-suspended', { admin: false, totp: false });
+    await prisma.user.update({ where: { id: suspended.id }, data: { status: 'suspended' } });
+    try {
+      const run = spawnSync(process.execPath, [TSX, 'scripts/grant-admin.ts', suspended.email!], { cwd: API, env: process.env, encoding: 'utf8' });
+      expect(run.status, run.stdout + run.stderr).toBe(1);
+      expect(run.stderr).toContain('الحساب غير نشط (معلَّق)');
+      expect(await prisma.userRole.count({ where: { userId: suspended.id, role: 'admin' } })).toBe(0);
+      expect(await prisma.adminPermission.count({ where: { userId: suspended.id } })).toBe(0);
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: suspended.id } })).isPlatformOwner).toBe(false);
+      expect(await prisma.auditLog.count({ where: { action: 'admin.bootstrap', entityId: suspended.id } })).toBe(0);
+    } finally {
+      // على الكود القديم يُمنح — لا يبقى حساب اختبار بإدارة أو ملكية على قاعدة التطوير
+      await prisma.adminPermission.deleteMany({ where: { userId: suspended.id } });
+      await prisma.userRole.deleteMany({ where: { userId: suspended.id, role: 'admin' } });
+      await prisma.user.update({ where: { id: suspended.id }, data: { isPlatformOwner: false } });
+    }
+  }, 60_000);
+
+  it('الحساب النشط: كل الصلاحيات، والإعادة لا تكرّرها وتُدقَّق، والمالك يبقى واحداً — داخل معاملة يُتراجع عنها', async () => {
+    if (!dbUp) return;
+    const user = await makeUser('grant-active', { admin: false, totp: false });
+    const owner = await prisma.user.findFirst({ where: { isPlatformOwner: true }, select: { id: true } });
+
+    const outcome = await prisma
+      .$transaction(async (tx) => {
+        expect((await grantAdmin(tx, { email: user.email! })).madeOwner).toBe(!owner);
+        expect((await grantAdmin(tx, { email: ` ${user.email!.toUpperCase()} ` })).madeOwner).toBe(false);
+        expect(await tx.userRole.count({ where: { userId: user.id, role: 'admin' } })).toBe(1);
+        expect(await tx.adminPermission.count({ where: { userId: user.id } })).toBe(PERMISSION_CODES.length);
+        expect(await tx.auditLog.count({ where: { action: 'admin.bootstrap', entityId: user.id } })).toBe(2);
+        expect(await tx.user.count({ where: { isPlatformOwner: true } })).toBe(1);
+        await expect(grantAdmin(tx, { email: `ghost.${SUFFIX}@basta.test` })).rejects.toThrow(/أنشئه من \/register أولاً/);
+        throw new Rollback();
+      })
+      .catch((e: unknown) => e);
+    expect(outcome).toBeInstanceOf(Rollback);
+    expect(await prisma.userRole.count({ where: { userId: user.id, role: 'admin' } })).toBe(0);
   });
 });
