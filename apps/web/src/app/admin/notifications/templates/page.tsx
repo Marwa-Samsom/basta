@@ -6,7 +6,17 @@ import { Icon, type IconName } from '@/components/icons';
 import { ClearableInput, TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAction, useAdminData } from '@/lib/admin';
+import { counted, type Counted } from '@/lib/arabic-count';
 import { when } from '@/lib/orders';
+
+/** «متغيّر واحد مجهول…»، «متغيّران مجهولان…»، «3 متغيّرات مجهولة…» — لا «3 متغيّر مجهول» */
+const UNKNOWN: Counted = {
+  one: 'متغيّر واحد مجهول لن يُستبدل',
+  two: 'متغيّران مجهولان لن يُستبدلا',
+  plural: '# متغيّرات مجهولة لن تُستبدل',
+  accusative: '# متغيّراً مجهولاً لن يُستبدل',
+  genitive: '# متغيّر مجهول لن يُستبدل',
+};
 
 interface Template {
   channel: string;
@@ -289,7 +299,7 @@ function Editor({ event, channel, template, onSaved }: { event: Matrix['events']
             )}
           </div>
         </div>
-        <p className={unknown ? 'ac2-fine ac2-note-danger' : 'ac2-fine'}>{unknown ? `${unknown} متغيّر مجهول لن يُستبدل عند الإرسال.` : 'كل المتغيّرات معروفة وستُستبدل ببيانات الطلب.'}</p>
+        <p className={unknown ? 'ac2-fine ac2-note-danger' : 'ac2-fine'}>{unknown ? `${counted(unknown, UNKNOWN)} عند الإرسال.` : 'كل المتغيّرات معروفة وستُستبدل ببيانات الطلب.'}</p>
       </section>
     </div>
   );

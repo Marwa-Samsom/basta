@@ -6,7 +6,11 @@ import { AdminHeader, Empty, Loading, MoreButton, SearchBox, SortButton, Tabs } 
 import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { TONE, useAdminList, VENDOR_STATUS } from '@/lib/admin';
+import { STORES, counted, type Counted } from '@/lib/arabic-count';
 import { when } from '@/lib/orders';
+
+/** «طلب واحد ينتظر»، «طلبان ينتظران»، «4 طلبات تنتظر»، «15 طلباً ينتظر» — لا «15 طلب ينتظر» */
+const QUEUE: Counted = { one: 'طلب واحد ينتظر', two: 'طلبان ينتظران', plural: '# طلبات تنتظر', accusative: '# طلباً ينتظر', genitive: '# طلب ينتظر' };
 
 interface Item {
   id: string;
@@ -56,7 +60,7 @@ export default function AdminVendorsPage() {
     <div className="ao-page">
       <AdminHeader
         title="المتاجر"
-        count={data ? (queue ? `${data.total} طلب ينتظر` : `${data.total} متجر`) : undefined}
+        count={data ? counted(data.total, queue ? QUEUE : STORES) : undefined}
         hint={queue ? 'الأقدم أولاً — الانتظار فوق يومي عمل يظهر بالأحمر.' : 'كل المتاجر بحالاتها.'}
       />
       <div className="toolbar">
