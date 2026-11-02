@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { writeErrorLog } from '../../../common/observability/error-log';
+import { everyAfterBoot } from '../../../common/periodic';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/public';
 import { acceptBy, acceptanceDueSince } from '../domain/acceptance';
@@ -57,7 +58,7 @@ const DRIFT_LABELS: Readonly<Record<string, string>> = {
 @Injectable()
 export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger('AdminAlerts');
-  private timer: NodeJS.Timeout | null = null;
+  private stop: (() => void) | null = null;
   private running = false;
   private lastDriftAt = 0;
 
@@ -69,12 +70,11 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
 
   onApplicationBootstrap(): void {
     if (process.env['VITEST'] || process.env['DISABLE_SCHEDULERS'] === 'true') return;
-    this.timer = setInterval(() => void this.tick(), EVERY_TEN_MINUTES);
-    this.timer.unref();
+    this.stop = everyAfterBoot(() => void this.tick(), EVERY_TEN_MINUTES);
   }
 
   onModuleDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
+    this.stop?.();
   }
 
   async tick(now: Date = new Date()): Promise<void> {

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConflictError, NotFoundError } from '../../../common/errors/domain-error';
+import { everyAfterBoot } from '../../../common/periodic';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { OrderLifecycleService } from '../../orders/public';
 import {
@@ -29,7 +30,7 @@ const EVERY_TEN_MINUTES = 600_000;
 @Injectable()
 export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger('Tracking');
-  private timer: NodeJS.Timeout | null = null;
+  private stop: (() => void) | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -40,12 +41,11 @@ export class TrackingService implements OnApplicationBootstrap, OnModuleDestroy 
   onApplicationBootstrap(): void {
     // لا شركة = لا مهمة تعلّم شحنة مستلمة لم يسلّمها أحد
     if (!this.carrier || process.env['VITEST'] || process.env['DISABLE_SCHEDULERS'] === 'true') return;
-    this.timer = setInterval(() => void this.advanceAll().catch((e) => this.logger.error(e)), EVERY_TEN_MINUTES);
-    this.timer.unref();
+    this.stop = everyAfterBoot(() => void this.advanceAll().catch((e) => this.logger.error(e)), EVERY_TEN_MINUTES);
   }
 
   onModuleDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
+    this.stop?.();
   }
 
   carriers(): { code: string; nameAr: string }[] {
