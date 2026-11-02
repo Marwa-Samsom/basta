@@ -70,13 +70,17 @@ describe('لغة الردّ تتبع زرّ اللغة', () => {
     if (!dbUp) return;
     const ar = (await get('/storefront/products?pageSize=5&currency=JOD')).json();
     const en = (await get('/storefront/products?pageSize=5&currency=JOD&lang=en')).json();
-    if (ar.items.length === 0) return;
-    expect(en.items[0].price.minorUnits).toBe(ar.items[0].price.minorUnits);
-    expect(ar.items[0].price.formatted).toMatch(ARABIC);
-    expect(en.items[0].price.formatted).toMatch(/JOD/);
-    expect(en.items[0].price.formatted).not.toMatch(ARABIC);
+    // المنتج نفسه بمعرّفه: ملفات أخرى تنشئ منتجات بين الطلبين فيتغيّر أوّل القائمة
+    type Item = { id: string; nameAr: string; price: { minorUnits: string; formatted: string }; vendor: { nameAr: string } };
+    const a = (ar.items as Item[]).find((x) => (en.items as Item[]).some((y) => y.id === x.id));
+    if (!a) return;
+    const e = (en.items as Item[]).find((y) => y.id === a.id)!;
+    expect(e.price.minorUnits).toBe(a.price.minorUnits);
+    expect(a.price.formatted).toMatch(ARABIC);
+    expect(e.price.formatted).toMatch(/JOD/);
+    expect(e.price.formatted).not.toMatch(ARABIC);
     // اسم المنتج والمتجر بيانات البائع — لا تُمسّ
-    expect(en.items[0].nameAr).toBe(ar.items[0].nameAr);
-    expect(en.items[0].vendor.nameAr).toBe(ar.items[0].vendor.nameAr);
+    expect(e.nameAr).toBe(a.nameAr);
+    expect(e.vendor.nameAr).toBe(a.vendor.nameAr);
   });
 });
