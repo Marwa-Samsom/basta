@@ -6,6 +6,7 @@ import { AdminHeader, Empty, Loading, MoreButton, SearchBox, SortButton, Tabs } 
 import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { media, PRODUCT_STATUS, TONE, useAdminList } from '@/lib/admin';
+import { PRODUCTS, counted } from '@/lib/arabic-count';
 import { money, when } from '@/lib/orders';
 
 interface Item {
@@ -37,7 +38,7 @@ export default function AdminProductsPage() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="المنتجات" count={data ? `${data.total} منتج` : undefined} hint="البائع ينشر بلا مراجعة. افتح أي منتج لتوقفه إن خالف — السبب يصل البائع حرفياً." />
+      <AdminHeader title="المنتجات" count={data ? counted(data.total, PRODUCTS) : undefined} hint="البائع ينشر بلا مراجعة. افتح أي منتج لتوقفه إن خالف — السبب يصل البائع حرفياً." />
       <div className="toolbar">
         <Tabs value={status} onChange={setStatus} label="حالة المنتج" options={['active', 'rejected', 'draft', 'archived'].map((k) => ({ key: k, label: PRODUCT_STATUS[k]! }))} />
         <div className="toolbar__end">

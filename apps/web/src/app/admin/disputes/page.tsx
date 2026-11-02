@@ -7,6 +7,7 @@ import { Icon } from '@/components/icons';
 import { TextArea } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAction, useAdminData, useAdminList } from '@/lib/admin';
+import { DISPUTES, counted } from '@/lib/arabic-count';
 import { DISPUTE_REASONS, DISPUTE_STATUS, ROLE_LABEL, labelOf, when } from '@/lib/orders';
 
 interface Row {
@@ -50,7 +51,7 @@ export default function AdminDisputesPage() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="النزاعات" count={data ? `${data.total} نزاع` : undefined} hint="الرصيد مجمَّد ما دام النزاع مفتوحاً." />
+      <AdminHeader title="النزاعات" count={data ? counted(data.total, DISPUTES) : undefined} hint="الرصيد مجمَّد ما دام النزاع مفتوحاً." />
       <div className="toolbar">
         <Tabs
           value={status}

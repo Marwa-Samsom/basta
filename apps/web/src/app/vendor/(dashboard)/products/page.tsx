@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Alert, EmptyState, MoreButton, PageHead, SortButton, Spinner, type SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
+import { PRODUCTS, VARIANTS, counted } from '@/lib/arabic-count';
 import { ProductThumb } from '@/components/product-editor';
 import {
   num,
@@ -213,8 +214,8 @@ function ProductsList() {
         count={
           total !== undefined
             ? page && filtered
-              ? `${num(total)} منتج · ${num(page.total)} معروض`
-              : `${num(total)} منتج`
+              ? `${counted(total, PRODUCTS)} · المعروض ${num(page.total)}`
+              : counted(total, PRODUCTS)
             : undefined
         }
         actions={
@@ -322,7 +323,14 @@ function ProductsList() {
               <p className="vp-nomatch__title">
                 {search.trim() ? `لا نتائج تطابق «${search.trim()}»` : 'لا منتجات تطابق هذا الفلتر.'}
               </p>
-              <p className="small muted">جرّب اسماً أو رمزاً أقصر، أو انتقل إلى تبويب آخر.</p>
+              {/* النصيحة على قدر التصفية: «اسماً أقصر» للبحث وحده — كانت تظهر وتبويب «مؤرشف» فارغ ولا بحث */}
+              <p className="small muted">
+                {search.trim()
+                  ? 'جرّب اسماً أو رمزاً أقصر، أو انتقل إلى تبويب آخر.'
+                  : category
+                    ? 'جرّب فئة أخرى، أو انتقل إلى تبويب آخر.'
+                    : 'لا منتج في هذه الحالة الآن — انتقل إلى تبويب آخر.'}
+              </p>
               {search || category ? (
                 <button
                   type="button"
@@ -363,13 +371,7 @@ function ProductsList() {
                             <span className="vp-prod__name">{p.nameAr}</span>
                             <span className="vp-prod__sub">
                               {p.vendorCategory ? `${p.vendorCategory.nameAr} · ` : ''}
-                              {p.variantCount > 1 ? (
-                                <>
-                                  <span className="num">{num(p.variantCount)}</span> متغيّرات
-                                </>
-                              ) : (
-                                'بلا متغيّرات'
-                              )}
+                              {p.variantCount > 1 ? counted(p.variantCount, VARIANTS) : 'بلا متغيّرات'}
                             </span>
                           </span>
                         </Link>
@@ -436,7 +438,7 @@ function ProductsList() {
             ) : (
               <div className="card__foot vp-foot">
                 <span className="small muted">
-                  <span className="num">{num(items.length)}</span> من <span className="num">{num(page.total)}</span> منتجاً
+                  <span className="num">{num(items.length)}</span> من {counted(page.total, { ...PRODUCTS, two: 'منتجين' })}
                 </span>
               </div>
             )

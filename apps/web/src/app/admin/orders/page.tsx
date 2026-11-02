@@ -8,6 +8,7 @@ import { Icon } from '@/components/icons';
 import { Alert } from '@/components/ui';
 import { api } from '@/lib/api';
 import { PARENT_STATUS, useAction, useAdminData, useAdminList } from '@/lib/admin';
+import { ORDERS, counted } from '@/lib/arabic-count';
 import { historyReason, labelOf, money, PAYMENT_STATUS, REFUND_STATUS, toneOf, when, type SubOrderView } from '@/lib/orders';
 
 interface Row {
@@ -89,7 +90,7 @@ function OrdersInner() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="الطلبات" count={data ? `${data.total} طلب` : undefined} />
+      <AdminHeader title="الطلبات" count={data ? counted(data.total, ORDERS) : undefined} />
       <div className="toolbar">
         <Tabs
           value={status}

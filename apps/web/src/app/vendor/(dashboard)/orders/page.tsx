@@ -5,7 +5,17 @@ import { useState } from 'react';
 import { Alert, EmptyState, MoreButton, PageHead, SortButton, type SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { useAdminList } from '@/lib/admin';
+import { counted, type Counted } from '@/lib/arabic-count';
 import { hoursAr, labelOf, money, toneOf, when } from '@/lib/orders';
+
+/** «طلب واحد ينتظر قبولك»، «طلبان ينتظران قبولك»، «4 طلبات تنتظر قبولك»، «11 طلباً ينتظر قبولك» */
+const WAITING: Counted = {
+  one: 'طلب واحد ينتظر قبولك',
+  two: 'طلبان ينتظران قبولك',
+  plural: '# طلبات تنتظر قبولك',
+  accusative: '# طلباً ينتظر قبولك',
+  genitive: '# طلب ينتظر قبولك',
+};
 
 interface Row {
   id: string;
@@ -86,7 +96,7 @@ export default function VendorOrdersPage() {
       />
 
       {waiting > 0 ? (
-        <Alert tone="warning" title={`${waiting} ${waiting === 1 ? 'طلب ينتظر' : 'طلبات تنتظر'} قبولك`}>
+        <Alert tone="warning" title={counted(waiting, WAITING)}>
           {/* المهلة كما تضبطها الإدارة لا «48» ثابتة (VOPS-019) */}
           الطلب الذي لا يُقبل خلال {hoursAr(data?.acceptanceHours ?? 48)} يُلغى آلياً ويُردّ مال المشتري.
         </Alert>
