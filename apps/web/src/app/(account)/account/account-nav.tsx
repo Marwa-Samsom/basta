@@ -8,6 +8,7 @@ import { LogoutButton } from '@/components/logout-button';
 import { NotificationBell } from '@/components/notification-bell';
 import { api, session } from '@/lib/api';
 import { NOTIFICATIONS_CHANGED } from '@/lib/addresses';
+import { useReturnTick } from '@/lib/fresh';
 
 /** ترتيب ملف التصميم: الطلبات، ثم المفضّلة والرسائل، ثم الباقي */
 const NAV: readonly DashNavItem[] = [
@@ -48,6 +49,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const roles = useSyncExternalStore(subscribe, () => session.roles().join(','), () => '').split(',');
   const [unread, setUnread] = useState(0);
 
+  const returned = useReturnTick();
   useEffect(() => {
     if (!signedIn) return;
     let alive = true;
@@ -61,7 +63,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
       alive = false;
       window.removeEventListener(NOTIFICATIONS_CHANGED, load);
     };
-  }, [signedIn]);
+  }, [signedIn, returned]);
 
   const panels = PANELS.filter((p) => p.roles.some((r) => roles.includes(r))).map((p) => p.item);
   const groups: DashNavGroup[] = [

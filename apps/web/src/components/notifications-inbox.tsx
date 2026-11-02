@@ -8,6 +8,7 @@ import { Alert, PageHead } from '@/components/ui';
 import { Icon, type IconName } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
+import { useReturnTick } from '@/lib/fresh';
 import { when } from '@/lib/orders';
 
 interface Item {
@@ -75,6 +76,24 @@ export function NotificationsInbox({
       alive = false;
     };
   }, [version]);
+
+  // الرجوع إلى الصفحة يجلب الجديد في أعلاها، ويُبقي ما حُمّل من الأقدم تحته
+  const returned = useReturnTick();
+  useEffect(() => {
+    if (!returned) return;
+    let alive = true;
+    api<Inbox>('/me/notifications')
+      .then((d) => {
+        if (!alive) return;
+        setInbox((cur) =>
+          cur ? { unread: d.unread, items: [...d.items, ...cur.items.filter((x) => !d.items.some((n) => n.id === x.id))], nextCursor: cur.items.length > d.items.length ? cur.nextCursor : d.nextCursor } : d,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [returned]);
 
   const markAll = async () => {
     setBusy(true);

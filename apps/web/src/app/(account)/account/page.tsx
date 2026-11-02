@@ -9,6 +9,7 @@ import { useLocale, useT } from '@/components/locale';
 import { Alert, PageHead, TextInput } from '@/components/ui';
 import { api, session as tokens } from '@/lib/api';
 import { SecurityPanel, SessionsPanel, type Profile } from '@/components/account-security';
+import { useReturnTick } from '@/lib/fresh';
 
 type Tab = 'profile' | 'security' | 'sessions';
 const TABS: { id: Tab; label: string; en: string }[] = [
@@ -141,6 +142,7 @@ export default function AccountPage() {
   const [tab, setTab] = useState<Tab>('profile');
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  const returned = useReturnTick();
   useEffect(() => {
     if (!tokens.read()) {
       router.replace('/login?next=/account');
@@ -149,7 +151,7 @@ export default function AccountPage() {
     api<Profile>('/me/account')
       .then(setProfile)
       .catch((e: Error) => setError(e.message));
-  }, [router]);
+  }, [router, returned]);
 
   function onTabKey(event: React.KeyboardEvent, index: number): void {
     // الأسهم بين التبويبات؛ الاتجاه البصري في RTL معكوس: اليسار هو «التالي»

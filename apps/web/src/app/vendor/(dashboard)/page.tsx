@@ -9,6 +9,7 @@ import { ProductThumb } from '@/components/product-editor';
 import { num, PRODUCT_STATUS, PRODUCT_STATUS_EN, type LowStockRow, type Page, type ProductListItem } from '@/lib/catalog';
 import { useLocale, useT } from '@/components/locale';
 import { localized, type Translate } from '@/lib/i18n';
+import { useReturnTick } from '@/lib/fresh';
 
 interface Snapshot {
   total: number;
@@ -34,6 +35,7 @@ export default function DashboardHome() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -62,7 +64,7 @@ export default function DashboardHome() {
     return () => {
       alive = false;
     };
-  }, [t]);
+  }, [t, returned]);
 
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (!snap) return <Spinner label={t('جارٍ تحميل المؤشرات…', 'Loading the dashboard…')} />;

@@ -26,6 +26,7 @@ import {
 import { regionName } from '@/lib/places';
 import { localized } from '@/lib/i18n';
 import { useLocale, useT } from '@/components/locale';
+import { useReturnTick } from '@/lib/fresh';
 
 interface VendorDetail extends SubOrderView {
   orderNumber: string;
@@ -117,6 +118,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
     };
   }, []);
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -130,7 +132,7 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, returned]);
 
   const move = async (to: SubOrderStatus, extra: Record<string, unknown> = {}) => {
     setBusy(true);

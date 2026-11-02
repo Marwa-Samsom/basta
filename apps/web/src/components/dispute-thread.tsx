@@ -17,6 +17,7 @@ import {
   ROLE_LABEL_EN,
   when,
 } from '@/lib/orders';
+import { useReturnTick } from '@/lib/fresh';
 
 interface Dispute {
   id: string;
@@ -65,6 +66,7 @@ export function DisputeThread({ id, base, me, back }: { id: string; base: string
     }
   }, [base, id]);
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -78,7 +80,7 @@ export function DisputeThread({ id, base, me, back }: { id: string; base: string
     return () => {
       alive = false;
     };
-  }, [base, id]);
+  }, [base, id, returned]);
 
   const act = async (path: string, payload?: unknown) => {
     setBusy(true);
@@ -216,11 +218,12 @@ export function DisputeList({ base, link, searchable = false }: { base: string; 
   >(null);
   const [error, setError] = useState<string | null>(null);
 
+  const returned = useReturnTick();
   useEffect(() => {
     api<typeof rows>(base)
       .then(setRows)
       .catch((e: Error) => setError(e.message));
-  }, [base]);
+  }, [base, returned]);
 
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (!rows) return <Spinner />;
