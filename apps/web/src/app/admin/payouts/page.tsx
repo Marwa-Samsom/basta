@@ -6,6 +6,7 @@ import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 import { TONE, useAction, useAdminList } from '@/lib/admin';
+import { ORDERS, counted } from '@/lib/arabic-count';
 import { money, when } from '@/lib/orders';
 import { ClearableInput } from '@/components/ui';
 
@@ -52,7 +53,7 @@ export default function AdminPayoutsPage() {
 
   return (
     <div className="ao-page">
-      <AdminHeader title="طلبات التحويل" count={data ? `${data.total} طلب` : undefined} hint="تحتاج صلاحية payouts.approve — هذه الصفحة تحرّك مالاً.">
+      <AdminHeader title="طلبات التحويل" count={data ? counted(data.total, ORDERS) : undefined} hint="تحتاج صلاحية payouts.approve — هذه الصفحة تحرّك مالاً.">
         <button
           type="button"
           className="btn btn--secondary btn--sm"
