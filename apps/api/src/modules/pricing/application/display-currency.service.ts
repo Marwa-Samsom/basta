@@ -1,7 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { minorUnitDigits } from '../../../common/money/money';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { settingNumber } from '../../../common/setting-number';
 import { convertMinor, fxFactor, type FxInput } from '../domain/pricing';
+
+/** هامش الصرف حين يغيب الإعداد أو يتلف */
+const DEFAULT_FX_SPREAD_BPS = 200;
+
+/**
+ * «هامش الصرف» كما يُطبَّق — قارئ واحد للمتجر والدفع ولوحة العملات. كان كلٌّ يقرؤه بـ Number()،
+ * فنصٌّ تالف في القاعدة («خمسة») يصير NaN: أسعار العملات الأخرى في المتجر، ومجموع الطلب في
+ * الدفع، و«NaN%» في لوحة العملات؛ والغائب تعرضه اللوحة 0 والدفع يحسبه 200 (2 نوفمبر 2026).
+ */
+export const fxSpreadBps = (raw: unknown): number => settingNumber(raw, DEFAULT_FX_SPREAD_BPS, 0);
 
 /** إن غاب إعداد الإدارة أو صار لعملة لا تُعرض */
 const FALLBACK = 'JOD';
@@ -117,7 +128,7 @@ export class DisplayCurrencyService {
       : currencies.some((c) => c.code === FALLBACK)
         ? FALLBACK
         : (currencies[0]?.code ?? FALLBACK);
-    return { currencies, defaultCurrency, rates, spreadBps: Number(setting('fx_spread_bps') ?? 200) };
+    return { currencies, defaultCurrency, rates, spreadBps: fxSpreadBps(setting('fx_spread_bps')) };
   }
 }
 

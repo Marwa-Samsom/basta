@@ -4,7 +4,7 @@ import { minorUnitDigits } from '../../../common/money/money';
 import { samePlace } from '../../../common/places';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
-import { DisplayCurrencyService } from './display-currency.service';
+import { DisplayCurrencyService, fxSpreadBps } from './display-currency.service';
 import {
   priceCart,
   quoteShipping,
@@ -159,7 +159,7 @@ export class PricingService {
         orderCurrency: currency,
         orderDigits: minorUnitDigits(currency),
         usdRates: rates,
-        spreadBps: Number(settings.get('fx_spread_bps') ?? 200),
+        spreadBps: fxSpreadBps(settings.get('fx_spread_bps')),
       },
     });
 
