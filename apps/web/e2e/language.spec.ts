@@ -66,7 +66,7 @@ test.describe('خانة التاريخ تتبع لغة الموقع', () => {
     // قائمة اللوحة بالإنجليزية
     await expect(page.getByRole('link', { name: 'Reports' })).toBeVisible();
 
-    const from = page.getByRole('button', { name: /^من:/ });
+    const from = page.getByRole('button', { name: /^From:/ });
     await expect(from).toHaveText(/^\d{1,2} [A-Z][a-z]+ \d{4}$/);
     await from.click();
     const dialog = page.getByRole('dialog', { name: 'Pick a date' });
