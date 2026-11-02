@@ -98,6 +98,10 @@
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
 }
+/* هدف لمس 44 على الجوال وبالإصبع (SYS-081) */
+@media (pointer: coarse), (max-width: 640px) {
+  .id-tabs .tabs__tab { min-height: var(--touch-min); }
+}
 .id-tabs .tabs__tab[aria-selected='true'] { border-color: var(--brand); }
 
 .id-card-title {

@@ -1480,8 +1480,24 @@ a.stat:hover { box-shadow: var(--shadow-md); }
 .pcard__stock { font-size: var(--text-2xs); font-weight: var(--weight-semi); color: var(--warning-text); }
 
 
-/* اللمس في المتجر: الرقائق أهداف لمس كالأزرار (44+)، وبطاقتان في السطر على الجوال */
+/*
+ * اللمس: كل هدف أساسي 44 بكسل على الأقل (--touch-min)، وبطاقتان في السطر على الجوال.
+ * قاستها صاحبة المشروع على 400 بكسل (SYS-081، 1 نوفمبر 2026): أيقونات الرأس 40 في المتجر
+ * و32 في اللوحات المضغوطة، و«ابحث» 36 و✕ مسحه 30، ورقائق المتاجر وتبويبات الحالات 32،
+ * والشعار 29. --ctrl-h يحمل الأيقونات والأزرار والحقول وزرّ العملة معاً؛ بالفأرة على
+ * الشاشة الكبيرة لا يتغيّر شيء.
+ */
 @media (pointer: coarse), (max-width: 640px) {
+  [data-density] { --ctrl-h: var(--touch-min); }
+  .btn--sm,
+  .store__all,
+  .store__cat,
+  .tabs__tab { min-height: var(--touch-min); }
+  .store__brand { display: inline-flex; align-items: center; min-block-size: var(--touch-min); }
+  .search__input { block-size: 54px; }
+  .search__go { block-size: var(--touch-min); }
+  .search__clear { inline-size: var(--touch-min); block-size: var(--touch-min); }
+  .search:has(.search__clear) .search__input { padding-inline-end: 124px; }
   .chip { min-height: var(--control-lg); }
   .pgrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
