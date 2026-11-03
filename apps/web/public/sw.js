@@ -16,6 +16,14 @@ const PAGES = `${VERSION}-pages`;
 const IMAGES = `${VERSION}-images`;
 const PRIVATE = /^\/(cart|checkout|orders|account|vendor|admin|login|register)(\/|$)/;
 
+/**
+ * الصور من أصل الخادم لا الموقع، و<img> يطلبها no-cors فيأتي ردّها «معتماً» (ok=false): لا يُحفظ
+ * شيء، ومخزن الصور فارغ أبداً، وما يظهر منها بلا اتصال من ذاكرة المتصفّح المؤقتة (SYS-086، 3 نوفمبر
+ * 2026). تُطلب بـ cors — الخادم يسمح لأصل الموقع — فيصير الردّ مقروءاً يُحفظ. وأصلٌ لا يسمح (مخزن
+ * ملفات خارجي) يرفض طلب cors، فتُطلب كما جاءت: تُعرض ولا تُحفظ، كما كانت.
+ */
+const loadImage = (req) => fetch(req.url, { mode: 'cors', credentials: 'omit' }).catch(() => fetch(req));
+
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(PAGES).then((c) => c.addAll(['/offline', '/icons/icon-192.png'])).then(() => self.skipWaiting()));
 });
@@ -37,13 +45,14 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/uploads/') && req.destination === 'image') {
     event.respondWith(
       caches.open(IMAGES).then(async (cache) => {
-        const hit = await cache.match(req);
-        const fresh = fetch(req)
+        // بالعنوان وحده: الردّ يحمل Vary: Origin، وطلب <img> بلا Origin
+        const hit = await cache.match(req.url, { ignoreVary: true });
+        const fresh = loadImage(req)
           .then((res) => {
-            if (res.ok) cache.put(req, res.clone());
+            if (res.ok) cache.put(req.url, res.clone());
             return res;
           })
-          .catch(() => hit);
+          .catch(() => hit || Response.error());
         return hit || fresh;
       }),
     );
