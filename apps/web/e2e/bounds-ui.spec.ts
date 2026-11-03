@@ -146,6 +146,42 @@ test('نسبتا الخصم الحدّيتان تُعرضان «0.01%» و«90%�
   }
 });
 
+test('مميّز أُوقف: شارته، وتحريك غيره يُرفض برسالة عند القسم ولا يسقطه، و«إزالة» الموقوف تنجح (ACFG-054)', async ({ page }) => {
+  // صاحبة المشروع بالشاشة (3 نوفمبر 2026): كانت الصفحة تُسقط الموقوف من أي حفظ، فحرّكت «ساعة» فاختفى بلا سبب
+  const t = tag();
+  const shop = await shopAt('approved', `${t}f`, { approvedAt: new Date() });
+  const make = async (k: string) =>
+    (await prisma.product.create({ data: { vendorId: shop.id, slug: `f54ui-${k}-${t}`, nameAr: `مميّز الشاشة ${k} ${t}`, status: 'active', publishedAt: new Date() } })).id;
+  const [a, stopped, c] = [await make('a'), await make('b'), await make('c')];
+  const KEY = 'home_featured_product_ids';
+  const before = await prisma.setting.findUnique({ where: { key: KEY } });
+  const saved = async () => (await prisma.setting.findUniqueOrThrow({ where: { key: KEY } })).valueJson;
+  try {
+    await prisma.setting.upsert({ where: { key: KEY }, create: { key: KEY, valueJson: [a, stopped, c] }, update: { valueJson: [a, stopped, c] } });
+    // «أوقف المنتج بسبب» من الإدارة يجعله مرفوضاً
+    await prisma.product.update({ where: { id: stopped }, data: { status: 'rejected' } });
+    await signInAdmin(page, '/admin/storefront');
+    const section = page.getByRole('region', { name: 'المنتجات المميّزة في الرئيسية' });
+    const item = (k: string) => section.getByRole('listitem').filter({ hasText: `مميّز الشاشة ${k} ${t}` });
+    await expect(item('b')).toContainText('لم يعد منشوراً — أزله قبل أي تغيير');
+    await expect(item('b').getByRole('button', { name: 'أعلى' })).toBeDisabled();
+
+    await item('c').getByRole('button', { name: 'أعلى' }).click();
+    await expect(section.getByRole('alert')).toHaveText('كل المميّز منتجات منشورة.');
+    expect(await saved()).toEqual([a, stopped, c]);
+    await expect(section.getByRole('listitem')).toHaveCount(3);
+
+    await item('b').getByRole('button', { name: 'إزالة' }).click();
+    await expect(page.getByText('حُفظ المميّز.')).toBeVisible();
+    await expect(section.getByRole('alert')).toHaveCount(0);
+    expect(await saved()).toEqual([a, c]);
+    await expect(section.getByRole('listitem')).toHaveCount(2);
+  } finally {
+    if (before) await prisma.setting.update({ where: { key: KEY }, data: { valueJson: before.valueJson as never } });
+    else await prisma.setting.deleteMany({ where: { key: KEY } });
+  }
+});
+
 test('بائع متجره مرفوض يفتح «منتجاتي»: يتحوّل إلى صفحة حالة طلبه (VCAT-051)', async ({ page }) => {
   const shop = await shopAt('rejected', tag(), { rejectionReason: 'الوثائق غير واضحة — أعد رفعها.', rejectedAt: new Date() });
   await page.goto('/login?next=/vendor/products');

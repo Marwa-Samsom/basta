@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
-import { ClearableInput, EmptyState } from '@/components/ui';
+import { Alert, ClearableInput, EmptyState } from '@/components/ui';
 import { DateField } from '@/components/date-field';
 import { useLocale, useT } from '@/components/locale';
 import { localized } from '@/lib/i18n';
@@ -63,6 +63,8 @@ export default function AdminStorefrontPage() {
   const pq = new URLSearchParams({ status: 'active', pageSize: '20', ...(productSearch.trim() ? { search: productSearch.trim() } : {}) });
   const products = useAdminData<{ items: { id: string; nameAr: string; vendor: { nameAr: string } }[]; total: number }>(`/admin/products?${pq}`);
   const act = useAction();
+  // رسالة المميّز عنده: تحت مئات اللافتات كان رفضه يظهر أعلى الصفحة فلا يُرى
+  const featuredAct = useAction();
   const [draft, setDraft] = useState({ placement: 'home_hero', titleAr: '', linkUrl: '/shops', imageKey: '', imageUrl: '', startsAt: '', endsAt: '' });
   const [showNew, setShowNew] = useState(false);
   const [filter, setFilter] = useState('all');
@@ -76,16 +78,17 @@ export default function AdminStorefrontPage() {
   };
 
   const saveFeatured = (ids: string[]) =>
-    act.run(async () => {
+    featuredAct.run(async () => {
       await api('/admin/storefront/featured', { method: 'PUT', body: { productIds: ids } });
       featured.reload();
     }, t('حُفظ المميّز.', 'Featured products saved.'));
 
   if (!banners.data) return <Loading error={banners.error} forbidden={banners.forbidden} />;
   const all = banners.data;
-  // ما لم يعد منشوراً يظهر معلَّماً، ويسقط من أي حفظ — الحفظ يقبل المنشور وحده
+  // ما لم يعد منشوراً يظهر معلَّماً ويبقى في كل حفظ، فيرفضه الخادم «كل المميّز منتجات منشورة.» حتى
+  // يُزال بيده. كان يسقط بصمت مع تحريك منتج غيره فيختفي بلا سبب يُرى (ACFG-054، 3 نوفمبر 2026)
   const rows = featured.data ?? [];
-  const ids = rows.filter((p) => p.active).map((p) => p.id);
+  const ids = rows.map((p) => p.id);
   const test = FILTERS.find((x) => x.key === filter)?.test ?? (() => true);
   const term = q.trim();
   const shown = all.filter(test).filter((b) => !term || (b.titleAr ?? '').includes(term));
@@ -285,6 +288,12 @@ export default function AdminStorefrontPage() {
           <span className="ac2-hint">{t('بالترتيب الظاهر — حتى 24 منتجاً منشوراً.', 'In the order shown — up to 24 published products.')}</span>
           <span className="ac2-end num ac2-hint">{ids.length} / 24</span>
         </header>
+        {featuredAct.error ? (
+          <div className="card__body">
+            <Alert tone="danger">{featuredAct.error}</Alert>
+          </div>
+        ) : null}
+        <Feedback error={null} notice={featuredAct.notice} />
         {rows.length === 0 ? (
           <p className="ac2-section-empty">
             {t('لا منتجات مميّزة بعد — أضف منتجاً منشوراً من القائمة أدناه.', 'No featured products yet — add a published product from the list below.')}
@@ -297,7 +306,7 @@ export default function AdminStorefrontPage() {
                 <span className="ac2-rank__name">
                   {p.nameAr ?? p.id.slice(0, 8)}
                   {p.vendor ? <span className="ac2-hint"> — {p.vendor}</span> : null}
-                  {p.active ? null : <span className="badge badge--warning">{t('لم يعد منشوراً — يسقط عند الحفظ', 'No longer published — dropped on save')}</span>}
+                  {p.active ? null : <span className="badge badge--warning">{t('لم يعد منشوراً — أزله قبل أي تغيير', 'No longer published — remove it before any change')}</span>}
                 </span>
                 <button type="button" className="icon-btn icon-btn--sm" disabled={i === 0 || !p.active} onClick={() => void saveFeatured(up(ids, p.id))} aria-label={t('أعلى', 'Move up')}>
                   <Icon name="chev-down" size={14} className="ac2-flip" />
