@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { use, useEffect, useState } from 'react';
 import { Alert, TextArea, TextInput } from '@/components/ui';
+import { AcceptDeadline } from '@/components/accept-countdown';
 import { Icon, type IconName } from '@/components/icons';
 import { api } from '@/lib/api';
 import {
@@ -19,7 +20,6 @@ import {
   toneOf,
   trackingLabel,
   when,
-  hoursAr,
   type SubOrderStatus,
   type SubOrderView,
 } from '@/lib/orders';
@@ -32,6 +32,8 @@ interface VendorDetail extends SubOrderView {
   orderNumber: string;
   /** مهلة القبول كما تضبطها الإدارة — المهمة تلغي بها */
   acceptanceHours: number;
+  /** موعد الإلغاء الآلي ما دام ينتظر التاجر، من الخادم */
+  acceptBy: string | null;
   shippingAddress: Record<string, string>;
   customerNote: string | null;
   financials: {
@@ -233,13 +235,8 @@ export default function VendorOrderPage({ params }: { params: Promise<{ id: stri
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      {order.status === 'awaiting_vendor' ? (
-        <Alert tone="warning">
-          {t(
-            `اقبل الطلب أو ارفضه خلال ${hoursAr(order.acceptanceHours)} من وصوله، وإلا أُلغي آلياً.`,
-            `Accept or reject the order within ${hoursAr(order.acceptanceHours, locale)} of its arrival, or it is canceled automatically.`,
-          )}
-        </Alert>
+      {order.status === 'awaiting_vendor' && order.acceptBy ? (
+        <AcceptDeadline by={new Date(order.acceptBy)} hours={order.acceptanceHours} />
       ) : null}
 
       {order.status === 'awaiting_vendor' || order.status === 'accepted' ? (

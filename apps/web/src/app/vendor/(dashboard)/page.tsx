@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Alert, EmptyState, PageHead, Spinner } from '@/components/ui';
+import { AcceptQueue } from '@/components/accept-countdown';
 import { Icon } from '@/components/icons';
 import { ProductThumb } from '@/components/product-editor';
 import { num, PRODUCT_STATUS, PRODUCT_STATUS_EN, type LowStockRow, type Page, type ProductListItem } from '@/lib/catalog';
@@ -19,6 +20,8 @@ interface Snapshot {
   low: LowStockRow[];
   recent: ProductListItem[];
   rejectedItems: ProductListItem[];
+  /** بانتظار القبول وموعد أقربها إلى الإلغاء الآلي — VON-057 */
+  waiting: { count: number; nearest: Date | null };
 }
 
 /**
@@ -40,13 +43,17 @@ export default function DashboardHome() {
     let alive = true;
     void (async () => {
       try {
-        const [all, drafts, rejected, active, low] = await Promise.all([
+        const [all, drafts, rejected, active, low, awaiting] = await Promise.all([
           api<Page<ProductListItem>>('/vendor/products?pageSize=5'),
           api<Page<ProductListItem>>('/vendor/products?status=draft&pageSize=1'),
           api<Page<ProductListItem>>('/vendor/products?status=rejected&pageSize=5'),
           api<Page<ProductListItem>>('/vendor/products?status=active&pageSize=1'),
           api<LowStockRow[]>('/vendor/inventory/low-stock'),
+          api<{ items: { placedAt: string }[]; counts: Record<string, number>; acceptanceHours: number }>(
+            '/vendor/orders?status=awaiting_vendor&sort=oldest',
+          ),
         ]);
+        const oldest = awaiting.items[0];
         if (!alive) return;
         setSnap({
           total: all.total,
@@ -56,6 +63,10 @@ export default function DashboardHome() {
           low,
           recent: all.items,
           rejectedItems: rejected.items,
+          waiting: {
+            count: awaiting.counts['awaiting_vendor'] ?? 0,
+            nearest: oldest ? new Date(new Date(oldest.placedAt).getTime() + awaiting.acceptanceHours * 3_600_000) : null,
+          },
         });
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : t('تعذّر تحميل المؤشرات.', 'Could not load the dashboard.'));
@@ -84,6 +95,8 @@ export default function DashboardHome() {
           </Link>
         }
       />
+
+      {snap.waiting.count > 0 && snap.waiting.nearest ? <AcceptQueue count={snap.waiting.count} nearest={snap.waiting.nearest} /> : null}
 
       {snap.total === 0 ? (
         <EmptyState

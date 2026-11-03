@@ -1,22 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { Alert, EmptyState, MoreButton, PageHead, SortButton, type SortOrder } from '@/components/ui';
+import { AcceptCountdown } from '@/components/accept-countdown';
 import { Icon } from '@/components/icons';
 import { useAdminList } from '@/lib/admin';
-import { counted, type Counted } from '@/lib/arabic-count';
+import { counted, WAITING_ORDERS } from '@/lib/arabic-count';
 import { hoursAr, labelOf, money, toneOf, when } from '@/lib/orders';
 import { useLocale, useT } from '@/components/locale';
-
-/** «طلب واحد ينتظر قبولك»، «طلبان ينتظران قبولك»، «4 طلبات تنتظر قبولك»، «11 طلباً ينتظر قبولك» */
-const WAITING: Counted = {
-  one: 'طلب واحد ينتظر قبولك',
-  two: 'طلبان ينتظران قبولك',
-  plural: '# طلبات تنتظر قبولك',
-  accusative: '# طلباً ينتظر قبولك',
-  genitive: '# طلب ينتظر قبولك',
-};
 
 interface Row {
   id: string;
@@ -53,10 +46,33 @@ const TABS: { statuses: string[]; label: string; en: string }[] = [
  * عشرون في الصفحة و«المزيد» لما بعدها (20 أكتوبر 2026) — كانت القائمة أول عشرين بلا غيرها.
  * والبحث برقم الطلب أو اسم المستلم أو منتج فيه.
  */
+/** التبويب من `?status=` — بطاقة الرئيسية تفتح «بانتظار القبول» (VON-057) */
+const tabOf = (status: string | null): string => TABS.map((tb) => tb.statuses.join(',')).find((k) => k && k === status) ?? '';
+
+// useSearchParams يحتاج حدّ Suspense في صفحة تُبنى مسبقاً
 export default function VendorOrdersPage() {
+  return (
+    <Suspense>
+      <VendorOrders />
+    </Suspense>
+  );
+}
+
+function VendorOrders() {
   const t = useT();
   const locale = useLocale();
-  const [tab, setTab] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  // من العنوان لا حالةٌ تُقرأ منه مرة: الانتقال بـ Link يركّب الصفحة قبل أن يتغيّر العنوان (كـ VON-055)
+  const tab = tabOf(params.get('status'));
+  const setTab = (next: string): void => {
+    const query = new URLSearchParams(params.toString());
+    if (next) query.set('status', next);
+    else query.delete('status');
+    const s = query.toString();
+    router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+  };
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortOrder>('newest');
   const q = new URLSearchParams({ sort });
@@ -103,7 +119,7 @@ export default function VendorOrdersPage() {
         <Alert
           tone="warning"
           title={t(
-            counted(waiting, WAITING),
+            counted(waiting, WAITING_ORDERS),
             `${waiting} ${waiting === 1 ? 'order is' : 'orders are'} awaiting your acceptance`,
           )}
         >
@@ -213,6 +229,10 @@ export default function VendorOrdersPage() {
                       </td>
                       <td data-label={t('الحالة', 'Status')}>
                         <span className={`badge ${toneOf(r.status)}`}>{labelOf(r.status, locale)}</span>
+                        {/* ما بقي قبل الإلغاء الآلي: الوصول + المهلة كما تضبطها الإدارة (VOPS-003) */}
+                        {r.status === 'awaiting_vendor' && data ? (
+                          <AcceptCountdown by={new Date(new Date(r.placedAt).getTime() + data.acceptanceHours * 3_600_000)} />
+                        ) : null}
                       </td>
                     </tr>
                   ))}
