@@ -1527,7 +1527,9 @@ describe('حدود المنتجات والخصائص — يُؤتمت 4', () => 
 
       expect(await prisma.attribute.count({ where: { code: { in: [...malformed, ...Object.values(rejected)] } } })).toBe(0);
     } finally {
-      for (const id of created) {
+      // ما قُبل خطأً (طفرة أو عيب) يُحذف أيضاً — لا خصيصة برمز تجربة تبقى في قائمة الإدارة
+      const strays = await prisma.attribute.findMany({ where: { code: { in: ['1size', 's', 'size-x', `a${tail}`.padEnd(42, 'x'), `n${tail}`, `t${tail}`, `v${tail}`, `m${tail}`] } }, select: { id: true } });
+      for (const id of [...created, ...strays.map((a) => a.id)]) {
         await app.inject({ method: 'DELETE', url: `/api/v1/admin/attributes/${id}`, headers: { authorization: `Bearer ${accessToken}` } });
       }
     }

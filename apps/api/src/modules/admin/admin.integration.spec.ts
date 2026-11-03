@@ -887,10 +887,12 @@ describe('حدود الضريبة والخصم والمختارات — يُؤت
   it('نسبة الخصم بين 0.01% و 90%: الصفر والغائب و 9001 و 10000 تُرفض، و 1 و 9000 تُقبلان (ACFG-034)', async () => {
     if (!dbUp) return;
     const tail = SUFFIX.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const created: string[] = [];
+    // كل رمز يُجرَّب يُطفأ في النهاية ولو فشل الاختبار في منتصفه — لا كوبون منصّة سارٍ يبقى
+    const attempted: string[] = [];
     try {
       for (const valueBps of [undefined, 0, 9001, 10000]) {
         const code = `PCT${valueBps ?? 'NA'}${tail}`.slice(0, 30);
+        attempted.push(code);
         const res = await call('POST', '/admin/coupons', admin.token, { code, scope: 'platform', type: 'percent', fundedBy: 'platform', ...(valueBps === undefined ? {} : { valueBps }) });
         expect(res.statusCode, `${valueBps}: ${res.body}`).toBe(400);
         expect(messages(res)).toContain('النسبة بين 0.01% و 90%.');
@@ -898,16 +900,16 @@ describe('حدود الضريبة والخصم والمختارات — يُؤت
       }
       for (const valueBps of [1, 9000]) {
         const code = `PCT${valueBps}${tail}`.slice(0, 30);
+        attempted.push(code);
         const res = await call('POST', '/admin/coupons', admin.token, { code, scope: 'platform', type: 'percent', fundedBy: 'platform', valueBps });
         expect(res.statusCode, `${valueBps}: ${res.body}`).toBe(201);
         const saved = await prisma.coupon.findUniqueOrThrow({ where: { code } });
-        created.push(saved.id);
         expect(saved.valueBps).toBe(valueBps);
         // لا يُترك كوبون منصّة 90% سارياً في متجر التجربة اليدوية
         await prisma.coupon.update({ where: { id: saved.id }, data: { isActive: false } });
       }
     } finally {
-      if (created.length) await prisma.coupon.updateMany({ where: { id: { in: created } }, data: { isActive: false } });
+      await prisma.coupon.updateMany({ where: { code: { in: attempted } }, data: { isActive: false } });
     }
   });
 
