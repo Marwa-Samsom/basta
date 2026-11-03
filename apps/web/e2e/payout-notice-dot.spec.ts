@@ -14,7 +14,7 @@ test('رسالة طلب السحب بنقطة واحدة بعد «ر.س.»', asy
     }),
   );
   await page.route(/\/api\/v1\/vendor\/finance\/payouts(\?.*)?$/, (route) =>
-    route.request().method() === 'POST' ? route.fulfill({ status: 201, json: { id: 'payout-e2e' } }) : route.fulfill({ json: [] }),
+    route.request().method() === 'POST' ? route.fulfill({ status: 201, json: { id: 'payout-e2e' } }) : route.fulfill({ json: { items: [], total: 0 } }),
   );
 
   await page.goto('/login?next=/vendor/finance');

@@ -32,6 +32,8 @@ interface Statement {
   rows: Row[];
   /** الكشف صفحات (500 قيد) — المؤشّر يجلب التالية، null حين لا تالية */
   nextCursor: string | null;
+  /** قيود المدة كلها — «X من Y» */
+  total?: number;
 }
 
 /**
@@ -93,6 +95,8 @@ export default function StatementPage() {
   const [data, setData] = useState<Statement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // كل ضغطة «حمّل القيود التالية»: كم أضافت ومن أي مؤشّر بدأت — «السابق» يُسقطها ويعيد المؤشّر
+  const [batches, setBatches] = useState<{ count: number; cursor: string }[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -123,7 +127,11 @@ export default function StatementPage() {
     if (from) q.set('from', from);
     if (to) q.set('to', to);
     api<Statement>(`/vendor/finance/statement?${q}`)
-      .then((d) => alive && setData(d))
+      .then((d) => {
+        if (!alive) return;
+        setData(d);
+        setBatches([]);
+      })
       .catch((e: Error) => alive && setError(e.message));
     return () => {
       alive = false;
@@ -133,15 +141,25 @@ export default function StatementPage() {
   // الصفحة التالية تُلحق بما جُلب: الرصيد بعد كل سطر يكمل من آخر سطر، والافتتاحي والختامي للمدة كلها
   const loadMore = async () => {
     if (!data?.nextCursor) return;
+    const cursor = data.nextCursor;
     setLoadingMore(true);
     try {
-      const next = await api<Statement>(`/vendor/finance/statement?${query()}&cursor=${data.nextCursor}`);
+      const next = await api<Statement>(`/vendor/finance/statement?${query()}&cursor=${cursor}`);
       setData({ ...next, rows: [...data.rows, ...next.rows] });
+      setBatches((b) => [...b, { count: next.rows.length, cursor }]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoadingMore(false);
     }
+  };
+
+  /** «السابق»: تُسقط آخر ما ألحقه «حمّل القيود التالية» ويعود مؤشّره — الرصيد بعد كل سطر باقٍ كما حُسب */
+  const less = () => {
+    const last = batches.at(-1);
+    if (!last || !data) return;
+    setData({ ...data, rows: data.rows.slice(0, Math.max(0, data.rows.length - last.count)), nextCursor: last.cursor });
+    setBatches((b) => b.slice(0, -1));
   };
 
   const download = async () => {
@@ -338,17 +356,23 @@ export default function StatementPage() {
               </table>
             </div>
           )}
-          {data?.nextCursor ? (
+          {data && (data.nextCursor || batches.length > 0) ? (
             <div className="vm-more">
-              <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void loadMore()}>
-                {loadingMore ? t('جارٍ الجلب…', 'Loading…') : t('حمّل القيود التالية', 'Load more entries')}
-              </button>
+              <span className="list-more__count num">
+                {t(`${data.rows.length} من ${Math.max(data.total ?? 0, data.rows.length)}`, `${data.rows.length} of ${Math.max(data.total ?? 0, data.rows.length)}`)}
+              </span>
+              {batches.length > 0 ? (
+                <button type="button" className="btn btn--ghost btn--sm" disabled={loadingMore} onClick={less}>
+                  {t('السابق', 'Previous')}
+                </button>
+              ) : null}
+              {data.nextCursor ? (
+                <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void loadMore()}>
+                  {loadingMore ? t('جارٍ الجلب…', 'Loading…') : t('حمّل القيود التالية', 'Load more entries')}
+                </button>
+              ) : null}
               <span className="vm-muted">
-                {t('جُلب', 'Loaded')} <span className="num">{data.rows.length}</span>{' '}
-                {t(
-                  'قيداً — التصفية بالنوع على المجلوب، والتصدير يشمل المدة كلها',
-                  `${data.rows.length === 1 ? 'entry' : 'entries'} — the type filter applies to what’s loaded; the export covers the whole period`,
-                )}
+                {t('التصفية بالنوع على المجلوب، والتصدير يشمل المدة كلها', 'The type filter applies to what’s loaded; the export covers the whole period')}
               </span>
             </div>
           ) : null}

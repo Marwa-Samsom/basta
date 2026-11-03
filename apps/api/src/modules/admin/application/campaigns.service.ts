@@ -42,6 +42,19 @@ export function campaignStatus(c: { isActive: boolean; startsAt: Date; endsAt: D
   return 'live';
 }
 
+export const CAMPAIGN_STATUSES = ['live', 'scheduled', 'ended', 'paused'] as const satisfies readonly CampaignStatus[];
+
+/** campaignStatus شرطاً في القاعدة — تصفية القائمة وعدّاداتها بالقاعدة نفسها */
+export function campaignStatusWhere(status: CampaignStatus, now: Date): Prisma.CampaignWhereInput {
+  if (status === 'ended') return { endsAt: { lte: now } };
+  if (status === 'paused') return { endsAt: { gt: now }, isActive: false };
+  if (status === 'scheduled') return { endsAt: { gt: now }, isActive: true, startsAt: { gt: now } };
+  return { endsAt: { gt: now }, isActive: true, startsAt: { lte: now } };
+}
+
+/** حملات الصفحة الواحدة في اللوحة */
+export const CAMPAIGNS_PAGE = 50;
+
 /** الكوبون صالح الآن: مفعّل، بدأ، لم ينتهِ، ولم تنفد استعمالاته */
 function couponLiveNow(c: { isActive: boolean; startsAt: Date | null; endsAt: Date | null; usageLimitTotal: number | null; usedCount: number }, now: Date): boolean {
   return (
@@ -73,16 +86,32 @@ export class CampaignsService {
 
   // ------------------------------------------------------------- القراءة
 
-  async list(now = new Date()) {
-    const rows = await this.prisma.campaign.findMany({
-      orderBy: [{ startsAt: 'desc' }],
-      include: {
-        coupon: { select: { code: true, isActive: true, endsAt: true } },
-        items: { select: { product: { select: { vendorId: true } } } },
-      },
-    });
+  /**
+   * بالحالة والبحث بالاسم وخمسين خمسين، ومعها عدّاد كل حالة للحملات كلها. كانت كلها في طلب
+   * واحد (3 نوفمبر 2026). الحالة من الساعة كـ campaignStatus، شرطاً في القاعدة لا بعد الجلب.
+   */
+  async list(q: { status?: CampaignStatus; search?: string; page: number } = { page: 1 }, now = new Date()) {
+    const where: Prisma.CampaignWhereInput = {
+      ...(q.status ? campaignStatusWhere(q.status, now) : {}),
+      ...(q.search ? { nameAr: { contains: q.search, mode: 'insensitive' } } : {}),
+    };
+    const [rows, total, ...perStatus] = await Promise.all([
+      this.prisma.campaign.findMany({
+        where,
+        orderBy: [{ startsAt: 'desc' }, { id: 'asc' }],
+        skip: (Math.max(1, q.page) - 1) * CAMPAIGNS_PAGE,
+        take: CAMPAIGNS_PAGE,
+        include: {
+          coupon: { select: { code: true, isActive: true, endsAt: true } },
+          items: { select: { product: { select: { vendorId: true } } } },
+        },
+      }),
+      this.prisma.campaign.count({ where }),
+      ...CAMPAIGN_STATUSES.map((s) => this.prisma.campaign.count({ where: campaignStatusWhere(s, now) })),
+    ]);
+    const counts = Object.fromEntries(CAMPAIGN_STATUSES.map((s, i) => [s, perStatus[i] ?? 0])) as Record<CampaignStatus, number>;
 
-    return rows.map((r) => {
+    const items = rows.map((r) => {
       return {
         id: r.id,
         nameAr: r.nameAr,
@@ -101,6 +130,7 @@ export class CampaignsService {
         },
       };
     });
+    return { items, total, counts: { all: CAMPAIGN_STATUSES.reduce((n, s) => n + counts[s], 0), ...counts } };
   }
 
   async get(id: string, now = new Date()) {

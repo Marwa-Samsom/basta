@@ -58,7 +58,13 @@ export default function AdminReportsPage() {
   const [view, setView] = useState<string | null>(null);
   const q = `from=${from}&to=${to}`;
   const { data, error, forbidden, invalid } = useAdminData<Report>(`/admin/reports/financial?${q}`);
-  const [dlError, setDlError] = useState<string | null>(null);
+  // رفض التصدير مربوط بفترته: تغييرها يمسحه، ورفضٌ وصل بعد تغييرها لا يُعرض تحت الفترة الجديدة
+  const [dlError, setDlError] = useState<{ q: string; message: string } | null>(null);
+  /**
+   * رسالة واحدة لا اثنتان (3 نوفمبر 2026): فترة 367 يوماً يرفضها التقرير نفسه فيظهر رفضه مكانه،
+   * فإن رُفض تصديرها بالكلمات نفسها لا يتكرّر التنبيه فوقه. وتبقى ACFG-090: لا ملف، وتنبيه أحمر بالسبب.
+   */
+  const dlShown = dlError && dlError.q === q && !(invalid && error === dlError.message) ? dlError.message : null;
 
   const download = async (ext: 'csv' | 'xlsx') => {
     // رفض تصدير سابق لا يبقى فوق تصدير نجح بعد تصحيح الفترة
@@ -71,17 +77,22 @@ export default function AdminReportsPage() {
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
-      setDlError((e as Error).message);
+      setDlError({ q, message: (e as Error).message });
     }
+  };
+
+  const setRange = (next: { from?: string; to?: string; preset: number | null }) => {
+    setDlError(null);
+    setPreset(next.preset);
+    if (next.from !== undefined) setFrom(next.from);
+    if (next.to !== undefined) setTo(next.to);
   };
 
   const pickRange = (days: number) => {
     const today = new Date();
     const start = new Date(today);
     start.setDate(today.getDate() - days);
-    setPreset(days);
-    setFrom(iso(start));
-    setTo(iso(today));
+    setRange({ from: iso(start), to: iso(today), preset: days });
   };
 
   const currencies = data ? [...new Set([...data.sales.map((s) => s.currency), ...data.ledger.map((l) => l.currency)])] : [];
@@ -145,11 +156,11 @@ export default function AdminReportsPage() {
         <span className="ac2-dates">
           <span className="ac2-inline ac2-hint">
             {t('من', 'From')}
-            <DateField label={t('من', 'From')} value={from} onChange={(v) => (setFrom(v), setPreset(null))} />
+            <DateField label={t('من', 'From')} value={from} onChange={(v) => setRange({ from: v, preset: null })} />
           </span>
           <span className="ac2-inline ac2-hint">
             {t('إلى', 'To')}
-            <DateField label={t('إلى', 'To')} value={to} onChange={(v) => (setTo(v), setPreset(null))} />
+            <DateField label={t('إلى', 'To')} value={to} onChange={(v) => setRange({ to: v, preset: null })} />
           </span>
         </span>
         <span className="toolbar__end">
@@ -163,7 +174,7 @@ export default function AdminReportsPage() {
           </button>
         </span>
       </div>
-      {dlError ? <Alert tone="danger">{dlError}</Alert> : null}
+      {dlShown ? <Alert tone="danger">{dlShown}</Alert> : null}
 
       {!data ? (
         <Loading error={error} forbidden={forbidden} inline={invalid} />

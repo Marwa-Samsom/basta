@@ -3,13 +3,14 @@
 import '@/styles/screens/messages.css';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
-import { Alert, EmptyState, PageHead } from '@/components/ui';
+import { Alert, EmptyState, MoreButton, PageHead } from '@/components/ui';
 import { api, session } from '@/lib/api';
-import { intlLocale, pick, type Bilingual, type Locale } from '@/lib/i18n';
 import { useReturnTick } from '@/lib/fresh';
+import { useAdminList } from '@/lib/admin';
+import { intlLocale, pick, type Bilingual, type Locale } from '@/lib/i18n';
 
 type Side = 'customer' | 'vendor';
 export type Audience = Side;
@@ -120,6 +121,10 @@ const WIDE = '(min-width: 761px)';
  *
  * فتح المحادثة يعلّمها مقروءة في الخادم — ولذلك لا تُفتح الأولى تلقائياً
  * على الجوال: خيط مخفيّ لم يره أحد لا يُعدّ مقروءاً.
+ *
+ * القائمة صفحات من الخادم بـ«المزيد» و«السابق»، والبحث هناك (3 نوفمبر 2026): كانت أول مئتي
+ * محادثة، والبحث يصفّي ما جُلب وحده. ما يتغيّر هنا (فُتح، أُرسل فيه) طبقة فوق الصفحات حتى
+ * يعيدها الخادم بحالها.
  */
 export function MessagesInbox({ audience }: { audience: Audience }) {
   const t = useT();
@@ -130,12 +135,16 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
   const base = audience === 'customer' ? '/me/conversations' : '/vendor/conversations';
   const path = audience === 'customer' ? '/account/messages' : '/vendor/messages';
 
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [unread, setUnread] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const [wide, setWide] = useState(false);
-  // البائع يصفّي محادثاته باسم المشتري أو موضوعها أو آخر رسالة — حتى مئتي محادثة محمّلة
+  // البائع يبحث في محادثاته باسم المشتري أو موضوعها أو آخر رسالة — في الخادم
   const [filter, setFilter] = useState('');
+  // المشتري بلا جلسة يُحوَّل إلى الدخول، ولا يُجلب شيء قبل أن تُعرف
+  const signedIn = useSyncExternalStore(
+    () => () => undefined,
+    () => session.read() !== null,
+    () => false,
+  );
+  const ready = audience === 'vendor' || signedIn;
 
   useEffect(() => {
     const mq = window.matchMedia(WIDE);
@@ -145,51 +154,44 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
     return () => mq.removeEventListener('change', sync);
   }, []);
 
-  const returned = useReturnTick();
   useEffect(() => {
     if (audience === 'customer' && !session.read()) {
       router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
-      return;
     }
-    let alive = true;
-    api<{ unread: number; items: Row[] }>(base)
-      .then((d) => {
-        if (!alive) return;
-        setRows(d.items);
-        setUnread(d.unread);
-      })
-      .catch((e: Error) => alive && setError(e.message));
-    return () => {
-      alive = false;
-    };
-  }, [audience, base, router, returned]);
+  }, [audience, router]);
 
   const term = filter.trim();
-  const shown = (rows ?? []).filter(
-    (r) => !term || [r.customer?.fullName ?? '', r.context.label, r.lastPreview].some((x) => x.toLowerCase().includes(term.toLowerCase())),
-  );
+  const list = useAdminList<Row, { unread: number; all: number }>(ready ? `${base}${term ? `?search=${encodeURIComponent(term)}` : ''}` : null, (r) => r.id);
+  const error = list.error;
+
+  // ما فُتح هنا (حتى آخر رسالة رآها) وما أُرسل فيه، فوق ما جاء من الخادم — بلا إعادة جلب،
+  // وما وصل بعدهما من الطرف الآخر يبقى جديداً غير مقروء
+  const [seen, setSeen] = useState<Readonly<Record<string, string>>>({});
+  const [sent, setSent] = useState<Readonly<Record<string, Message>>>({});
+  const patched = list.items.map((r): Row => {
+    const m = sent[r.id];
+    if (m && m.createdAt >= r.lastMessageAt) return { ...r, lastPreview: m.body.slice(0, 140), lastMessageAt: m.createdAt, lastSenderSide: m.side, unread: false };
+    const upTo = seen[r.id];
+    return r.unread && upTo && upTo >= r.lastMessageAt ? { ...r, unread: false } : r;
+  });
+  // ما أُرسل فيه للتوّ أولاً، كما سيرتّبه الخادم
+  const fresh = patched.filter((r) => sent[r.id]?.createdAt === r.lastMessageAt).sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+  const rows = list.data ? [...fresh, ...patched.filter((r) => !fresh.includes(r))] : null;
+  // غير المقروء من الخادم، ناقصاً ما قُرئ هنا ولا يزال الخادم يعدّه
+  const unread = Math.max(0, (list.data?.unread ?? 0) - list.items.filter((r, i) => r.unread && !patched[i]!.unread).length);
+  const shown = rows ?? [];
   const activeId = selected ?? (wide ? (shown[0]?.id ?? null) : null);
 
   /** الخيط أُرسل فيه أو فُتح — القائمة تتبعه بلا إعادة جلب */
-  const rowsRef = useRef<Row[] | null>(null);
+  const itemsRef = useRef<Row[]>([]);
   useEffect(() => {
-    rowsRef.current = rows;
-  }, [rows]);
+    itemsRef.current = list.items;
+  });
   const onOpened = useCallback((id: string) => {
-    if (!rowsRef.current?.find((r) => r.id === id)?.unread) return;
-    setUnread((u) => Math.max(0, u - 1));
-    setRows((list) => list?.map((r) => (r.id === id ? { ...r, unread: false } : r)) ?? list);
+    const r = itemsRef.current.find((x) => x.id === id);
+    if (r?.unread) setSeen((s) => ({ ...s, [id]: r.lastMessageAt }));
   }, []);
-
-  const onSent = useCallback((id: string, m: Message) => {
-    setRows((list) => {
-      if (!list) return list;
-      const row = list.find((r) => r.id === id);
-      if (!row) return list;
-      const next: Row = { ...row, lastPreview: m.body.slice(0, 140), lastMessageAt: m.createdAt, lastSenderSide: m.side, unread: false };
-      return [next, ...list.filter((r) => r.id !== id)];
-    });
-  }, []);
+  const onSent = useCallback((id: string, m: Message) => setSent((s) => ({ ...s, [id]: m })), []);
 
   const head =
     audience === 'customer' ? (
@@ -201,7 +203,7 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
         )}
       />
     ) : (
-      <PageHead title={t('الرسائل', 'Messages')} {...(rows ? { count: summary(rows.length, unread, locale) } : {})} />
+      <PageHead title={t('الرسائل', 'Messages')} {...(list.data ? { count: summary(list.data.all, unread, locale) } : {})} />
     );
 
   if (error && !rows) {
@@ -226,7 +228,7 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
     );
   }
 
-  if (rows.length === 0) {
+  if (!term && rows.length === 0) {
     return (
       <div className={audience === 'customer' ? 'ms-page' : 'vm-page ms-page'}>
         {head}
@@ -333,6 +335,7 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
               );
             })}
           </ul>
+          <MoreButton list={list} />
         </nav>
 
         {activeId ? (

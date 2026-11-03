@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
+import { like, pageArgs } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor, VendorScope } from '../../../common/security/actor';
 import { NotificationsService } from '../../notifications/public';
@@ -20,8 +21,39 @@ const NOT_FOUND = 'المحادثة غير موجودة. حدّث الصفحة �
 const PRODUCT_NOT_FOUND = 'المنتج غير متاح الآن، فلا يمكن سؤال متجره عنه.';
 const ORDER_NOT_FOUND = 'الطلب غير موجود في حسابك.';
 
-/** سقف القائمة — محادثات شخص أو متجر؛ الأقدم يبقى محفوظاً ولا يُعرض */
-const LIST_LIMIT = 200;
+/**
+ * محادثات الصفحة الواحدة من صندوق شخص أو متجر — «المزيد» يُلحق ما بعدها. كان سقفاً بمئتين:
+ * الأقدم يبقى محفوظاً ولا يُعرض، والبحث يصفّي ما جُلب وحده (3 نوفمبر 2026).
+ */
+export const THREADS_PAGE = 30;
+
+export interface ThreadQuery {
+  search?: string;
+  page: number;
+}
+
+export interface ThreadList {
+  unread: number;
+  items: ThreadRow[];
+  /** نتيجة البحث كلها — «X من Y» */
+  total: number;
+  /** محادثات الصندوق كلها بلا بحث — رأس الصفحة */
+  all: number;
+}
+
+/** البحث في الصندوق: سياق المحادثة (المنتج أو رقم الطلب) أو آخر رسالة، واسم الطرف الآخر */
+function threadSearch(t: string, side: Side): Prisma.ConversationWhereInput {
+  const general = ['استفسار عام', 'general inquiry'].some((l) => l.includes(t.toLowerCase()));
+  return {
+    OR: [
+      { lastPreview: like(t) },
+      { product: { nameAr: like(t) } },
+      { subOrder: { subOrderNumber: like(t) } },
+      side === 'vendor' ? { customer: { fullName: like(t) } } : { vendor: { nameAr: like(t) } },
+      ...(general ? [{ productId: null, subOrderId: null }] : []),
+    ],
+  };
+}
 
 export interface ContextView {
   kind: 'product' | 'order' | 'general';
@@ -203,17 +235,8 @@ export class MessagingService {
     });
   }
 
-  async listForCustomer(userId: string): Promise<{ unread: number; items: ThreadRow[] }> {
-    const [rows, unread] = await Promise.all([
-      this.prisma.conversation.findMany({
-        where: { customerId: userId },
-        orderBy: [{ lastMessageAt: 'desc' }, { id: 'desc' }],
-        take: LIST_LIMIT,
-        select: ROW_SELECT,
-      }),
-      this.countUnread({ customerId: userId }),
-    ]);
-    return { unread, items: rows.map((r) => rowOf(r, 'customer')) };
+  async listForCustomer(userId: string, q: ThreadQuery = { page: 1 }): Promise<ThreadList> {
+    return this.list({ customerId: userId }, 'customer', q);
   }
 
   async openForCustomer(userId: string, id: string): Promise<ThreadView> {
@@ -226,17 +249,25 @@ export class MessagingService {
 
   // ----------------------------------------------------------------- البائع
 
-  async listForVendor(scope: VendorScope): Promise<{ unread: number; items: ThreadRow[] }> {
-    const [rows, unread] = await Promise.all([
+  async listForVendor(scope: VendorScope, q: ThreadQuery = { page: 1 }): Promise<ThreadList> {
+    return this.list({ vendorId: scope.vendorId }, 'vendor', q);
+  }
+
+  /** الصندوق صفحةً صفحة بالأحدث رسالةً — غير المقروء للصندوق كله، والإجمالي لنتيجة البحث */
+  private async list(owner: { customerId: string } | { vendorId: string }, side: Side, q: ThreadQuery): Promise<ThreadList> {
+    const where: Prisma.ConversationWhereInput = { ...owner, ...(q.search ? threadSearch(q.search, side) : {}) };
+    const [rows, total, unread, all] = await Promise.all([
       this.prisma.conversation.findMany({
-        where: { vendorId: scope.vendorId },
+        where,
         orderBy: [{ lastMessageAt: 'desc' }, { id: 'desc' }],
-        take: LIST_LIMIT,
+        ...pageArgs(q.page, THREADS_PAGE),
         select: ROW_SELECT,
       }),
-      this.countUnread({ vendorId: scope.vendorId }),
+      this.prisma.conversation.count({ where }),
+      this.countUnread(owner),
+      q.search ? this.prisma.conversation.count({ where: owner }) : null,
     ]);
-    return { unread, items: rows.map((r) => rowOf(r, 'vendor')) };
+    return { unread, items: rows.map((r) => rowOf(r, side)), total, all: all ?? total };
   }
 
   async openForVendor(scope: VendorScope, id: string): Promise<ThreadView> {

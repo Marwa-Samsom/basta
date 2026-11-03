@@ -283,7 +283,7 @@ describe('AD-17 · الحملات — الترتيب والظهور في الر�
     await prisma.coupon.update({ where: { id: coupon.id }, data: { isActive: true } });
 
     // القائمة: العدد والنطاق والرمز
-    const row = ((await call('GET', '/admin/campaigns', content)).json() as { id: string; productCount: number; couponCode: string; scope: { shops: number } }[]).find((c) => c.id === id)!;
+    const row = ((await call('GET', `/admin/campaigns?search=${encodeURIComponent(`جارية ${SUFFIX}`)}`, content)).json() as { items: { id: string; productCount: number; couponCode: string; scope: { shops: number } }[] }).items.find((c) => c.id === id)!;
     expect(row.productCount).toBe(3);
     expect(row.couponCode).toBe(coupon.code);
     expect(row.scope.shops).toBe(1);
@@ -305,9 +305,15 @@ describe('AD-17 · الحملات — الترتيب والظهور في الر�
     const pub = await publicOf();
     for (const id of [scheduled, ended, paused]) expect(pub.some((c) => c.id === id)).toBe(false);
 
-    const list = (await call('GET', '/admin/campaigns', content)).json() as { id: string; status: string }[];
-    const st = (id: string) => list.find((c) => c.id === id)?.status;
+    const list = (await call('GET', `/admin/campaigns?search=${SUFFIX}`, content)).json() as { items: { id: string; status: string }[] };
+    const st = (id: string) => list.items.find((c) => c.id === id)?.status;
     expect([st(scheduled), st(ended), st(paused)]).toEqual(['scheduled', 'ended', 'paused']);
+    // وتصفية الحالة في الخادم بالقاعدة نفسها
+    for (const [status, id] of [['scheduled', scheduled], ['ended', ended], ['paused', paused]] as const) {
+      const only = (await call('GET', `/admin/campaigns?status=${status}&search=${SUFFIX}`, content)).json() as { items: { id: string; status: string }[] };
+      expect(only.items.some((c) => c.id === id), status).toBe(true);
+      expect(only.items.every((c) => c.status === status), status).toBe(true);
+    }
 
     // الاستئناف يعيدها
     expect((await call('PATCH', `/admin/campaigns/${paused}`, content, { isActive: true })).statusCode).toBe(204);

@@ -1,13 +1,13 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, MoreButton } from '@/components/admin';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { ClearableInput, EmptyState } from '@/components/ui';
 import { api } from '@/lib/api';
-import { useAction, useAdminData } from '@/lib/admin';
+import { useAction, useAdminList } from '@/lib/admin';
 import { intlLocale, localized, type Locale } from '@/lib/i18n';
 
 interface Attr {
@@ -77,28 +77,32 @@ export default function AdminAttributesPage() {
   );
 }
 
-const ATTR_FILTERS = [
-  { key: 'all', label: 'الكل', en: 'All', test: () => true },
-  { key: 'axis', label: 'محاور المتغيّرات', en: 'Variant axes', test: (a: Attr) => a.isVariantAxis },
-  { key: 'filter', label: 'قابلة للتصفية', en: 'Filterable', test: (a: Attr) => a.isFilterable },
+type AttrFilter = 'all' | 'axis' | 'filter';
+
+const ATTR_FILTERS: { key: AttrFilter; label: string; en: string }[] = [
+  { key: 'all', label: 'الكل', en: 'All' },
+  { key: 'axis', label: 'محاور المتغيّرات', en: 'Variant axes' },
+  { key: 'filter', label: 'قابلة للتصفية', en: 'Filterable' },
 ];
 
+/** التصفية والبحث والصفحات من الخادم (3 نوفمبر 2026) — المكتبة قليلة اليوم وتكبر مع كل خصيصة */
 function Attributes() {
   const t = useT();
   const locale = useLocale();
   const types = localized(locale, TYPES, TYPES_EN);
-  const { data, error, forbidden, reload } = useAdminData<Attr[]>('/admin/attributes');
+  const [filter, setFilter] = useState<AttrFilter>('all');
+  const [q, setQ] = useState('');
+  const aq = new URLSearchParams({ ...(filter !== 'all' ? { filter } : {}), ...(q.trim() ? { search: q.trim() } : {}) });
+  const list = useAdminList<Attr, { counts: Record<AttrFilter, number> }>(`/admin/attributes?${aq}`, (a) => a.id);
+  const { data, error, forbidden, reload } = list;
   const act = useAction();
   const [draft, setDraft] = useState({ code: '', nameAr: '', inputType: 'select', unit: '', values: '', isFilterable: true, isVariantAxis: false });
-  const [filter, setFilter] = useState('all');
-  const [q, setQ] = useState('');
   const [showNew, setShowNew] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
-  if (!data) return <Loading error={error} forbidden={forbidden} />;
+  if (!data) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
 
-  const test = ATTR_FILTERS.find((f) => f.key === filter)?.test ?? (() => true);
-  const term = q.trim();
-  const shown = data.filter(test).filter((a) => !term || a.nameAr.includes(term) || a.code.includes(term.toLowerCase()));
+  const shown = list.items;
+  const none = data.counts.all === 0;
 
   return (
     <div className="ac2-page">
@@ -107,7 +111,7 @@ function Attributes() {
           {ATTR_FILTERS.map((f) => (
             <button key={f.key} type="button" role="tab" className="tabs__tab" aria-selected={filter === f.key} onClick={() => setFilter(f.key)}>
               {t(f.label, f.en)}
-              <span className="tabs__count">{data.filter(f.test).length}</span>
+              <span className="tabs__count">{data.counts[f.key]}</span>
             </button>
           ))}
         </div>
@@ -211,78 +215,81 @@ function Attributes() {
       {shown.length === 0 ? (
         <EmptyState
           icon="file"
-          title={data.length === 0 ? t('لا خصائص بعد', 'No attributes yet') : t('لا خصائص بهذه التصفية', 'No attributes match this filter')}
+          title={none ? t('لا خصائص بعد', 'No attributes yet') : t('لا خصائص بهذه التصفية', 'No attributes match this filter')}
           actions={
-            data.length === 0 ? null : (
+            none ? null : (
               <button type="button" className="btn btn--secondary btn--sm" onClick={() => (setFilter('all'), setQ(''))}>
                 {t('أزل التصفية', 'Clear filter')}
               </button>
             )
           }
         >
-          {data.length === 0
+          {none
             ? t('أضف أول خصيصة من «خصيصة جديدة» — يراها كل بائع في محرّر منتجه.', 'Add the first attribute from “New attribute” — every seller sees it in their product editor.')
             : t('جرّب تصفية أخرى.', 'Try another filter.')}
         </EmptyState>
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">{t('الاسم', 'Name')}</th>
-                <th scope="col">{t('الرمز', 'Code')}</th>
-                <th scope="col">{t('النوع', 'Type')}</th>
-                <th scope="col">{t('الوحدة', 'Unit')}</th>
-                <th scope="col">{t('للتصفية', 'Filterable')}</th>
-                <th scope="col">{t('محور', 'Axis')}</th>
-                <th scope="col" className="end">
-                  <span className="visually-hidden">{t('إجراء', 'Action')}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((a) => {
-                const isOpen = open === a.id;
-                return (
-                  <Fragment key={a.id}>
-                  <tr>
-                    <td>
-                      <span className="ac2-inline">
-                        <strong>{a.nameAr}</strong>
-                        {a.archivedAt ? <span className="badge badge--pending">{t('مؤرشفة', 'Archived')}</span> : null}
-                      </span>
-                    </td>
-                    <td className="num" data-label={t('الرمز', 'Code')}>
-                      {a.code}
-                    </td>
-                    <td className="small" data-label={t('النوع', 'Type')}>
-                      {types[a.inputType] ?? a.inputType}
-                    </td>
-                    <td className="num ac2-muted-cell" data-label={t('الوحدة', 'Unit')}>
-                      {a.unit ?? '—'}
-                    </td>
-                    <td data-label={t('للتصفية', 'Filterable')}>
-                      {a.isFilterable ? <span className="badge badge--success">{t('نعم', 'Yes')}</span> : <span className="badge badge--pending">{t('لا', 'No')}</span>}
-                    </td>
-                    <td data-label={t('محور', 'Axis')}>{a.isVariantAxis ? <span className="badge badge--brand">{t('محور', 'Axis')}</span> : <span className="badge badge--pending">—</span>}</td>
-                    <td className="end" data-label="">
-                      <button type="button" className="btn btn--secondary btn--sm" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : a.id)}>
-                        {isOpen ? t('أغلق', 'Close') : t('حرّر', 'Edit')}
-                      </button>
-                    </td>
-                  </tr>
-                  {isOpen ? (
-                    <tr className="ac2-expand">
-                      <td colSpan={7} data-label="">
-                        <AttrEditor key={a.id} attr={a} onChanged={reload} onDeleted={() => (setOpen(null), reload())} />
+        <div className="ac2-col">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('الاسم', 'Name')}</th>
+                  <th scope="col">{t('الرمز', 'Code')}</th>
+                  <th scope="col">{t('النوع', 'Type')}</th>
+                  <th scope="col">{t('الوحدة', 'Unit')}</th>
+                  <th scope="col">{t('للتصفية', 'Filterable')}</th>
+                  <th scope="col">{t('محور', 'Axis')}</th>
+                  <th scope="col" className="end">
+                    <span className="visually-hidden">{t('إجراء', 'Action')}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((a) => {
+                  const isOpen = open === a.id;
+                  return (
+                    <Fragment key={a.id}>
+                    <tr>
+                      <td>
+                        <span className="ac2-inline">
+                          <strong>{a.nameAr}</strong>
+                          {a.archivedAt ? <span className="badge badge--pending">{t('مؤرشفة', 'Archived')}</span> : null}
+                        </span>
+                      </td>
+                      <td className="num" data-label={t('الرمز', 'Code')}>
+                        {a.code}
+                      </td>
+                      <td className="small" data-label={t('النوع', 'Type')}>
+                        {types[a.inputType] ?? a.inputType}
+                      </td>
+                      <td className="num ac2-muted-cell" data-label={t('الوحدة', 'Unit')}>
+                        {a.unit ?? '—'}
+                      </td>
+                      <td data-label={t('للتصفية', 'Filterable')}>
+                        {a.isFilterable ? <span className="badge badge--success">{t('نعم', 'Yes')}</span> : <span className="badge badge--pending">{t('لا', 'No')}</span>}
+                      </td>
+                      <td data-label={t('محور', 'Axis')}>{a.isVariantAxis ? <span className="badge badge--brand">{t('محور', 'Axis')}</span> : <span className="badge badge--pending">—</span>}</td>
+                      <td className="end" data-label="">
+                        <button type="button" className="btn btn--secondary btn--sm" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : a.id)}>
+                          {isOpen ? t('أغلق', 'Close') : t('حرّر', 'Edit')}
+                        </button>
                       </td>
                     </tr>
-                  ) : null}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+                    {isOpen ? (
+                      <tr className="ac2-expand">
+                        <td colSpan={7} data-label="">
+                          <AttrEditor key={a.id} attr={a} onChanged={reload} onDeleted={() => (setOpen(null), reload())} />
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <MoreButton list={list} />
         </div>
       )}
     </div>

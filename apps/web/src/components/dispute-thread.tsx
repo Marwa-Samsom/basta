@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
-import { Alert, EmptyState, PageHead, Spinner } from '@/components/ui';
+import { Alert, EmptyState, MoreButton, PageHead, Spinner } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useAdminList } from '@/lib/admin';
 import { localized } from '@/lib/i18n';
 import {
   DISPUTE_REASONS,
@@ -205,43 +206,38 @@ export function DisputeThread({ id, base, me, back }: { id: string; base: string
   );
 }
 
-/** قائمة النزاعات — لكلا الجمهورين */
+interface DisputeRow {
+  id: string;
+  reasonCode: string;
+  status: string;
+  createdAt: string;
+  subOrder: { subOrderNumber: string; vendor: { nameAr: string } };
+  _count: { messages: number };
+}
+
+/**
+ * قائمة النزاعات — لكلا الجمهورين. صفحات من الخادم بـ«المزيد» و«السابق»، وبحث البائع (رقم
+ * الطلب أو السبب) هناك أيضاً (3 نوفمبر 2026): كانت أول مئة نزاع، والبحث يصفّي ما جُلب وحده.
+ */
 export function DisputeList({ base, link, searchable = false }: { base: string; link: (id: string) => string; searchable?: boolean }) {
   const t = useT();
   const locale = useLocale();
   const reasons = localized(locale, DISPUTE_REASONS, DISPUTE_REASONS_EN);
   const statuses = localized(locale, DISPUTE_STATUS, DISPUTE_STATUS_EN);
-  // للبائع: تصفية النزاعات المحمّلة برقم الطلب أو السبب
   const [filter, setFilter] = useState('');
-  const [rows, setRows] = useState<
-    { id: string; reasonCode: string; status: string; createdAt: string; subOrder: { subOrderNumber: string; vendor: { nameAr: string } }; _count: { messages: number } }[] | null
-  >(null);
-  const [error, setError] = useState<string | null>(null);
+  const term = filter.trim();
+  const list = useAdminList<DisputeRow>(`${base}${term ? `?search=${encodeURIComponent(term)}` : ''}`, (r) => r.id);
 
-  const returned = useReturnTick();
-  useEffect(() => {
-    api<typeof rows>(base)
-      .then(setRows)
-      .catch((e: Error) => setError(e.message));
-  }, [base, returned]);
-
-  if (error) return <Alert tone="danger">{error}</Alert>;
-  if (!rows) return <Spinner />;
-  if (rows.length === 0) {
+  if (list.error) return <Alert tone="danger">{list.error}</Alert>;
+  if (!list.data) return <Spinner />;
+  if (!term && list.total === 0) {
     return (
       <EmptyState icon="msg" title={t('لا نزاعات', 'No disputes')}>
         {t('حين يُفتح نزاع على طلب يظهر هنا بخيط رسائله وحالته.', 'When a dispute is opened on an order, it shows up here with its message thread and status.')}
       </EmptyState>
     );
   }
-  const term = filter.trim();
-  const shown = term
-    ? rows.filter(
-        (r) =>
-          r.subOrder.subOrderNumber.toLowerCase().includes(term.toLowerCase()) ||
-          (reasons[r.reasonCode] ?? '').toLowerCase().includes(term.toLowerCase()),
-      )
-    : rows;
+  const shown = list.items;
   return (
     <>
       {searchable ? (
@@ -295,6 +291,7 @@ export function DisputeList({ base, link, searchable = false }: { base: string; 
         </tbody>
       </table>
     </div>
+    <MoreButton list={list} />
     </>
   );
 }

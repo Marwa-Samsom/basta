@@ -40,21 +40,45 @@ export class OperationsService {
 
   // ---------------------------------------------------------- AD-23 الإدارة
 
-  async admins() {
-    const rows = await this.prisma.user.findMany({
-      where: { roles: { some: { role: 'admin' } } },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true, email: true, fullName: true, status: true, totpEnabledAt: true, lastLoginAt: true, isPlatformOwner: true,
-        permissions: { select: { permission: true } },
-      },
-    });
-    return rows.map(({ isPlatformOwner, ...u }) => ({
-      ...u,
-      isOwner: isPlatformOwner,
-      twoFactor: !!u.totpEnabledAt,
-      permissions: u.permissions.map((p) => p.permission),
-    }));
+  /**
+   * المديرون بالتصفية («بلا تحقّق بخطوتين») والبحث (الاسم أو البريد) وخمسين خمسين، ومعها عدّاد كل
+   * تصفية. كانوا يُقرؤون كلهم — 4491 مديراً على قاعدة التطوير (3 نوفمبر 2026). `iAmOwner`: هل
+   * الطالب مالك المنصة — كانت اللوحة تبحث عنه في القائمة نفسها، وقد لا يكون في صفحتها.
+   */
+  async admins(actorId: string, q: { filter?: 'tfa_off'; search?: string; page: number }) {
+    const t = q.search;
+    const base: Prisma.UserWhereInput = { roles: { some: { role: 'admin' } } };
+    const where: Prisma.UserWhereInput = {
+      ...base,
+      ...(q.filter === 'tfa_off' ? { totpEnabledAt: null } : {}),
+      ...(t ? { OR: [{ fullName: like(t) }, { email: like(t) }] } : {}),
+    };
+    const [rows, total, all, tfaOff, me] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        ...pageArgs(q.page),
+        select: {
+          id: true, email: true, fullName: true, status: true, totpEnabledAt: true, lastLoginAt: true, isPlatformOwner: true,
+          permissions: { select: { permission: true } },
+        },
+      }),
+      this.prisma.user.count({ where }),
+      this.prisma.user.count({ where: base }),
+      this.prisma.user.count({ where: { ...base, totpEnabledAt: null } }),
+      this.prisma.user.findUnique({ where: { id: actorId }, select: { isPlatformOwner: true } }),
+    ]);
+    return {
+      items: rows.map(({ isPlatformOwner, ...u }) => ({
+        ...u,
+        isOwner: isPlatformOwner,
+        twoFactor: !!u.totpEnabledAt,
+        permissions: u.permissions.map((p) => p.permission),
+      })),
+      total,
+      counts: { all, tfa_off: tfaOff },
+      iAmOwner: me?.isPlatformOwner ?? false,
+    };
   }
 
   /**

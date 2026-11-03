@@ -17,7 +17,7 @@ import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagg
 import type { MultipartFile } from '@fastify/multipart';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { InvalidInputError } from '../../../common/errors/domain-error';
-import { pageOf, termOf } from '../../../common/paging';
+import { ADMIN_PAGE, like, pageOf, termOf } from '../../../common/paging';
 import { assertOneOf } from '../../../common/validation';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { AuditService } from '../../identity/public';
@@ -233,24 +233,41 @@ export class AdminCatalogController {
   }
 
   @Get('attributes')
-  @ApiOperation({ summary: 'كل السمات بقيمها، وكم منتجاً ومتغيّراً يستعمل كلاً منها وكل قيمة — AD-09' })
-  listAttributes() {
-    return this.prisma.attribute.findMany({
-      orderBy: [{ sort: 'asc' }, { code: 'asc' }],
-      include: {
-        values: {
-          orderBy: { sort: 'asc' },
-          select: {
-            id: true,
-            valueAr: true,
-            valueEn: true,
-            hexColor: true,
-            _count: { select: { productValues: true, variantOptions: true, productImages: true } },
+  @ApiOperation({ summary: 'السمات بقيمها خمسين خمسين بتصفية وبحث، وكم منتجاً ومتغيّراً يستعمل كلاً منها وكل قيمة — AD-09' })
+  async listAttributes(@Query('filter') filter?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    // كانت المكتبة كلها في طلب واحد — قليلة اليوم، وتكبر مع كل خصيصة يحتاجها بائع (3 نوفمبر 2026)
+    const kind = filter ? assertOneOf(filter, ['axis', 'filter'] as const, 'تصفية الخصائص') : undefined;
+    const term = termOf(search);
+    const where = {
+      ...(kind === 'axis' ? { isVariantAxis: true } : kind === 'filter' ? { isFilterable: true } : {}),
+      ...(term ? { OR: [{ nameAr: like(term) }, { code: like(term) }] } : {}),
+    };
+    const [items, total, all, axis, filterable] = await Promise.all([
+      this.prisma.attribute.findMany({
+        where,
+        orderBy: [{ sort: 'asc' }, { code: 'asc' }, { id: 'asc' }],
+        skip: (pageOf(page) - 1) * ADMIN_PAGE,
+        take: ADMIN_PAGE,
+        include: {
+          values: {
+            orderBy: { sort: 'asc' },
+            select: {
+              id: true,
+              valueAr: true,
+              valueEn: true,
+              hexColor: true,
+              _count: { select: { productValues: true, variantOptions: true, productImages: true } },
+            },
           },
+          _count: { select: { productValues: true, variantOptions: true } },
         },
-        _count: { select: { productValues: true, variantOptions: true } },
-      },
-    });
+      }),
+      this.prisma.attribute.count({ where }),
+      this.prisma.attribute.count(),
+      this.prisma.attribute.count({ where: { isVariantAxis: true } }),
+      this.prisma.attribute.count({ where: { isFilterable: true } }),
+    ]);
+    return { items, total, counts: { all, axis, filter: filterable } };
   }
 
   @Get('products')

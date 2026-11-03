@@ -25,6 +25,8 @@ export const ENTRY_LABELS: Record<string, string> = {
 export const STATEMENT_PAGE = 500;
 /** أطول مدة لكشف واحد أو تصدير */
 export const STATEMENT_MAX_DAYS = 366;
+/** طلبات سحب المتجر في الصفحة الواحدة من سجلّه */
+export const VENDOR_PAYOUTS_PAGE = 20;
 const ZERO = { pending: 0n, available: 0n };
 
 export interface StatementRow {
@@ -113,7 +115,7 @@ export class FinanceService {
     const from = range.from ?? null;
     const to = range.to ?? null;
     const after = cursor ?? null;
-    const [opening, closing, beforePage, ids] = await Promise.all([
+    const [opening, closing, beforePage, ids, [counted]] = await Promise.all([
       from ? this.balance(Prisma.sql`"vendorId" = ${vendorId}::uuid AND "currency" = ${currency} AND "createdAt" < ${from}`) : ZERO,
       this.balance(Prisma.sql`"vendorId" = ${vendorId}::uuid AND "currency" = ${currency} AND (${to}::timestamptz IS NULL OR "createdAt" <= ${to})`),
       after
@@ -129,6 +131,12 @@ export class FinanceService {
                OR (e."createdAt", e."id") > (SELECT c."createdAt", c."id" FROM "ledger_entries" c WHERE c."id" = ${after}::uuid))
         ORDER BY e."createdAt", e."id"
         LIMIT ${pageSize + 1}`,
+      // قيود المدة كلها — «X من Y» تحت الكشف
+      this.prisma.$queryRaw<{ total: number }[]>`
+        SELECT count(*)::int AS "total" FROM "ledger_entries" e
+        WHERE e."vendorId" = ${vendorId}::uuid AND e."currency" = ${currency}
+          AND (${from}::timestamptz IS NULL OR e."createdAt" >= ${from})
+          AND (${to}::timestamptz IS NULL OR e."createdAt" <= ${to})`,
     ]);
     const more = ids.length > pageSize;
     const pageIds = ids.slice(0, pageSize).map((r) => r.id);
@@ -179,6 +187,8 @@ export class FinanceService {
       rows,
       /** آخر قيد في الصفحة — يُرسل cursor للصفحة التالية؛ null حين لا صفحة بعدها */
       nextCursor: more ? pageIds[pageIds.length - 1]! : null,
+      /** قيود المدة كلها، لا الصفحة */
+      total: counted?.total ?? 0,
     };
   }
 
@@ -324,17 +334,22 @@ export class FinanceService {
     });
   }
 
-  async payouts(filter: { vendorId?: string; status?: string }) {
-    const rows = await this.prisma.payoutRequest.findMany({
-      where: {
-        ...(filter.vendorId ? { vendorId: filter.vendorId } : {}),
-        ...(filter.status ? { status: filter.status as never } : {}),
-      },
-      orderBy: { requestedAt: 'desc' },
-      take: 200,
-      include: { vendor: { select: { nameAr: true } } },
-    });
-    return rows.map((r) => ({ ...present(r), vendor: r.vendor.nameAr }));
+  /**
+   * VD-21 سجلّ سحوبات المتجر، الأحدث أولاً وعشرين عشرين. كان أول مئتين بلا ما بعدها ولا عدد
+   * (3 نوفمبر 2026).
+   */
+  async payouts(vendorId: string, page: number) {
+    const where: Prisma.PayoutRequestWhereInput = { vendorId };
+    const [rows, total] = await Promise.all([
+      this.prisma.payoutRequest.findMany({
+        where,
+        orderBy: [{ requestedAt: 'desc' }, { id: 'asc' }],
+        ...pageArgs(page, VENDOR_PAYOUTS_PAGE),
+        include: { vendor: { select: { nameAr: true } } },
+      }),
+      this.prisma.payoutRequest.count({ where }),
+    ]);
+    return { items: rows.map((r) => ({ ...present(r), vendor: r.vendor.nameAr })), total };
   }
 
   /**
@@ -427,14 +442,24 @@ export class FinanceService {
 
   // --------------------------------------------------------------- العمولات
 
-  /** القواعد السارية: العامة وما خُصّص للمتاجر */
-  async commissionRules() {
-    const now = new Date();
-    return this.prisma.commissionRule.findMany({
-      where: { scope: { in: ['global', 'vendor'] }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
-      orderBy: [{ scope: 'asc' }, { effectiveFrom: 'desc' }],
-      include: { vendor: { select: { nameAr: true } } },
-    });
+  /**
+   * القواعد السارية: العامة وحدها في `global`، والخاصة بالمتاجر صفحاتٍ خمسين خمسين ببحث باسم
+   * المتجر، الأحدث أولاً. كانت كلها في طلب واحد — 534 قاعدة على قاعدة التطوير (3 نوفمبر 2026).
+   * `counts.vendor` عدد الخاصة كلها، لا نتيجة البحث: لا خاصة أصلاً غير «لا نتيجة لهذا الاسم».
+   */
+  async commissionRules(q: { search?: string; page: number }) {
+    const live: Prisma.CommissionRuleWhereInput = { OR: [{ effectiveTo: null }, { effectiveTo: { gt: new Date() } }] };
+    const vendor: Prisma.CommissionRuleWhereInput = { ...live, scope: 'vendor' };
+    const t = q.search;
+    const where: Prisma.CommissionRuleWhereInput = { ...vendor, ...(t ? { vendor: { OR: [{ nameAr: like(t) }, { nameEn: like(t) }, { slug: like(t) }] } } : {}) };
+    const include = { vendor: { select: { nameAr: true } } } as const;
+    const [global, items, total, all] = await Promise.all([
+      this.prisma.commissionRule.findFirst({ where: { ...live, scope: 'global' }, orderBy: [{ effectiveFrom: 'desc' }, { id: 'asc' }], include }),
+      this.prisma.commissionRule.findMany({ where, orderBy: [{ effectiveFrom: 'desc' }, { id: 'asc' }], ...pageArgs(q.page), include }),
+      this.prisma.commissionRule.count({ where }),
+      this.prisma.commissionRule.count({ where: vendor }),
+    ]);
+    return { global, items, total, counts: { vendor: all } };
   }
 
   /**

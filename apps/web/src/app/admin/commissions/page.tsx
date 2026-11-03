@@ -1,12 +1,12 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, MoreButton, SearchBox } from '@/components/admin';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
-import { pct, useAction, useAdminData } from '@/lib/admin';
+import { pct, useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { when } from '@/lib/orders';
 import { ClearableInput } from '@/components/ui';
 
@@ -35,11 +35,17 @@ const PICK = 20;
  *
  * المتجر يُختار ببحث (20 أكتوبر 2026): القائمة كانت أقدم مئة متجر معتمد، فما بعدها — «غزة»
  * بين آلاف متاجر الاختبار — لا تُعطى نسبة خاصة.
+ *
+ * والنسب الخاصة صفحات من الخادم ببحث باسم المتجر (3 نوفمبر 2026): كانت القواعد كلها — 534 —
+ * تُجلب وتُصفّى هنا بلا «المزيد» ولا «السابق». العامة تأتي وحدها معها.
  */
 export default function AdminCommissionsPage() {
   const t = useT();
   const locale = useLocale();
-  const { data, error, forbidden, reload } = useAdminData<Rule[]>('/admin/finance/commissions');
+  const [ruleSearch, setRuleSearch] = useState('');
+  const rq = new URLSearchParams(ruleSearch.trim() ? { search: ruleSearch.trim() } : {});
+  const list = useAdminList<Rule, { global: Rule | null; counts: { vendor: number } }>(`/admin/finance/commissions?${rq}`, (r) => r.id);
+  const { data, error, forbidden, reload } = list;
   const act = useAction();
   const ask = useConfirm();
   const [scope, setScope] = useState<'global' | 'vendor'>('global');
@@ -47,20 +53,18 @@ export default function AdminCommissionsPage() {
   // اسم المختار يبقى ظاهراً ولو خرج من نتائج بحث لاحق
   const [targetName, setTargetName] = useState('');
   const [vendorSearch, setVendorSearch] = useState('');
-  const [ruleSearch, setRuleSearch] = useState('');
   const vq = new URLSearchParams({ status: 'approved', limit: String(PICK), ...(vendorSearch.trim() ? { search: vendorSearch.trim() } : {}) });
   const { data: vendors } = useAdminData<{ items: VendorItem[]; total: number }>(scope === 'vendor' ? `/admin/vendors?${vq}` : null);
   const [rate, setRate] = useState('');
   const formRef = useRef<HTMLElement | null>(null);
   const rateRef = useRef<HTMLInputElement | null>(null);
 
-  if (!data) return <Loading error={error} forbidden={forbidden} />;
+  if (!data) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
 
-  const global = data.find((r) => r.scope === 'global') ?? null;
-  const custom = data.filter((r) => r.scope === 'vendor');
-  // النسب الخاصة كلها في الصفحة — تُصفّى هنا باسم المتجر
-  const ruleTerm = ruleSearch.trim();
-  const shownCustom = ruleTerm ? custom.filter((r) => (r.vendor?.nameAr ?? '').includes(ruleTerm)) : custom;
+  const global = data.global;
+  // كل النسب الخاصة لا نتيجة البحث: «لا نسبة خاصة» غير «لا نسبة لهذا الاسم»
+  const hasCustom = data.counts.vendor > 0;
+  const shownCustom = list.items;
 
   // «غيّر» و«نسبة لمتجر» تملأ النموذج وتنقل التركيز إليه
   const startRule = (s: Rule['scope'], vendorId = '', vendorName = '') => {
@@ -166,7 +170,7 @@ export default function AdminCommissionsPage() {
           <h2 className="ac2-title">{t('نسب خاصة بمتاجر', 'Custom shop rates')}</h2>
           <span className="ac2-hint">{t('تتجاوز النسبة العامة للمتجر وحده', 'Override the general rate for that shop only')}</span>
           <span className="ac2-end ac2-inline">
-            {custom.length > 0 ? (
+            {hasCustom ? (
               <SearchBox
                 value={ruleSearch}
                 onChange={setRuleSearch}
@@ -181,52 +185,55 @@ export default function AdminCommissionsPage() {
             </button>
           </span>
         </header>
-        {custom.length === 0 ? (
+        {!hasCustom ? (
           <p className="ac2-section-empty">{t('كل المتاجر على النسبة العامة.', 'All shops are on the general rate.')}</p>
         ) : shownCustom.length === 0 ? (
           <p className="ac2-section-empty">
             {t('لا نسبة خاصة لمتجر بهذا الاسم — ابحث عنه في «نسبة جديدة» لتعطيه واحدة.', 'No custom rate for a shop with this name — search for it in “New rate” to give it one.')}
           </p>
         ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">{t('المتجر', 'Shop')}</th>
-                  <th scope="col">{t('النسبة', 'Rate')}</th>
-                  <th scope="col">{t('السريان', 'In effect')}</th>
-                  <th scope="col" className="end">
-                    <span className="visually-hidden">{t('إجراءات', 'Actions')}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {shownCustom.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <strong>{r.vendor?.nameAr ?? '—'}</strong>
-                    </td>
-                    <td className="num ac2-rate" data-label={t('النسبة', 'Rate')}>
-                      {pct(r.rateBps, locale)}
-                    </td>
-                    <td className="ac2-muted-cell" data-label={t('السريان', 'In effect')}>
-                      {when(r.effectiveFrom, locale)} — {r.effectiveTo ? when(r.effectiveTo, locale) : t('مفتوحة', 'Open-ended')}
-                    </td>
-                    <td className="end" data-label="">
-                      <span className="ac2-inline">
-                        <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => startRule('vendor', r.vendorId ?? '', r.vendor?.nameAr ?? '')}>
-                          {t('غيّر', 'Change')}
-                        </button>
-                        <button type="button" className="btn btn--ghost btn--sm" disabled={act.busy} onClick={() => void endCustom(r)}>
-                          {t('أعده إلى العامة', 'Back to general rate')}
-                        </button>
-                      </span>
-                    </td>
+          <>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t('المتجر', 'Shop')}</th>
+                    <th scope="col">{t('النسبة', 'Rate')}</th>
+                    <th scope="col">{t('السريان', 'In effect')}</th>
+                    <th scope="col" className="end">
+                      <span className="visually-hidden">{t('إجراءات', 'Actions')}</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {shownCustom.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <strong>{r.vendor?.nameAr ?? '—'}</strong>
+                      </td>
+                      <td className="num ac2-rate" data-label={t('النسبة', 'Rate')}>
+                        {pct(r.rateBps, locale)}
+                      </td>
+                      <td className="ac2-muted-cell" data-label={t('السريان', 'In effect')}>
+                        {when(r.effectiveFrom, locale)} — {r.effectiveTo ? when(r.effectiveTo, locale) : t('مفتوحة', 'Open-ended')}
+                      </td>
+                      <td className="end" data-label="">
+                        <span className="ac2-inline">
+                          <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => startRule('vendor', r.vendorId ?? '', r.vendor?.nameAr ?? '')}>
+                            {t('غيّر', 'Change')}
+                          </button>
+                          <button type="button" className="btn btn--ghost btn--sm" disabled={act.busy} onClick={() => void endCustom(r)}>
+                            {t('أعده إلى العامة', 'Back to general rate')}
+                          </button>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <MoreButton list={list} />
+          </>
         )}
       </section>
 

@@ -66,6 +66,13 @@ async function login(email: string, totp?: string): Promise<string> {
   return res.json().tokens.accessToken as string;
 }
 
+/** نسب المتجر الخاصة السارية كما تعرضها لوحة العمولة — صفحات، فيُوصل إلى المتجر برابطه */
+async function listedRates(vendorId: string): Promise<number[]> {
+  const { slug } = await prisma.vendor.findUniqueOrThrow({ where: { id: vendorId }, select: { slug: true } });
+  const listed = (await call('GET', `/admin/finance/commissions?search=${encodeURIComponent(slug)}`, admin.token)).json() as { items: { vendorId: string | null; rateBps: number }[] };
+  return listed.items.filter((r) => r.vendorId === vendorId).map((r) => r.rateBps);
+}
+
 async function placeOrder(qty: number[], currency = 'JOD') {
   const cart = await call('POST', '/cart', undefined, { currency });
   const token = cart.json().token as string;
@@ -301,8 +308,7 @@ describe('بوابة 10 · البند 2 — لقطة العمولة', () => {
     const custom = await call('POST', '/admin/finance/commissions', admin.token, { scope: 'vendor', vendorId: jod, rateBps: 300 });
     expect(custom.statusCode, custom.body).toBe(201);
     expect((await placeOrder([0, 1])).sub(1).items[0]!.commissionBpsSnapshot).toBe(300);
-    const listed = (await call('GET', '/admin/finance/commissions', admin.token)).json() as { scope: string; vendorId: string | null; rateBps: number }[];
-    expect(listed.filter((r) => r.scope === 'vendor' && r.vendorId === jod).map((r) => r.rateBps)).toEqual([300]);
+    expect(await listedRates(jod)).toEqual([300]);
 
     // الإلغاء يُنهي النسبة الخاصة ولا يحذفها، فيعود المتجر إلى العامة من الآن
     const ended = await call('DELETE', `/admin/finance/commissions/vendor/${jod}`, admin.token);
@@ -341,8 +347,7 @@ describe('بوابة 10 · البند 2 — لقطة العمولة', () => {
       }
       const [current] = await live();
       // القائمة والتسعير يقولان الشيء نفسه
-      const listed = (await call('GET', '/admin/finance/commissions', admin.token)).json() as { scope: string; vendorId: string | null; rateBps: number }[];
-      expect(listed.filter((r) => r.scope === 'vendor' && r.vendorId === jod).map((r) => r.rateBps)).toEqual([current!.rateBps]);
+      expect(await listedRates(jod)).toEqual([current!.rateBps]);
       expect((await placeOrder([0, 1])).sub(1).items[0]!.commissionBpsSnapshot).toBe(current!.rateBps);
 
       expect((await call('DELETE', `/admin/finance/commissions/vendor/${jod}`, admin.token)).statusCode).toBe(200);
