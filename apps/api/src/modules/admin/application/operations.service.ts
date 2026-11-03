@@ -10,6 +10,8 @@ import { acceptBy, acceptanceDueSince } from '../domain/acceptance';
 import { PERMISSION_CODES, SETTINGS_SPEC } from '../domain/permissions';
 
 const PAGE = 50;
+/** طلبات الصفحة الواحدة في ملف العميل */
+const CUSTOMER_ORDERS_PAGE = 20;
 
 /**
  * عمليات الإدارة اليومية — بوابة 11 البند الأول: لا عملية تشغيلية تحتاج فتح
@@ -40,21 +42,45 @@ export class OperationsService {
 
   // ---------------------------------------------------------- AD-23 الإدارة
 
-  async admins() {
-    const rows = await this.prisma.user.findMany({
-      where: { roles: { some: { role: 'admin' } } },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true, email: true, fullName: true, status: true, totpEnabledAt: true, lastLoginAt: true, isPlatformOwner: true,
-        permissions: { select: { permission: true } },
-      },
-    });
-    return rows.map(({ isPlatformOwner, ...u }) => ({
-      ...u,
-      isOwner: isPlatformOwner,
-      twoFactor: !!u.totpEnabledAt,
-      permissions: u.permissions.map((p) => p.permission),
-    }));
+  /**
+   * المديرون بالتصفية («بلا تحقّق بخطوتين») والبحث (الاسم أو البريد) وخمسين خمسين، ومعها عدّاد كل
+   * تصفية. كانوا يُقرؤون كلهم — 4491 مديراً على قاعدة التطوير (3 نوفمبر 2026). `iAmOwner`: هل
+   * الطالب مالك المنصة — كانت اللوحة تبحث عنه في القائمة نفسها، وقد لا يكون في صفحتها.
+   */
+  async admins(actorId: string, q: { filter?: 'tfa_off'; search?: string; page: number }) {
+    const t = q.search;
+    const base: Prisma.UserWhereInput = { roles: { some: { role: 'admin' } } };
+    const where: Prisma.UserWhereInput = {
+      ...base,
+      ...(q.filter === 'tfa_off' ? { totpEnabledAt: null } : {}),
+      ...(t ? { OR: [{ fullName: like(t) }, { email: like(t) }] } : {}),
+    };
+    const [rows, total, all, tfaOff, me] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        ...pageArgs(q.page),
+        select: {
+          id: true, email: true, fullName: true, status: true, totpEnabledAt: true, lastLoginAt: true, isPlatformOwner: true,
+          permissions: { select: { permission: true } },
+        },
+      }),
+      this.prisma.user.count({ where }),
+      this.prisma.user.count({ where: base }),
+      this.prisma.user.count({ where: { ...base, totpEnabledAt: null } }),
+      this.prisma.user.findUnique({ where: { id: actorId }, select: { isPlatformOwner: true } }),
+    ]);
+    return {
+      items: rows.map(({ isPlatformOwner, ...u }) => ({
+        ...u,
+        isOwner: isPlatformOwner,
+        twoFactor: !!u.totpEnabledAt,
+        permissions: u.permissions.map((p) => p.permission),
+      })),
+      total,
+      counts: { all, tfa_off: tfaOff },
+      iAmOwner: me?.isPlatformOwner ?? false,
+    };
   }
 
   /**
@@ -183,7 +209,6 @@ export class OperationsService {
       select: {
         id: true, fullName: true, email: true, phone: true, status: true, createdAt: true, lastLoginAt: true,
         totpEnabledAt: true, roles: { select: { role: true } },
-        orders: { orderBy: { placedAt: 'desc' }, take: 20, select: { orderNumber: true, status: true, currency: true, grandTotalMinorUnits: true, placedAt: true } },
       },
     });
     if (!u) throw new NotFoundError('العميل غير موجود.', { id });
@@ -195,8 +220,25 @@ export class OperationsService {
       // المدير لا يُعاد ضبط تحققه من هنا — الواجهة تُخفي الزرّ، والخادم يرفض
       totpResettable: totpEnabledAt !== null && !roles.some((r) => r.role === 'admin'),
       disputes,
-      orders: u.orders.map((o) => ({ ...o, grandTotalMinorUnits: o.grandTotalMinorUnits.toString() })),
     };
+  }
+
+  /**
+   * طلبات العميل في ملفه، الأحدث أولاً وعشرين عشرين. كانت آخر عشرين مع الملف بلا ما قبلها ولا
+   * عددها (3 نوفمبر 2026).
+   */
+  async customerOrders(id: string, page: number) {
+    const where: Prisma.OrderWhereInput = { customerUserId: id };
+    const [rows, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        orderBy: [{ placedAt: 'desc' }, { id: 'asc' }],
+        ...pageArgs(page, CUSTOMER_ORDERS_PAGE),
+        select: { id: true, orderNumber: true, status: true, currency: true, grandTotalMinorUnits: true, placedAt: true },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+    return { items: rows.map((o) => ({ ...o, grandTotalMinorUnits: o.grandTotalMinorUnits.toString() })), total };
   }
 
   /** التعليق يُنهي الجلسات فوراً — الدخول يرفض الحساب غير النشط */
@@ -336,22 +378,47 @@ export class OperationsService {
 
   // ------------------------------------------------------ AD-11 العملات
 
-  async currencies() {
-    const [currencies, spread] = await Promise.all([
+  async currencies(now: Date = new Date()) {
+    const [currencies, spread, current] = await Promise.all([
       this.prisma.currency.findMany({ orderBy: [{ sort: 'asc' }, { code: 'asc' }] }),
       this.prisma.setting.findUnique({ where: { key: 'fx_spread_bps' } }),
+      this.currentRates(now),
     ]);
-    const history = await this.prisma.exchangeRate.findMany({ where: { baseCode: 'USD' }, orderBy: { effectiveAt: 'desc' }, take: 200 });
     return {
       // ما يُطبَّق فعلاً — كان الغائب يُعرض 0 والدفع يحسبه 200، والتالف «NaN%»
       spreadBps: fxSpreadBps(spread?.valueJson),
       currencies: currencies.map((c) => ({
         ...c,
         minPayoutMinorUnits: c.minPayoutMinorUnits.toString(),
-        currentRate: history.find((h) => h.quoteCode === c.code)?.rate.toString() ?? (c.code === 'USD' ? '1' : null),
+        currentRate: current.get(c.code)?.rate.toString() ?? (c.code === 'USD' ? '1' : null),
       })),
-      history: history.map((h) => ({ ...h, rate: h.rate.toString() })),
     };
+  }
+
+  /**
+   * السعر الساري لكل عملة: الأحدث قبل اللحظة، كما يسعّر الدفع (display-currency usdRates). كان يُؤخذ من
+   * أحدث 200 سطر في السجلّ، فعملة سعرها أقدم منها تُعرض «—» وهي مسعَّرة (ACFG-016، 2 نوفمبر 2026).
+   */
+  private async currentRates(now: Date) {
+    const rows = await this.prisma.exchangeRate.findMany({
+      where: { baseCode: 'USD', effectiveAt: { lte: now } },
+      orderBy: [{ quoteCode: 'asc' }, { effectiveAt: 'desc' }],
+      distinct: ['quoteCode'],
+      select: { id: true, quoteCode: true, rate: true },
+    });
+    return new Map(rows.map((r) => [r.quoteCode, r]));
+  }
+
+  /** سجلّ أسعار الصرف بصفحات، الأحدث أولاً، والساري لكل عملة معلَّم — كانت الصفحة تقصّه على أحدث 50 بلا «المزيد» */
+  async rateHistory(page = 1, now: Date = new Date()) {
+    const where = { baseCode: 'USD' };
+    const [rows, total, current] = await Promise.all([
+      this.prisma.exchangeRate.findMany({ where, orderBy: [{ effectiveAt: 'desc' }, { id: 'desc' }], skip: (Math.max(1, page) - 1) * PAGE, take: PAGE }),
+      this.prisma.exchangeRate.count({ where }),
+      this.currentRates(now),
+    ]);
+    const ids = new Set([...current.values()].map((r) => r.id));
+    return { items: rows.map((h) => ({ ...h, rate: h.rate.toString(), current: ids.has(h.id) })), total };
   }
 
   /** سعر جديد إضافة لا تعديل — الجدول للإضافة فقط (ADR-013) */

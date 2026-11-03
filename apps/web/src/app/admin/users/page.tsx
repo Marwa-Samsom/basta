@@ -1,13 +1,13 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, MoreButton } from '@/components/admin';
 import { useMe } from '@/components/admin-context';
 import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { EmptyState, TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
-import { useAction, useAdminData } from '@/lib/admin';
+import { useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { when } from '@/lib/orders';
 import { useLocale, useT } from '@/components/locale';
 
@@ -29,9 +29,11 @@ interface Perm {
   hint: string;
 }
 
-const FILTERS = [
-  { key: 'all', label: 'الكل', en: 'All', test: () => true },
-  { key: 'tfa_off', label: 'بلا تحقّق بخطوتين', en: 'Without two-step verification', test: (u: Admin) => !u.twoFactor },
+type Filter = 'all' | 'tfa_off';
+
+const FILTERS: { key: Filter; label: string; en: string }[] = [
+  { key: 'all', label: 'الكل', en: 'All' },
+  { key: 'tfa_off', label: 'بلا تحقّق بخطوتين', en: 'Without two-step verification' },
 ];
 
 /** أسماء الصلاحيات وشروحها بالإنجليزية — الخادم يرسلها بالعربية وحدها، فتُقرأ بالرمز */
@@ -56,12 +58,19 @@ const PERM_EN: Record<string, { label: string; hint: string }> = {
  * AD-23 — مستخدمو الإدارة. الإدارة تُمنح لحساب قائم (ينشئه صاحبه بنفسه فلا
  * تمرّ كلمة مرور بيد أحد)، والتحقق الثنائي يُفرض عند أول دخول. تغيير
  * الصلاحيات يُنهي جلسات صاحبها ليدخل بها الجديدة.
+ *
+ * التصفية والبحث والصفحات من الخادم (3 نوفمبر 2026): كان المديرون كلهم — 4491 على قاعدة
+ * التطوير — يُجلبون ويُصفّون هنا بلا «المزيد» ولا «السابق».
  */
 export default function AdminUsersPage() {
   const t = useT();
   const locale = useLocale();
   const me = useMe();
-  const { data, error, forbidden, reload } = useAdminData<Admin[]>('/admin/users');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [q, setQ] = useState('');
+  const uq = new URLSearchParams({ ...(filter !== 'all' ? { filter } : {}), ...(q.trim() ? { search: q.trim() } : {}) });
+  const list = useAdminList<Admin, { counts: Record<Filter, number>; iAmOwner: boolean }>(`/admin/users?${uq}`, (u) => u.id);
+  const { data, error, forbidden, reload } = list;
   const { data: perms } = useAdminData<Perm[]>('/admin/permissions');
   const act = useAction();
   const ask = useConfirm();
@@ -69,12 +78,11 @@ export default function AdminUsersPage() {
   const [picked, setPicked] = useState<string[]>([]);
   const [editing, setEditing] = useState<Record<string, string[]>>({});
   const [showGrant, setShowGrant] = useState(false);
-  const [filter, setFilter] = useState('all');
-  const [q, setQ] = useState('');
-  if (!data || !perms) return <Loading error={error} forbidden={forbidden} />;
+  if (!data || !perms) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
 
   // لا يُمنح ولا يُسحب إلا ما يحمله المدير نفسه — والمالك وحده فوق ذلك (الخادم يفرضه)
-  const iAmOwner = data.some((u) => u.id === me.userId && u.isOwner);
+  // من الخادم: المالك قد لا يكون في الصفحة المعروضة
+  const iAmOwner = data.iAmOwner;
   const mine = (code: string) => iAmOwner || me.permissions.includes(code);
   const permLabel = (p: Perm) => (locale === 'en' && PERM_EN[p.code] ? PERM_EN[p.code]!.label : p.labelAr);
   const permHint = (p: Perm) => (locale === 'en' && PERM_EN[p.code] ? PERM_EN[p.code]!.hint : p.hint);
@@ -97,9 +105,7 @@ export default function AdminUsersPage() {
     </div>
   );
 
-  const test = FILTERS.find((x) => x.key === filter)?.test ?? (() => true);
-  const term = q.trim().toLowerCase();
-  const shown = data.filter(test).filter((u) => !term || (u.fullName ?? '').toLowerCase().includes(term) || (u.email ?? '').toLowerCase().includes(term));
+  const shown = list.items;
 
   return (
     <div className="ac2-page">
@@ -116,7 +122,7 @@ export default function AdminUsersPage() {
           {FILTERS.map((x) => (
             <button key={x.key} type="button" role="tab" className="tabs__tab" aria-selected={filter === x.key} onClick={() => setFilter(x.key)}>
               {t(x.label, x.en)}
-              <span className="tabs__count">{data.filter(x.test).length}</span>
+              <span className="tabs__count">{data.counts[x.key]}</span>
             </button>
           ))}
         </div>
@@ -191,128 +197,131 @@ export default function AdminUsersPage() {
           {t('جرّب تصفية أخرى.', 'Try another filter.')}
         </EmptyState>
       ) : (
-        <div className="table-wrap">
-          <table className="table ac2-users">
-            <thead>
-              <tr>
-                <th scope="col">{t('المدير', 'Admin')}</th>
-                <th scope="col">{t('البريد', 'Email')}</th>
-                <th scope="col">{t('التحقّق بخطوتين', 'Two-step verification')}</th>
-                <th scope="col">{t('الصلاحيات', 'Permissions')}</th>
-                <th scope="col">{t('آخر دخول', 'Last sign-in')}</th>
-                <th scope="col" className="end">
-                  <span className="visually-hidden">{t('إجراء', 'Action')}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((u) => (
-                <Fragment key={u.id}>
-                  <tr data-tone={u.twoFactor ? undefined : 'warning'}>
-                    <td>
-                      <span className="ac2-cell">
-                        <span className="ac2-cell__main">{u.fullName ?? '—'}</span>
-                        {u.id === me.userId ? <span className="ac2-cell__sub">{t('أنت', 'You')}</span> : null}
-                        {u.isOwner ? <span className="badge badge--brand">{t('مالك المنصة', 'Platform owner')}</span> : null}
-                      </span>
-                    </td>
-                    <td className="num" data-label={t('البريد', 'Email')}>
-                      {u.email}
-                    </td>
-                    <td data-label={t('التحقّق بخطوتين', 'Two-step verification')}>
-                      {u.twoFactor ? <span className="badge badge--success">{t('مفعّل', 'On')}</span> : <span className="badge badge--danger">{t('غير مفعّل', 'Off')}</span>}
-                    </td>
-                    <td className="wrap ac2-muted-cell" data-label={t('الصلاحيات', 'Permissions')}>
-                      {editing[u.id] ? (
-                        <div className="stack">
-                          {checkboxes(editing[u.id]!, (v) => setEditing({ ...editing, [u.id]: v }))}
-                          <div className="ac2-form__actions">
+        <div className="ac2-col">
+          <div className="table-wrap">
+            <table className="table ac2-users">
+              <thead>
+                <tr>
+                  <th scope="col">{t('المدير', 'Admin')}</th>
+                  <th scope="col">{t('البريد', 'Email')}</th>
+                  <th scope="col">{t('التحقّق بخطوتين', 'Two-step verification')}</th>
+                  <th scope="col">{t('الصلاحيات', 'Permissions')}</th>
+                  <th scope="col">{t('آخر دخول', 'Last sign-in')}</th>
+                  <th scope="col" className="end">
+                    <span className="visually-hidden">{t('إجراء', 'Action')}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((u) => (
+                  <Fragment key={u.id}>
+                    <tr data-tone={u.twoFactor ? undefined : 'warning'}>
+                      <td>
+                        <span className="ac2-cell">
+                          <span className="ac2-cell__main">{u.fullName ?? '—'}</span>
+                          {u.id === me.userId ? <span className="ac2-cell__sub">{t('أنت', 'You')}</span> : null}
+                          {u.isOwner ? <span className="badge badge--brand">{t('مالك المنصة', 'Platform owner')}</span> : null}
+                        </span>
+                      </td>
+                      <td className="num" data-label={t('البريد', 'Email')}>
+                        {u.email}
+                      </td>
+                      <td data-label={t('التحقّق بخطوتين', 'Two-step verification')}>
+                        {u.twoFactor ? <span className="badge badge--success">{t('مفعّل', 'On')}</span> : <span className="badge badge--danger">{t('غير مفعّل', 'Off')}</span>}
+                      </td>
+                      <td className="wrap ac2-muted-cell" data-label={t('الصلاحيات', 'Permissions')}>
+                        {editing[u.id] ? (
+                          <div className="stack">
+                            {checkboxes(editing[u.id]!, (v) => setEditing({ ...editing, [u.id]: v }))}
+                            <div className="ac2-form__actions">
+                              <button
+                                type="button"
+                                className="btn btn--primary btn--sm"
+                                disabled={act.busy}
+                                onClick={() =>
+                                  void act.run(async () => {
+                                    await api(`/admin/users/${u.id}/permissions`, { method: 'PUT', body: { permissions: editing[u.id] } });
+                                    setEditing(({ [u.id]: _, ...rest }) => rest);
+                                    reload();
+                                  }, t('حُدّثت الصلاحيات وأُنهيت جلساته.', 'Permissions updated and their sessions ended.'))
+                                }
+                              >
+                                {t('حفظ', 'Save')}
+                              </button>
+                              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(({ [u.id]: _, ...rest }) => rest)}>
+                                {t('تراجع', 'Cancel')}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          u.permissions
+                            .map((p) => {
+                              const perm = perms.find((x) => x.code === p);
+                              return perm ? permLabel(perm) : p;
+                            })
+                            .join(' · ') || '—'
+                        )}
+                      </td>
+                      <td className="ac2-muted-cell" data-label={t('آخر دخول', 'Last sign-in')}>
+                        {u.lastLoginAt ? when(u.lastLoginAt, locale) : t('لم يدخل بعد', 'Never signed in')}
+                      </td>
+                      <td className="end" data-label="">
+                        <span className="ac2-actions">
+                          {!editing[u.id] && (!u.isOwner || u.id === me.userId) ? (
+                            <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditing({ ...editing, [u.id]: u.permissions })}>
+                              {t('الصلاحيات', 'Permissions')}
+                            </button>
+                          ) : null}
+                          {u.id !== me.userId && !u.isOwner ? (
                             <button
                               type="button"
-                              className="btn btn--primary btn--sm"
+                              className="btn btn--danger btn--sm"
                               disabled={act.busy}
-                              onClick={() =>
+                              onClick={async () => {
+                                const sure = await ask({
+                                  title: t(`تسحب الإدارة من ${u.email}؟`, `Revoke admin from ${u.email}?`),
+                                  body: t(
+                                    'تسقط صلاحياته الإدارية كلها ويُسجَّل خروجه من كل أجهزته. حسابه نفسه يبقى.',
+                                    'All their admin permissions are dropped and they are signed out of all their devices. The account itself remains.',
+                                  ),
+                                  confirmLabel: t('اسحب الإدارة', 'Revoke admin'),
+                                  danger: true,
+                                });
+                                if (!sure) return;
                                 void act.run(async () => {
-                                  await api(`/admin/users/${u.id}/permissions`, { method: 'PUT', body: { permissions: editing[u.id] } });
-                                  setEditing(({ [u.id]: _, ...rest }) => rest);
+                                  await api(`/admin/users/${u.id}/revoke`, { method: 'POST' });
                                   reload();
-                                }, t('حُدّثت الصلاحيات وأُنهيت جلساته.', 'Permissions updated and their sessions ended.'))
-                              }
+                                }, t('سُحبت الإدارة.', 'Admin access revoked.'));
+                              }}
                             >
-                              {t('حفظ', 'Save')}
+                              <Icon name="x" size={14} />
+                              {t('سحب الإدارة', 'Revoke admin')}
                             </button>
-                            <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(({ [u.id]: _, ...rest }) => rest)}>
-                              {t('تراجع', 'Cancel')}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        u.permissions
-                          .map((p) => {
-                            const perm = perms.find((x) => x.code === p);
-                            return perm ? permLabel(perm) : p;
-                          })
-                          .join(' · ') || '—'
-                      )}
-                    </td>
-                    <td className="ac2-muted-cell" data-label={t('آخر دخول', 'Last sign-in')}>
-                      {u.lastLoginAt ? when(u.lastLoginAt, locale) : t('لم يدخل بعد', 'Never signed in')}
-                    </td>
-                    <td className="end" data-label="">
-                      <span className="ac2-actions">
-                        {!editing[u.id] && (!u.isOwner || u.id === me.userId) ? (
-                          <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditing({ ...editing, [u.id]: u.permissions })}>
-                            {t('الصلاحيات', 'Permissions')}
-                          </button>
-                        ) : null}
-                        {u.id !== me.userId && !u.isOwner ? (
-                          <button
-                            type="button"
-                            className="btn btn--danger btn--sm"
-                            disabled={act.busy}
-                            onClick={async () => {
-                              const sure = await ask({
-                                title: t(`تسحب الإدارة من ${u.email}؟`, `Revoke admin from ${u.email}?`),
-                                body: t(
-                                  'تسقط صلاحياته الإدارية كلها ويُسجَّل خروجه من كل أجهزته. حسابه نفسه يبقى.',
-                                  'All their admin permissions are dropped and they are signed out of all their devices. The account itself remains.',
-                                ),
-                                confirmLabel: t('اسحب الإدارة', 'Revoke admin'),
-                                danger: true,
-                              });
-                              if (!sure) return;
-                              void act.run(async () => {
-                                await api(`/admin/users/${u.id}/revoke`, { method: 'POST' });
-                                reload();
-                              }, t('سُحبت الإدارة.', 'Admin access revoked.'));
-                            }}
-                          >
-                            <Icon name="x" size={14} />
-                            {t('سحب الإدارة', 'Revoke admin')}
-                          </button>
-                        ) : null}
-                      </span>
-                    </td>
-                  </tr>
-                  {!u.twoFactor ? (
-                    <tr className="ac2-rownote" data-tone="warning">
-                      <td colSpan={6} data-label="">
-                        <span className="alert alert--warning ac2-callout ac2-callout--sm">
-                          <Icon name="info" size={14} />
-                          <span>
-                            {t(
-                              'لم يفعّل التحقّق بخطوتين — سيُحوَّل إلى شاشة التفعيل الإلزامي عند أول دخول ولا يمكنه تخطّيها.',
-                              'Two-step verification is not set up — they will be sent to the mandatory setup screen on first sign-in and cannot skip it.',
-                            )}
-                          </span>
+                          ) : null}
                         </span>
                       </td>
                     </tr>
-                  ) : null}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+                    {!u.twoFactor ? (
+                      <tr className="ac2-rownote" data-tone="warning">
+                        <td colSpan={6} data-label="">
+                          <span className="alert alert--warning ac2-callout ac2-callout--sm">
+                            <Icon name="info" size={14} />
+                            <span>
+                              {t(
+                                'لم يفعّل التحقّق بخطوتين — سيُحوَّل إلى شاشة التفعيل الإلزامي عند أول دخول ولا يمكنه تخطّيها.',
+                                'Two-step verification is not set up — they will be sent to the mandatory setup screen on first sign-in and cannot skip it.',
+                              )}
+                            </span>
+                          </span>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <MoreButton list={list} />
         </div>
       )}
     </div>

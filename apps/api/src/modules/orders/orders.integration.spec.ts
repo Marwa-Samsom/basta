@@ -1436,7 +1436,9 @@ describe('تنبيهات الإدارة الدورية — مرة لكل حال�
     await alerts.acceptanceDue(new Date(), 1);
     await alerts.acceptanceDue(new Date(), 1);
     for (const s of [c, d]) expect(await about('admin_acceptance_due', s.subOrderNumber), s.subOrderNumber).toHaveLength(1);
-  });
+    // الدفعة 1 تمرّ على كل ما يقارب مهلته في قاعدة التطوير: ثلاث ثوانٍ وحده، وتتجاوز الخمس الافتراضية
+    // والحزمة كلها تعمل معه (3 نوفمبر 2026)
+  }, 30_000);
 
   it('انحراف في التدقيق: يُنبَّه من يرى التقارير مرة في اليوم لكل منظر — لا من لا يراها', async () => {
     if (!dbUp) return;

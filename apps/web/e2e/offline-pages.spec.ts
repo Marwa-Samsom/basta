@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { makeVendor, tag } from './fixtures';
+import { makeVendor, prisma, tag } from './fixtures';
 
 /**
  * بلا اتصال — AUTH-086، 26 أكتوبر 2026. عامل الخدمة يعمل في بناء الإنتاج وحده، فيُشغَّل
@@ -74,6 +74,37 @@ test('بلا اتصال: صفحة فُتحت بالكبس على رابط داخ
   try {
     await page.goto(`/p/${v.productSlug}`);
     await expect(page.getByRole('heading', { level: 1, name: v.productName })).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
+const cachedImages = (page: Page) =>
+  page.evaluate(async () => {
+    const c = await caches.open('basta-v1-images');
+    return (await c.keys()).map((r) => new URL(r.url).pathname);
+  });
+
+// SYS-086، 3 نوفمبر 2026: مخزن الصور فارغ أبداً. الصور من أصل الخادم و<img> يطلبها no-cors، فردّها
+// «معتم» (ok=false) ولا يُحفظ — وما يظهر منها بلا اتصال من ذاكرة المتصفّح المؤقتة لا من الجهاز
+test('بلا اتصال: صورة المنتج تُحفظ في مخزن الصور وتُعرض منه', async ({ page, context }) => {
+  test.skip(!(await controlled(page)), 'عامل الخدمة يعمل في بناء الإنتاج وحده');
+  const product = await prisma.product.findFirstOrThrow({
+    where: { status: 'active', deletedAt: null, vendor: { status: 'approved' }, images: { some: {} }, variants: { some: { isActive: true, archivedAt: null } } },
+    select: { slug: true },
+  });
+
+  await page.goto(`/p/${encodeURIComponent(product.slug)}`);
+  await expect(page.locator('img[src*="/uploads/"]').first()).toBeVisible();
+  await expect.poll(() => cachedImages(page)).not.toEqual([]);
+  expect((await cachedImages(page)).every((p) => p.startsWith('/uploads/'))).toBe(true);
+
+  await context.setOffline(true);
+  try {
+    await page.reload();
+    const shown = page.locator('img[src*="/uploads/"]').first();
+    await expect(shown).toBeVisible();
+    await expect.poll(() => shown.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   } finally {
     await context.setOffline(false);
   }

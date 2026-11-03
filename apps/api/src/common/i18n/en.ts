@@ -406,6 +406,8 @@ export const EN_MESSAGES: Readonly<Record<string, string>> = {
   'الحساب موثَّق من قبل.': 'The account is already verified.',
   'لديك متجر مسجَّل بالفعل.': 'You already have a registered shop.',
   'اسم المتجر بالعربية مطلوب.': "The shop's Arabic name is required.",
+  'اسم المتجر بالإنجليزية مطلوب.': "The shop's English name is required.",
+  'اسم المتجر بالإنجليزية يُكتب بحروف إنجليزية.': "Write the shop's English name in English letters.",
   'بلد المتجر يُكتب برمز من حرفين (SA، JO، AE…).':
     "The shop's country is written as a two-letter code (SA, JO, AE…).",
   'رابط المتجر مستعمَل. جرّب البديل المقترح.':
@@ -841,6 +843,15 @@ export const EN_MESSAGES: Readonly<Record<string, string>> = {
   'حالة الطلب': 'order status',
   'حالة السحب': 'payout status',
   التصفية: 'filter',
+  // تصفية القوائم الإدارية من الخادم (3 نوفمبر 2026)
+  'حالة الصفحة': 'page status',
+  'حالة الكوبون': 'coupon status',
+  'حالة الحملة': 'campaign status',
+  'تصفية اللافتات': 'banner filter',
+  'تصفية المديرين': 'admin filter',
+  'تصفية الخصائص': 'attribute filter',
+  'رموز الإشعارات بأحرف لاتينية صغيرة وأرقام وشرطة سفلية، مفصولة بفواصل.':
+    'Notification codes are lowercase Latin letters, digits and underscores, separated by commas.',
   جمع: 'Addition',
   طرح: 'Subtraction',
   مقارنة: 'Comparison',

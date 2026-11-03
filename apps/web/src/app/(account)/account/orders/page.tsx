@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
-import { Alert, EmptyState, PageHead } from '@/components/ui';
-import { api, session } from '@/lib/api';
+import { Alert, EmptyState, MoreButton, PageHead } from '@/components/ui';
+import { session } from '@/lib/api';
+import { useAdminList } from '@/lib/admin';
 import { localized, type Locale, type Translate } from '@/lib/i18n';
 import { labelOf, money, toneOf, when } from '@/lib/orders';
 import { imageUrl } from '@/lib/storefront';
-import { useReturnTick } from '@/lib/fresh';
 
 interface Row {
   number: string;
@@ -89,30 +89,32 @@ function transferState(o: Row, t: Translate, locale: Locale): { label: string; t
  *
  * طلب واحد من عدّة متاجر يظهر طلباً واحداً — بحالة كل متجر تحته، لأن كل
  * متجر يشحن وحده ويصل وحده.
+ *
+ * صفحات من الخادم بـ«المزيد» و«السابق» (3 نوفمبر 2026): كانت أول عشرين طلباً وحدها،
+ * فما قبلها لا يُوصل إليه من «طلباتي».
  */
 export default function MyOrdersPage() {
   const t = useT();
   const locale = useLocale();
   const router = useRouter();
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const returned = useReturnTick();
+  // بلا جلسة يُحوَّل إلى الدخول، ولا يُجلب شيء قبل أن تُعرف (كـ«نزاعاتي»)
+  const signedIn = useSyncExternalStore(
+    () => () => undefined,
+    () => session.read() !== null,
+    () => false,
+  );
   useEffect(() => {
-    if (!session.read()) {
-      router.replace('/login?next=/account/orders');
-      return;
-    }
-    api<{ items: Row[] }>('/me/orders')
-      .then((d) => setRows(d.items))
-      .catch((e: Error) => setError(e.message));
-  }, [router, returned]);
+    if (!session.read()) router.replace('/login?next=/account/orders');
+  }, [router]);
+  const list = useAdminList<Row>(signedIn ? '/me/orders' : null, (o) => o.number);
+  const rows = list.data ? list.items : null;
+  const error = list.error;
 
   return (
     <div className="sp-page">
       <PageHead
         title={t('طلباتي', 'My orders')}
-        {...(rows && rows.length > 0 ? { count: rows.length } : {})}
+        {...(list.data && list.total > 0 ? { count: list.total } : {})}
         actions={
           <Link href="/account/disputes" className="btn btn--secondary btn--sm">
             <Icon name="msg" size={15} />
@@ -202,6 +204,7 @@ export default function MyOrdersPage() {
           })}
         </ul>
       ) : null}
+      <MoreButton list={list} />
     </div>
   );
 }

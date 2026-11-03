@@ -227,14 +227,15 @@ export default function CurrencyPage() {
             <Icon name="next" size={16} mirror />
           </button>
           <p className="vo-commit__hint">
-            {data.settlementCurrencyChosen
-              ? t(
-                  `اخترت ${CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameAr ?? data.settlementCurrency} من قبل — تستطيع تغييرها حتى ترسل طلبك.`,
-                  `You chose ${CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameEn ?? data.settlementCurrency} earlier — you can change it until you submit your application.`,
-                )
-              : acknowledged
-                ? t('تُسأل مرة واحدة فقط قبل التأكيد.', "You'll be asked only once before confirming.")
-                : t('علّم «فهمت» لتتابع.', 'Tick “I understand” to continue.')}
+            {/* الزرّ معطّل بلا «فهمت» لمن اختار من قبل أيضاً — فالتلميح يقول لماذا أولاً */}
+            {!acknowledged
+              ? t('علّم «فهمت» لتتابع.', 'Tick “I understand” to continue.')
+              : data.settlementCurrencyChosen
+                ? t(
+                    `اخترت ${CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameAr ?? data.settlementCurrency} من قبل — تستطيع تغييرها حتى ترسل طلبك.`,
+                    `You chose ${CURRENCIES.find((c) => c.code === data.settlementCurrency)?.nameEn ?? data.settlementCurrency} earlier — you can change it until you submit your application.`,
+                  )
+                : t('تُسأل مرة واحدة فقط قبل التأكيد.', "You'll be asked only once before confirming.")}
           </p>
           <Link className="btn btn--secondary btn--block" href="/vendor/register">
             <Icon name="back" size={16} mirror />

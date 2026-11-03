@@ -850,13 +850,16 @@ describe('الخصائص: تصحيح، وحذف غير المستعمل، وأر
 
       // الأرشفة: القائمة تعرض الاستعمال والأرشفة، والمكتبة العامة تحمل العلامة
       expect((await call('POST', `/admin/attributes/${axis.id}/archive`)).statusCode).toBe(204);
-      const listed = ((await call('GET', '/admin/attributes')).json() as {
-        id: string;
-        nameAr: string;
-        archivedAt: string | null;
-        _count: { variantOptions: number };
-        values: { valueAr: string; _count: { variantOptions: number } }[];
-      }[]).find((x) => x.id === axis.id)!;
+      // القائمة صفحات — الخصيصة يُوصل إليها برمزها
+      const listed = ((await call('GET', `/admin/attributes?search=edit_axis_${SUFFIX}`)).json() as {
+        items: {
+          id: string;
+          nameAr: string;
+          archivedAt: string | null;
+          _count: { variantOptions: number };
+          values: { valueAr: string; _count: { variantOptions: number } }[];
+        }[];
+      }).items.find((x) => x.id === axis.id)!;
       expect(listed).toMatchObject({ nameAr: 'القصّة', _count: { variantOptions: 1 } });
       expect(listed.archivedAt).not.toBeNull();
       expect(listed.values.map((v) => [v.valueAr, v._count.variantOptions])).toEqual([['ضيّق', 1], ['واسع', 0]]);

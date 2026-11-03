@@ -7,13 +7,15 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
 import { ForbiddenActorError, vendorScopeOf, type Actor, type VendorScope } from '../../../common/security/actor';
 import { CurrentActor, Roles } from '../../../common/security/decorators';
-import { MessagingService } from '../application/messaging.service';
+import { pageOf, termOf } from '../../../common/paging';
+import { MessagingService, type ThreadQuery } from '../application/messaging.service';
 import { BODY_MAX, BODY_MIN } from '../domain/messages';
 
 /** معرّف غير صالح يُعامل كغير موجود — 404 لا 400، فلا يكشف الرد شكل المعرّفات */
@@ -21,6 +23,12 @@ const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundExcept
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const BODY_MSG = `الرسالة من ${BODY_MIN} إلى ${BODY_MAX} حرف.`;
+
+/** ?search= و?page= لصندوق الرسائل */
+function threadQuery(search?: string, page?: string): ThreadQuery {
+  const term = termOf(search);
+  return { ...(term ? { search: term } : {}), page: pageOf(page) };
+}
 
 function scopeOf(actor: Actor): VendorScope {
   try {
@@ -66,8 +74,8 @@ export class MyConversationsController {
   }
 
   @Get()
-  list(@CurrentActor() a: Actor) {
-    return this.messaging.listForCustomer(a.userId);
+  list(@CurrentActor() a: Actor, @Query('search') search?: string, @Query('page') page?: string) {
+    return this.messaging.listForCustomer(a.userId, threadQuery(search, page));
   }
 
   @Get(':id')
@@ -93,8 +101,8 @@ export class VendorConversationsController {
   constructor(private readonly messaging: MessagingService) {}
 
   @Get()
-  list(@CurrentActor() a: Actor) {
-    return this.messaging.listForVendor(scopeOf(a));
+  list(@CurrentActor() a: Actor, @Query('search') search?: string, @Query('page') page?: string) {
+    return this.messaging.listForVendor(scopeOf(a), threadQuery(search, page));
   }
 
   @Get(':id')

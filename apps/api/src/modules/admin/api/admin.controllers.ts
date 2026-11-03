@@ -38,7 +38,7 @@ import { InvalidInputError } from '../../../common/errors/domain-error';
 import type { Actor } from '../../../common/security/actor';
 import { CurrentActor, Public, RequirePermission, Roles } from '../../../common/security/decorators';
 import { pageOf, sortOf, termOf } from '../../../common/paging';
-import { BANNER_PLACEMENTS, ContentService, type CouponInput } from '../application/content.service';
+import { BANNER_PLACEMENTS, COUPON_STATES, ContentService, type CouponInput } from '../application/content.service';
 import { OperationsService } from '../application/operations.service';
 import { ReportsService, type Range } from '../application/reports.service';
 import { PERMISSIONS } from '../domain/permissions';
@@ -313,8 +313,13 @@ export class AdminOperationsController {
 
   @Get('users')
   @RequirePermission('users.manage')
-  admins() {
-    return this.ops.admins();
+  admins(@CurrentActor() a: Actor, @Query('filter') filter?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.ops.admins(a.userId, {
+      ...(filter ? { filter: assertOneOf(filter, ['tfa_off'] as const, 'تصفية المديرين') } : {}),
+      ...(term ? { search: term } : {}),
+      page: pageOf(page),
+    });
   }
 
   @Post('users/grant')
@@ -348,6 +353,12 @@ export class AdminOperationsController {
   @RequirePermission('customers.manage')
   customer(@Param('id', uuidParam) id: string) {
     return this.ops.customer(id);
+  }
+
+  @Get('customers/:id/orders')
+  @RequirePermission('customers.manage')
+  customerOrders(@Param('id', uuidParam) id: string, @Query('page') page?: string) {
+    return this.ops.customerOrders(id, pageOf(page));
   }
 
   @Post('customers/:id/suspend')
@@ -422,6 +433,12 @@ export class AdminOperationsController {
     return this.ops.currencies();
   }
 
+  @Get('fx-rates')
+  @RequirePermission('settings.edit')
+  rateHistory(@Query('page') page?: string) {
+    return this.ops.rateHistory(pageOf(page));
+  }
+
   @Post('fx-rates')
   @RequirePermission('settings.edit')
   addRate(@CurrentActor() a: Actor, @Body() dto: RateDto) {
@@ -469,8 +486,13 @@ export class AdminContentController {
 
   @Get('coupons')
   @RequirePermission('coupons.manage')
-  coupons() {
-    return this.content.coupons();
+  coupons(@Query('state') state?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.content.coupons({
+      ...(state ? { state: assertOneOf(state, COUPON_STATES, 'حالة الكوبون') } : {}),
+      ...(term ? { search: term } : {}),
+      page: pageOf(page),
+    });
   }
 
   @Post('coupons')
@@ -488,8 +510,13 @@ export class AdminContentController {
 
   @Get('pages')
   @RequirePermission('content.manage')
-  pages() {
-    return this.content.pages();
+  pages(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.content.pages({
+      ...(status ? { status: assertOneOf(status, ['published', 'draft'] as const, 'حالة الصفحة') } : {}),
+      ...(term ? { search: term } : {}),
+      page: pageOf(page),
+    });
   }
 
   @Post('pages')
@@ -506,8 +533,13 @@ export class AdminContentController {
 
   @Get('banners')
   @RequirePermission('content.manage')
-  banners() {
-    return this.content.banners();
+  banners(@Query('filter') filter?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.content.banners({
+      ...(filter ? { filter: assertOneOf(filter, ['home'] as const, 'تصفية اللافتات') } : {}),
+      ...(term ? { search: term } : {}),
+      page: pageOf(page),
+    });
   }
 
   @Post('banners/image')

@@ -26,6 +26,20 @@ export function isInternalPath(raw: string): boolean {
 }
 
 export const BANNER_PLACEMENTS = ['home_hero', 'home_middle'] as const;
+
+/** حالة الكوبون كما تعرضها اللوحة: الموقوف يدوياً، ثم المنتهي بتاريخه أو باستعماله، ثم ما قارب النفاد */
+export const COUPON_STATES = ['active', 'ending', 'expired', 'off'] as const;
+export type CouponState = (typeof COUPON_STATES)[number];
+
+/** الحالة تعبيرَ SQL على `coupons c` — «قارب النفاد» ما تجاوز 90% من حدّه الكلي */
+function couponStateSql(now: Date): Prisma.Sql {
+  return Prisma.sql`(CASE
+    WHEN NOT c."isActive" THEN 'off'
+    WHEN (c."endsAt" IS NOT NULL AND c."endsAt" < ${now}) OR (c."usageLimitTotal" IS NOT NULL AND c."usedCount" >= c."usageLimitTotal") THEN 'expired'
+    WHEN c."usageLimitTotal" IS NOT NULL AND c."usedCount" * 10 > c."usageLimitTotal" * 9 THEN 'ending'
+    ELSE 'active' END)`;
+}
+
 const FEATURED_KEY = 'home_featured_product_ids';
 
 export interface CouponInput {
@@ -64,14 +78,48 @@ export class ContentService {
 
   // ----------------------------------------------------------- الكوبونات
 
-  async coupons() {
-    const rows = await this.prisma.coupon.findMany({ orderBy: { code: 'asc' }, include: { vendor: { select: { nameAr: true } } } });
-    return rows.map((c) => ({
-      ...c,
-      valueMinorUnits: c.valueMinorUnits?.toString() ?? null,
-      maxDiscountMinorUnits: c.maxDiscountMinorUnits?.toString() ?? null,
-      minOrderMinorUnits: c.minOrderMinorUnits?.toString() ?? null,
-    }));
+  /**
+   * AD-16 — بالحالة والبحث (الرمز أو اسم المتجر) وخمسين خمسين، ومعها عدّاد كل حالة للكوبونات
+   * كلها. كانت تُقرأ كلها في طلب واحد — 1733 كوبوناً على قاعدة التطوير (3 نوفمبر 2026). الحالة
+   * تُحسب في القاعدة بقاعدة اللوحة نفسها، فتُصفّى وتُعدّ قبل الصفحة لا بعدها.
+   */
+  async coupons(q: { state?: CouponState; search?: string; page: number }) {
+    const state = couponStateSql(new Date());
+    const want = q.state ?? null;
+    const term = q.search ? `%${q.search.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+    const where = Prisma.sql`(${want}::text IS NULL OR ${state} = ${want})
+      AND (${term}::text IS NULL OR c."code" ILIKE ${term} OR v."nameAr" ILIKE ${term})`;
+    const { skip, take } = pageArgs(q.page);
+    const [ids, counted, grouped] = await Promise.all([
+      this.prisma.$queryRaw<{ id: string; state: CouponState }[]>`
+        SELECT c."id", ${state} AS "state" FROM "coupons" c LEFT JOIN "vendors" v ON v."id" = c."vendorId"
+        WHERE ${where} ORDER BY c."code", c."id" LIMIT ${take} OFFSET ${skip}`,
+      this.prisma.$queryRaw<{ total: number }[]>`
+        SELECT count(*)::int AS "total" FROM "coupons" c LEFT JOIN "vendors" v ON v."id" = c."vendorId" WHERE ${where}`,
+      this.prisma.$queryRaw<{ state: CouponState; n: number }[]>`SELECT ${state} AS "state", count(*)::int AS "n" FROM "coupons" c GROUP BY 1`,
+    ]);
+    const rows = new Map(
+      (await this.prisma.coupon.findMany({ where: { id: { in: ids.map((r) => r.id) } }, include: { vendor: { select: { nameAr: true } } } })).map((c) => [c.id, c]),
+    );
+    const counts = Object.fromEntries(COUPON_STATES.map((k) => [k, grouped.find((g) => g.state === k)?.n ?? 0])) as Record<CouponState, number>;
+    return {
+      items: ids.flatMap(({ id, state: s }) => {
+        const c = rows.get(id);
+        return c
+          ? [
+              {
+                ...c,
+                state: s,
+                valueMinorUnits: c.valueMinorUnits?.toString() ?? null,
+                maxDiscountMinorUnits: c.maxDiscountMinorUnits?.toString() ?? null,
+                minOrderMinorUnits: c.minOrderMinorUnits?.toString() ?? null,
+              },
+            ]
+          : [];
+      }),
+      total: counted[0]?.total ?? 0,
+      counts: { all: COUPON_STATES.reduce((n, k) => n + counts[k], 0), ...counts },
+    };
   }
 
   private validateCoupon(i: CouponInput) {
@@ -130,8 +178,24 @@ export class ContentService {
 
   // -------------------------------------------------------------- الصفحات
 
-  pages() {
-    return this.prisma.cmsPage.findMany({ orderBy: { slug: 'asc' } });
+  /**
+   * AD-18 — بالحالة (منشورة أو مسوّدة) والبحث (العنوان أو المسار) وخمسين خمسين، ومعها عدّاد كل
+   * حالة للصفحات كلها. كانت تُقرأ كلها بلا صفحات — 263 صفحة على قاعدة التطوير (ACFG-056،
+   * 3 نوفمبر 2026).
+   */
+  async pages(q: { status?: 'published' | 'draft'; search?: string; page: number }) {
+    const t = q.search;
+    const where: Prisma.CmsPageWhereInput = {
+      ...(q.status ? { isPublished: q.status === 'published' } : {}),
+      ...(t ? { OR: [{ titleAr: like(t) }, { slug: like(t) }] } : {}),
+    };
+    const [items, total, all, published] = await Promise.all([
+      this.prisma.cmsPage.findMany({ where, orderBy: [{ slug: 'asc' }, { id: 'asc' }], ...pageArgs(q.page) }),
+      this.prisma.cmsPage.count({ where }),
+      this.prisma.cmsPage.count(),
+      this.prisma.cmsPage.count({ where: { isPublished: true } }),
+    ]);
+    return { items, total, counts: { all, published, draft: all - published } };
   }
 
   async savePage(actorId: string, input: { id?: string; slug: string; titleAr: string; bodyAr: string; isPublished: boolean }) {
@@ -157,9 +221,28 @@ export class ContentService {
 
   // -------------------------------------------------------------- البانرات
 
-  async banners() {
-    const rows = await this.prisma.banner.findMany({ orderBy: [{ placement: 'asc' }, { sort: 'asc' }] });
-    return rows.map((b) => ({ ...b, imageUrl: `${UPLOADS_URL_PREFIX}${b.imageKey}/full.webp` }));
+  /**
+   * AD-19 — بالموضع («الرئيسية» = home_*) والبحث بالعنوان وخمسين خمسين. `placements` عدد لافتات
+   * كل موضع: منه ترتيب اللافتة الجديدة في آخر موضعها، وكانت اللوحة تعدّه من القائمة كاملة.
+   */
+  async banners(q: { filter?: 'home'; search?: string; page: number }) {
+    const t = q.search;
+    const where: Prisma.BannerWhereInput = {
+      ...(q.filter === 'home' ? { placement: { startsWith: 'home_' } } : {}),
+      ...(t ? { titleAr: like(t) } : {}),
+    };
+    const [rows, total, grouped] = await Promise.all([
+      this.prisma.banner.findMany({ where, orderBy: [{ placement: 'asc' }, { sort: 'asc' }, { id: 'asc' }], ...pageArgs(q.page) }),
+      this.prisma.banner.count({ where }),
+      this.prisma.banner.groupBy({ by: ['placement'], _count: true }),
+    ]);
+    const sum = (gs: typeof grouped) => gs.reduce((n, g) => n + g._count, 0);
+    return {
+      items: rows.map((b) => ({ ...b, imageUrl: `${UPLOADS_URL_PREFIX}${b.imageKey}/full.webp` })),
+      total,
+      counts: { all: sum(grouped), home: sum(grouped.filter((g) => g.placement.startsWith('home_'))) },
+      placements: Object.fromEntries(grouped.map((g) => [g.placement, g._count])) as Record<string, number>,
+    };
   }
 
   /** صورة البانر: WebP بعرض 1600 بحدّ أقصى — تُرفع أولاً ثم يُحفظ البانر بمفتاحها */

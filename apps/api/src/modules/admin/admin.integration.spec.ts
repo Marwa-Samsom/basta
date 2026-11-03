@@ -455,6 +455,41 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     expect(cur.currencies.find((c: { code: string }) => c.code === 'SAR').currentRate).toMatch(/^3\.75/);
   });
 
+  it('العملات: الساري لكل عملة مسعَّرة كما يسعّر الدفع، والسجلّ بصفحات (ACFG-016)', async () => {
+    if (!dbUp) return;
+    // الساري كما يحسبه الدفع (display-currency usdRates): الأحدث قبل اللحظة لكل عملة — كان يُؤخذ من أحدث
+    // 200 سطر، فعملة سعرها أقدم منها تُعرض بلا سعر
+    const rows = await prisma.exchangeRate.findMany({
+      where: { baseCode: 'USD', effectiveAt: { lte: new Date() } },
+      orderBy: { effectiveAt: 'desc' },
+      select: { id: true, quoteCode: true, rate: true },
+    });
+    const latest = new Map<string, { id: string; rate: string }>();
+    for (const r of rows) if (!latest.has(r.quoteCode)) latest.set(r.quoteCode, { id: r.id, rate: r.rate.toString() });
+
+    const cur = (await call('GET', '/admin/currencies', admin.token)).json();
+    for (const c of cur.currencies as { code: string; currentRate: string | null }[]) {
+      const want = latest.get(c.code);
+      if (want) expect(Number(c.currentRate), c.code).toBe(Number(want.rate));
+    }
+
+    // السجلّ بصفحات من 50 بعدّه كلّه، و«الساري» على سطر الساري وحده
+    const total = await prisma.exchangeRate.count({ where: { baseCode: 'USD' } });
+    const first = await call('GET', '/admin/fx-rates', admin.token);
+    expect(first.statusCode, first.body).toBe(200);
+    const p1 = first.json() as { items: { id: string; effectiveAt: string; current: boolean }[]; total: number };
+    expect(p1.total).toBe(total);
+    expect(p1.items).toHaveLength(Math.min(50, total));
+    const currentIds = new Set([...latest.values()].map((v) => v.id));
+    for (const h of p1.items) expect(h.current, h.id).toBe(currentIds.has(h.id));
+    if (total > 50) {
+      const p2 = (await call('GET', '/admin/fx-rates?page=2', admin.token)).json() as typeof p1;
+      expect(p2.items.length).toBeGreaterThan(0);
+      expect(p2.items.some((h) => p1.items.some((x) => x.id === h.id))).toBe(false);
+      expect(new Date(p2.items[0]!.effectiveAt).getTime()).toBeLessThanOrEqual(new Date(p1.items.at(-1)!.effectiveAt).getTime());
+    }
+  });
+
   it('العملاء: البحث والتعليق يُنهي الجلسة ويمنع الدخول، ثم الإعادة', async () => {
     if (!dbUp) return;
     const email = `cust.${SUFFIX}@basta.test`;
@@ -494,8 +529,9 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     const g = await call('POST', '/admin/users/grant', admin.token, { email, permissions: ['reports.view'] });
     expect(g.statusCode, g.body).toBe(201);
     expect((await call('POST', '/admin/users/grant', admin.token, { email, permissions: ['everything'] })).statusCode).toBe(400);
-    const list = (await call('GET', '/admin/users', admin.token)).json();
-    const mine = list.find((x: { email: string }) => x.email === email);
+    // آلاف المديرين على قاعدة التطوير: القائمة صفحات، والممنوح يُوصل إليه ببريده
+    const list = (await call('GET', `/admin/users?search=${encodeURIComponent(email)}`, admin.token)).json();
+    const mine = list.items.find((x: { email: string }) => x.email === email);
     expect(mine.twoFactor).toBe(false);
     expect(mine.permissions).toEqual(['reports.view']);
     expect((await call('PUT', `/admin/users/${admin.userId}/permissions`, admin.token, { permissions: ['reports.view'] })).statusCode).toBe(409);
@@ -530,16 +566,19 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
     expect(await perms(senior.userId)).toEqual(['payouts.approve', 'reports.view']);
 
     // مالك المنصة: لا يمسّه حتى مدير بكل الصلاحيات
-    const owner = (await prisma.user.findFirst({ where: { isPlatformOwner: true }, select: { id: true } }))
+    const owner = (await prisma.user.findFirst({ where: { isPlatformOwner: true }, select: { id: true, email: true } }))
       ?? (await prisma.user.create({
         data: { email: `owner.${SUFFIX}@basta.test`, fullName: 'المالك', isPlatformOwner: true, roles: { create: { role: 'admin' } }, permissions: { create: PERMISSION_CODES.map((permission) => ({ permission })) } },
-        select: { id: true },
+        select: { id: true, email: true },
       }));
     const ownerBefore = await perms(owner.id);
     expect((await call('PUT', `/admin/users/${owner.id}/permissions`, admin.token, { permissions: ['reports.view'] })).statusCode).toBe(403);
     expect((await call('POST', `/admin/users/${owner.id}/revoke`, admin.token)).statusCode).toBe(403);
     expect(await perms(owner.id)).toEqual(ownerBefore);
-    expect((await call('GET', '/admin/users', staff.token)).json().find((u: { id: string }) => u.id === owner.id).isOwner).toBe(true);
+    const owners = (await call('GET', `/admin/users?search=${encodeURIComponent(owner.email ?? '')}`, staff.token)).json();
+    expect(owners.items.find((u: { id: string }) => u.id === owner.id).isOwner).toBe(true);
+    // الطالب ليس المالك — اللوحة تعرف ذلك من الخادم لا من وجوده في الصفحة
+    expect(owners.iAmOwner).toBe(false);
 
     // والمالك وحده فوق القاعدة: يمنح ما يشاء
     await app.get(OperationsService).setPermissions(owner.id, senior.userId, ['payouts.approve', 'reports.view', 'settings.edit']);

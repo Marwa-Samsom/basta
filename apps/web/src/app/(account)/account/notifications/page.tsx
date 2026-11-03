@@ -25,6 +25,8 @@ interface Page {
   unread: number;
   items: Item[];
   nextCursor?: string | null;
+  /** إشعارات العرض كلها (الكل أو غير المقروء) — «X من Y» */
+  total?: number;
 }
 
 type Tone = 'brand' | 'info' | 'success' | 'danger' | 'warning' | 'neutral';
@@ -116,6 +118,7 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [items, setItems] = useState<Item[] | null>(null);
   const [unread, setUnread] = useState(0);
+  const [total, setTotal] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
   // كل ضغطة «حمّل المزيد»: كم أضافت ومن أي مؤشّر بدأت — «السابق» يُسقطها ويعيد المؤشّر
   const [batches, setBatches] = useState<{ count: number; cursor: string }[]>([]);
@@ -142,6 +145,7 @@ export default function NotificationsPage() {
         if (!alive) return;
         setItems(p.items);
         setUnread(p.unread);
+        setTotal(p.total ?? p.items.length);
         setCursor(p.nextCursor ?? null);
         setBatches([]);
       })
@@ -160,6 +164,7 @@ export default function NotificationsPage() {
       .then((p) => {
         if (!alive) return;
         setUnread(p.unread);
+        if (p.total !== undefined) setTotal(p.total);
         setItems((list) => (list ? [...p.items, ...list.filter((x) => !p.items.some((n) => n.id === x.id))] : p.items));
       })
       .catch(() => undefined);
@@ -176,6 +181,7 @@ export default function NotificationsPage() {
       setItems((list) => [...(list ?? []), ...p.items]);
       setBatches((b) => [...b, { count: p.items.length, cursor }]);
       setUnread(p.unread);
+      if (p.total !== undefined) setTotal(p.total);
       setCursor(p.nextCursor ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('تعذّر جلب المزيد.', "Couldn't load more."));
@@ -377,6 +383,7 @@ export default function NotificationsPage() {
           ))}
           {cursor || batches.length > 0 ? (
             <div className="aa-more">
+              <span className="list-more__count num">{t(`${items.length} من ${Math.max(total, items.length)}`, `${items.length} of ${Math.max(total, items.length)}`)}</span>
               {batches.length > 0 ? (
                 <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={less}>
                   {t('السابق', 'Previous')}

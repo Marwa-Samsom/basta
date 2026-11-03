@@ -36,8 +36,9 @@ export function SellFaq({ documents }: { documents: string }) {
     {
       q: t('بأي عملة أُسعّر وأقبض؟', 'Which currency do I price and get paid in?'),
       a: t(
-        `تختار عملة تسوية واحدة بعد قبول متجرك: ${list(CURRENCIES.map((c) => c.nameAr))}. تُسعّر بها وتُحسب بها أرباحك، وتُثبَّت فلا تتغيّر بعد تثبيتها — لذلك تؤكّدها قبل التثبيت.`,
-        `You choose one settlement currency after your shop is approved: ${listEn(CURRENCIES.map((c) => c.nameEn))}. You price in it and your earnings are calculated in it, and once it’s locked it can’t change — so you confirm it before locking it.`,
+        // كخطوة العملة في التسجيل: تُختار قبل الإرسال وتتغيّر حتى الإرسال، والاعتماد يثبّتها (ADR-013)
+        `تختار عملة تسوية واحدة أثناء التسجيل، قبل إرسال طلبك للمراجعة: ${list(CURRENCIES.map((c) => c.nameAr))}. تُسعّر بها منتجاتك وتُحسب بها أرباحك. تستطيع تغييرها حتى ترسل طلبك، ثم يثبّتها اعتماد متجرك فلا تتغيّر بعده.`,
+        `You choose one settlement currency during sign-up, before you submit your application for review: ${listEn(CURRENCIES.map((c) => c.nameEn))}. Your products are priced in it and your earnings are calculated in it, and you can change it until you submit your application — approval of your shop locks it, and it can’t change after that.`,
       ),
     },
     {

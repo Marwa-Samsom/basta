@@ -3,7 +3,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 import type { Actor } from '../../../common/security/actor';
 import { CurrentActor, Public, RequirePermission, Roles } from '../../../common/security/decorators';
-import { CAMPAIGN_MAX_PRODUCTS, CAMPAIGN_PLACEMENTS, CampaignsService, type CampaignInput } from '../application/campaigns.service';
+import { pageOf, termOf } from '../../../common/paging';
+import { assertOneOf } from '../../../common/validation';
+import { CAMPAIGN_MAX_PRODUCTS, CAMPAIGN_PLACEMENTS, CAMPAIGN_STATUSES, CampaignsService, type CampaignInput } from '../application/campaigns.service';
 
 const uuidParam = new ParseUUIDPipe({ exceptionFactory: () => new NotFoundException('المورد غير موجود.') });
 
@@ -74,8 +76,13 @@ export class AdminCampaignsController {
 
   @Get()
   @RequirePermission('content.manage')
-  list() {
-    return this.campaigns.list();
+  list(@Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.campaigns.list({
+      ...(status ? { status: assertOneOf(status, CAMPAIGN_STATUSES, 'حالة الحملة') } : {}),
+      ...(term ? { search: term } : {}),
+      page: pageOf(page),
+    });
   }
 
   @Get('product-search')

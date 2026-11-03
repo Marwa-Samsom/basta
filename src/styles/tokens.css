@@ -17,12 +17,13 @@
 /* ---------- 1 · الخطوط ---------- */
 /* Almarai 800 للعناوين — وجه عربي له شخصية، يفصل العنوان عن النص بصرياً
    IBM Plex Sans Arabic للواجهة — أوسع أوزاناً وأدق في المقاسات الصغيرة
-   IBM Plex Mono للأرقام الجدولية في اللوحات */
+   IBM Plex Mono للأرقام الجدولية في اللوحات، وخلفه IBM Plex Sans Arabic لما يجاور الرقم من عربي
+   (رمز العملة «د.أ»، «م»، «أيام») — كان يقع على Courier New فيُرسم متباعداً «د . أ» (SYS-080) */
 
 :root {
   --font-display: "Almarai", "Segoe UI", Tahoma, sans-serif;
   --font-ui:      "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
-  --font-mono:    "IBM Plex Mono", "Consolas", ui-monospace, monospace;
+  --font-mono:    "IBM Plex Mono", "IBM Plex Sans Arabic", "Consolas", ui-monospace, monospace;
 
   /* سلّم الطباعة — نسبة 1.2 (ثالثة صغرى)، محسوبة لا مرتجلة. رُفع درجة (نحو 1px في
      الصغير و2px في العناوين) بطلب صاحبة المشروع، 22 أكتوبر 2026: الخط كان صغيراً؛

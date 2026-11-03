@@ -47,6 +47,19 @@ const REASON_AR: Readonly<Record<string, string>> = {
   other: 'مشكلة أخرى',
 };
 
+/** السبب كما يقرؤه من اختار الإنجليزية — يُبحث به كما يُبحث بالعربي (نسخة الواجهة DISPUTE_REASONS_EN) */
+const REASON_EN: Readonly<Record<string, string>> = {
+  not_received: "I didn't receive my order",
+  damaged: 'Arrived damaged',
+  not_as_described: 'Not as described',
+  return_refused: 'My return was refused',
+  refund_missing: "I didn't receive my refund",
+  other: 'Another problem',
+};
+
+/** نزاعات الصفحة الواحدة في قائمة المشتري أو المتجر */
+export const DISPUTES_PAGE = 20;
+
 /** القرار كما يقرؤه كل طرف — لمن حُسم، وما يعنيه لماله */
 const OUTCOME_AR = {
   customer: { customer: 'حُسم لصالحك، ويُردّ لك ما بقي من مبلغ هذا المتجر إلى وسيلة دفعك', vendor: 'حُسم لصالح المتجر' },
@@ -153,14 +166,34 @@ export class DisputesService {
     });
   }
 
-  async list(party: Party, status?: string) {
-    const rows = await this.prisma.dispute.findMany({
-      where: { ...this.scope(party), ...(status ? { status } : {}) },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: LIST_SELECT,
-    });
-    return rows;
+  /**
+   * نزاعات المشتري أو المتجر، الأحدث أولاً وعشرين عشرين. كانت أول مئة بلا ما بعدها، وبحث البائع
+   * يصفّي ما جُلب وحده (3 نوفمبر 2026). البحث برقم الطلب أو طلب المتجر، أو بالسبب كما يُقرأ
+   * على الشاشة بالعربية أو الإنجليزية.
+   */
+  async list(party: Party, q: { status?: string; search?: string; page: number }) {
+    const t = q.search;
+    const reasons = t
+      ? Object.keys(REASON_AR).filter((k) => [REASON_AR[k], REASON_EN[k]].some((label) => label?.toLowerCase().includes(t.toLowerCase())))
+      : [];
+    const where: Prisma.DisputeWhereInput = {
+      ...this.scope(party),
+      ...(q.status ? { status: q.status } : {}),
+      ...(t
+        ? {
+            OR: [
+              { subOrder: { subOrderNumber: like(t) } },
+              { subOrder: { order: { orderNumber: like(t) } } },
+              ...(reasons.length ? [{ reasonCode: { in: reasons } }] : []),
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.dispute.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...pageArgs(q.page, DISPUTES_PAGE), select: LIST_SELECT }),
+      this.prisma.dispute.count({ where }),
+    ]);
+    return { items, total };
   }
 
   /**

@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, MoreButton, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { Alert, ClearableInput, EmptyState } from '@/components/ui';
 import { DateField } from '@/components/date-field';
 import { useLocale, useT } from '@/components/locale';
 import { localized } from '@/lib/i18n';
 import { api } from '@/lib/api';
-import { media, useAction, useAdminData } from '@/lib/admin';
+import { media, useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { when } from '@/lib/orders';
 
 interface Banner {
@@ -39,7 +39,9 @@ function up(ids: string[], id: string): string[] {
   return next;
 }
 
-const FILTERS = [
+type Filter = 'all' | 'home';
+
+const FILTERS: { key: Filter; label: string; en: string; test: (b: Banner) => boolean }[] = [
   { key: 'all', label: 'الكل', en: 'All', test: () => true },
   { key: 'home', label: 'الرئيسية', en: 'Home page', test: (b: Banner) => b.placement.startsWith('home_') },
 ];
@@ -57,7 +59,11 @@ export default function AdminStorefrontPage() {
   const locale = useLocale();
   const placements = localized(locale, PLACEMENTS, PLACEMENTS_EN);
   const retired = localized(locale, RETIRED, RETIRED_EN);
-  const banners = useAdminData<Banner[]>('/admin/banners');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [q, setQ] = useState('');
+  // اللافتات بالموضع والبحث وصفحاتها من الخادم (3 نوفمبر 2026) — كانت 223 لافتة تُجلب كلها
+  const bq = new URLSearchParams({ ...(filter !== 'all' ? { filter } : {}), ...(q.trim() ? { search: q.trim() } : {}) });
+  const banners = useAdminList<Banner, { counts: Record<Filter, number>; placements: Record<string, number> }>(`/admin/banners?${bq}`, (b) => b.id);
   const featured = useAdminData<{ id: string; nameAr: string | null; vendor: string | null; active: boolean }[]>('/admin/storefront/featured');
   const [productSearch, setProductSearch] = useState('');
   const pq = new URLSearchParams({ status: 'active', pageSize: '20', ...(productSearch.trim() ? { search: productSearch.trim() } : {}) });
@@ -67,8 +73,6 @@ export default function AdminStorefrontPage() {
   const featuredAct = useAction();
   const [draft, setDraft] = useState({ placement: 'home_hero', titleAr: '', linkUrl: '/shops', imageKey: '', imageUrl: '', startsAt: '', endsAt: '' });
   const [showNew, setShowNew] = useState(false);
-  const [filter, setFilter] = useState('all');
-  const [q, setQ] = useState('');
 
   const upload = async (file: File) => {
     await act.run(async () => {
@@ -91,7 +95,12 @@ export default function AdminStorefrontPage() {
   const ids = rows.map((p) => p.id);
   const test = FILTERS.find((x) => x.key === filter)?.test ?? (() => true);
   const term = q.trim();
-  const shown = all.filter(test).filter((b) => !term || (b.titleAr ?? '').includes(term));
+  // الخادم صفّى وبحث؛ والشرط نفسه هنا يُخفي صفوف التصفية السابقة ما دامت الصفحة الجديدة في الطريق
+  // (تبقى على الشاشة حتى تصل). وهو أيضاً يُبقي السطور السبعة فوقه كما في main فلا يتعارض تعديل طلب الدمج 190
+  // للمميّز بينها مع هذا الطلب
+  const shown = all.items.filter(test).filter((b) => !term || (b.titleAr ?? '').toLowerCase().includes(term.toLowerCase()));
+  const { counts, placements: perPlacement } = all;
+  const none = counts.all === 0;
 
   return (
     <div className="ac2-page">
@@ -105,7 +114,7 @@ export default function AdminStorefrontPage() {
           {FILTERS.map((x) => (
             <button key={x.key} type="button" role="tab" className="tabs__tab" aria-selected={filter === x.key} onClick={() => setFilter(x.key)}>
               {t(x.label, x.en)}
-              <span className="tabs__count">{all.filter(x.test).length}</span>
+              <span className="tabs__count">{counts[x.key]}</span>
             </button>
           ))}
         </div>
@@ -182,7 +191,8 @@ export default function AdminStorefrontPage() {
                       imageKey: draft.imageKey,
                       titleAr: draft.titleAr || null,
                       linkUrl: draft.linkUrl || null,
-                      sort: all.filter((b) => b.placement === draft.placement).length,
+                      // في آخر موضعها — بعدد لافتاته كلها لا بما في الصفحة
+                      sort: perPlacement[draft.placement] ?? 0,
                       isActive: true,
                       ...(draft.startsAt ? { startsAt: new Date(draft.startsAt).toISOString() } : {}),
                       ...(draft.endsAt ? { endsAt: new Date(draft.endsAt).toISOString() } : {}),
@@ -202,9 +212,9 @@ export default function AdminStorefrontPage() {
       {shown.length === 0 ? (
         <EmptyState
           icon="image"
-          title={all.length === 0 ? t('لا لافتات بعد', 'No banners yet') : t('لا لافتات بهذه التصفية', 'No banners match this filter')}
+          title={none ? t('لا لافتات بعد', 'No banners yet') : t('لا لافتات بهذه التصفية', 'No banners match this filter')}
           actions={
-            all.length === 0 ? (
+            none ? (
               <button type="button" className="btn btn--primary btn--sm" onClick={() => setShowNew(true)}>
                 <Icon name="plus" size={14} />
                 {t('لافتة جديدة', 'New banner')}
@@ -216,69 +226,72 @@ export default function AdminStorefrontPage() {
             )
           }
         >
-          {all.length === 0
+          {none
             ? t('ارفع صورة لافتة واختر موضعها في الواجهة.', 'Upload a banner image and choose its placement on the storefront.')
             : t('جرّب تصفية أخرى أو أضف لافتة.', 'Try another filter or add a banner.')}
         </EmptyState>
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">{t('اللافتة', 'Banner')}</th>
-                <th scope="col">{t('الموضع', 'Placement')}</th>
-                <th scope="col">{t('الترتيب', 'Order')}</th>
-                <th scope="col">{t('الجدولة', 'Schedule')}</th>
-                <th scope="col" className="end">
-                  {t('ظاهرة', 'Visible')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((b) => (
-                <tr key={b.id} data-tone={b.isActive ? undefined : 'off'}>
-                  <td>
-                    <span className="ac2-banner">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={media(b.imageUrl) ?? ''} alt="" className="ac2-thumb" />
-                      <span className="ac2-cell">
-                        <span className="ac2-cell__main">{b.titleAr ?? '—'}</span>
-                        <span className="ac2-cell__sub num">{b.linkUrl ?? '—'}</span>
-                      </span>
-                    </span>
-                  </td>
-                  <td className="ac2-muted-cell" data-label={t('الموضع', 'Placement')}>
-                    {placements[b.placement] ?? retired[b.placement] ?? b.placement}
-                  </td>
-                  <td className="num" data-label={t('الترتيب', 'Order')}>
-                    {b.sort}
-                  </td>
-                  <td className="ac2-muted-cell" data-label={t('الجدولة', 'Schedule')}>
-                    {b.startsAt ? when(b.startsAt, locale) : t('الآن', 'Now')} — {b.endsAt ? when(b.endsAt, locale) : t('مفتوح', 'Open-ended')}
-                  </td>
-                  <td className="end" data-label={t('ظاهرة', 'Visible')}>
-                    <button
-                      type="button"
-                      role="switch"
-                      className="ac2-switch"
-                      aria-checked={b.isActive}
-                      aria-label={t(`إظهار ${b.titleAr ?? 'اللافتة'}`, `Show ${b.titleAr ?? 'banner'}`)}
-                      disabled={act.busy}
-                      onClick={() =>
-                        void act.run(async () => {
-                          await api(`/admin/banners/${b.id}`, {
-                            method: 'PATCH',
-                            body: { placement: b.placement, imageKey: b.imageKey, linkUrl: b.linkUrl, titleAr: b.titleAr, sort: b.sort, startsAt: b.startsAt, endsAt: b.endsAt, isActive: !b.isActive },
-                          });
-                          banners.reload();
-                        })
-                      }
-                    />
-                  </td>
+        <div className="ac2-col">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('اللافتة', 'Banner')}</th>
+                  <th scope="col">{t('الموضع', 'Placement')}</th>
+                  <th scope="col">{t('الترتيب', 'Order')}</th>
+                  <th scope="col">{t('الجدولة', 'Schedule')}</th>
+                  <th scope="col" className="end">
+                    {t('ظاهرة', 'Visible')}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {shown.map((b) => (
+                  <tr key={b.id} data-tone={b.isActive ? undefined : 'off'}>
+                    <td>
+                      <span className="ac2-banner">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={media(b.imageUrl) ?? ''} alt="" className="ac2-thumb" />
+                        <span className="ac2-cell">
+                          <span className="ac2-cell__main">{b.titleAr ?? '—'}</span>
+                          <span className="ac2-cell__sub num">{b.linkUrl ?? '—'}</span>
+                        </span>
+                      </span>
+                    </td>
+                    <td className="ac2-muted-cell" data-label={t('الموضع', 'Placement')}>
+                      {placements[b.placement] ?? retired[b.placement] ?? b.placement}
+                    </td>
+                    <td className="num" data-label={t('الترتيب', 'Order')}>
+                      {b.sort}
+                    </td>
+                    <td className="ac2-muted-cell" data-label={t('الجدولة', 'Schedule')}>
+                      {b.startsAt ? when(b.startsAt, locale) : t('الآن', 'Now')} — {b.endsAt ? when(b.endsAt, locale) : t('مفتوح', 'Open-ended')}
+                    </td>
+                    <td className="end" data-label={t('ظاهرة', 'Visible')}>
+                      <button
+                        type="button"
+                        role="switch"
+                        className="ac2-switch"
+                        aria-checked={b.isActive}
+                        aria-label={t(`إظهار ${b.titleAr ?? 'اللافتة'}`, `Show ${b.titleAr ?? 'banner'}`)}
+                        disabled={act.busy}
+                        onClick={() =>
+                          void act.run(async () => {
+                            await api(`/admin/banners/${b.id}`, {
+                              method: 'PATCH',
+                              body: { placement: b.placement, imageKey: b.imageKey, linkUrl: b.linkUrl, titleAr: b.titleAr, sort: b.sort, startsAt: b.startsAt, endsAt: b.endsAt, isActive: !b.isActive },
+                            });
+                            banners.reload();
+                          })
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <MoreButton list={banners} />
         </div>
       )}
 
