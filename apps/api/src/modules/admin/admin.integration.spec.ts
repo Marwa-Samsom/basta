@@ -797,6 +797,44 @@ describe('مدخلات خاطئة في اللوحة تُرفض برسالة تق
 });
 
 /**
+ * موجة «يُؤتمت» · الدفعة 2 — لا شاشة تحرير للكوبون غير «إيقاف/تفعيل»، فالتعديل عبر الواجهة البرمجية وحدها:
+ * ما استُعمل منه مثبّت في لقطات الطلبات، ورمزه ونوعه ومموّله لا تتغيّر بعده.
+ */
+describe('الكوبون المستعمل (موجة «يُؤتمت» · الدفعة 2، 2 نوفمبر 2026)', () => {
+  it('لا يتغيّر رمزه ولا نوعه ولا مموّله، وحدّه يتغيّر؛ وغير الموجود 404 (ACFG-040)', async () => {
+    if (!dbUp) return;
+    const RULE = 'كوبون مستعمل: لا يتغيّر رمزه ولا نوعه ولا ممّوله. أوقفه وأنشئ غيره.';
+    const code = `USED${SUFFIX.slice(-6)}`.toUpperCase();
+    const body = { code, scope: 'vendor', vendorId: vendor.vendorId, type: 'percent', valueBps: 1000, fundedBy: 'vendor', usageLimitTotal: 50 };
+    const created = await call('POST', '/admin/coupons', admin.token, body);
+    expect(created.statusCode, created.body).toBe(201);
+    const id = created.json().id as string;
+    // استُعمل مرة — كما يتركه طلب مدفوع به
+    await prisma.coupon.update({ where: { id }, data: { usedCount: 1 } });
+
+    for (const change of [{ code: `${code}X` }, { type: 'free_shipping', valueBps: undefined }, { fundedBy: 'platform' }]) {
+      const res = await call('PUT', `/admin/coupons/${id}`, admin.token, { ...body, ...change });
+      expect(res.statusCode, JSON.stringify(change)).toBe(409);
+      expect(res.json().message).toBe(RULE);
+    }
+    expect(await prisma.coupon.findUniqueOrThrow({ where: { id } })).toMatchObject({ code, type: 'percent', fundedBy: 'vendor', usageLimitTotal: 50 });
+
+    const limit = await call('PUT', `/admin/coupons/${id}`, admin.token, { ...body, usageLimitTotal: 80 });
+    expect(limit.statusCode, limit.body).toBe(204);
+    expect(await prisma.coupon.findUniqueOrThrow({ where: { id } })).toMatchObject({ code, usageLimitTotal: 80, usedCount: 1 });
+
+    const ghost = await call('PUT', `/admin/coupons/${randomUUID()}`, admin.token, body);
+    expect(ghost.statusCode).toBe(404);
+    expect(ghost.json().message).toBe('الكوبون غير موجود.');
+    const junk = await call('PUT', '/admin/coupons/abc', admin.token, body);
+    expect(junk.statusCode).toBe(404);
+    expect(junk.json().message).toBe('المورد غير موجود.');
+
+    await call('PUT', `/admin/coupons/${id}`, admin.token, { ...body, usageLimitTotal: 80, isActive: false }); // لا يبقى كوبون اختبار فعّالاً
+  });
+});
+
+/**
  * موجة «يُؤتمت» الرابعة (3 نوفمبر 2026): حدود إعدادات الإدارة على الخادم. الاختبار على قاعدة
  * التطوير نفسها: كل ما يمسّه عامّ (ضريبة البلد، الكوبونات، مختارات الرئيسية) يُعاد كما وجده.
  */

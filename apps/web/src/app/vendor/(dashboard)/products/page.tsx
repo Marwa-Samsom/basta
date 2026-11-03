@@ -19,6 +19,7 @@ import {
   type ProductStatus,
   type VendorCategory,
 } from '@/lib/catalog';
+import { useReturnTick } from '@/lib/fresh';
 
 type TabKey = ProductStatus | 'all';
 
@@ -151,10 +152,11 @@ function ProductsList() {
     [t],
   );
 
+  const returned = useReturnTick();
   useEffect(() => {
     const timer = setTimeout(() => void load(tab, search, category, sort), search ? 350 : 0);
     return () => clearTimeout(timer);
-  }, [tab, search, category, sort, load]);
+  }, [tab, search, category, sort, load, returned]);
 
   // قائمة الفئات للتصفية — فشلها يُبقي القائمة بلا تصفية لا يمنعها
   useEffect(() => {
@@ -188,7 +190,7 @@ function ProductsList() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [returned]);
 
   // الأولى وما أُلحق بها، بلا صفّ مكرّر إن تحرّكت القائمة بين صفحتين
   const items = page ? [...page.items, ...extra].filter((p, i, all) => all.findIndex((x) => x.id === p.id) === i) : [];

@@ -15,6 +15,7 @@ import {
   type SavedAddress,
 } from '@/lib/addresses';
 import type { Translate } from '@/lib/i18n';
+import { useReturnTick } from '@/lib/fresh';
 
 const PHONE = /^\+?[0-9 ]{7,20}$/;
 const UNDO_MS = 6_000;
@@ -107,6 +108,7 @@ export default function AddressesPage() {
     }
   }, [t]);
 
+  const returned = useReturnTick();
   useEffect(() => {
     if (!session.read()) {
       router.replace('/login?next=/account/addresses');
@@ -119,7 +121,7 @@ export default function AddressesPage() {
     return () => {
       alive = false;
     };
-  }, [router]);
+  }, [router, returned]);
 
   useEffect(
     () => () => {

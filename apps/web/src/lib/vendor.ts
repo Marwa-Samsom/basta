@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, session } from './api';
+import { useReturnTick } from './fresh';
 import { documentLocale, intlLocale, type Locale } from './i18n';
 import { withNext } from './safe-path';
 import type { Blocker } from '@/components/ui';
@@ -100,6 +101,7 @@ export function useOnboarding(): {
    * الإدارة. كانت اللوحة تقف على «مطلوب تسجيل الدخول.» وحده بلا رابط ولا قائمة فيعلق
    * (VOPS-009). لا يُطلب الخادم أصلاً، والمؤشّر يبقى حتى يصل الدخول.
    */
+  const returned = useReturnTick();
   useEffect(() => {
     if (!session.read()) {
       router.replace(withNext('/login', `${window.location.pathname}${window.location.search}`));
@@ -110,11 +112,13 @@ export function useOnboarding(): {
       try {
         const next = await api<Onboarding>('/vendor/onboarding');
         if (!alive) return;
-        setData(next);
+        // الرجوع إلى الصفحة يجلب من جديد بصمت: ما لم يتغيّر يبقى بمرجعه، فلا يُعاد ما بُني عليه
+        setData((old) => (old && JSON.stringify(old) === JSON.stringify(next) ? old : next));
         setError(null);
         setMissing(false);
       } catch (err) {
-        if (!alive) return;
+        // فشل التحديث عند الرجوع لا يمحو ما على الشاشة — الرجوع التالي يعيد المحاولة
+        if (!alive || returned) return;
         if (err instanceof ApiError && err.status === 404) setMissing(true);
         else setError(err instanceof Error ? err.message : loadFailed());
       } finally {
@@ -124,7 +128,7 @@ export function useOnboarding(): {
     return () => {
       alive = false;
     };
-  }, [router]);
+  }, [router, returned]);
 
   /**
    * لا متجر ← التسجيل، بعد الرسم لا أثناءه. كانت كل شاشة تنادي `router.replace` في جسمها،

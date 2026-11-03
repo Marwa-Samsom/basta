@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { minorUnitDigits } from '@/lib/money';
 import { money, when } from '@/lib/orders';
 import { useLocale, useT } from '@/components/locale';
+import { useReturnTick } from '@/lib/fresh';
 
 interface WalletView {
   currency: string;
@@ -80,6 +81,7 @@ export default function FinancePage() {
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -96,7 +98,7 @@ export default function FinancePage() {
     return () => {
       alive = false;
     };
-  }, [version]);
+  }, [version, returned]);
 
   const withdraw = async (w: WalletView) => {
     const minor = toMinor(amount[w.currency] ?? '', w.currency);

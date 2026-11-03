@@ -9,6 +9,7 @@ import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { api, session } from '@/lib/api';
 import { NOTIFICATIONS_CHANGED } from '@/lib/addresses';
 import { intlLocale, type Locale, type Translate } from '@/lib/i18n';
+import { useReturnTick } from '@/lib/fresh';
 import { when } from '@/lib/orders';
 
 interface Item {
@@ -149,6 +150,23 @@ export default function NotificationsPage() {
       alive = false;
     };
   }, [router, fetchPage]);
+
+  // الرجوع إلى الصفحة يجلب الجديد في أعلاها، ويُبقي ما حُمّل بـ«المزيد» تحته ومؤشّره
+  const returned = useReturnTick();
+  useEffect(() => {
+    if (!returned) return;
+    let alive = true;
+    fetchPage(null)
+      .then((p) => {
+        if (!alive) return;
+        setUnread(p.unread);
+        setItems((list) => (list ? [...p.items, ...list.filter((x) => !p.items.some((n) => n.id === x.id))] : p.items));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [returned, fetchPage]);
 
   async function more(): Promise<void> {
     if (!cursor) return;

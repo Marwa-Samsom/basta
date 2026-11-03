@@ -9,6 +9,7 @@ import { Icon } from '@/components/icons';
 import { num, type Page, type ProductListItem, type VendorCategory } from '@/lib/catalog';
 import { useLocale, useT } from '@/components/locale';
 import type { Locale } from '@/lib/i18n';
+import { useReturnTick } from '@/lib/fresh';
 
 /** «فئة واحدة · فئتان · 3 فئات · 11 فئة» */
 function categoriesLabel(n: number, locale: Locale): string {
@@ -48,6 +49,7 @@ export default function VendorCategoriesPage() {
     [],
   );
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     fetchAll()
@@ -62,7 +64,7 @@ export default function VendorCategoriesPage() {
     return () => {
       alive = false;
     };
-  }, [fetchAll, t]);
+  }, [fetchAll, t, returned]);
 
   /** بعد كل كتابة: القائمة كما يراها الخادم الآن */
   async function load(): Promise<void> {

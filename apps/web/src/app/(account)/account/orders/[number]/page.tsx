@@ -31,6 +31,7 @@ import {
 } from '@/lib/orders';
 import { regionName } from '@/lib/places';
 import { imageUrl } from '@/lib/storefront';
+import { useReturnTick } from '@/lib/fresh';
 
 interface Item extends OrderItemView {
   imageKeySnapshot?: string | null;
@@ -155,6 +156,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
     [load],
   );
 
+  const returned = useReturnTick();
   useEffect(() => {
     if (!session.read()) {
       router.replace(`/login?next=/account/orders/${number}`);
@@ -172,7 +174,7 @@ export default function MyOrderPage({ params }: { params: Promise<{ number: stri
     return () => {
       alive = false;
     };
-  }, [number, router]);
+  }, [number, router, returned]);
 
   const back = (
     <Link href="/account/orders" className="sp-back">

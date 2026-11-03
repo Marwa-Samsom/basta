@@ -7,6 +7,7 @@ import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { DateField } from '@/components/date-field';
 import { Icon } from '@/components/icons';
 import { api, apiBlob } from '@/lib/api';
+import { useReturnTick } from '@/lib/fresh';
 import { labelOf, money, toneOf } from '@/lib/orders';
 import { useLocale, useT } from '@/components/locale';
 import { intlLocale, type Locale } from '@/lib/i18n';
@@ -307,6 +308,8 @@ export default function ReportsPage() {
   // المدى الذي وصلت أرقامه — «جارٍ التحديث» ما دام المطلوب غيره
   const [loaded, setLoaded] = useState('');
   const loading = loaded !== `${from}|${to}`;
+  // الرجوع إلى الصفحة يجلب أرقامها من جديد بصمت (lib/fresh)
+  const returned = useReturnTick();
 
   useEffect(() => {
     let alive = true;
@@ -321,7 +324,7 @@ export default function ReportsPage() {
     return () => {
       alive = false;
     };
-  }, [from, to]);
+  }, [from, to, returned]);
 
   const pick = (days: number) => {
     setPreset(days);

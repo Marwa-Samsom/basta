@@ -5,6 +5,7 @@ import { CurrencyPicker } from '@/components/currency-picker';
 import { Icon } from '@/components/icons';
 import { LanguageToggle } from '@/components/locale';
 import { NotificationBell } from '@/components/notification-bell';
+import { RefreshOnReturn } from '@/components/refresh-on-return';
 import { SearchBox } from '@/components/search-box';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { CartButton, ShopStrip } from '@/components/store-chrome';
@@ -93,7 +94,10 @@ export default async function StoreLayout({ children }: { children: React.ReactN
         </nav>
       </header>
 
-      <main className="store__main">{children}</main>
+      <main className="store__main">
+        <RefreshOnReturn />
+        {children}
+      </main>
 
       <footer className="store__foot">
         <div className="store__foot-cols">

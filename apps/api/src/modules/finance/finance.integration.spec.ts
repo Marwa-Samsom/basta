@@ -17,13 +17,14 @@ import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
 import { TrackingService } from '../shipping/public';
-import { FinanceService, ReleaseScheduler } from './public';
+import { FinanceService, LedgerService, ReleaseScheduler } from './public';
 
 const prisma = new PrismaClient();
 let app: NestFastifyApplication;
 let tracking: TrackingService;
 let release: ReleaseScheduler;
 let finance: FinanceService;
+let ledger: LedgerService;
 let dbUp = false;
 
 const SUFFIX = `fn${Date.now()}`;
@@ -50,7 +51,7 @@ const minimums = new Map<string, bigint>();
 const ADDRESS = { recipientName: 'مشترٍ', phone: '+966500000000', country: 'SA', region: 'الرياض', city: 'الرياض', street: 'طريق الملك فهد 1' };
 
 type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
-async function call(method: 'GET' | 'POST' | 'DELETE', url: string, token?: string, body?: unknown, headers: Record<string, string> = {}): Promise<Res> {
+async function call(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, token?: string, body?: unknown, headers: Record<string, string> = {}): Promise<Res> {
   return app.inject({
     method,
     url: `/api/v1${url}`,
@@ -146,6 +147,7 @@ beforeAll(async () => {
   tracking = app.get(TrackingService);
   release = app.get(ReleaseScheduler);
   finance = app.get(FinanceService);
+  ledger = app.get(LedgerService);
 
   for (const [tag, currency, price] of [['sar', 'SAR', 23_300n], ['jod', 'JOD', 12_345n]] as const) {
     const email = `v${tag}.${SUFFIX}@basta.test`;
@@ -647,6 +649,228 @@ describe('تحرير الأرصدة لا يتجوّع بالمسترَدّ كل�
     // المسترَدّ كله لا يُكتب له قيد تحرير بصفر، ولا يعود إلى الطابور
     for (const id of zeros) expect(await prisma.ledgerEntry.count({ where: { refId: id, entryType: 'hold_release_out' } })).toBe(0);
     expect(await viewCount('audit_wallet_drift')).toBe(0);
+  });
+});
+
+/**
+ * موجة «يُؤتمت» · الدفعة 2 — ما لا تقدر عليه يد في المتصفّح: مديران يضغطان في اللحظة نفسها، وإجراء
+ * على طلب سحب ليس في حالته، ونسختان من مهمة التحرير على فرعي واحد. كل محفظة هنا لمتجر الاختبار:
+ * يُحرَّر فرعيّه وحده (لا دورة المهمة على القاعدة كلها، فأرصدة التجربة اليدوية لا تُمسّ).
+ */
+describe('السحب والتحرير تحت التزامن (موجة «يُؤتمت» · الدفعة 2، 2 نوفمبر 2026)', () => {
+  const STATE = 'حالة الطلب لا تسمح بهذا الإجراء.';
+  const PAID = 'لا يُرفض إلا طلب لم يُحوَّل بعد.';
+
+  /** فرعي مسلَّم انقضى تعليقه — للبائع 0 */
+  async function due(qty = 2) {
+    const { sub } = await placeOrder([qty, 0]);
+    await deliver(0, sub(0).id);
+    await prisma.subOrder.update({ where: { id: sub(0).id }, data: { holdReleaseAt: new Date(Date.now() - 60_000) } });
+    return sub(0).id;
+  }
+  const releaseOne = (subOrderId: string) => prisma.$transaction((tx) => ledger.release(tx as never, subOrderId));
+  const request = async () => {
+    const r = await call('POST', '/vendor/finance/payouts', vendors[0]!.token, { currency: 'SAR', amountMinorUnits: '100' });
+    expect(r.statusCode, r.body).toBe(201);
+    return r.json().id as string;
+  };
+  const act = (id: string, what: 'approve' | 'paid' | 'reject', token = admin.token) =>
+    call('POST', `/admin/finance/payouts/${id}/${what}`, token, what === 'paid' ? { transferReference: `TRX-${id.slice(0, 8)}` } : what === 'reject' ? { reason: 'اسم الحساب لا يطابق' } : undefined);
+  const reversals = async (id: string) => {
+    const p = await prisma.payoutRequest.findUniqueOrThrow({ where: { id } });
+    return prisma.ledgerEntry.count({ where: { reversesEntryId: p.ledgerEntryId! } });
+  };
+  const balances = async () => {
+    const w = await wallet(0);
+    return [w.balancePendingMinorUnits, w.balanceAvailableMinorUnits, w.balanceWithdrawnMinorUnits];
+  };
+
+  it('انتقالات السحب غير المسموحة: 409 أو 404 برسالتها، ولا قيد ولا تغيّر في المحفظة (ADM-084)', async () => {
+    if (!dbUp) return;
+    await releaseOne(await due());
+    const requested = await request();
+    const approved = await request();
+    expect((await act(approved, 'approve')).statusCode).toBe(204);
+    const paid = await request();
+    expect((await act(paid, 'approve')).statusCode).toBe(204);
+    expect((await act(paid, 'paid')).statusCode).toBe(204);
+
+    const before = await balances();
+    const entries = await prisma.ledgerEntry.count({ where: { vendorId: vendors[0]!.vendorId } });
+
+    const early = await act(requested, 'paid');
+    expect(early.statusCode).toBe(409);
+    expect(early.json().message).toBe(STATE);
+    const twice = await act(approved, 'approve');
+    expect(twice.statusCode).toBe(409);
+    expect(twice.json().message).toBe(STATE);
+    const late = await act(paid, 'reject');
+    expect(late.statusCode).toBe(409);
+    expect(late.json().message).toBe(PAID);
+    expect(await reversals(paid)).toBe(0);
+
+    const ghost = await act(randomUUID(), 'approve');
+    expect(ghost.statusCode).toBe(404);
+    expect(ghost.json().message).toBe('طلب السحب غير موجود.');
+    expect((await act(randomUUID(), 'reject')).json().message).toBe('طلب السحب غير موجود.');
+    const junk = await call('POST', '/admin/finance/payouts/abc/approve', admin.token);
+    expect(junk.statusCode).toBe(404);
+    expect(junk.json().message).toBe('المورد غير موجود.');
+
+    expect(await balances()).toEqual(before);
+    expect(await prisma.ledgerEntry.count({ where: { vendorId: vendors[0]!.vendorId } })).toBe(entries);
+    const statuses = await prisma.payoutRequest.findMany({ where: { id: { in: [requested, approved, paid] } }, select: { id: true, status: true } });
+    expect(Object.fromEntries(statuses.map((p) => [p.id, p.status]))).toEqual({ [requested]: 'requested', [approved]: 'approved', [paid]: 'paid' });
+
+    // لا يبقى طلب اختبار في طابور سحوبات الإدارة
+    for (const id of [requested, approved]) expect((await act(id, 'reject')).statusCode).toBe(204);
+  });
+
+  it('موافقتان من مديرين معاً، وتحويل ورفض معاً: أثر واحد ودفتر سليم (ADM-085)', async () => {
+    if (!dbUp) return;
+    const email = `admin2.${SUFFIX}@basta.test`;
+    const second = await prisma.user.create({
+      data: {
+        email, fullName: 'مدير مال ثانٍ', passwordHash: await hashPassword(PASSWORD),
+        roles: { create: { role: 'admin' } },
+        permissions: { create: [{ permission: 'payouts.approve' }] },
+        totpSecretEnc: adminSecret, totpEnabledAt: new Date(),
+      },
+    });
+    try {
+      const other = await login(email, generateSync({ strategy: 'totp', secret: adminSecret, crypto: totpCrypto, base32: totpBase32 }));
+      await releaseOne(await due());
+
+      const p = await request();
+      const approvals = await Promise.all([act(p, 'approve'), act(p, 'approve', other)]);
+      expect(approvals.map((r) => r.statusCode).sort()).toEqual([204, 409]);
+      expect(approvals.find((r) => r.statusCode === 409)!.json().message).toBe(STATE);
+      expect(await prisma.auditLog.count({ where: { entityId: p, action: 'payout.approve' } })).toBe(1);
+      expect(await prisma.payoutRequest.findUniqueOrThrow({ where: { id: p } })).toMatchObject({ status: 'approved' });
+      expect((await act(p, 'reject')).statusCode).toBe(204); // تنظيف
+
+      // ثلاث جولات: الفائز يتبدّل، وكل جولة تُفحص على من فاز فيها
+      for (let round = 0; round < 3; round++) {
+        const id = await request();
+        expect((await act(id, 'approve')).statusCode).toBe(204);
+        const [available] = (await balances()).slice(1);
+        const [paid, rejected] = await Promise.all([act(id, 'paid'), act(id, 'reject', other)]);
+        expect([paid.statusCode, rejected.statusCode].sort()).toEqual([204, 409]);
+        const row = await prisma.payoutRequest.findUniqueOrThrow({ where: { id } });
+        if (paid.statusCode === 204) {
+          expect(rejected.json().message).toBe(PAID);
+          expect(row.status).toBe('paid');
+          expect(await reversals(id)).toBe(0);
+          expect((await wallet(0)).balanceAvailableMinorUnits).toBe(available);
+        } else {
+          expect(paid.json().message).toBe(STATE);
+          expect(row.status).toBe('rejected');
+          expect(await reversals(id)).toBe(1);
+          expect((await wallet(0)).balanceAvailableMinorUnits).toBe(available! + row.amountMinorUnits);
+        }
+      }
+      const w = await wallet(0);
+      expect(w.balanceAvailableMinorUnits).toBeGreaterThanOrEqual(0n);
+      expect(await viewCount('audit_wallet_drift')).toBe(0);
+      expect(await viewCount('audit_withdrawn_drift')).toBe(0);
+    } finally {
+      await prisma.user.update({ where: { id: second.id }, data: { status: 'suspended' } });
+    }
+  });
+
+  it('تحرير الفرعي من نسختين معاً: زوج قيود واحد — والقاعدة ترفض قيد تحرير أو بيع ثانياً (SYS-021)', async () => {
+    if (!dbUp) return;
+    const id = await due(1);
+    const pending = (await prisma.ledgerEntry.findMany({ where: { refId: id, bucket: 'pending' } })).reduce(
+      (s, e) => s + (e.direction === 'credit' ? e.amountMinorUnits : -e.amountMinorUnits),
+      0n,
+    );
+    expect(pending).toBeGreaterThan(0n);
+    const before = (await wallet(0)).balanceAvailableMinorUnits;
+
+    // ما تفعله دورة كل نسخة لهذا الفرعي، خمس مرات في اللحظة نفسها
+    const raced = await Promise.allSettled(Array.from({ length: 5 }, () => releaseOne(id)));
+    const moved = raced.filter((r): r is PromiseFulfilledResult<bigint> => r.status === 'fulfilled' && r.value > 0n);
+    expect(moved).toHaveLength(1);
+    expect(await prisma.ledgerEntry.count({ where: { refId: id, entryType: 'hold_release_out' } })).toBe(1);
+    expect(await prisma.ledgerEntry.count({ where: { refId: id, entryType: 'hold_release_in' } })).toBe(1);
+    expect((await wallet(0)).balanceAvailableMinorUnits).toBe(before + pending);
+    expect(await viewCount('audit_wallet_drift')).toBe(0);
+
+    /**
+     * قيد ثانٍ يُكتب في القاعدة مباشرة (كما لو سها عنه التطبيق): الفهرس الفريد يرفضه. داخل معاملة
+     * تُتراجع دائماً — الدفتر لا يُحذف منه، فلو قُبل الإدراج لما بقي منه أثر على قاعدة التطوير.
+     */
+    const ROLLBACK = new Error('تراجع');
+    const duplicate = async (entryType: 'hold_release_out' | 'sale_credit', refId: string) => {
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(
+            `INSERT INTO "ledger_entries" ("id", "walletId", "vendorId", "currency", "entryType", "direction", "amountMinorUnits", "bucket", "refType", "refId", "memo")
+             SELECT gen_random_uuid(), "walletId", "vendorId", "currency", "entryType", "direction", "amountMinorUnits", "bucket", "refType", "refId", 'قيد مكرّر — اختبار'
+             FROM "ledger_entries" WHERE "refId" = $1::uuid AND "entryType" = '${entryType}' AND "reversesEntryId" IS NULL LIMIT 1`,
+            refId,
+          );
+          throw ROLLBACK;
+        });
+      } catch (err) {
+        return err === ROLLBACK ? 'قُبل' : (err as Error).message;
+      }
+      return 'قُبل';
+    };
+    // 23505 تفرّد على refId: الفهرسان الجزئيان ledger_one_release_per_sub_order و ledger_one_sale_per_sub_order
+    // وحدهما على هذا العمود (المعرّف الجديد عشوائي) — كلٌّ لنوع قيده
+    const UNIQUE_REF = /23505[\s\S]*Key \(\\?"refId\\?"\)/;
+    expect(await duplicate('hold_release_out', id)).toMatch(UNIQUE_REF);
+    const { sub } = await placeOrder([1, 0]);
+    expect(await prisma.ledgerEntry.count({ where: { refId: sub(0).id, entryType: 'sale_credit' } })).toBe(1);
+    expect(await duplicate('sale_credit', sub(0).id)).toMatch(UNIQUE_REF);
+    expect(await prisma.ledgerEntry.count({ where: { refId: { in: [id, sub(0).id] }, memo: 'قيد مكرّر — اختبار' } })).toBe(0);
+  });
+
+  /**
+   * عيب كشفه CHK-029: قيد البيع = القطع ناقص خصم يموّله البائع، فكوبونه الثابت بقيمة القطعة كلها
+   * يجعله صفراً فلا يُكتب، ويبقى قيد الشحن وحده. المهمة كانت تشترط قيد البيع فلا تحرّر الشحن أبداً،
+   * والمنظر يسمّيه «طلب مدفوع بلا قيد بيع» فتُنبَّه الإدارة كل يوم عن طلب سليم.
+   */
+  it('كوبون يموّله البائع بقيمة القطعة كلها: يُحرَّر شحنه، ولا يُعدّ «بلا قيد بيع» (CHK-029)', async () => {
+    if (!dbUp) return;
+    const i = 1; // متجر الدينار — القطعة 12.345 والشحن 1.700
+    const coupon = await prisma.coupon.create({
+      data: { code: `ALL-${SUFFIX}`.toUpperCase(), scope: 'vendor', vendorId: vendors[i]!.vendorId, type: 'fixed', valueMinorUnits: 20_000n, currency: 'JOD', fundedBy: 'vendor' },
+    });
+    try {
+      const cart = (await call('POST', '/cart', undefined, { currency: 'JOD' })).json().token as string;
+      const headers = { 'x-cart-token': cart };
+      expect((await call('POST', '/cart/items', undefined, { variantId: vendors[i]!.variantId, qty: 1 }, headers)).statusCode).toBe(201);
+      expect((await call('PUT', '/cart/coupon', undefined, { code: coupon.code }, headers)).statusCode).toBe(200);
+      const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, headers)).json();
+      const res = await call('POST', '/checkout', buyer.token, { address: ADDRESS, paymentToken: 'tok_success', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
+        ...headers,
+        'idempotency-key': randomUUID(),
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const sub = await prisma.subOrder.findFirstOrThrow({ where: { orderId: res.json().orderId } });
+      expect(sub).toMatchObject({ discountMinorUnits: 12_345n, totalMinorUnits: 1_700n, vendorNetMinorUnits: 1_700n });
+
+      // البيع صفر فلا قيد له، والشحن قيده — ولا يراه المنظر «مدفوعاً بلا قيد بيع»
+      const kinds = (await prisma.ledgerEntry.findMany({ where: { refId: sub.id }, select: { entryType: true } })).map((e) => e.entryType);
+      expect(kinds).toEqual(['shipping_credit']);
+      expect(await prisma.$queryRaw<unknown[]>`SELECT 1 FROM audit_sub_order_without_ledger WHERE sub_order_id = ${sub.id}::uuid`).toEqual([]);
+
+      await deliver(i, sub.id);
+      await prisma.subOrder.update({ where: { id: sub.id }, data: { holdReleaseAt: new Date(Date.now() - 60_000) } });
+      const before = (await wallet(i)).balanceAvailableMinorUnits;
+      // دورة المهمة نفسها — شرط اختيارها هو موضع العيب
+      await release.tick();
+      const out = await prisma.ledgerEntry.findMany({ where: { refId: sub.id, entryType: 'hold_release_out' } });
+      expect(out.map((e) => e.amountMinorUnits)).toEqual([1_700n]);
+      expect((await wallet(i)).balanceAvailableMinorUnits).toBe(before + 1_700n);
+      expect(await prisma.$queryRaw<unknown[]>`SELECT 1 FROM audit_money_conservation WHERE sub_order_id = ${sub.id}::uuid`).toEqual([]);
+      expect(await viewCount('audit_wallet_drift')).toBe(0);
+    } finally {
+      await prisma.coupon.update({ where: { id: coupon.id }, data: { isActive: false } });
+    }
   });
 });
 

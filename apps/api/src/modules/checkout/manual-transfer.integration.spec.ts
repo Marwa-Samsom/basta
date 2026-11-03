@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
+import { InventoryService } from '../inventory/public';
 import { OrderScheduler } from '../orders/public';
 import { BANK_TRANSFER_TOKEN, ManualTransferProvider, PAYMENT_PROVIDER } from '../payments/public';
 import { pendingToReconcile } from './application/checkout.service';
@@ -574,6 +575,102 @@ describe('التحويل اليدوي · الردّ', () => {
     });
     expect(await checkout.reconcile(pendingId)).toBe('pending');
     expect((await prisma.payment.findUniqueOrThrow({ where: { orderId: pendingId } })).status).toBe('pending');
+  });
+});
+
+/** موجة «يُؤتمت» · الدفعة 2 — ما لا تقدر عليه يد في المتصفّح: حجز سقط تحت التأكيد، ومديران يسجّلان ردّاً معاً */
+describe('التحويل اليدوي · التأكيد والردّ تحت التزامن (موجة «يُؤتمت» · الدفعة 2، 2 نوفمبر 2026)', () => {
+  it('حجز سقط وبيعت آخر قطعة لغيره: التأكيد يُرفض باسم المنتج — لا مرجع ولا تقسيم ولا مخزون سالب (ADM-095)', async () => {
+    if (!dbUp) return;
+    await setTransferSettings(TRANSFER_SETTINGS);
+    const product = await prisma.product.create({
+      data: { vendorId: vendorIds[0]!, slug: `last-${SUFFIX}`, nameAr: 'القطعة الأخيرة', status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendorIds[0]!, sku: `LAST-${SUFFIX}`.toUpperCase(), priceMinorUnits: 12_500n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 1, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 1, reason: 'import' } });
+
+    const late = await account('lastpiece');
+    const { res } = await order([{ variantId: variant.id, qty: 1 }], late);
+    expect(res.statusCode, res.body).toBe(200);
+    const { orderId, orderNumber: number, total } = res.json();
+    openOrders.push(orderId);
+    const placed = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+
+    // الحجز سقط (خادم سقط قبل أن يُمدّ) فعادت القطعة متاحة — ثم بيعت لمشترٍ آخر وأُكّد تحويله
+    await app.get(InventoryService).release(placed.reservationIds);
+    expect(await stockOf(variant.id)).toEqual({ onHand: 1, reserved: 0 });
+    const rival = await order([{ variantId: variant.id, qty: 1 }], await account('rival'));
+    expect(rival.res.statusCode, rival.res.body).toBe(200);
+    await checkout.confirmTransfer(rival.res.json().orderNumber, financeId, { reference: 'CLQ-RIVAL', receivedMinor: BigInt(rival.res.json().total.minorUnits) });
+    expect(await stockOf(variant.id)).toEqual({ onHand: 0, reserved: 0 });
+
+    const confirm = await call('POST', `/admin/payments/transfers/${number}/confirm`, {
+      token: financeToken,
+      body: { reference: 'CLQ-LATE', receivedMinorUnits: total.minorUnits },
+    });
+    expect(confirm.statusCode, confirm.body).toBe(409);
+    expect(confirm.json().message).toBe('لم يبقَ ما يكفي من «القطعة الأخيرة» لهذا الطلب — لا تؤكّده. ردّ التحويل للمشتري من البنك.');
+
+    // المعاملة كلها تراجعت: لا مرجع ولا مؤكِّد، ولا فرعي ولا قيد ولا سطر تدقيق، وقطعة غيره كما هي
+    const after = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true, subOrders: true } });
+    expect(after.status).toBe('pending_payment');
+    expect(after.payment).toMatchObject({ status: 'awaiting_transfer', transferReference: null, confirmedBy: null });
+    expect(after.subOrders).toHaveLength(0);
+    expect(after.reservationIds).toEqual(placed.reservationIds);
+    expect(await prisma.auditLog.count({ where: { action: 'payment.transfer_confirmed', entityId: orderId } })).toBe(0);
+    expect(await stockOf(variant.id)).toEqual({ onHand: 0, reserved: 0 });
+  });
+
+  it('تسجيل الردّ من مديرين معاً: واحد يمرّ وإشعار واحد — والقصير والمسجَّل وغير الموجود مرفوضة (ADM-097)', async () => {
+    if (!dbUp) return;
+    await setTransferSettings(TRANSFER_SETTINGS);
+    const who = await account('refund97');
+    const { res } = await order([{ variantId: variantIds[0]!, qty: 1 }], who);
+    const { orderId, orderNumber: number, total } = res.json();
+    await checkout.confirmTransfer(number, financeId, { reference: 'CLQ-97', receivedMinor: BigInt(total.minorUnits) });
+    const sub = await prisma.subOrder.findFirstOrThrow({ where: { orderId } });
+    expect((await call('POST', `/me/orders/${number}/stores/${sub.id}/cancel`, { token: who.token, body: { reason: 'غيّرت رأيي' } })).statusCode).toBe(200);
+    const refund = await prisma.refund.findFirstOrThrow({ where: { subOrderId: sub.id } });
+    expect(refund.status).toBe('awaiting_transfer');
+
+    const AGAIN = 'هذا الاسترداد لا ينتظر تحويلاً — ربما سُجّل للتوّ. حدّث الصفحة.';
+    const record = (token: string, reference: string, id: string = refund.id) => call('POST', `/admin/refunds/${id}/transfer`, { token, body: { reference } });
+
+    // حرفان: الزرّ معطّل في الشاشة، والخادم يرفضهما إن وصلاه
+    const short = await record(financeToken, 'ab');
+    expect(short.statusCode).toBe(400);
+    expect(short.json().message).toContain('اكتب مرجع التحويل كما في كشف البنك (3 أحرف على الأقل).');
+    expect((await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } })).status).toBe('awaiting_transfer');
+
+    const second = await admin('finance97', ['payouts.approve']);
+    try {
+      const both = await Promise.all([record(financeToken, 'OUT-971'), record(second.token, 'OUT-972')]);
+      expect(both.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+      expect(both.find((r) => r.statusCode === 409)!.json().message).toBe(AGAIN);
+      const winner = both[0]!.statusCode === 200 ? 'OUT-971' : 'OUT-972';
+      expect(await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } })).toMatchObject({ status: 'succeeded', transferReference: winner });
+      const told = (await notices(who.id, 'refund_transferred')).filter((n) => n.channel === 'in_app');
+      expect(told).toHaveLength(1);
+      expect((told[0]!.payloadJson as Record<string, string>)['reference']).toBe(winner);
+      expect(await prisma.auditLog.count({ where: { action: 'refund.transfer_recorded', entityId: refund.id } })).toBe(1);
+
+      // استرداد تمّ (كاسترداد بطاقة ناجح): الرسالة نفسها، والمرجع لا يتغيّر
+      const done = await record(financeToken, 'OUT-973');
+      expect(done.statusCode).toBe(409);
+      expect(done.json().message).toBe(AGAIN);
+      expect((await prisma.refund.findUniqueOrThrow({ where: { id: refund.id } })).transferReference).toBe(winner);
+
+      for (const id of [randomUUID(), 'abc']) {
+        const ghost = await record(financeToken, 'OUT-974', id);
+        expect(ghost.statusCode, id).toBe(404);
+        expect(ghost.json().message).toBe('الاسترداد غير موجود.');
+      }
+    } finally {
+      await prisma.user.update({ where: { id: second.id }, data: { status: 'suspended' } });
+    }
   });
 });
 

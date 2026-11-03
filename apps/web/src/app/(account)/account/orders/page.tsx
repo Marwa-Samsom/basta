@@ -10,6 +10,7 @@ import { api, session } from '@/lib/api';
 import { localized, type Locale, type Translate } from '@/lib/i18n';
 import { labelOf, money, toneOf, when } from '@/lib/orders';
 import { imageUrl } from '@/lib/storefront';
+import { useReturnTick } from '@/lib/fresh';
 
 interface Row {
   number: string;
@@ -96,6 +97,7 @@ export default function MyOrdersPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const returned = useReturnTick();
   useEffect(() => {
     if (!session.read()) {
       router.replace('/login?next=/account/orders');
@@ -104,7 +106,7 @@ export default function MyOrdersPage() {
     api<{ items: Row[] }>('/me/orders')
       .then((d) => setRows(d.items))
       .catch((e: Error) => setError(e.message));
-  }, [router]);
+  }, [router, returned]);
 
   return (
     <div className="sp-page">
