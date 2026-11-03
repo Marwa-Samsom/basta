@@ -150,6 +150,22 @@ export function vendorSlug(name: string): string {
  */
 export const storeName = (raw: string): string => raw.trim().replace(/\s+/g, ' ');
 
+const ARABIC_LETTER = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+/**
+ * اسم المتجر بالإنجليزية إجباري (قرار صاحبة المشروع، 3 نوفمبر 2026): منه يُشتقّ رابط المتجر ويُعرض
+ * في الواجهة الإنجليزية، فلا يُقبل فارغاً ولا بحروف عربية — «ركن الصوف» في خانته رابطٌ بحروف مترجَمة
+ * وواجهةٌ إنجليزية تعرض اسماً عربياً.
+ */
+export function englishStoreName(raw: string | null | undefined): string {
+  const name = storeName(raw ?? '');
+  if (name.length < 2) throw new InvalidInputError('اسم المتجر بالإنجليزية مطلوب.', { field: 'nameEn' });
+  if (ARABIC_LETTER.test(name) || !/[A-Za-z]/.test(name)) {
+    throw new InvalidInputError('اسم المتجر بالإنجليزية يُكتب بحروف إنجليزية.', { field: 'nameEn' });
+  }
+  return name;
+}
+
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/;
 
 /** أسماء تصطدم بمسارات المنصة نفسها أو تنتحل صفتها. */
@@ -279,6 +295,8 @@ export interface Blocker {
 
 export interface OnboardingSnapshot {
   readonly nameAr: string;
+  /** إجباري منذ 3 نوفمبر 2026 — ومسوّدة سُجّلت قبله بلا اسم إنجليزي لا تُرسل حتى تكتبه */
+  readonly nameEn: string | null;
   readonly slug: string;
   readonly country: string;
   /** اختار البائع عملة التسوية صراحةً (VD-04) — المقترحة من البلد لا تكفي */
@@ -299,6 +317,14 @@ export function submissionBlockers(snapshot: OnboardingSnapshot): readonly Block
       code: 'name_missing',
       message: 'اسم المتجر بالعربية مطلوب.',
       field: 'nameAr',
+    });
+  }
+
+  if (!snapshot.nameEn || snapshot.nameEn.trim().length < 2) {
+    blockers.push({
+      code: 'name_en_missing',
+      message: 'اسم المتجر بالإنجليزية مطلوب.',
+      field: 'nameEn',
     });
   }
 

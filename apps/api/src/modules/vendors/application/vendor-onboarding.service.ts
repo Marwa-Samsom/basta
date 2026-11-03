@@ -15,6 +15,7 @@ import { VendorDocumentStorage } from '../infrastructure/document-storage';
 import {
   assertCurrencyChangeable,
   currencyLocked,
+  englishStoreName,
   assertDocumentFile,
   assertSettlementCurrency,
   assertSlug,
@@ -130,14 +131,14 @@ export class VendorOnboardingService {
 
     const nameAr = storeName(input.nameAr);
     if (nameAr.length < 2) throw new InvalidInputError('اسم المتجر بالعربية مطلوب.');
-    const nameEn = input.nameEn ? storeName(input.nameEn) || null : null;
+    const nameEn = englishStoreName(input.nameEn);
 
     const country = input.country.trim().toUpperCase();
     if (!/^[A-Z]{2}$/.test(country)) {
       throw new InvalidInputError('بلد المتجر يُكتب برمز من حرفين (SA، JO، AE…).', { country });
     }
 
-    const slug = await this.resolveSlug(input.slug ?? vendorSlug(nameEn || nameAr));
+    const slug = await this.resolveSlug(input.slug ?? vendorSlug(nameEn));
 
     if (input.businessType && !['individual', 'company'].includes(input.businessType)) {
       throw new InvalidInputError('نوع النشاط: فرد أو شركة.', { businessType: input.businessType });
@@ -262,6 +263,7 @@ export class VendorOnboardingService {
     const bank = vendor.bankAccounts[0] ?? null;
     const blockers = submissionBlockers({
       nameAr: vendor.nameAr,
+      nameEn: vendor.nameEn,
       slug: vendor.slug,
       country: vendor.country,
       currencyChosen: vendor.settlementCurrencyChosenAt !== null,
@@ -338,7 +340,8 @@ export class VendorOnboardingService {
       if (nameAr.length < 2) throw new InvalidInputError('اسم المتجر بالعربية مطلوب.');
       data['nameAr'] = nameAr;
     }
-    if (input.nameEn !== undefined) data['nameEn'] = input.nameEn ? storeName(input.nameEn) || null : null;
+    // إجباري: التعديل يغيّره ولا يمسحه
+    if (input.nameEn !== undefined) data['nameEn'] = englishStoreName(input.nameEn);
     if (input.slug !== undefined && input.slug !== vendor.slug) {
       data['slug'] = await this.resolveSlug(input.slug);
     }

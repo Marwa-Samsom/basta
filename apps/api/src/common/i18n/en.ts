@@ -406,6 +406,8 @@ export const EN_MESSAGES: Readonly<Record<string, string>> = {
   'الحساب موثَّق من قبل.': 'The account is already verified.',
   'لديك متجر مسجَّل بالفعل.': 'You already have a registered shop.',
   'اسم المتجر بالعربية مطلوب.': "The shop's Arabic name is required.",
+  'اسم المتجر بالإنجليزية مطلوب.': "The shop's English name is required.",
+  'اسم المتجر بالإنجليزية يُكتب بحروف إنجليزية.': "Write the shop's English name in English letters.",
   'بلد المتجر يُكتب برمز من حرفين (SA، JO، AE…).':
     "The shop's country is written as a two-letter code (SA, JO, AE…).",
   'رابط المتجر مستعمَل. جرّب البديل المقترح.':

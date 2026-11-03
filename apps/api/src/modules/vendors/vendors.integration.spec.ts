@@ -237,7 +237,7 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     const bad = await app.inject({
       method: 'POST',
       ...api('/vendor/onboarding/apply', await login(`seller.${SUFFIX}@basta.test`)),
-      payload: { nameAr: 'عملة مجهولة', country: 'JO', settlementCurrency: 'XYZ' },
+      payload: { nameAr: 'عملة مجهولة', nameEn: `Unknown Currency ${SUFFIX}`, country: 'JO', settlementCurrency: 'XYZ' },
     });
     expect(bad.statusCode).toBe(400);
   });
@@ -296,12 +296,44 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     expect(shop.json().nameEn).toBe(`Cotton House ${SUFFIX}`);
   });
 
+  it('الاسم الإنجليزي إجباري بحروف إنجليزية: التسجيل بدونه أو بالعربية يُرفض بلا متجر، والتعديل لا يمسحه (3 نوفمبر 2026)', async () => {
+    if (!dbUp) return;
+    const email = `english.${SUFFIX}@basta.test`;
+    const userId = await registerUser(email, ['customer']);
+    const token = await login(email);
+    const apply = (payload: Record<string, unknown>) =>
+      app.inject({ method: 'POST', ...api('/vendor/onboarding/apply', token), payload });
+
+    for (const [nameEn, message] of [
+      [undefined, 'اسم المتجر بالإنجليزية مطلوب.'],
+      ['   ', 'اسم المتجر بالإنجليزية مطلوب.'],
+      ['ركن الصوف', 'اسم المتجر بالإنجليزية يُكتب بحروف إنجليزية.'],
+    ] as const) {
+      const res = await apply({ nameAr: 'ركن الصوف', ...(nameEn === undefined ? {} : { nameEn }), country: 'JO' });
+      expect(res.statusCode, `${String(nameEn)}: ${res.body}`).toBe(400);
+      expect([res.json().message].flat()).toContain(message);
+    }
+    expect(await prisma.vendor.count({ where: { ownerUserId: userId } })).toBe(0);
+
+    const ok = await apply({ nameAr: 'ركن الصوف', nameEn: `English Only ${SUFFIX}`, country: 'JO' });
+    expect(ok.statusCode, ok.body).toBe(201);
+    createdVendorIds.push(ok.json().vendor.id);
+    const seller = ok.json().tokens.accessToken;
+
+    for (const nameEn of [null, '', 'ركن الصوف']) {
+      const shop = await app.inject({ method: 'PATCH', ...api('/vendor/onboarding/shop', seller), payload: { nameEn } });
+      expect(shop.statusCode, `${String(nameEn)}: ${shop.body}`).toBe(400);
+    }
+    const vendor = await prisma.vendor.findUniqueOrThrow({ where: { id: ok.json().vendor.id } });
+    expect(vendor.nameEn).toBe(`English Only ${SUFFIX}`);
+  });
+
   it('لا متجرين على حساب واحد', async () => {
     if (!dbUp) return;
     const res = await app.inject({
       method: 'POST',
       ...api('/vendor/onboarding/apply', sellerToken),
-      payload: { nameAr: 'متجر ثانٍ', country: 'JO' },
+      payload: { nameAr: 'متجر ثانٍ', nameEn: `Second Store ${SUFFIX}`, country: 'JO' },
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe('DUPLICATE');
@@ -316,7 +348,7 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
     // الخدمة مباشرةً تُبقي الطلبات متداخلة فعلاً (inject يقرّبها من التتالي)، وواحد عبر الواجهة
     const onboarding = app.get(VendorOnboardingService);
     const actor = { userId, roles: ['customer'] as const, permissions: [] };
-    const payload = (i: number) => ({ nameAr: `متجر السباق ${i}`, slug: `racer-${i}-${SUFFIX}`.toLowerCase(), country: 'SA', settlementCurrency: 'SAR' });
+    const payload = (i: number) => ({ nameAr: `متجر السباق ${i}`, nameEn: `Racer ${i} ${SUFFIX}`, slug: `racer-${i}-${SUFFIX}`.toLowerCase(), country: 'SA', settlementCurrency: 'SAR' });
     const direct = await Promise.allSettled([1, 2, 3, 4].map((i) => onboarding.apply(actor, payload(i))));
     const viaApi = await app.inject({ method: 'POST', ...api('/vendor/onboarding/apply', token), payload: payload(5) });
     const results = [
