@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Alert, EmptyState, MoreButton, PageHead, SortButton, type SortOrder } from '@/components/ui';
+import { AcceptCountdown } from '@/components/accept-countdown';
 import { Icon } from '@/components/icons';
 import { useAdminList } from '@/lib/admin';
 import { counted, type Counted } from '@/lib/arabic-count';
@@ -213,6 +214,10 @@ export default function VendorOrdersPage() {
                       </td>
                       <td data-label={t('الحالة', 'Status')}>
                         <span className={`badge ${toneOf(r.status)}`}>{labelOf(r.status, locale)}</span>
+                        {/* ما بقي قبل الإلغاء الآلي: الوصول + المهلة كما تضبطها الإدارة (VOPS-003) */}
+                        {r.status === 'awaiting_vendor' && data ? (
+                          <AcceptCountdown by={new Date(new Date(r.placedAt).getTime() + data.acceptanceHours * 3_600_000)} />
+                        ) : null}
                       </td>
                     </tr>
                   ))}

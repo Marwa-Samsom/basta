@@ -36,6 +36,10 @@
 .vm-hint { font-size: var(--text-2xs); color: var(--text-muted); line-height: 1.7; }
 
 .vm-muted { color: var(--text-muted); font-size: var(--text-xs); }
+/* ما بقي من مهلة القبول تحت شارة الحالة — تحذير تحت يوم، وخطر تحت ساعتين (VOPS-003) */
+.vm-countdown { display: block; margin-block-start: var(--space-1); color: var(--text-muted); font-size: var(--text-xs); white-space: nowrap; }
+.vm-countdown[data-tone="warning"] { color: var(--warning-text); }
+.vm-countdown[data-tone="danger"] { color: var(--danger-text); font-weight: 600; }
 .vm-strong { color: var(--text-strong); font-size: var(--text-sm); }
 .vm-mono { font-family: var(--font-mono); }
 
