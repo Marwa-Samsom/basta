@@ -72,8 +72,22 @@ test('صفحات المحتوى: «المزيد» و«السابق» والعد�
     // «يظهر في الرابط: /pages/terms» كان ثابتاً مهما كُتب المعرّف
     await page.getByRole('button', { name: 'صفحة جديدة' }).click();
     await page.getByLabel('المُعرّف النصّي').fill('tajriba');
-    await expect(page.getByText('يظهر في الرابط: /pages/tajriba')).toBeVisible();
+    // والرابط معزول باتجاه اليسار: بلا عزل كان يظهر «pages/tajriba/» — الشرطة في آخره
+    await expect(page.getByText(/يظهر في الرابط/)).toHaveText('يظهر في الرابط: ⁦/pages/tajriba⁩');
     await expect(page.getByText('/pages/terms')).toHaveCount(0);
+    // والشرطة الأولى أقصى يسار الرابط على الشاشة — قبل «pages» لا بعد «tajriba»
+    const [slash, word] = await page.getByText(/يظهر في الرابط/).evaluate((el) => {
+      const text = el.firstChild as Text;
+      const box = (from: number, to: number) => {
+        const r = document.createRange();
+        r.setStart(text, from);
+        r.setEnd(text, to);
+        return r.getBoundingClientRect().left;
+      };
+      const at = (text.textContent ?? '').indexOf('/pages');
+      return [box(at, at + 1), box(at + 1, at + 6)];
+    });
+    expect(slash).toBeLessThan(word);
   } finally {
     await prisma.cmsPage.deleteMany({ where: { slug: { startsWith: `pg-${t}-` } } });
   }

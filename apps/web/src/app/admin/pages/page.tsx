@@ -28,6 +28,12 @@ const FILTERS: { key: Filter; label: string; en: string }[] = [
   { key: 'draft', label: 'مسوّدة', en: 'Draft' },
 ];
 
+/**
+ * الرابط معزولاً باتجاه اليسار داخل الجملة العربية (U+2066 … U+2069): بلا عزل يقلبه المتصفّح فتصير
+ * «/pages/tajriba» على الشاشة «pages/tajriba/» — الشرطة الأولى في آخره (3 نوفمبر 2026)
+ */
+const path = (p: string) => `⁦${p}⁩`;
+
 const words = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 
 /**
@@ -71,7 +77,7 @@ export default function AdminPagesPage() {
     <div className="ac2-page">
       <AdminHeader
         title={t('صفحات المحتوى', 'Content pages')}
-        hint={t('من نحن، الشروط، الخصوصية، سياسة الإرجاع — تُعرض للزوار على /pages.', 'About us, terms, privacy, return policy — shown to visitors at /pages.')}
+        hint={t(`من نحن، الشروط، الخصوصية، سياسة الإرجاع — تُعرض للزوار على ${path('/pages')}.`, 'About us, terms, privacy, return policy — shown to visitors at /pages.')}
       />
 
       <div className="toolbar">
@@ -175,8 +181,8 @@ export default function AdminPagesPage() {
           <TextInput label={t('المُعرّف النصّي', 'Slug')} hint={
               // الرابط بالمعرّف المكتوب لا بمثال ثابت: «tajriba» كانت تقول «/pages/terms»
               f.slug
-                ? t(`يظهر في الرابط: /pages/${f.slug}`, `Shown in the link: /pages/${f.slug}`)
-                : t('يظهر في الرابط، مثلاً: /pages/terms', 'Shown in the link, for example: /pages/terms')
+                ? t(`يظهر في الرابط: ${path(`/pages/${f.slug}`)}`, `Shown in the link: /pages/${f.slug}`)
+                : t(`يظهر في الرابط، مثلاً: ${path('/pages/terms')}`, 'Shown in the link, for example: /pages/terms')
             } dir="ltr" className="field__control num" value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase() })} />
           <TextArea label={t('النص', 'Text')} hint={t('سطر فارغ يفصل فقرة عن فقرة.', 'A blank line separates paragraphs.')} rows={14} value={f.bodyAr} onChange={(e) => setF({ ...f, bodyAr: e.target.value })} />
           <div className="ac2-setting__row">
