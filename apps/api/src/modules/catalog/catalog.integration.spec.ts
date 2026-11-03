@@ -1421,25 +1421,28 @@ describe('حدود المنتجات والخصائص — يُؤتمت 4', () => 
     expect(await prisma.productVariant.count({ where: { sku } })).toBe(0);
   });
 
-  dbIt('إنشاءان متزامنان بالـ SKU الجديد نفسه: 201 و 409 DUPLICATE، ومتغيّر حيّ واحد ولا منتج يتيم (VCAT-034)', async () => {
+  dbIt('إنشاءات متزامنة بالـ SKU الجديد نفسه: واحد 201 والبقية 409 DUPLICATE، ومتغيّر حيّ واحد ولا منتج يتيم (VCAT-034)', async () => {
     const A = as('a');
     const sku = `RACE-${SUFFIX}`;
     const category = await catOf('a');
     const name = (n: number) => `منتج السباق ${n} ${SUFFIX}`;
+    // ستة لا اثنان: كي يتجاوز بعضها فحص SKU معاً ويبلغ القيد الفريد في القاعدة — حيث تمنع المعاملة منتجاً يتيماً
+    const racers = [1, 2, 3, 4, 5, 6];
     const results = await Promise.all(
-      [1, 2].map((n) =>
+      racers.map((n) =>
         A.post('/vendor/products', { vendorCategoryId: category, nameAr: name(n), attributes: material(), variants: [{ sku, price: '10.00', stock: 1 }] }),
       ),
     );
-    expect(results.map((r) => r.statusCode).sort()).toEqual([201, 409]);
-    const lost = results.find((r) => r.statusCode === 409)!;
-    expect(lost.json().code).toBe('DUPLICATE');
-    expect([
-      `SKU «${sku}» مستعمل لمتغيّر آخر في متجرك.`,
-      'SKU مستعمل لمتغيّر آخر في متجرك — لكل متغيّر حيّ SKU فريد على مستوى المتجر.',
-    ]).toContain(lost.json().message);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([201, 409, 409, 409, 409, 409]);
+    for (const lost of results.filter((r) => r.statusCode === 409)) {
+      expect(lost.json().code).toBe('DUPLICATE');
+      expect([
+        `SKU «${sku}» مستعمل لمتغيّر آخر في متجرك.`,
+        'SKU مستعمل لمتغيّر آخر في متجرك — لكل متغيّر حيّ SKU فريد على مستوى المتجر.',
+      ]).toContain(lost.json().message);
+    }
 
-    const ours = { vendorId: vendors.a.vendorId, nameAr: { in: [name(1), name(2)] } };
+    const ours = { vendorId: vendors.a.vendorId, nameAr: { in: racers.map(name) } };
     expect(await prisma.productVariant.count({ where: { vendorId: vendors.a.vendorId, sku, archivedAt: null } })).toBe(1);
     expect(await prisma.product.count({ where: ours })).toBe(1);
     expect(await prisma.product.count({ where: { ...ours, variants: { none: {} } } })).toBe(0);
