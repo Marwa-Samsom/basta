@@ -40,7 +40,7 @@ let aSubId = '';
 const today = new Date().toISOString().slice(0, 10);
 
 type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
-async function call(method: 'GET' | 'POST', url: string, token?: string, body?: unknown, headers: Record<string, string> = {}): Promise<Res> {
+async function call(method: 'GET' | 'POST' | 'PUT', url: string, token?: string, body?: unknown, headers: Record<string, string> = {}): Promise<Res> {
   return app.inject({
     method,
     url: `/api/v1${url}`,
@@ -286,5 +286,64 @@ describe('VD-19 · طلب رفضه البائع (VOPS-098، 22 أكتوبر 2026
     // القيد المعاكس للعمولة يشير إلى قيدها الأصلي
     const reversal = await prisma.ledgerEntry.findFirstOrThrow({ where: { refId: b.id, entryType: 'commission_debit', direction: 'credit' } });
     expect(reversal.reversesEntryId).not.toBeNull();
+  });
+});
+
+/**
+ * عيب كشفه CHK-029 (2 نوفمبر 2026): كوبون يموّله البائع بقيمة القطعة كلها يجعل قيد البيع صفراً فلا يُكتب.
+ * «طلبات مدفوعة» والرسم كانا يعدّان قيد البيع وحده: يسقط الطلب منهما، ويُحسب المتوسط على غيره.
+ */
+describe('VD-19 · طلب غطّى كوبونُ البائع قطعته كلها (CHK-029، 2 نوفمبر 2026)', () => {
+  it('يُعدّ في «طلبات مدفوعة» وفي الرسم، والمتوسط عليه — والمبيعات صفره والشحن شحنه', async () => {
+    if (!dbUp) return;
+    const email = `repd.${SUFFIX}@basta.test`;
+    const u = await prisma.user.create({
+      data: { email, fullName: 'بائع تقارير د', passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'vendor_owner' } } },
+    });
+    const vendor = await prisma.vendor.create({
+      data: {
+        ownerUserId: u.id, slug: `rep-d-${SUFFIX}`, nameAr: `متجر تقارير د ${SUFFIX}`, status: 'approved', approvedAt: new Date(),
+        settlementCurrency: 'SAR', country: 'SA',
+        shippingZones: { create: { nameAr: 'السعودية', regions: { create: { country: 'SA' } }, rates: { create: { method: 'flat', priceMinorUnits: 1_500n } } } },
+      },
+    });
+    const product = await prisma.product.create({
+      data: { vendorId: vendor.id, slug: `rep-d-${SUFFIX}`, nameAr: 'منتج تقارير د', status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId: vendor.id, sku: `VRP-D-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 10, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 10, reason: 'import' } });
+    seats.push({ userId: u.id, vendorId: vendor.id, variantId: variant.id, productId: product.id, token: await login(email) });
+    const d = seats.length - 1;
+    const coupon = await prisma.coupon.create({
+      data: { code: `REPD-${SUFFIX}`.toUpperCase(), scope: 'vendor', vendorId: vendor.id, type: 'fixed', valueMinorUnits: 10_000n, currency: 'SAR', fundedBy: 'vendor' },
+    });
+
+    const buy = async (code?: string) => {
+      const token = (await call('POST', '/cart', undefined, { currency: 'SAR' })).json().token as string;
+      const headers = { 'x-cart-token': token };
+      expect((await call('POST', '/cart/items', undefined, { variantId: variant.id, qty: 1 }, headers)).statusCode).toBe(201);
+      if (code) expect((await call('PUT', '/cart/coupon', undefined, { code }, headers)).statusCode).toBe(200);
+      const shown = (await call('POST', '/checkout/quote', undefined, { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city }, headers)).json();
+      const placed = await call('POST', '/checkout', buyerToken, { address: ADDRESS, paymentToken: 'tok_success', expectedTotal: shown.totals.total.minorUnits, expectedCurrency: shown.currency }, {
+        ...headers,
+        'idempotency-key': randomUUID(),
+      });
+      expect(placed.statusCode, placed.body).toBe(200);
+    };
+    try {
+      await buy(coupon.code); // القطعة مخصومة كلها: لا قيد بيع، وقيد شحن
+      await buy(); // طلب عادي
+      const c = (await report(d)).currencies[0];
+      expect(c.salesMinorUnits).toBe('10000');
+      expect(c.shippingMinorUnits).toBe('3000');
+      expect(c.paidOrders).toBe(2);
+      expect(c.averageOrderMinorUnits).toBe('5000');
+      expect(c.series).toEqual([{ day: today, salesMinorUnits: '10000', orders: 2 }]);
+    } finally {
+      await prisma.coupon.update({ where: { id: coupon.id }, data: { isActive: false } });
+    }
   });
 });
