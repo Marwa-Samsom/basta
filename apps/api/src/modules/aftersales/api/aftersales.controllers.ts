@@ -86,8 +86,9 @@ export class CustomerDisputesController {
   constructor(private readonly disputes: DisputesService) {}
 
   @Get()
-  list(@CurrentActor() a: Actor) {
-    return this.disputes.list({ kind: 'customer', userId: a.userId });
+  list(@CurrentActor() a: Actor, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.disputes.list({ kind: 'customer', userId: a.userId }, { ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 
   @Post()
@@ -127,8 +128,9 @@ export class VendorDisputesController {
   constructor(private readonly disputes: DisputesService) {}
 
   @Get()
-  list(@CurrentActor() a: Actor, @Query('status') status?: string) {
-    return this.disputes.list(vendorParty(a), status);
+  list(@CurrentActor() a: Actor, @Query('status') status?: string, @Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.disputes.list(vendorParty(a), { ...(status ? { status } : {}), ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 
   @Get(':id')

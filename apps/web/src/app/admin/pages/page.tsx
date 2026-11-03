@@ -1,12 +1,12 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { AdminHeader, Feedback, Loading } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, MoreButton } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { EmptyState, TextArea, TextInput } from '@/components/ui';
 import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
-import { useAction, useAdminData } from '@/lib/admin';
+import { useAction, useAdminList } from '@/lib/admin';
 import { when } from '@/lib/orders';
 
 interface Page {
@@ -18,30 +18,43 @@ interface Page {
   updatedAt: string;
 }
 
+type Filter = 'all' | 'published' | 'draft';
+
 const EMPTY = { id: '', slug: '', titleAr: '', bodyAr: '', isPublished: false };
 
-const FILTERS = [
-  { key: 'all', label: 'الكل', en: 'All', test: () => true },
-  { key: 'published', label: 'منشورة', en: 'Published', test: (p: Page) => p.isPublished },
-  { key: 'draft', label: 'مسوّدة', en: 'Draft', test: (p: Page) => !p.isPublished },
+const FILTERS: { key: Filter; label: string; en: string }[] = [
+  { key: 'all', label: 'الكل', en: 'All' },
+  { key: 'published', label: 'منشورة', en: 'Published' },
+  { key: 'draft', label: 'مسوّدة', en: 'Draft' },
 ];
+
+/**
+ * الرابط معزولاً باتجاه اليسار داخل الجملة العربية (U+2066 … U+2069): بلا عزل يقلبه المتصفّح فتصير
+ * «/pages/tajriba» على الشاشة «pages/tajriba/» — الشرطة الأولى في آخره (3 نوفمبر 2026)
+ */
+const path = (p: string) => `⁦${p}⁩`;
 
 const words = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 
 /**
  * AD-18 — صفحات المحتوى (من نحن، الشروط، الخصوصية، سياسة الإرجاع). النص
  * يُعرض كما يُكتب بفقراته — سطر فارغ يفصل فقرة عن فقرة.
+ *
+ * الحالة والبحث والصفحات من الخادم (3 نوفمبر 2026): كانت الصفحات كلها تُجلب وتُصفّى هنا،
+ * 263 صفحة بلا «المزيد» ولا «السابق» (ACFG-056).
  */
 export default function AdminPagesPage() {
   const t = useT();
   const locale = useLocale();
-  const { data, error, forbidden, reload } = useAdminData<Page[]>('/admin/pages');
   const act = useAction();
   const [f, setF] = useState(EMPTY);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
+  const query = new URLSearchParams({ ...(filter !== 'all' ? { status: filter } : {}), ...(q.trim() ? { search: q.trim() } : {}) });
+  const list = useAdminList<Page, { counts: Record<Filter, number> }>(`/admin/pages?${query}`, (p) => p.id);
+  const { data, error, forbidden, reload } = list;
   const editorRef = useRef<HTMLElement | null>(null);
-  if (!data) return <Loading error={error} forbidden={forbidden} />;
+  if (!data) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
 
   const save = () =>
     act.run(async () => {
@@ -57,15 +70,14 @@ export default function AdminPagesPage() {
     editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
-  const test = FILTERS.find((x) => x.key === filter)?.test ?? (() => true);
-  const term = q.trim();
-  const shown = data.filter(test).filter((p) => !term || p.titleAr.includes(term) || p.slug.includes(term.toLowerCase()));
+  const shown = list.items;
+  const none = data.counts.all === 0;
 
   return (
     <div className="ac2-page">
       <AdminHeader
         title={t('صفحات المحتوى', 'Content pages')}
-        hint={t('من نحن، الشروط، الخصوصية، سياسة الإرجاع — تُعرض للزوار على /pages.', 'About us, terms, privacy, return policy — shown to visitors at /pages.')}
+        hint={t(`من نحن، الشروط، الخصوصية، سياسة الإرجاع — تُعرض للزوار على ${path('/pages')}.`, 'About us, terms, privacy, return policy — shown to visitors at /pages.')}
       />
 
       <div className="toolbar">
@@ -73,14 +85,14 @@ export default function AdminPagesPage() {
           {FILTERS.map((x) => (
             <button key={x.key} type="button" role="tab" className="tabs__tab" aria-selected={filter === x.key} onClick={() => setFilter(x.key)}>
               {t(x.label, x.en)}
-              <span className="tabs__count">{data.filter(x.test).length}</span>
+              <span className="tabs__count">{data.counts[x.key]}</span>
             </button>
           ))}
         </div>
         <div className="toolbar__end">
           <label className="input-icon ac2-search">
             <Icon name="search" size={15} />
-            <input type="search" className="field__control" placeholder={t('ابحث بعنوان الصفحة', 'Search by page title')} aria-label={t('ابحث بعنوان الصفحة', 'Search by page title')} value={q} onChange={(e) => setQ(e.target.value)} />
+            <input type="search" className="field__control" placeholder={t('ابحث بعنوان الصفحة أو رابطها', 'Search by page title or link')} aria-label={t('ابحث بعنوان الصفحة', 'Search by page title')} value={q} onChange={(e) => setQ(e.target.value)} />
           </label>
           <button type="button" className="btn btn--primary" onClick={() => open(EMPTY)}>
             <Icon name="plus" size={15} />
@@ -95,75 +107,83 @@ export default function AdminPagesPage() {
         {shown.length === 0 ? (
           <EmptyState
             icon="file"
-            title={data.length === 0 ? t('لا صفحات بعد', 'No pages yet') : t('لا صفحات بهذه التصفية', 'No pages match this filter')}
+            title={none ? t('لا صفحات بعد', 'No pages yet') : t('لا صفحات بهذه التصفية', 'No pages match this filter')}
             actions={
-              data.length === 0 ? null : (
+              none ? null : (
                 <button type="button" className="btn btn--secondary btn--sm" onClick={() => (setFilter('all'), setQ(''))}>
                   {t('أزل التصفية', 'Clear filters')}
                 </button>
               )
             }
           >
-            {data.length === 0
+            {none
               ? t('اكتب أول صفحة من المحرّر — تُحفظ مسوّدة حتى تنشرها.', 'Write the first page in the editor — it is saved as a draft until you publish it.')
               : t('جرّب تصفية أخرى.', 'Try another filter.')}
           </EmptyState>
         ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">{t('الصفحة', 'Page')}</th>
-                  <th scope="col">{t('الرابط', 'Link')}</th>
-                  <th scope="col">{t('آخر تعديل', 'Last edited')}</th>
-                  <th scope="col">{t('الكلمات', 'Words')}</th>
-                  <th scope="col">{t('الحالة', 'Status')}</th>
-                  <th scope="col" className="end">
-                    <span className="visually-hidden">{t('إجراء', 'Action')}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((p) => (
-                  <tr key={p.id} data-tone={f.id === p.id ? 'selected' : undefined}>
-                    <td>
-                      <strong>{p.titleAr}</strong>
-                    </td>
-                    <td className="num" data-label={t('الرابط', 'Link')}>
-                      /pages/{p.slug}
-                    </td>
-                    <td className="ac2-muted-cell" data-label={t('آخر تعديل', 'Last edited')}>
-                      {when(p.updatedAt, locale)}
-                    </td>
-                    <td className="num" data-label={t('الكلمات', 'Words')}>
-                      {words(p.bodyAr)}
-                    </td>
-                    <td data-label={t('الحالة', 'Status')}>
-                      {p.isPublished ? <span className="badge badge--success">{t('منشورة', 'Published')}</span> : <span className="badge badge--pending">{t('مسوّدة', 'Draft')}</span>}
-                    </td>
-                    <td className="end" data-label="">
-                      <span className="ac2-actions">
-                        <button type="button" className="btn btn--secondary btn--sm" aria-pressed={f.id === p.id} onClick={() => open({ id: p.id, slug: p.slug, titleAr: p.titleAr, bodyAr: p.bodyAr, isPublished: p.isPublished })}>
-                          {t('حرّر', 'Edit')}
-                        </button>
-                        {p.isPublished ? (
-                          <a className="btn btn--ghost btn--sm" href={`/pages/${p.slug}`} target="_blank" rel="noreferrer">
-                            {t('عاين', 'Preview')}
-                          </a>
-                        ) : null}
-                      </span>
-                    </td>
+          <div className="ac2-col">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t('الصفحة', 'Page')}</th>
+                    <th scope="col">{t('الرابط', 'Link')}</th>
+                    <th scope="col">{t('آخر تعديل', 'Last edited')}</th>
+                    <th scope="col">{t('الكلمات', 'Words')}</th>
+                    <th scope="col">{t('الحالة', 'Status')}</th>
+                    <th scope="col" className="end">
+                      <span className="visually-hidden">{t('إجراء', 'Action')}</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {shown.map((p) => (
+                    <tr key={p.id} data-tone={f.id === p.id ? 'selected' : undefined}>
+                      <td>
+                        <strong>{p.titleAr}</strong>
+                      </td>
+                      <td className="num" data-label={t('الرابط', 'Link')}>
+                        /pages/{p.slug}
+                      </td>
+                      <td className="ac2-muted-cell" data-label={t('آخر تعديل', 'Last edited')}>
+                        {when(p.updatedAt, locale)}
+                      </td>
+                      <td className="num" data-label={t('الكلمات', 'Words')}>
+                        {words(p.bodyAr)}
+                      </td>
+                      <td data-label={t('الحالة', 'Status')}>
+                        {p.isPublished ? <span className="badge badge--success">{t('منشورة', 'Published')}</span> : <span className="badge badge--pending">{t('مسوّدة', 'Draft')}</span>}
+                      </td>
+                      <td className="end" data-label="">
+                        <span className="ac2-actions">
+                          <button type="button" className="btn btn--secondary btn--sm" aria-pressed={f.id === p.id} onClick={() => open({ id: p.id, slug: p.slug, titleAr: p.titleAr, bodyAr: p.bodyAr, isPublished: p.isPublished })}>
+                            {t('حرّر', 'Edit')}
+                          </button>
+                          {p.isPublished ? (
+                            <a className="btn btn--ghost btn--sm" href={`/pages/${p.slug}`} target="_blank" rel="noreferrer">
+                              {t('عاين', 'Preview')}
+                            </a>
+                          ) : null}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <MoreButton list={list} />
           </div>
         )}
 
         <section ref={editorRef} className="card ac2-sticky" aria-label={f.id ? t('تحرير الصفحة', 'Edit page') : t('صفحة جديدة', 'New page')}>
           <h2 className="ac2-title">{f.id ? t(`تحرير «${f.titleAr || 'صفحة'}»`, `Edit “${f.titleAr || 'page'}”`) : t('صفحة جديدة', 'New page')}</h2>
           <TextInput label={t('العنوان', 'Title')} value={f.titleAr} onChange={(e) => setF({ ...f, titleAr: e.target.value })} />
-          <TextInput label={t('المُعرّف النصّي', 'Slug')} hint={t('يظهر في الرابط: /pages/terms', 'Shown in the link: /pages/terms')} dir="ltr" className="field__control num" value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase() })} />
+          <TextInput label={t('المُعرّف النصّي', 'Slug')} hint={
+              // الرابط بالمعرّف المكتوب لا بمثال ثابت: «tajriba» كانت تقول «/pages/terms»
+              f.slug
+                ? t(`يظهر في الرابط: ${path(`/pages/${f.slug}`)}`, `Shown in the link: /pages/${f.slug}`)
+                : t(`يظهر في الرابط، مثلاً: ${path('/pages/terms')}`, 'Shown in the link, for example: /pages/terms')
+            } dir="ltr" className="field__control num" value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase() })} />
           <TextArea label={t('النص', 'Text')} hint={t('سطر فارغ يفصل فقرة عن فقرة.', 'A blank line separates paragraphs.')} rows={14} value={f.bodyAr} onChange={(e) => setF({ ...f, bodyAr: e.target.value })} />
           <div className="ac2-setting__row">
             <span className="ac2-setting__label">

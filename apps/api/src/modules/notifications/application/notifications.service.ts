@@ -345,8 +345,12 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
    * إشعار رآه)، ويصفّي غير المقروء. الترتيب (الوقت، ثم المعرّف) ثابت، فلا
    * يتكرّر إشعار بين صفحتين ولا يسقط، ولو تساوى وقتا إشعارين.
    * المؤشّر نفسه يُقرأ في نطاق المستخدم: معرّف إشعار غيره لا يعني شيئاً.
+   *
+   * و`codes` يصفّي برموز القوالب (رقائق صندوق اللوحة: الطلبات، المال…)، و`counts` يعيد عدد
+   * كل رمز في الصندوق كله — كانت الرقائق تصفّي ما جُلب وتعدّه وحده (3 نوفمبر 2026).
+   * و`total` عدد ما في العرض كله، لا الصفحة.
    */
-  async inbox(userId: string, opts: { before?: string; limit?: number; unreadOnly?: boolean } = {}) {
+  async inbox(userId: string, opts: { before?: string; limit?: number; unreadOnly?: boolean; codes?: string[]; counts?: boolean } = {}) {
     const limit = Math.min(Math.max(opts.limit ?? 30, 1), 50);
     const base: Prisma.NotificationWhereInput = { userId, channel: 'in_app', status: 'sent' };
     let after: Prisma.NotificationWhereInput = {};
@@ -360,19 +364,28 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
         OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }],
       };
     }
-    const where: Prisma.NotificationWhereInput = { ...base, ...after, ...(opts.unreadOnly ? { readAt: null } : {}) };
-    const [rows, unread] = await Promise.all([
+    const view: Prisma.NotificationWhereInput = {
+      ...base,
+      ...(opts.unreadOnly ? { readAt: null } : {}),
+      ...(opts.codes ? { templateCode: { in: opts.codes } } : {}),
+    };
+    const [rows, unread, total, byCode] = await Promise.all([
       this.prisma.notification.findMany({
-        where,
+        where: { ...view, ...after },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: limit + 1,
         select: { id: true, templateCode: true, body: true, payloadJson: true, readAt: true, createdAt: true },
       }),
       this.prisma.notification.count({ where: { ...base, readAt: null } }),
+      this.prisma.notification.count({ where: view }),
+      opts.counts ? this.prisma.notification.groupBy({ by: ['templateCode'], where: base, _count: true }) : null,
     ]);
     const items = rows.slice(0, limit);
     return {
       unread,
+      /** إشعارات العرض كلها (الكل، أو غير المقروء، أو رموز التصفية) — «X من Y» تحت القائمة */
+      total,
+      ...(byCode ? { counts: Object.fromEntries(byCode.map((g) => [g.templateCode, g._count])) as Record<string, number> } : {}),
       items: items.map((i) => ({
         id: i.id,
         code: i.templateCode,

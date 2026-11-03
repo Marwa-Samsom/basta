@@ -27,7 +27,14 @@ interface Profile extends Omit<Row, 'orders'> {
   totpEnabled: boolean;
   /** مفعَّل وليس حساب مدير — الوحيد الذي يُعاد ضبطه من هنا */
   totpResettable: boolean;
-  orders: { orderNumber: string; status: string; currency: string; grandTotalMinorUnits: string; placedAt: string }[];
+}
+
+interface CustomerOrder {
+  orderNumber: string;
+  status: string;
+  currency: string;
+  grandTotalMinorUnits: string;
+  placedAt: string;
 }
 
 /** AD-21 — العملاء: بحث، وملف بطلباته ونزاعاته، وتعليق بسبب يُنهي جلساته فوراً */
@@ -144,6 +151,8 @@ function CustomerProfile({ id, onChange }: { id: string; onChange: () => void })
   const locale = useLocale();
   const parentStatus = localized(locale, PARENT_STATUS, PARENT_STATUS_EN);
   const { data, error, reload } = useAdminData<Profile>(`/admin/customers/${id}`);
+  // طلباته صفحات من الخادم بـ«المزيد» و«السابق» — كانت آخر عشرين مع الملف بلا ما قبلها (3 نوفمبر 2026)
+  const orders = useAdminList<CustomerOrder>(`/admin/customers/${id}/orders`, (o) => o.orderNumber);
   const act = useAction();
   if (!data) return <Loading error={error} inline />;
   const done = () => {
@@ -163,9 +172,9 @@ function CustomerProfile({ id, onChange }: { id: string; onChange: () => void })
           <span className="ao-fact__v num">{data.disputes}</span>
         </span>
       </div>
-      {data.orders.length ? (
+      {orders.items.length ? (
         <ul className="ao-olist">
-          {data.orders.map((o) => (
+          {orders.items.map((o) => (
             <li key={o.orderNumber}>
               <span className="num ao-strong">{o.orderNumber}</span>
               <span className="muted">{parentStatus[o.status] ?? o.status}</span>
@@ -174,6 +183,7 @@ function CustomerProfile({ id, onChange }: { id: string; onChange: () => void })
           ))}
         </ul>
       ) : null}
+      <MoreButton list={orders} />
       <div className="ao-cprofile__actions">
         {data.status === 'active' ? (
           <ReasonButton

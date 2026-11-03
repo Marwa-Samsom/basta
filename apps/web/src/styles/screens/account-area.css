@@ -241,7 +241,7 @@
 .aa-notif__side { display: grid; gap: 4px; justify-items: end; flex: none; color: var(--text-muted); }
 .aa-notif__time { font-size: var(--text-2xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.aa-more { display: flex; justify-content: center; gap: var(--space-3); padding: var(--space-3); }
+.aa-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-3); }
 
 /* ------------------------------------------- ST-15 · منتقي العنوان المحفوظ */
 

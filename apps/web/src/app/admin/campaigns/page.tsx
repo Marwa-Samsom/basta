@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AdminHeader, Feedback, Loading, SearchBox } from '@/components/admin';
+import { AdminHeader, Feedback, Loading, MoreButton, SearchBox } from '@/components/admin';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { ClearableInput, EmptyState } from '@/components/ui';
 import { DateField } from '@/components/date-field';
 import { api } from '@/lib/api';
-import { media, useAction, useAdminData } from '@/lib/admin';
+import { media, useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { intlLocale, localized, type Locale } from '@/lib/i18n';
 import { when } from '@/lib/orders';
 
@@ -109,15 +109,19 @@ const EMPTY = { nameAr: '', placement: 'home_top' as Campaign['placement'], star
  * AD-17 — الحملات والمنتجات المميّزة. مدة وموضع في الرئيسية ومنتجات مرتّبة
  * يدوياً، وكوبون يُعلَن معها (يعمل بشروطه هو). الحملة لا تُحذف: تُوقف فتختفي
  * من الواجهة فوراً وتبقى في السجل.
+ *
+ * الحالة والبحث والصفحات من الخادم (3 نوفمبر 2026): كانت الحملات كلها تُجلب وتُصفّى هنا.
  */
 export default function AdminCampaignsPage() {
   const t = useT();
   const locale = useLocale();
   const placements = localized(locale, PLACEMENTS, PLACEMENTS_EN);
-  const { data, error, forbidden, reload } = useAdminData<Campaign[]>('/admin/campaigns');
-  const act = useAction();
   const [filter, setFilter] = useState<'all' | Status>('all');
   const [q, setQ] = useState('');
+  const query = new URLSearchParams({ ...(filter !== 'all' ? { status: filter } : {}), ...(q.trim() ? { search: q.trim() } : {}) });
+  const list = useAdminList<Campaign, { counts: Record<'all' | Status, number> }>(`/admin/campaigns?${query}`, (c) => c.id);
+  const { data, error, forbidden, reload } = list;
+  const act = useAction();
   // picked: رمز المختار ليبقى ظاهراً ولو خرج من نتائج البحث، وusable=false إن لم يعد صالحاً
   const [form, setForm] = useState<{ id: string | null; couponId: string | null; picked: { code: string; usable: boolean } | null; v: typeof EMPTY } | null>(null);
   // «كوبون يُعلَن» بحثاً برمزه وأوّل عشرين — كانت كل الكوبونات المفعّلة قائمة واحدة (ACFG-039، 31 أكتوبر 2026)
@@ -128,8 +132,8 @@ export default function AdminCampaignsPage() {
 
   if (!data) return <Loading error={error} forbidden={forbidden} onRetry={reload} />;
 
-  const term = q.trim();
-  const shown = data.filter((c) => filter === 'all' || c.status === filter).filter((c) => !term || c.nameAr.includes(term));
+  const shown = list.items;
+  const none = data.counts.all === 0;
 
   const openNew = () => (setOrdering(null), setCouponSearch(''), setForm({ id: null, couponId: null, picked: null, v: EMPTY }));
   const openEdit = (c: Campaign) => (
@@ -174,7 +178,7 @@ export default function AdminCampaignsPage() {
     );
 
   const formValid = form && form.v.nameAr.trim().length >= 3 && form.v.startsAt && form.v.endsAt && new Date(form.v.endsAt) > new Date(form.v.startsAt);
-  const current = ordering ? data.find((c) => c.id === ordering) : null;
+  const current = ordering ? list.items.find((c) => c.id === ordering) : null;
 
   return (
     <div className="ac2-page">
@@ -188,7 +192,7 @@ export default function AdminCampaignsPage() {
           {FILTERS.map((x) => (
             <button key={x.key} type="button" role="tab" className="tabs__tab" aria-selected={filter === x.key} onClick={() => setFilter(x.key)}>
               {t(x.label, x.en)}
-              <span className="tabs__count">{x.key === 'all' ? data.length : data.filter((c) => c.status === x.key).length}</span>
+              <span className="tabs__count">{data.counts[x.key]}</span>
             </button>
           ))}
         </div>
@@ -324,9 +328,9 @@ export default function AdminCampaignsPage() {
       {shown.length === 0 ? (
         <EmptyState
           icon="chart"
-          title={data.length === 0 ? t('لا حملات بعد', 'No campaigns yet') : t('لا حملات بهذه التصفية', 'No campaigns match this filter')}
+          title={none ? t('لا حملات بعد', 'No campaigns yet') : t('لا حملات بهذه التصفية', 'No campaigns match this filter')}
           actions={
-            data.length === 0 ? (
+            none ? (
               <button type="button" className="btn btn--primary btn--sm" onClick={openNew}>
                 <Icon name="plus" size={14} />
                 {t('حملة جديدة', 'New campaign')}
@@ -338,81 +342,84 @@ export default function AdminCampaignsPage() {
             )
           }
         >
-          {data.length === 0
+          {none
             ? t('أنشئ أول حملة: مدتها وموضعها في الرئيسية، ثم رتّب منتجاتها.', 'Create the first campaign: its period and spot on the home page, then arrange its products.')
             : t('جرّب تصفية أخرى أو أنشئ حملة.', 'Try another filter or create a campaign.')}
         </EmptyState>
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">{t('الحملة', 'Campaign')}</th>
-                <th scope="col">{t('المدة', 'Period')}</th>
-                <th scope="col">{t('النطاق', 'Reach')}</th>
-                <th scope="col">{t('الكوبون', 'Coupon')}</th>
-                <th scope="col">{t('الموضع', 'Spot')}</th>
-                <th scope="col">{t('الحالة', 'Status')}</th>
-                <th scope="col" className="end">
-                  <span className="visually-hidden">{t('إجراء', 'Action')}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((c) => (
-                <tr key={c.id} data-tone={ordering === c.id ? 'selected' : c.status === 'ended' ? 'muted' : undefined}>
-                  <td>
-                    <span className="ac2-cell">
-                      <span className="ac2-cell__main">{c.nameAr}</span>
-                      <span className="ac2-cell__sub">{productsLabel(c.productCount, locale)}</span>
-                    </span>
-                  </td>
-                  <td className="ac2-muted-cell" data-label={t('المدة', 'Period')}>
-                    <span title={`${when(c.startsAt, locale)} — ${when(c.endsAt, locale)}`}>
-                      {day(c.startsAt, locale)} – {day(c.endsAt, locale)}
-                    </span>
-                  </td>
-                  <td className="ac2-muted-cell" data-label={t('النطاق', 'Reach')}>
-                    {scopeOf(c, locale)}
-                  </td>
-                  <td data-label={t('الكوبون', 'Coupon')}>{c.couponCode ? <span className="num ac2-campaign-code">{c.couponCode}</span> : <span className="ac2-faint">—</span>}</td>
-                  <td className="ac2-muted-cell" data-label={t('الموضع', 'Spot')}>
-                    {placements[c.placement] ?? c.placement}
-                  </td>
-                  <td data-label={t('الحالة', 'Status')}>
-                    <span className={`badge ${STATUS[c.status].tone}`}>{t(STATUS[c.status].label, STATUS[c.status].en)}</span>
-                  </td>
-                  <td className="end" data-label="">
-                    <span className="ac2-actions">
-                      <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => openEdit(c)} aria-label={t(`حرّر ${c.nameAr}`, `Edit ${c.nameAr}`)}>
-                        {t('حرّر', 'Edit')}
-                      </button>
-                      {c.status !== 'ended' ? (
+        <div className="ac2-col">
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('الحملة', 'Campaign')}</th>
+                  <th scope="col">{t('المدة', 'Period')}</th>
+                  <th scope="col">{t('النطاق', 'Reach')}</th>
+                  <th scope="col">{t('الكوبون', 'Coupon')}</th>
+                  <th scope="col">{t('الموضع', 'Spot')}</th>
+                  <th scope="col">{t('الحالة', 'Status')}</th>
+                  <th scope="col" className="end">
+                    <span className="visually-hidden">{t('إجراء', 'Action')}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((c) => (
+                  <tr key={c.id} data-tone={ordering === c.id ? 'selected' : c.status === 'ended' ? 'muted' : undefined}>
+                    <td>
+                      <span className="ac2-cell">
+                        <span className="ac2-cell__main">{c.nameAr}</span>
+                        <span className="ac2-cell__sub">{productsLabel(c.productCount, locale)}</span>
+                      </span>
+                    </td>
+                    <td className="ac2-muted-cell" data-label={t('المدة', 'Period')}>
+                      <span title={`${when(c.startsAt, locale)} — ${when(c.endsAt, locale)}`}>
+                        {day(c.startsAt, locale)} – {day(c.endsAt, locale)}
+                      </span>
+                    </td>
+                    <td className="ac2-muted-cell" data-label={t('النطاق', 'Reach')}>
+                      {scopeOf(c, locale)}
+                    </td>
+                    <td data-label={t('الكوبون', 'Coupon')}>{c.couponCode ? <span className="num ac2-campaign-code">{c.couponCode}</span> : <span className="ac2-faint">—</span>}</td>
+                    <td className="ac2-muted-cell" data-label={t('الموضع', 'Spot')}>
+                      {placements[c.placement] ?? c.placement}
+                    </td>
+                    <td data-label={t('الحالة', 'Status')}>
+                      <span className={`badge ${STATUS[c.status].tone}`}>{t(STATUS[c.status].label, STATUS[c.status].en)}</span>
+                    </td>
+                    <td className="end" data-label="">
+                      <span className="ac2-actions">
+                        <button type="button" className="btn btn--secondary btn--sm" disabled={act.busy} onClick={() => openEdit(c)} aria-label={t(`حرّر ${c.nameAr}`, `Edit ${c.nameAr}`)}>
+                          {t('حرّر', 'Edit')}
+                        </button>
+                        {c.status !== 'ended' ? (
+                          <button
+                            type="button"
+                            className="btn btn--secondary btn--sm"
+                            disabled={act.busy}
+                            onClick={() => toggle(c)}
+                            aria-label={t(`${c.isActive ? 'أوقف' : 'فعّل'} ${c.nameAr}`, `${c.isActive ? 'Pause' : 'Activate'} ${c.nameAr}`)}
+                          >
+                            {c.isActive ? t('أوقف', 'Pause') : t('فعّل', 'Activate')}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
-                          className="btn btn--secondary btn--sm"
-                          disabled={act.busy}
-                          onClick={() => toggle(c)}
-                          aria-label={t(`${c.isActive ? 'أوقف' : 'فعّل'} ${c.nameAr}`, `${c.isActive ? 'Pause' : 'Activate'} ${c.nameAr}`)}
+                          className="btn btn--primary btn--sm"
+                          aria-expanded={ordering === c.id}
+                          onClick={() => (setForm(null), setOrdering(ordering === c.id ? null : c.id))}
+                          aria-label={t(`رتّب منتجات ${c.nameAr}`, `Arrange products of ${c.nameAr}`)}
                         >
-                          {c.isActive ? t('أوقف', 'Pause') : t('فعّل', 'Activate')}
+                          {t('رتّب المنتجات', 'Arrange products')}
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="btn btn--primary btn--sm"
-                        aria-expanded={ordering === c.id}
-                        onClick={() => (setForm(null), setOrdering(ordering === c.id ? null : c.id))}
-                        aria-label={t(`رتّب منتجات ${c.nameAr}`, `Arrange products of ${c.nameAr}`)}
-                      >
-                        {t('رتّب المنتجات', 'Arrange products')}
-                      </button>
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <MoreButton list={list} />
         </div>
       )}
     </div>

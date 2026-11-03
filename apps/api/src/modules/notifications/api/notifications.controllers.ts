@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUrl, IsUUID, Length, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, MaxLength, Min } from 'class-validator';
 import type { Actor } from '../../../common/security/actor';
 import { CurrentActor, RequirePermission, Roles } from '../../../common/security/decorators';
 import { NotificationsService } from '../application/notifications.service';
@@ -55,6 +55,16 @@ export class InboxQueryDto {
   @IsOptional()
   @IsIn(['1', 'true'])
   unread?: string;
+
+  /** رموز القوالب مفصولة بفواصل — «الطلبات» أو «المال» في صندوق اللوحة تصفيةً من الخادم */
+  @IsOptional()
+  @Matches(/^[a-z0-9_]{1,60}(,[a-z0-9_]{1,60}){0,49}$/, { message: 'رموز الإشعارات بأحرف لاتينية صغيرة وأرقام وشرطة سفلية، مفصولة بفواصل.' })
+  codes?: string;
+
+  /** عدد إشعارات كل رمز في الصندوق كله — لعدّادات التصفية */
+  @IsOptional()
+  @IsIn(['1', 'true'])
+  counts?: string;
 }
 
 /** { orders: false, … } — المفاتيح تُفحص في الخدمة مقابل قائمة الفئات */
@@ -83,6 +93,8 @@ export class MyNotificationsController {
       ...(q.before ? { before: q.before } : {}),
       ...(q.limit ? { limit: q.limit } : {}),
       ...(q.unread ? { unreadOnly: true } : {}),
+      ...(q.codes ? { codes: q.codes.split(',') } : {}),
+      ...(q.counts ? { counts: true } : {}),
     });
   }
 

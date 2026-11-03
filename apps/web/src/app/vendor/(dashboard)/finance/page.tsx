@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Alert, ClearableInput, EmptyState, Field, PageHead } from '@/components/ui';
+import { Alert, ClearableInput, EmptyState, Field, MoreButton, PageHead } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
+import { useAdminList } from '@/lib/admin';
 import { minorUnitDigits } from '@/lib/money';
 import { money, when } from '@/lib/orders';
 import { useLocale, useT } from '@/components/locale';
@@ -69,12 +70,14 @@ function toMinor(input: string, currency: string): string | null {
  *
  * ثلاثة جيوب لكل عملة، ولا تُجمع عملتان في رقم واحد (ADR-013). «المعلّق»
  * ليس مالاً ضائعاً: يُحرَّر بعد فترة الإرجاع من التسليم، وأقرب موعد ظاهر.
+ *
+ * سجلّ السحوبات صفحات من الخادم بـ«المزيد» و«السابق» (3 نوفمبر 2026): كان أول مئتين بلا ما بعدها.
  */
 export default function FinancePage() {
   const t = useT();
   const locale = useLocale();
   const [wallets, setWallets] = useState<WalletView[] | null>(null);
-  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const payouts = useAdminList<Payout>('/vendor/finance/payouts', (p) => p.id);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [amount, setAmount] = useState<Record<string, string>>({});
@@ -86,11 +89,8 @@ export default function FinancePage() {
     let alive = true;
     void (async () => {
       try {
-        const [w, p] = await Promise.all([api<WalletView[]>('/vendor/finance/wallets'), api<Payout[]>('/vendor/finance/payouts')]);
-        if (alive) {
-          setWallets(w);
-          setPayouts(p);
-        }
+        const w = await api<WalletView[]>('/vendor/finance/wallets');
+        if (alive) setWallets(w);
       } catch (e) {
         if (alive) setError((e as Error).message);
       }
@@ -121,6 +121,7 @@ export default function FinancePage() {
       setError(null);
       setAmount({ ...amount, [w.currency]: '' });
       setVersion((v) => v + 1);
+      payouts.reload();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -343,9 +344,11 @@ export default function FinancePage() {
           <section className="card card--flush">
             <header className="card__head">
               <h2>{t('سجلّ السحوبات', 'Payout history')}</h2>
-              {payouts.length ? <span className="num vm-count">{payouts.length}</span> : null}
+              {payouts.total ? <span className="num vm-count">{payouts.total}</span> : null}
             </header>
-            {payouts.length === 0 ? (
+            {payouts.error ? (
+              <Alert tone="danger">{payouts.error}</Alert>
+            ) : !payouts.data ? null : payouts.items.length === 0 ? (
               <p className="vm-list-empty">
                 {t(
                   'لا سحوبات بعد. طلبات السحب تظهر هنا بحالتها ومرجع تحويلها.',
@@ -354,7 +357,7 @@ export default function FinancePage() {
               </p>
             ) : (
               <ul className="vm-payouts">
-                {payouts.map((p) => {
+                {payouts.items.map((p) => {
                   const st = PAYOUT_STATUS[p.status];
                   const step = STEPS.findIndex((s) => s.key === p.status);
                   const inFlight = p.status === 'requested' || p.status === 'approved' || p.status === 'processing';
@@ -400,6 +403,7 @@ export default function FinancePage() {
                 })}
               </ul>
             )}
+            <MoreButton list={payouts} />
           </section>
         </div>
       ) : null}

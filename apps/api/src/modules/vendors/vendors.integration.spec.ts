@@ -420,7 +420,8 @@ describe('بوابة 06 · البند الأول — الرحلة كاملة ب�
 
   it('AD-04: الطلب يظهر في طابور المراجعة بالأقدم أولاً', async () => {
     if (!dbUp) return;
-    const res = await app.inject({ method: 'GET', ...api('/admin/vendors?status=in_review', adminToken) });
+    // الطابور صفحات بالأقدم أولاً، وقاعدة التطوير تراكم فيه طلبات التشغيلات السابقة — يُوصل إلى الطلب برابطه
+    const res = await app.inject({ method: 'GET', ...api(`/admin/vendors?status=in_review&search=dar-alqutn-${SUFFIX}`, adminToken) });
     expect(res.statusCode, res.body).toBe(200);
     const mine = res.json().items.find((v: { id: string }) => v.id === vendorId);
     expect(mine).toBeDefined();

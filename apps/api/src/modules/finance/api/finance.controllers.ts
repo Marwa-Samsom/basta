@@ -118,8 +118,8 @@ export class VendorFinanceController {
   }
 
   @Get('payouts')
-  payouts(@CurrentActor() a: Actor) {
-    return this.finance.payouts({ vendorId: vendorIdOf(a) });
+  payouts(@CurrentActor() a: Actor, @Query('page') page?: string) {
+    return this.finance.payouts(vendorIdOf(a), pageOf(page));
   }
 
   /** المالك وحده يسحب — الموظّف يرى ولا يحرّك المال */
@@ -187,8 +187,9 @@ export class AdminFinanceController {
 
   @Get('commissions')
   @RequirePermission('commissions.edit')
-  commissions() {
-    return this.finance.commissionRules();
+  commissions(@Query('search') search?: string, @Query('page') page?: string) {
+    const term = termOf(search);
+    return this.finance.commissionRules({ ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 
   @Delete('commissions/vendor/:vendorId')

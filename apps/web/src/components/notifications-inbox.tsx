@@ -3,7 +3,7 @@
 import '@/styles/screens/vendor-orders-money.css';
 import '@/styles/screens/vendor-extra.css';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, PageHead } from '@/components/ui';
 import { Icon, type IconName } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
@@ -25,6 +25,10 @@ interface Inbox {
   items: Item[];
   /** معرّف آخر المعروض إن بقي أقدم منه — يُطلب به ما بعده */
   nextCursor: string | null;
+  /** ما في التصفية المختارة كلها — «X من Y» */
+  total?: number;
+  /** عدد كل رمز قالب في الصندوق كله — عدّادات الرقائق */
+  counts?: Record<string, number>;
 }
 
 export type InboxTone = 'brand' | 'danger' | 'warning' | 'success' | 'money' | 'info';
@@ -43,7 +47,10 @@ export interface InboxEvent {
  * الصندوق نفسه الذي يقرؤه الجرس في الشريط العلوي (`/me/notifications`):
  * فتح الإشعار يعلّمه مقروءاً ثم يذهب إلى رابطه، و«تعليم الكل مقروءاً» طلب
  * واحد للخادم. الخادم يعيد آخر 30 إشعاراً، و«الأقدم» يُلحق الثلاثين التالية بموضع آخرها
- * (20 أكتوبر 2026 — كان ما قبل الثلاثين لا يُرى).
+ * (20 أكتوبر 2026 — كان ما قبل الثلاثين لا يُرى)، و«السابق» يُسقط آخر ما ألحقه.
+ *
+ * الرقائق (الطلبات، المال…) تصفية من الخادم برموز قوالبها، وعدّاداتها للصندوق كله (3 نوفمبر
+ * 2026): كانت تصفّي ما جُلب وتعدّه وحده، فتقول «المال (0)» وفي الصندوق تحويلات أقدم.
  */
 export function NotificationsInbox({
   events,
@@ -64,29 +71,49 @@ export function NotificationsInbox({
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  // كل ضغطة «الأقدم»: كم أضافت ومن أي مؤشّر بدأت — «السابق» يُسقطها ويعيد المؤشّر
+  const [batches, setBatches] = useState<{ count: number; cursor: string }[]>([]);
   const eventOf = (code: string): InboxEvent | { title: string; icon: IconName; tone: InboxTone; kind: null } =>
     events[code] ?? { title: t('إشعار', 'Notification'), icon: 'bell', tone: 'info', kind: null };
+  const codesOf = (k: string) => Object.keys(events).filter((code) => events[code]!.kind === k);
+  // رقاقة بلا قالب معروف لا تطابق شيئاً — لا تصير «الكل» بالخطأ
+  const codes = filter === 'all' ? '' : `&codes=${codesOf(filter).join(',') || '_'}`;
+  const query = `/me/notifications?counts=1${codes}`;
 
   useEffect(() => {
     let alive = true;
-    api<Inbox>('/me/notifications')
-      .then((d) => alive && setInbox(d))
+    api<Inbox>(query)
+      .then((d) => {
+        if (!alive) return;
+        setInbox(d);
+        setBatches([]);
+      })
       .catch((e: Error) => alive && setError(e.message));
     return () => {
       alive = false;
     };
-  }, [version]);
+  }, [version, query]);
 
   // الرجوع إلى الصفحة يجلب الجديد في أعلاها، ويُبقي ما حُمّل من الأقدم تحته
   const returned = useReturnTick();
+  const queryRef = useRef(query);
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
   useEffect(() => {
     if (!returned) return;
     let alive = true;
-    api<Inbox>('/me/notifications')
+    api<Inbox>(queryRef.current)
       .then((d) => {
         if (!alive) return;
         setInbox((cur) =>
-          cur ? { unread: d.unread, items: [...d.items, ...cur.items.filter((x) => !d.items.some((n) => n.id === x.id))], nextCursor: cur.items.length > d.items.length ? cur.nextCursor : d.nextCursor } : d,
+          cur
+            ? {
+                ...d,
+                items: [...d.items, ...cur.items.filter((x) => !d.items.some((n) => n.id === x.id))],
+                nextCursor: cur.items.length > d.items.length ? cur.nextCursor : d.nextCursor,
+              }
+            : d,
         );
       })
       .catch(() => undefined);
@@ -110,16 +137,36 @@ export function NotificationsInbox({
 
   const older = async () => {
     if (!inbox?.nextCursor) return;
+    const cursor = inbox.nextCursor;
     setLoadingMore(true);
     try {
-      const next = await api<Inbox>(`/me/notifications?before=${encodeURIComponent(inbox.nextCursor)}`);
-      setInbox((cur) => (cur ? { unread: next.unread, items: [...cur.items, ...next.items.filter((n) => !cur.items.some((x) => x.id === n.id))], nextCursor: next.nextCursor } : cur));
+      const next = await api<Inbox>(`/me/notifications?before=${encodeURIComponent(cursor)}${codes}`);
+      const fresh = next.items.filter((n) => !inbox.items.some((x) => x.id === n.id));
+      setInbox((cur) => (cur ? { ...cur, unread: next.unread, ...(next.total !== undefined ? { total: next.total } : {}), items: [...cur.items, ...fresh], nextCursor: next.nextCursor } : cur));
+      setBatches((b) => [...b, { count: fresh.length, cursor }]);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoadingMore(false);
     }
+  };
+
+  /** «السابق»: تُسقط آخر ما ألحقه «الأقدم» ويعود مؤشّره، فيُجلب من جديد إن طُلب */
+  const less = () => {
+    const last = batches.at(-1);
+    if (!last) return;
+    setInbox((cur) => (cur ? { ...cur, items: cur.items.slice(0, Math.max(0, cur.items.length - last.count)), nextCursor: last.cursor } : cur));
+    setBatches((b) => b.slice(0, -1));
+  };
+
+  /** تبديل الرقاقة يبدأ من أول الصندوق بتصفيتها — والهيكل يظهر حتى يصل الجديد */
+  const pick = (k: string) => {
+    if (k === filter) return;
+    setInbox(null);
+    setError(null);
+    setBatches([]);
+    setFilter(k);
   };
 
   const open = async (n: Item) => {
@@ -150,19 +197,19 @@ export function NotificationsInbox({
     );
   }
 
-  const countOf = (k: string) => (k === 'all' ? inbox.items.length : inbox.items.filter((n) => eventOf(n.code).kind === k).length);
-  const shown = inbox.items.filter((n) => filter === 'all' || eventOf(n.code).kind === filter);
+  const counts = inbox.counts ?? {};
+  const all = Object.values(counts).reduce((n, c) => n + c, 0);
+  const countOf = (k: string) => (k === 'all' ? all : codesOf(k).reduce((n, code) => n + (counts[code] ?? 0), 0));
+  const shown = inbox.items;
+  const total = Math.max(inbox.total ?? shown.length, shown.length);
 
   return (
     <div className="vm-page vx-notifs">
       <PageHead
         title={t('الإشعارات', 'Notifications')}
         meta={
-          inbox.items.length
-            ? t(
-                `${inbox.items.length} إشعاراً · ${inbox.unread} غير مقروء`,
-                `${inbox.items.length} ${inbox.items.length === 1 ? 'notification' : 'notifications'} · ${inbox.unread} unread`,
-              )
+          all
+            ? t(`${all} إشعاراً · ${inbox.unread} غير مقروء`, `${all} ${all === 1 ? 'notification' : 'notifications'} · ${inbox.unread} unread`)
             : t('لا إشعارات', 'No notifications')
         }
         actions={
@@ -179,7 +226,7 @@ export function NotificationsInbox({
 
       <div className="vx-pills" role="group" aria-label={t('تصفية الإشعارات', 'Filter notifications')}>
         {filters.map((f) => (
-          <button key={f.key} type="button" className="vx-pill" aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>
+          <button key={f.key} type="button" className="vx-pill" aria-pressed={filter === f.key} onClick={() => pick(f.key)}>
             {f.label}
             <span className="vx-pill__count">{countOf(f.key)}</span>
           </button>
@@ -223,11 +270,19 @@ export function NotificationsInbox({
             })}
           </ul>
         )}
-        {inbox.nextCursor ? (
+        {inbox.nextCursor || batches.length > 0 ? (
           <div className="list-more">
-            <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void older()}>
-              {loadingMore ? t('جارٍ التحميل…', 'Loading…') : t('الأقدم', 'Older')}
-            </button>
+            <span className="list-more__count num">{t(`${shown.length} من ${total}`, `${shown.length} of ${total}`)}</span>
+            {batches.length > 0 ? (
+              <button type="button" className="btn btn--ghost btn--sm" disabled={loadingMore} onClick={less}>
+                {t('السابق', 'Previous')}
+              </button>
+            ) : null}
+            {inbox.nextCursor ? (
+              <button type="button" className="btn btn--secondary btn--sm" disabled={loadingMore} onClick={() => void older()}>
+                {loadingMore ? t('جارٍ التحميل…', 'Loading…') : t('الأقدم', 'Older')}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </section>
