@@ -378,22 +378,47 @@ export class OperationsService {
 
   // ------------------------------------------------------ AD-11 العملات
 
-  async currencies() {
-    const [currencies, spread] = await Promise.all([
+  async currencies(now: Date = new Date()) {
+    const [currencies, spread, current] = await Promise.all([
       this.prisma.currency.findMany({ orderBy: [{ sort: 'asc' }, { code: 'asc' }] }),
       this.prisma.setting.findUnique({ where: { key: 'fx_spread_bps' } }),
+      this.currentRates(now),
     ]);
-    const history = await this.prisma.exchangeRate.findMany({ where: { baseCode: 'USD' }, orderBy: { effectiveAt: 'desc' }, take: 200 });
     return {
       // ما يُطبَّق فعلاً — كان الغائب يُعرض 0 والدفع يحسبه 200، والتالف «NaN%»
       spreadBps: fxSpreadBps(spread?.valueJson),
       currencies: currencies.map((c) => ({
         ...c,
         minPayoutMinorUnits: c.minPayoutMinorUnits.toString(),
-        currentRate: history.find((h) => h.quoteCode === c.code)?.rate.toString() ?? (c.code === 'USD' ? '1' : null),
+        currentRate: current.get(c.code)?.rate.toString() ?? (c.code === 'USD' ? '1' : null),
       })),
-      history: history.map((h) => ({ ...h, rate: h.rate.toString() })),
     };
+  }
+
+  /**
+   * السعر الساري لكل عملة: الأحدث قبل اللحظة، كما يسعّر الدفع (display-currency usdRates). كان يُؤخذ من
+   * أحدث 200 سطر في السجلّ، فعملة سعرها أقدم منها تُعرض «—» وهي مسعَّرة (ACFG-016، 2 نوفمبر 2026).
+   */
+  private async currentRates(now: Date) {
+    const rows = await this.prisma.exchangeRate.findMany({
+      where: { baseCode: 'USD', effectiveAt: { lte: now } },
+      orderBy: [{ quoteCode: 'asc' }, { effectiveAt: 'desc' }],
+      distinct: ['quoteCode'],
+      select: { id: true, quoteCode: true, rate: true },
+    });
+    return new Map(rows.map((r) => [r.quoteCode, r]));
+  }
+
+  /** سجلّ أسعار الصرف بصفحات، الأحدث أولاً، والساري لكل عملة معلَّم — كانت الصفحة تقصّه على أحدث 50 بلا «المزيد» */
+  async rateHistory(page = 1, now: Date = new Date()) {
+    const where = { baseCode: 'USD' };
+    const [rows, total, current] = await Promise.all([
+      this.prisma.exchangeRate.findMany({ where, orderBy: [{ effectiveAt: 'desc' }, { id: 'desc' }], skip: (Math.max(1, page) - 1) * PAGE, take: PAGE }),
+      this.prisma.exchangeRate.count({ where }),
+      this.currentRates(now),
+    ]);
+    const ids = new Set([...current.values()].map((r) => r.id));
+    return { items: rows.map((h) => ({ ...h, rate: h.rate.toString(), current: ids.has(h.id) })), total };
   }
 
   /** سعر جديد إضافة لا تعديل — الجدول للإضافة فقط (ADR-013) */
