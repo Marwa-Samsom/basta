@@ -140,7 +140,8 @@ function code(tail: string): string {
 
 // ======================================================================== لوحة الإدارة
 
-describe('لوحة الإدارة: كل قائمة صفحات من الخادم بتصفيتها وبحثها وعدّاداتها', () => {
+// كل حالة تُنشئ عشرات الصفوف — تحت الحزمة كاملة تتجاوز مهلة الخمس ثوانٍ الافتراضية
+describe('لوحة الإدارة: كل قائمة صفحات من الخادم بتصفيتها وبحثها وعدّاداتها', { timeout: 60_000 }, () => {
   it('صفحات المحتوى: خمسون خمسون، والحالة والبحث (العنوان أو الرابط) في الخادم (ACFG-056)', async () => {
     if (!dbUp) return;
     await prisma.cmsPage.createMany({
@@ -323,7 +324,7 @@ describe('لوحة الإدارة: كل قائمة صفحات من الخادم 
 
 // ======================================================================== البائع والمشتري
 
-describe('لوحة البائع وحساب المشتري: لا سقف صامت — صفحات بـ«المزيد» و«السابق»', () => {
+describe('لوحة البائع وحساب المشتري: لا سقف صامت — صفحات بـ«المزيد» و«السابق»', { timeout: 60_000 }, () => {
   it('سجلّ سحوبات البائع: عشرون عشرون، الأحدث أولاً (كان أول مئتين)', async () => {
     if (!dbUp) return;
     // محفظة فارغة وطلبات مرفوضة بلا قيد: لا مال يتحرّك ولا يختلّ دفتر
@@ -430,7 +431,15 @@ describe('لوحة البائع وحساب المشتري: لا سقف صامت 
   it('ملف العميل في الإدارة: طلباته عشرين عشرين، الأحدث أولاً (كانت آخر عشرين بلا ما قبلها)', async () => {
     if (!dbUp) return;
     await subOrder();
-    for (let i = 0; i < 20; i++) await checkout();
+    // عشرون طلباً أقدم لم يُدفع: بلا طلبات فرعية ولا مال ولا إشعار — شراء حقيقي عشرين مرة كان يملأ
+    // طابور الإشعارات وطابور «قاربت مهلة القبول» على اختبارات الملفات الأخرى
+    const old = Date.now() - 86_400_000;
+    await prisma.order.createMany({
+      data: Array.from({ length: 20 }, (_, i) => ({
+        orderNumber: `PG-${SUFFIX}-${i}`, idempotencyKey: randomUUID(), customerUserId: buyer.userId, currency: 'SAR', status: 'payment_failed' as const,
+        itemsSubtotalMinorUnits: 15_000n, grandTotalMinorUnits: 16_500n, shippingAddressSnapshot: {}, placedAt: new Date(old - i * 60_000),
+      })),
+    });
     const { one } = await twoPages(`/admin/customers/${buyer.userId}/orders`, admin.token, 21, 20, (r) => r['orderNumber'] as string);
     const newest = await prisma.order.findFirstOrThrow({ where: { customerUserId: buyer.userId }, orderBy: { placedAt: 'desc' }, select: { orderNumber: true } });
     expect(one.items[0]!['orderNumber']).toBe(newest.orderNumber);
