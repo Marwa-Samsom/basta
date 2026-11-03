@@ -41,9 +41,9 @@ function up(ids: string[], id: string): string[] {
 
 type Filter = 'all' | 'home';
 
-const FILTERS: { key: Filter; label: string; en: string }[] = [
-  { key: 'all', label: 'الكل', en: 'All' },
-  { key: 'home', label: 'الرئيسية', en: 'Home page' },
+const FILTERS: { key: Filter; label: string; en: string; test: (b: Banner) => boolean }[] = [
+  { key: 'all', label: 'الكل', en: 'All', test: () => true },
+  { key: 'home', label: 'الرئيسية', en: 'Home page', test: (b: Banner) => b.placement.startsWith('home_') },
 ];
 
 /**
@@ -85,13 +85,19 @@ export default function AdminStorefrontPage() {
       featured.reload();
     }, t('حُفظ المميّز.', 'Featured products saved.'));
 
-  if (!banners.data) return <Loading error={banners.error} forbidden={banners.forbidden} onRetry={banners.reload} />;
-  const { counts, placements: perPlacement } = banners.data;
-  const none = counts.all === 0;
+  if (!banners.data) return <Loading error={banners.error} forbidden={banners.forbidden} />;
+  const all = banners.data;
   // ما لم يعد منشوراً يظهر معلَّماً، ويسقط من أي حفظ — الحفظ يقبل المنشور وحده
   const rows = featured.data ?? [];
   const ids = rows.filter((p) => p.active).map((p) => p.id);
-  const shown = banners.items;
+  const test = FILTERS.find((x) => x.key === filter)?.test ?? (() => true);
+  const term = q.trim();
+  // الخادم صفّى وبحث؛ والشرط نفسه هنا يُخفي صفوف التصفية السابقة ما دامت الصفحة الجديدة في الطريق
+  // (تبقى على الشاشة حتى تصل). وهو أيضاً يُبقي السطور السبعة فوقه كما في main فلا يتعارض تعديل #190
+  // للمميّز بينها مع هذا الطلب
+  const shown = all.items.filter(test).filter((b) => !term || (b.titleAr ?? '').toLowerCase().includes(term.toLowerCase()));
+  const { counts, placements: perPlacement } = all;
+  const none = counts.all === 0;
 
   return (
     <div className="ac2-page">
