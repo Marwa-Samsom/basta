@@ -885,7 +885,10 @@ describe('صيغ طلب السحب ومرجع التحويل — يُؤتمت 4'
     if (!dbUp) return;
     const i = 0;
     const payouts = () => prisma.payoutRequest.count({ where: { vendorId: vendors[i]!.vendorId } });
-    const before = { payouts: await payouts(), available: (await wallet(i)).balanceAvailableMinorUnits };
+    // المحفظة تُنشأ مع أول قيد — قد لا توجد حين يجري هذا الاختبار وحده
+    const available = async () =>
+      (await prisma.wallet.findUnique({ where: { vendorId_currency: { vendorId: vendors[i]!.vendorId, currency: vendors[i]!.currency } } }))?.balanceAvailableMinorUnits ?? 0n;
+    const before = { payouts: await payouts(), available: await available() };
     for (const amount of ['0', '-100', '1.5', 100, '12345678901234567']) {
       const res = await call('POST', '/vendor/finance/payouts', vendors[i]!.token, { currency: 'SAR', amountMinorUnits: amount });
       expect(res.statusCode, `${JSON.stringify(amount)}: ${res.body}`).toBe(400);
@@ -895,7 +898,7 @@ describe('صيغ طلب السحب ومرجع التحويل — يُؤتمت 4'
     expect(lower.statusCode, lower.body).toBe(400);
     expect(messages(lower)).toContain('أحد الحقول: صيغة غير صحيحة.');
     expect(await payouts()).toBe(before.payouts);
-    expect((await wallet(i)).balanceAvailableMinorUnits).toBe(before.available);
+    expect(await available()).toBe(before.available);
   });
 
   it('مرجع التحويل 3–120 حرفاً بعد القصّ: «ab» و«   ab» و121 تُرفض والطلب «معتمد»، و3 أحرف «حُوِّل» (ADM-082)', async () => {

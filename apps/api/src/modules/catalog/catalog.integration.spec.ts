@@ -1456,14 +1456,15 @@ describe('حدود المنتجات والخصائص — يُؤتمت 4', () => 
     ];
     try {
       for (const [status, reason] of cases) {
-        await prisma.vendor.update({ where: { id: vendors.b.vendorId }, data: { status } });
+        // المرفوض يحمل سببه دائماً (قيد vendors_rejection_reason_check)
+        await prisma.vendor.update({ where: { id: vendors.b.vendorId }, data: { status, rejectionReason: status === 'rejected' ? 'الوثائق غير واضحة — أعد رفعها.' : null } });
         const res = await B.post(`/vendor/products/${product.id}/publish`);
         expect(res.statusCode, `${status}: ${res.body}`).toBe(409);
         expect(res.json().details.reasons, status).toContain(reason);
         expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status, status).toBe('draft');
       }
     } finally {
-      await prisma.vendor.update({ where: { id: vendors.b.vendorId }, data: { status: 'approved' } });
+      await prisma.vendor.update({ where: { id: vendors.b.vendorId }, data: { status: 'approved', rejectionReason: null } });
     }
   });
 

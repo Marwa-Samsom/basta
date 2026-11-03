@@ -916,8 +916,14 @@ describe('حدود الضريبة والخصم والمختارات — يُؤت
     const KEY = 'home_featured_product_ids';
     const saved = await prisma.setting.findUnique({ where: { key: KEY } });
     const put = (productIds: unknown[]) => call('PUT', '/admin/storefront/featured', admin.token, { productIds });
-    const product = async (tag: string, vendorId: string, data: Record<string, unknown> = {}) =>
-      (await prisma.product.create({ data: { vendorId, slug: `f54-${tag}-${SUFFIX}`, nameAr: `مميّز ${tag}`, status: 'active', publishedAt: new Date(), ...data } })).id;
+    // منتج كامل بمتغيّر حيّ — قاعدة الرؤية في الرئيسية تشترطه، فلا يسقط إلا بما يختبره
+    const product = async (tag: string, vendorId: string, data: Record<string, unknown> = {}) => {
+      const p = await prisma.product.create({ data: { vendorId, slug: `f54-${tag}-${SUFFIX}`, nameAr: `مميّز ${tag}`, status: 'active', publishedAt: new Date(), ...data } });
+      const v = await prisma.productVariant.create({ data: { productId: p.id, vendorId, sku: `F54-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 5_000n, optionsKey: '', isActive: true } });
+      await prisma.inventory.create({ data: { variantId: v.id, onHand: 5, reserved: 0 } });
+      await prisma.inventoryMovement.create({ data: { variantId: v.id, delta: 5, reason: 'import' } });
+      return p.id;
+    };
     try {
       const draft = await product('draft', vendor.vendorId, { status: 'draft', publishedAt: null });
       const deleted = await product('deleted', vendor.vendorId, { deletedAt: new Date() });

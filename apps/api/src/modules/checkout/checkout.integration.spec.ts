@@ -757,7 +757,9 @@ describe('ما ليس معروضاً للبيع لا يدخل السلة', () =>
       payload: body,
     });
     expect(hook.statusCode).toBe(200);
-    expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('paid');
+    // المدفوع «قيد التنفيذ» (processing) والدفعة محصَّلة
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('processing');
+    expect((await prisma.payment.findUniqueOrThrow({ where: { orderId } })).status).toBe('captured');
     expect(await stockOf(item.variantId)).toEqual({ onHand: 8, reserved: 0 });
   });
 });
