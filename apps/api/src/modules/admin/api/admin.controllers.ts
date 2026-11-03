@@ -355,6 +355,12 @@ export class AdminOperationsController {
     return this.ops.customer(id);
   }
 
+  @Get('customers/:id/orders')
+  @RequirePermission('customers.manage')
+  customerOrders(@Param('id', uuidParam) id: string, @Query('page') page?: string) {
+    return this.ops.customerOrders(id, pageOf(page));
+  }
+
   @Post('customers/:id/suspend')
   @RequirePermission('customers.manage')
   @HttpCode(HttpStatus.NO_CONTENT)

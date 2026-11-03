@@ -229,7 +229,7 @@ describe('لوحة الإدارة: كل قائمة صفحات من الخادم 
     if (!dbUp) return;
     const owners = Array.from({ length: 52 }, (_, i) => ({ id: randomUUID(), email: `cm${i}.${SUFFIX}@basta.test`, fullName: `مالك ${i}` }));
     await prisma.user.createMany({ data: owners.map((o) => ({ ...o, passwordHash: 'x' })) });
-    const shops = owners.map((o, i) => ({ id: randomUUID(), ownerUserId: o.id, slug: `cm-${SUFFIX}-${i}`, nameAr: `عمولة ${SUFFIX} ${i}`, status: 'approved', approvedAt: new Date(), settlementCurrency: 'SAR', country: 'SA' }));
+    const shops = owners.map((o, i) => ({ id: randomUUID(), ownerUserId: o.id, slug: `cm-${SUFFIX}-${i}`, nameAr: `عمولة ${SUFFIX} ${i}`, status: 'approved' as const, approvedAt: new Date(), settlementCurrency: 'SAR', country: 'SA' }));
     await prisma.vendor.createMany({ data: shops });
     const now = Date.now();
     await prisma.commissionRule.createMany({
@@ -426,24 +426,45 @@ describe('لوحة البائع وحساب المشتري: لا سقف صامت 
     expect(s.total).toBe(entries);
     expect(s.rows).toHaveLength(Math.min(entries, 500));
   });
+
+  it('ملف العميل في الإدارة: طلباته عشرين عشرين، الأحدث أولاً (كانت آخر عشرين بلا ما قبلها)', async () => {
+    if (!dbUp) return;
+    await subOrder();
+    for (let i = 0; i < 20; i++) await checkout();
+    const { one } = await twoPages(`/admin/customers/${buyer.userId}/orders`, admin.token, 21, 20, (r) => r['orderNumber'] as string);
+    const newest = await prisma.order.findFirstOrThrow({ where: { customerUserId: buyer.userId }, orderBy: { placedAt: 'desc' }, select: { orderNumber: true } });
+    expect(one.items[0]!['orderNumber']).toBe(newest.orderNumber);
+    // الملف نفسه بلا قائمة الطلبات — تُقرأ صفحاتها وحدها
+    expect((await get<Record<string, unknown>>(`/admin/customers/${buyer.userId}`, admin.token))['orders']).toBeUndefined();
+  });
 });
 
 /** طلب مدفوع واحد من متجر الاختبار للمشتري — نزاعاته وقيوده تُبنى عليه */
 let placed: { id: string; subOrderNumber: string } | null = null;
+let variantId = '';
 async function subOrder(): Promise<{ id: string; subOrderNumber: string }> {
   if (placed) return placed;
-  const p = await prisma.product.create({
-    data: { vendorId: vendor.vendorId, vendorCategoryId: vendor.categoryId, slug: `p-${SUFFIX}`, nameAr: `منتج ${SUFFIX}`, status: 'active', publishedAt: new Date() },
-  });
-  const variant = await prisma.productVariant.create({
-    data: { productId: p.id, vendorId: vendor.vendorId, sku: `SKU-${SUFFIX}`.toUpperCase(), priceMinorUnits: 15_000n, optionsKey: '', isActive: true },
-  });
-  await prisma.inventory.create({ data: { variantId: variant.id, onHand: 10, reserved: 0 } });
-  await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 10, reason: 'import' } });
+  const orderId = await checkout();
+  placed = await prisma.subOrder.findFirstOrThrow({ where: { orderId }, select: { id: true, subOrderNumber: true } });
+  return placed;
+}
 
+/** طلب مدفوع من المشترية بقطعة من منتج الاختبار — يُنشئ المنتج أول مرة */
+async function checkout(): Promise<string> {
+  if (!variantId) {
+    const p = await prisma.product.create({
+      data: { vendorId: vendor.vendorId, vendorCategoryId: vendor.categoryId, slug: `p-${SUFFIX}`, nameAr: `منتج ${SUFFIX}`, status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: p.id, vendorId: vendor.vendorId, sku: `SKU-${SUFFIX}`.toUpperCase(), priceMinorUnits: 15_000n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand: 100, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 100, reason: 'import' } });
+    variantId = variant.id;
+  }
   const cart = await call('POST', '/cart', undefined, { currency: 'SAR' });
   const token = cart.json().token as string;
-  await call('POST', '/cart/items', undefined, { variantId: variant.id, qty: 1 }, { 'x-cart-token': token });
+  await call('POST', '/cart/items', undefined, { variantId, qty: 1 }, { 'x-cart-token': token });
   const address = { recipientName: 'مشترية', phone: '+966500000001', country: 'SA', region: 'الرياض', city: 'الرياض', street: 'شارع 1' };
   const shown = (await call('POST', '/checkout/quote', undefined, { country: address.country, region: address.region, city: address.city }, { 'x-cart-token': token })).json();
   const res = await call(
@@ -454,7 +475,5 @@ async function subOrder(): Promise<{ id: string; subOrderNumber: string }> {
     { 'x-cart-token': token, 'idempotency-key': randomUUID() },
   );
   expect(res.statusCode, res.body).toBe(200);
-  const sub = await prisma.subOrder.findFirstOrThrow({ where: { orderId: res.json().orderId }, select: { id: true, subOrderNumber: true } });
-  placed = sub;
-  return sub;
+  return res.json().orderId as string;
 }

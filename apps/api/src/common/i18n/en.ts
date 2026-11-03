@@ -841,6 +841,15 @@ export const EN_MESSAGES: Readonly<Record<string, string>> = {
   'حالة الطلب': 'order status',
   'حالة السحب': 'payout status',
   التصفية: 'filter',
+  // تصفية القوائم الإدارية من الخادم (3 نوفمبر 2026)
+  'حالة الصفحة': 'page status',
+  'حالة الكوبون': 'coupon status',
+  'حالة الحملة': 'campaign status',
+  'تصفية اللافتات': 'banner filter',
+  'تصفية المديرين': 'admin filter',
+  'تصفية الخصائص': 'attribute filter',
+  'رموز الإشعارات بأحرف لاتينية صغيرة وأرقام وشرطة سفلية، مفصولة بفواصل.':
+    'Notification codes are lowercase Latin letters, digits and underscores, separated by commas.',
   جمع: 'Addition',
   طرح: 'Subtraction',
   مقارنة: 'Comparison',

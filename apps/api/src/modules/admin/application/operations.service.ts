@@ -10,6 +10,8 @@ import { acceptBy, acceptanceDueSince } from '../domain/acceptance';
 import { PERMISSION_CODES, SETTINGS_SPEC } from '../domain/permissions';
 
 const PAGE = 50;
+/** طلبات الصفحة الواحدة في ملف العميل */
+const CUSTOMER_ORDERS_PAGE = 20;
 
 /**
  * عمليات الإدارة اليومية — بوابة 11 البند الأول: لا عملية تشغيلية تحتاج فتح
@@ -207,7 +209,6 @@ export class OperationsService {
       select: {
         id: true, fullName: true, email: true, phone: true, status: true, createdAt: true, lastLoginAt: true,
         totpEnabledAt: true, roles: { select: { role: true } },
-        orders: { orderBy: { placedAt: 'desc' }, take: 20, select: { orderNumber: true, status: true, currency: true, grandTotalMinorUnits: true, placedAt: true } },
       },
     });
     if (!u) throw new NotFoundError('العميل غير موجود.', { id });
@@ -219,8 +220,25 @@ export class OperationsService {
       // المدير لا يُعاد ضبط تحققه من هنا — الواجهة تُخفي الزرّ، والخادم يرفض
       totpResettable: totpEnabledAt !== null && !roles.some((r) => r.role === 'admin'),
       disputes,
-      orders: u.orders.map((o) => ({ ...o, grandTotalMinorUnits: o.grandTotalMinorUnits.toString() })),
     };
+  }
+
+  /**
+   * طلبات العميل في ملفه، الأحدث أولاً وعشرين عشرين. كانت آخر عشرين مع الملف بلا ما قبلها ولا
+   * عددها (3 نوفمبر 2026).
+   */
+  async customerOrders(id: string, page: number) {
+    const where: Prisma.OrderWhereInput = { customerUserId: id };
+    const [rows, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        orderBy: [{ placedAt: 'desc' }, { id: 'asc' }],
+        ...pageArgs(page, CUSTOMER_ORDERS_PAGE),
+        select: { id: true, orderNumber: true, status: true, currency: true, grandTotalMinorUnits: true, placedAt: true },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+    return { items: rows.map((o) => ({ ...o, grandTotalMinorUnits: o.grandTotalMinorUnits.toString() })), total };
   }
 
   /** التعليق يُنهي الجلسات فوراً — الدخول يرفض الحساب غير النشط */
