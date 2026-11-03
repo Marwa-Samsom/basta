@@ -815,3 +815,73 @@ describe('التعليق يصل إلى البحث — الاقتراحات وا�
     expect(res.json().suggestions).not.toContain(`قميص ${word}`);
   });
 });
+
+/**
+ * موجة «يُؤتمت» الرابعة (3 نوفمبر 2026): انتقالات المتجر غير المسموحة على الخادم — الاعتماد
+ * والرفض لغير «قيد المراجعة» (ADM-033)، والتعليق والرفع وتعليقان متزامنان (ADM-043).
+ */
+describe('انتقالات المتجر غير المسموحة — يُؤتمت 4', () => {
+  const messages = (res: { json: () => { message?: string | string[] } }) => [res.json().message].flat();
+  const admin = (path: string, payload?: object) =>
+    app.inject({ method: 'POST', ...api(`/admin/vendors/${path}`, adminToken), ...(payload ? { payload } : {}) });
+
+  async function vendorAt(status: 'pending' | 'in_review' | 'approved', tag: string): Promise<string> {
+    const ownerUserId = await registerUser(`${tag}.${SUFFIX}@basta.test`, ['customer']);
+    const vendor = await prisma.vendor.create({
+      data: {
+        ownerUserId, slug: `${tag}-${SUFFIX}`.toLowerCase(), nameAr: `متجر ${tag}`, status, settlementCurrency: 'JOD', country: 'JO',
+        ...(status === 'pending' ? {} : { submittedAt: new Date() }),
+        ...(status === 'approved' ? { approvedAt: new Date() } : {}),
+      },
+    });
+    createdVendorIds.push(vendor.id);
+    return vendor.id;
+  }
+  const statusOf = async (id: string) => (await prisma.vendor.findUniqueOrThrow({ where: { id } })).status;
+
+  it('اعتماد مسوّدة 409، ورفض معتمد 409، ومعرّف غير موجود 404، وغير UUID 404 — والحالتان كما هما (ADM-033)', async () => {
+    if (!dbUp) return;
+    const pending = await vendorAt('pending', 'adm33p');
+    const approved = await vendorAt('approved', 'adm33a');
+
+    const approve = await admin(`${pending}/approve`);
+    expect(approve.statusCode, approve.body).toBe(409);
+    expect(messages(approve)).toContain('الانتقال من «مسوّدة» إلى «معتمد» غير مسموح.');
+    const reject = await admin(`${approved}/reject`, { reason: 'سبب الرفض عشرون حرفاً' });
+    expect(reject.statusCode, reject.body).toBe(409);
+    expect(messages(reject)).toContain('الانتقال من «معتمد» إلى «مرفوض» غير مسموح.');
+    const missing = await admin(`${randomUUID()}/approve`);
+    expect(missing.statusCode).toBe(404);
+    expect(messages(missing)).toContain('المتجر غير موجود.');
+    const malformed = await admin('not-a-uuid/approve');
+    expect(malformed.statusCode).toBe(404);
+    expect(messages(malformed)).toContain('المورد غير موجود.');
+
+    expect(await statusOf(pending)).toBe('pending');
+    expect(await statusOf(approved)).toBe('approved');
+    expect(await prisma.auditLog.count({ where: { entityId: { in: [pending, approved] }, action: { in: ['vendor.approve', 'vendor.reject'] } } })).toBe(0);
+  });
+
+  it('تعليق قيد المراجعة 409، ورفع تعليق المعتمد 409، وتعليقان متزامنان: واحد 204 وسطر تدقيق واحد (ADM-043)', async () => {
+    if (!dbUp) return;
+    const reviewing = await vendorAt('in_review', 'adm43r');
+    const approved = await vendorAt('approved', 'adm43a');
+    const reason = 'مخالفة متكررة لسياسة الإرجاع';
+
+    const suspendReview = await admin(`${reviewing}/suspend`, { reason });
+    expect(suspendReview.statusCode, suspendReview.body).toBe(409);
+    expect(messages(suspendReview)).toContain('الانتقال من «قيد المراجعة» إلى «معلَّق» غير مسموح.');
+    expect(await statusOf(reviewing)).toBe('in_review');
+
+    const reinstate = await admin(`${approved}/reinstate`);
+    expect(reinstate.statusCode, reinstate.body).toBe(409);
+    expect(messages(reinstate)).toContain('الانتقال من «معتمد» إلى «معتمد» غير مسموح.');
+
+    const both = await Promise.all([admin(`${approved}/suspend`, { reason }), admin(`${approved}/suspend`, { reason })]);
+    expect(both.map((r) => r.statusCode).sort()).toEqual([204, 409]);
+    const loser = both.find((r) => r.statusCode === 409)!;
+    expect(['تغيّرت حالة المتجر.', 'الانتقال من «معلَّق» إلى «معلَّق» غير مسموح.']).toContain(messages(loser)[0]);
+    expect(await statusOf(approved)).toBe('suspended');
+    expect(await prisma.auditLog.count({ where: { entityId: approved, action: 'vendor.suspend' } })).toBe(1);
+  });
+});

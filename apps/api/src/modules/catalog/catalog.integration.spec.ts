@@ -1378,3 +1378,157 @@ describe('صور المنتجات: الظاهر للعموم، والمسودّ�
     expect((await get(img.urls['thumb.webp']!)).statusCode).toBe(404);
   });
 });
+
+/**
+ * موجة «يُؤتمت» الرابعة (3 نوفمبر 2026): حدود المنتج والمتغيّرات والخصائص على الخادم، والنشر
+ * بحسب حالة المتجر — ما لا تمنعه الواجهة وحدها.
+ */
+describe('حدود المنتجات والخصائص — يُؤتمت 4', () => {
+  const messages = (res: { json: () => { message?: string | string[] } }) => [res.json().message].flat();
+  const material = () => [{ attributeId: attr('material').attributeId, text: 'قطن' }];
+
+  dbIt('معرّف متغيّر من منتج آخر 404 ولا يُمسّ، والمكرّر 400، والمعرّف على منتج جديد 400 (VCAT-033)', async () => {
+    const A = as('a');
+    const p1 = await simpleProduct('a', `V33A-${SUFFIX}`);
+    const p2 = await simpleProduct('a', `V33B-${SUFFIX}`);
+    const v1 = p1.variants[0]!;
+    const v2 = p2.variants[0]!;
+    const before = await prisma.productVariant.findUniqueOrThrow({ where: { id: v2.id } });
+
+    const foreign = await A.patch(`/vendor/products/${p1.id}`, { variants: [{ id: v2.id, sku: v2.sku, price: '99.00' }] });
+    expect(foreign.statusCode, foreign.body).toBe(404);
+    expect(messages(foreign)).toContain('المتغيّر غير موجود في هذا المنتج.');
+    const after = await prisma.productVariant.findUniqueOrThrow({ where: { id: v2.id } });
+    expect(after.productId).toBe(p2.id);
+    expect(after.priceMinorUnits).toBe(before.priceMinorUnits);
+    expect(after.archivedAt).toBeNull();
+
+    const twice = await A.patch(`/vendor/products/${p1.id}`, {
+      variants: [{ id: v1.id, sku: v1.sku, price: '10.00' }, { id: v1.id, sku: v1.sku, price: '11.00' }],
+    });
+    expect(twice.statusCode, twice.body).toBe(400);
+    expect(messages(twice)).toContain('المتغيّر نفسه مذكور مرتين.');
+
+    const sku = `V33C-${SUFFIX}`;
+    const fresh = await A.post('/vendor/products', {
+      vendorCategoryId: await catOf('a'),
+      nameAr: 'منتج بمعرّف متغيّر',
+      attributes: material(),
+      variants: [{ id: randomUUID(), sku, price: '10.00', stock: 1 }],
+    });
+    expect(fresh.statusCode, fresh.body).toBe(400);
+    expect(messages(fresh)).toContain('متغيّرات المنتج الجديد لا تحمل معرّفات — المعرّف يُنشأ عند الحفظ.');
+    expect(await prisma.productVariant.count({ where: { sku } })).toBe(0);
+  });
+
+  dbIt('إنشاءان متزامنان بالـ SKU الجديد نفسه: 201 و 409 DUPLICATE، ومتغيّر حيّ واحد ولا منتج يتيم (VCAT-034)', async () => {
+    const A = as('a');
+    const sku = `RACE-${SUFFIX}`;
+    const category = await catOf('a');
+    const name = (n: number) => `منتج السباق ${n} ${SUFFIX}`;
+    const results = await Promise.all(
+      [1, 2].map((n) =>
+        A.post('/vendor/products', { vendorCategoryId: category, nameAr: name(n), attributes: material(), variants: [{ sku, price: '10.00', stock: 1 }] }),
+      ),
+    );
+    expect(results.map((r) => r.statusCode).sort()).toEqual([201, 409]);
+    const lost = results.find((r) => r.statusCode === 409)!;
+    expect(lost.json().code).toBe('DUPLICATE');
+    expect([
+      `SKU «${sku}» مستعمل لمتغيّر آخر في متجرك.`,
+      'SKU مستعمل لمتغيّر آخر في متجرك — لكل متغيّر حيّ SKU فريد على مستوى المتجر.',
+    ]).toContain(lost.json().message);
+
+    const ours = { vendorId: vendors.a.vendorId, nameAr: { in: [name(1), name(2)] } };
+    expect(await prisma.productVariant.count({ where: { vendorId: vendors.a.vendorId, sku, archivedAt: null } })).toBe(1);
+    expect(await prisma.product.count({ where: ours })).toBe(1);
+    expect(await prisma.product.count({ where: { ...ours, variants: { none: {} } } })).toBe(0);
+  });
+
+  dbIt('متجر معلَّق أو محظور أو مرفوض لا ينشر: 409 بعائقه، والمنتج يبقى مسوّدة (VCAT-051)', async () => {
+    const B = as('b');
+    const product = await simpleProduct('b', `V51-${SUFFIX}`);
+    await withImage('b', product.id);
+    const cases: ['suspended' | 'banned' | 'rejected', string][] = [
+      ['suspended', 'المتجر معلَّق — لا تنشر منتجاً حتى يُرفع التعليق'],
+      ['banned', 'المتجر معلَّق — لا تنشر منتجاً حتى يُرفع التعليق'],
+      ['rejected', 'أرسل طلب متجرك للمراجعة أولاً — النشر يُتاح من لحظة إرساله'],
+    ];
+    try {
+      for (const [status, reason] of cases) {
+        await prisma.vendor.update({ where: { id: vendors.b.vendorId }, data: { status } });
+        const res = await B.post(`/vendor/products/${product.id}/publish`);
+        expect(res.statusCode, `${status}: ${res.body}`).toBe(409);
+        expect(res.json().details.reasons, status).toContain(reason);
+        expect((await prisma.product.findUniqueOrThrow({ where: { id: product.id } })).status, status).toBe('draft');
+      }
+    } finally {
+      await prisma.vendor.update({ where: { id: vendors.b.vendorId }, data: { status: 'approved' } });
+    }
+  });
+
+  dbIt('رمز الخصيصة وتفرّده واسمها ونوعها وقيمها: كل رفض بلا خصيصة، والحدّان يُقبلان (ACFG-095)', async () => {
+    const admin = await prisma.user.create({
+      data: {
+        email: `attr.bounds.${SUFFIX}@basta.test`,
+        fullName: 'حدود الخصائص',
+        passwordHash: await hashPassword(randomUUID()),
+        roles: { create: { role: 'admin' } },
+        permissions: { create: { permission: 'catalog.manage' } },
+        totpEnabledAt: new Date(),
+      },
+    });
+    const { accessToken } = await app.get(TokenService).issue({ sub: admin.id, roles: ['admin'], permissions: ['catalog.manage'] }, {});
+    const post = (payload: object) =>
+      app.inject({ method: 'POST', url: '/api/v1/admin/attributes', headers: { authorization: `Bearer ${accessToken}` }, payload });
+    const created: string[] = [];
+    const tail = SUFFIX.replace(/[^a-z0-9]/g, '');
+    try {
+      const shape = 'رمز السمة حروف لاتينية صغيرة وأرقام و _ ويبدأ بحرف.';
+      const malformed = ['1size', 's', 'size-x', `a${tail}`.padEnd(42, 'x')];
+      for (const code of malformed) {
+        const res = await post({ code, nameAr: 'سمة الحدود', inputType: 'text' });
+        expect(res.statusCode, code).toBe(400);
+        expect(messages(res), code).toContain(shape);
+      }
+      // الحدّان: حرفان (أول رمز من حرفين غير مستعمل) و 41
+      const taken = new Set((await prisma.attribute.findMany({ select: { code: true } })).map((a) => a.code));
+      const two = [...'qwzjkvx'].flatMap((c) => [...'0123456789'].map((d) => `${c}${d}`)).find((c) => !taken.has(c))!;
+      for (const code of [two, `b${tail}`.padEnd(41, 'y')]) {
+        expect([2, 41]).toContain(code.length);
+        const res = await post({ code, nameAr: 'سمة الحدود', inputType: 'text' });
+        expect(res.statusCode, `${code}: ${res.body}`).toBe(201);
+        created.push(res.json().id);
+      }
+
+      const dup = await post({ code: 'size', nameAr: 'مقاس آخر', inputType: 'select', values: [{ valueAr: 'S' }] });
+      expect(dup.statusCode).toBe(409);
+      expect(messages(dup)).toContain('رمز السمة «size» مستعمل.');
+
+      const rejected = { name: `n${tail}`, type: `t${tail}`, values: `v${tail}`, many: `m${tail}` };
+      const shortName = await post({ code: rejected.name, nameAr: 'س', inputType: 'text' });
+      expect(shortName.statusCode).toBe(400);
+      expect(messages(shortName)).toContain('الاسم بالعربية: 2 أحرف على الأقل.');
+      const date = await post({ code: rejected.type, nameAr: 'تاريخ', inputType: 'date' });
+      expect(date.statusCode).toBe(400);
+      expect(messages(date)).toContain('نوع السمة غير معروف.');
+      const twice = await post({ code: rejected.values, nameAr: 'لون الحدود', inputType: 'select', values: [{ valueAr: 'Red' }, { valueAr: 'red' }] });
+      expect(twice.statusCode).toBe(409);
+      expect(messages(twice)).toContain('القيمة «red» مكررة في السمة — الاستيراد يطابق بالاسم فلا يُقبل تكراره.');
+      const many = await post({
+        code: rejected.many,
+        nameAr: 'كثيرة',
+        inputType: 'select',
+        values: Array.from({ length: 201 }, (_, i) => ({ valueAr: `قيمة ${i}` })),
+      });
+      expect(many.statusCode).toBe(400);
+      expect(messages(many)).toContain('أحد الحقول: 200 على الأكثر.');
+
+      expect(await prisma.attribute.count({ where: { code: { in: [...malformed, ...Object.values(rejected)] } } })).toBe(0);
+    } finally {
+      for (const id of created) {
+        await app.inject({ method: 'DELETE', url: `/api/v1/admin/attributes/${id}`, headers: { authorization: `Bearer ${accessToken}` } });
+      }
+    }
+  });
+});

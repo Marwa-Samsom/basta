@@ -46,7 +46,7 @@ const ADDRESS = {
 type Inject = Awaited<ReturnType<NestFastifyApplication['inject']>>;
 
 async function call(
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   url: string,
   opts: { body?: unknown; headers?: Record<string, string> } = {},
 ): Promise<Inject> {
@@ -665,6 +665,100 @@ describe('رمز السلة لا يُخمَّن', () => {
     const real = await call('GET', '/cart', { headers: { 'x-cart-token': token } });
     expect(real.statusCode).toBe(200);
     expect(real.body).toContain(variantIds[0]!);
+  });
+});
+
+/**
+ * موجة «يُؤتمت» الرابعة (3 نوفمبر 2026): شرط البيع على الخادم — متغيّر نشط غير مؤرشف، ومنتج
+ * منشور غير محذوف، ومتجر معتمد (CHK-012)؛ والأرشفة لا تُفسد حجزاً قائماً (VCAT-058).
+ */
+describe('ما ليس معروضاً للبيع لا يدخل السلة', () => {
+  const VENDOR_PASSWORD = 'كلمة-مرور-اختبار-طويلة';
+
+  async function forSale(vendorId: string, tag: string, onHand = 10) {
+    const product = await prisma.product.create({
+      data: { vendorId, slug: `p-${tag}-${SUFFIX}`, nameAr: `منتج ${tag}`, status: 'active', publishedAt: new Date() },
+    });
+    const variant = await prisma.productVariant.create({
+      data: { productId: product.id, vendorId, sku: `SKU-${tag}-${SUFFIX}`.toUpperCase(), priceMinorUnits: 10_000n, optionsKey: '', isActive: true },
+    });
+    await prisma.inventory.create({ data: { variantId: variant.id, onHand, reserved: 0 } });
+    await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: onHand, reason: 'import' } });
+    return { productId: product.id, variantId: variant.id };
+  }
+
+  async function vendorIn(status: 'in_review' | 'suspended', tag: string): Promise<string> {
+    const user = await prisma.user.create({
+      data: { email: `${tag}.${SUFFIX}@basta.test`, fullName: `بائع ${tag}`, passwordHash: await hashPassword(VENDOR_PASSWORD), roles: { create: { role: 'vendor_owner' } } },
+    });
+    const vendor = await prisma.vendor.create({
+      data: { ownerUserId: user.id, slug: `v-${tag}-${SUFFIX}`, nameAr: `متجر ${tag}`, status, settlementCurrency: 'JOD', country: 'JO', submittedAt: new Date() },
+    });
+    return vendor.id;
+  }
+
+  const addTo = (cart: string, variantId: string) =>
+    call('POST', '/cart/items', { body: { variantId, qty: 1 }, headers: { 'x-cart-token': cart } });
+
+  it('مؤرشف، ومعطّل، وموقوف من الإدارة، ومحذوف، ولمتجر قيد المراجعة أو معلَّق: 404 بلا سطر (CHK-012)', async () => {
+    if (!dbUp) return;
+    const base = vendorIds[0]!;
+    const archived = await forSale(base, 'c12arch');
+    await prisma.productVariant.update({ where: { id: archived.variantId }, data: { archivedAt: new Date() } });
+    const inactive = await forSale(base, 'c12off');
+    await prisma.productVariant.update({ where: { id: inactive.variantId }, data: { isActive: false } });
+    const stopped = await forSale(base, 'c12stop');
+    await prisma.product.update({ where: { id: stopped.productId }, data: { status: 'rejected' } });
+    const deleted = await forSale(base, 'c12del');
+    await prisma.product.update({ where: { id: deleted.productId }, data: { deletedAt: new Date() } });
+    const inReview = await forSale(await vendorIn('in_review', 'c12rev'), 'c12rev');
+    const suspended = await forSale(await vendorIn('suspended', 'c12sus'), 'c12sus');
+    const fine = await forSale(base, 'c12ok');
+
+    const cart = await cartWith([]);
+    for (const [name, v] of Object.entries({ archived, inactive, stopped, deleted, inReview, suspended })) {
+      const res = await addTo(cart, v.variantId);
+      expect(res.statusCode, `${name}: ${res.body}`).toBe(404);
+      expect(res.json().message, name).toBe('المنتج غير متاح للبيع.');
+    }
+    expect(await prisma.cartItem.count({ where: { cart: { sessionToken: cart } } })).toBe(0);
+    expect((await addTo(cart, fine.variantId)).statusCode).toBe(201);
+    expect(await prisma.cartItem.count({ where: { cart: { sessionToken: cart } } })).toBe(1);
+  });
+
+  it('أرشفة منتج محجوز: الإضافة الجديدة 404، والحجز القائم يُثبَّت عند الدفع فينقص المخزون بقطعتيه (VCAT-058)', async () => {
+    if (!dbUp) return;
+    const item = await forSale(vendorIds[0]!, 'v58', 10);
+    const reserved = await cartWith([{ variantId: item.variantId, qty: 2 }]);
+    const res = await pay(reserved, 'tok_3ds');
+    expect(res.json().outcome).toBe('requires_action');
+    const orderId = res.json().orderId as string;
+    expect(await stockOf(item.variantId)).toEqual({ onHand: 10, reserved: 2 });
+
+    // البائع يحذف المنتج (أرشفة) والمشتري الثاني في صفحة الدفع
+    const owner = await prisma.user.findFirstOrThrow({ where: { vendors: { some: { id: vendorIds[0]! } } }, select: { email: true } });
+    const vendorToken = (await call('POST', '/auth/login', { body: { email: owner.email, password: VENDOR_PASSWORD } })).json().tokens.accessToken as string;
+    const removed = await call('DELETE', `/vendor/products/${item.productId}`, { headers: { authorization: `Bearer ${vendorToken}` } });
+    expect(removed.statusCode, removed.body).toBe(204);
+    expect(await stockOf(item.variantId)).toEqual({ onHand: 10, reserved: 2 });
+
+    const late = await cartWith([]);
+    const add = await addTo(late, item.variantId);
+    expect(add.statusCode).toBe(404);
+    expect(add.json().message).toBe('المنتج غير متاح للبيع.');
+    expect(await prisma.cartItem.count({ where: { cart: { sessionToken: late } } })).toBe(0);
+
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { orderId } });
+    const body = fake.eventFor(payment.providerIntentId!, orderId, payment.amountMinorUnits, payment.currency);
+    const hook = await app.inject({
+      method: 'POST',
+      url: '/api/v1/payments/webhook/fake',
+      headers: { 'x-signature': FakePaymentProvider.sign(body), 'content-type': 'application/json' },
+      payload: body,
+    });
+    expect(hook.statusCode).toBe(200);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('paid');
+    expect(await stockOf(item.variantId)).toEqual({ onHand: 8, reserved: 0 });
   });
 });
 

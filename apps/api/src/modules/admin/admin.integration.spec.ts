@@ -795,3 +795,133 @@ describe('مدخلات خاطئة في اللوحة تُرفض برسالة تق
     }
   });
 });
+
+/**
+ * موجة «يُؤتمت» الرابعة (3 نوفمبر 2026): حدود إعدادات الإدارة على الخادم. الاختبار على قاعدة
+ * التطوير نفسها: كل ما يمسّه عامّ (ضريبة البلد، الكوبونات، مختارات الرئيسية) يُعاد كما وجده.
+ */
+describe('حدود الضريبة والخصم والمختارات — يُؤتمت 4', () => {
+  const messages = (res: { json: () => { message?: string | string[] } }) => [res.json().message].flat();
+
+  it('نسبة الضريبة 0–5000 عدداً صحيحاً، ورمز البلد حرفان ويُكبَّر، وصفّ سارٍ واحد لكل بلد (ACFG-031)', async () => {
+    if (!dbUp) return;
+    const live = (country: string) => prisma.taxRate.findMany({ where: { country, effectiveTo: null, region: null } });
+    const [kwBefore] = await live('KW');
+    const [joBefore] = await live('JO');
+    const put = (country: string, body: object) => call('PUT', `/admin/taxes/${country}`, admin.token, body);
+    try {
+      expect((await put('KW', { rateBps: 0, isPriceInclusive: true })).statusCode).toBe(204);
+      expect((await put('KW', { rateBps: 5000, isPriceInclusive: true })).statusCode).toBe(204);
+      for (const [rateBps, message] of [
+        [5001, 'أحد الحقول: لا يزيد عن 5000.'],
+        [-100, 'أحد الحقول: لا يقلّ عن 0.'],
+        [12.5, 'أحد الحقول: رقم صحيح مطلوب.'],
+      ] as const) {
+        const res = await put('KW', { rateBps, isPriceInclusive: true });
+        expect(res.statusCode, String(rateBps)).toBe(400);
+        expect(messages(res), String(rateBps)).toContain(message);
+      }
+      const yes = await put('KW', { rateBps: 100, isPriceInclusive: 'yes' });
+      expect(yes.statusCode).toBe(400);
+      expect(messages(yes)).toContain('أحد الحقول: نعم أو لا.');
+      const sau = await put('SAU', { rateBps: 100, isPriceInclusive: true });
+      expect(sau.statusCode).toBe(400);
+      expect(messages(sau)).toContain('رمز البلد حرفان.');
+      expect(await prisma.taxRate.count({ where: { country: { in: ['SA', 'SAU'] }, effectiveFrom: { gte: new Date(Date.now() - 60_000) } } })).toBe(0);
+
+      // «jo» بأحرف صغيرة تُقبل وتُحفظ JO — بالنسبة السارية نفسها كي لا تتغيّر ضريبة الموقع
+      const jo = await put('jo', { rateBps: joBefore?.rateBps ?? 1600, isPriceInclusive: joBefore?.isPriceInclusive ?? true });
+      expect(jo.statusCode, jo.body).toBe(204);
+      const joNow = await live('JO');
+      expect(joNow).toHaveLength(1);
+      expect(joNow[0]!.rateBps).toBe(joBefore?.rateBps ?? 1600);
+
+      const kwNow = await live('KW');
+      expect(kwNow).toHaveLength(1);
+      expect(kwNow[0]!.rateBps).toBe(5000);
+    } finally {
+      if (kwBefore) await put('KW', { rateBps: kwBefore.rateBps, isPriceInclusive: kwBefore.isPriceInclusive });
+      else await prisma.taxRate.updateMany({ where: { country: 'KW', effectiveTo: null }, data: { effectiveTo: new Date() } });
+      if (!joBefore) await prisma.taxRate.updateMany({ where: { country: 'JO', effectiveTo: null }, data: { effectiveTo: new Date() } });
+    }
+  });
+
+  it('نسبة الخصم بين 0.01% و 90%: الصفر والغائب و 9001 و 10000 تُرفض، و 1 و 9000 تُقبلان (ACFG-034)', async () => {
+    if (!dbUp) return;
+    const tail = SUFFIX.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const created: string[] = [];
+    try {
+      for (const valueBps of [undefined, 0, 9001, 10000]) {
+        const code = `PCT${valueBps ?? 'NA'}${tail}`.slice(0, 30);
+        const res = await call('POST', '/admin/coupons', admin.token, { code, scope: 'platform', type: 'percent', fundedBy: 'platform', ...(valueBps === undefined ? {} : { valueBps }) });
+        expect(res.statusCode, `${valueBps}: ${res.body}`).toBe(400);
+        expect(messages(res)).toContain('النسبة بين 0.01% و 90%.');
+        expect(await prisma.coupon.count({ where: { code } })).toBe(0);
+      }
+      for (const valueBps of [1, 9000]) {
+        const code = `PCT${valueBps}${tail}`.slice(0, 30);
+        const res = await call('POST', '/admin/coupons', admin.token, { code, scope: 'platform', type: 'percent', fundedBy: 'platform', valueBps });
+        expect(res.statusCode, `${valueBps}: ${res.body}`).toBe(201);
+        const saved = await prisma.coupon.findUniqueOrThrow({ where: { code } });
+        created.push(saved.id);
+        expect(saved.valueBps).toBe(valueBps);
+        // لا يُترك كوبون منصّة 90% سارياً في متجر التجربة اليدوية
+        await prisma.coupon.update({ where: { id: saved.id }, data: { isActive: false } });
+      }
+    } finally {
+      if (created.length) await prisma.coupon.updateMany({ where: { id: { in: created } }, data: { isActive: false } });
+    }
+  });
+
+  it('المختارات منشورة فقط وحتى 24 والمكرّر مرة؛ الموقوف لا يُحرَّك ويُزال، وغير المعتمد يُقبل ولا يظهر (ACFG-054)', async () => {
+    if (!dbUp) return;
+    const KEY = 'home_featured_product_ids';
+    const saved = await prisma.setting.findUnique({ where: { key: KEY } });
+    const put = (productIds: unknown[]) => call('PUT', '/admin/storefront/featured', admin.token, { productIds });
+    const product = async (tag: string, vendorId: string, data: Record<string, unknown> = {}) =>
+      (await prisma.product.create({ data: { vendorId, slug: `f54-${tag}-${SUFFIX}`, nameAr: `مميّز ${tag}`, status: 'active', publishedAt: new Date(), ...data } })).id;
+    try {
+      const draft = await product('draft', vendor.vendorId, { status: 'draft', publishedAt: null });
+      const deleted = await product('deleted', vendor.vendorId, { deletedAt: new Date() });
+      const ok = await product('ok', vendor.vendorId);
+      const stopped = await product('stopped', vendor.vendorId);
+      const owner = await prisma.user.create({ data: { email: `f54rev.${SUFFIX}@basta.test`, fullName: 'بائع قيد المراجعة', passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'vendor_owner' } } } });
+      const reviewVendor = await prisma.vendor.create({
+        data: { ownerUserId: owner.id, slug: `f54rev-${SUFFIX}`, nameAr: `قيد المراجعة ${SUFFIX}`, status: 'in_review', submittedAt: new Date(), settlementCurrency: 'SAR', country: 'SA' },
+      });
+      const unapproved = await product('review', reviewVendor.id);
+
+      for (const id of [draft, deleted]) {
+        const res = await put([id]);
+        expect(res.statusCode).toBe(400);
+        expect(messages(res)).toContain('كل المميّز منتجات منشورة.');
+      }
+      const abc = await put(['abc']);
+      expect(abc.statusCode).toBe(400);
+      expect(messages(abc)).toContain('أحد الحقول: معرّف غير صالح.');
+      const tooMany = await put(Array.from({ length: 25 }, () => randomUUID()));
+      expect(tooMany.statusCode).toBe(400);
+      expect(messages(tooMany)).toContain('أحد الحقول: 24 على الأكثر.');
+
+      expect((await put([ok, ok])).statusCode).toBe(204);
+      expect((await prisma.setting.findUniqueOrThrow({ where: { key: KEY } })).valueJson).toEqual([ok]);
+
+      // مميّز أُوقف بعد اختياره: تحريكه والموقوف في القائمة يُرفض، وإزالته تنجح
+      expect((await put([ok, stopped])).statusCode).toBe(204);
+      await prisma.product.update({ where: { id: stopped }, data: { status: 'rejected' } });
+      const moved = await put([stopped, ok]);
+      expect(moved.statusCode).toBe(400);
+      expect(messages(moved)).toContain('كل المميّز منتجات منشورة.');
+      expect((await put([ok])).statusCode).toBe(204);
+
+      // منتج منشور لمتجر غير معتمد: يُقبل ولا يظهر في الرئيسية
+      expect((await put([ok, unapproved])).statusCode).toBe(204);
+      const shown = ((await call('GET', '/storefront/featured')).json() as { id: string }[]).map((p) => p.id);
+      expect(shown).toContain(ok);
+      expect(shown).not.toContain(unapproved);
+    } finally {
+      if (saved) await prisma.setting.update({ where: { key: KEY }, data: { valueJson: saved.valueJson as never } });
+      else await prisma.setting.deleteMany({ where: { key: KEY } });
+    }
+  });
+});

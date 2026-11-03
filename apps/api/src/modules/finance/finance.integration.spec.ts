@@ -649,3 +649,58 @@ describe('تحرير الأرصدة لا يتجوّع بالمسترَدّ كل�
     expect(await viewCount('audit_wallet_drift')).toBe(0);
   });
 });
+
+/**
+ * موجة «يُؤتمت» الرابعة (3 نوفمبر 2026): صيغ المال على الخادم — طلب السحب (VOPS-082) ومرجع
+ * التحويل (ADM-082)، بلا قيد ولا طلب عند أي رفض.
+ */
+describe('صيغ طلب السحب ومرجع التحويل — يُؤتمت 4', () => {
+  const messages = (res: { json: () => { message?: string | string[] } }) => [res.json().message].flat();
+
+  it('المبلغ عدد صحيح موجب بالوحدات الصغرى نصّاً، والعملة ثلاثة أحرف كبيرة — ولا قيد ولا طلب (VOPS-082)', async () => {
+    if (!dbUp) return;
+    const i = 0;
+    const payouts = () => prisma.payoutRequest.count({ where: { vendorId: vendors[i]!.vendorId } });
+    const before = { payouts: await payouts(), available: (await wallet(i)).balanceAvailableMinorUnits };
+    for (const amount of ['0', '-100', '1.5', 100, '12345678901234567']) {
+      const res = await call('POST', '/vendor/finance/payouts', vendors[i]!.token, { currency: 'SAR', amountMinorUnits: amount });
+      expect(res.statusCode, `${JSON.stringify(amount)}: ${res.body}`).toBe(400);
+      expect(messages(res), JSON.stringify(amount)).toContain('المبلغ عدد صحيح موجب بالوحدات الصغرى.');
+    }
+    const lower = await call('POST', '/vendor/finance/payouts', vendors[i]!.token, { currency: 'sar', amountMinorUnits: '100' });
+    expect(lower.statusCode, lower.body).toBe(400);
+    expect(messages(lower)).toContain('أحد الحقول: صيغة غير صحيحة.');
+    expect(await payouts()).toBe(before.payouts);
+    expect((await wallet(i)).balanceAvailableMinorUnits).toBe(before.available);
+  });
+
+  it('مرجع التحويل 3–120 حرفاً بعد القصّ: «ab» و«   ab» و121 تُرفض والطلب «معتمد»، و3 أحرف «حُوِّل» (ADM-082)', async () => {
+    if (!dbUp) return;
+    const i = 0;
+    // رصيد يكفي سحباً واحداً من هذا الاختبار وحده
+    const { sub } = await placeOrder([1, 0]);
+    await deliver(i, sub(i).id);
+    await prisma.subOrder.update({ where: { id: sub(i).id }, data: { holdReleaseAt: new Date(Date.now() - 60_000) } });
+    await release.tick();
+    const req = await call('POST', '/vendor/finance/payouts', vendors[i]!.token, { currency: 'SAR', amountMinorUnits: '100' });
+    expect(req.statusCode, req.body).toBe(201);
+    const id = req.json().id as string;
+    expect((await call('POST', `/admin/finance/payouts/${id}/approve`, admin.token)).statusCode).toBe(204);
+    const paid = (transferReference: string) => call('POST', `/admin/finance/payouts/${id}/paid`, admin.token, { transferReference });
+
+    for (const [reference, message] of [
+      ['ab', 'مرجع التحويل: 3 أحرف على الأقل.'],
+      ['   ab', 'مرجع التحويل مطلوب.'],
+      ['x'.repeat(121), 'مرجع التحويل: 120 حرفاً على الأكثر.'],
+    ] as const) {
+      const res = await paid(reference);
+      expect(res.statusCode, `${JSON.stringify(reference)}: ${res.body}`).toBe(400);
+      expect(messages(res), JSON.stringify(reference)).toContain(message);
+      expect((await prisma.payoutRequest.findUniqueOrThrow({ where: { id } })).status).toBe('approved');
+    }
+    expect((await paid('abc')).statusCode).toBe(204);
+    const done = await prisma.payoutRequest.findUniqueOrThrow({ where: { id } });
+    expect(done.status).toBe('paid');
+    expect(done.transferReference).toBe('abc');
+  });
+});

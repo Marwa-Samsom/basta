@@ -576,3 +576,36 @@ describe('التحويل اليدوي · الردّ', () => {
     expect((await prisma.payment.findUniqueOrThrow({ where: { orderId: pendingId } })).status).toBe('pending');
   });
 });
+
+/**
+ * موجة «يُؤتمت» الرابعة (3 نوفمبر 2026): حدود تأكيد وصول التحويل على الخادم — ADM-091. كل
+ * مخالفة 400 والطلب ينتظر تحويله كما كان.
+ */
+describe('حدود تأكيد التحويل — يُؤتمت 4', () => {
+  it('مرجع «ab» و81 حرفاً، ومبلغ «25.5» و«abc»، وملاحظة 201 حرف: 400 برسالته بلا تأكيد (ADM-091)', async () => {
+    if (!dbUp) return;
+    const { res } = await order([{ variantId: variantIds[0]!, qty: 1 }]);
+    const { orderId, orderNumber: number, total } = res.json();
+    openOrders.push(orderId);
+    const confirm = (body: object) => call('POST', `/admin/payments/transfers/${number}/confirm`, { token: financeToken, body });
+    const messages = (r: Res) => [r.json().message].flat();
+
+    for (const reference of ['ab', 'x'.repeat(81)]) {
+      const r = await confirm({ reference, receivedMinorUnits: total.minorUnits });
+      expect(r.statusCode, reference.length.toString()).toBe(400);
+      expect(messages(r)).toContain('اكتب مرجع التحويل كما في كشف البنك (3 أحرف على الأقل).');
+    }
+    for (const receivedMinorUnits of ['25.5', 'abc']) {
+      const r = await confirm({ reference: 'CLQ-1', receivedMinorUnits });
+      expect(r.statusCode, receivedMinorUnits).toBe(400);
+      expect(messages(r)).toContain('اكتب المبلغ الذي وصل.');
+    }
+    const note = await confirm({ reference: 'CLQ-1', receivedMinorUnits: total.minorUnits, note: 'م'.repeat(201) });
+    expect(note.statusCode).toBe(400);
+    expect(messages(note)).toContain('الملاحظة: 200 حرفاً على الأكثر.');
+
+    const after = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+    expect(after.status).toBe('pending_payment');
+    expect(after.payment?.status).toBe('awaiting_transfer');
+  });
+});
