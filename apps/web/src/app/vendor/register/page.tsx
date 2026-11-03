@@ -23,6 +23,13 @@ interface SlugCheck {
  */
 const DRAFT_KEY = 'basta.vendorRegisterDraft';
 const BLANK = { nameAr: '', nameEn: '', slug: '', country: 'JO', businessType: 'individual' };
+
+/** كفحص الخادم (englishStoreName): الاسم الإنجليزي إجباري بحروف إنجليزية — 3 نوفمبر 2026 */
+const ARABIC_LETTER = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const englishNameOk = (raw: string): boolean => {
+  const name = raw.trim();
+  return name.length >= 2 && /[A-Za-z]/.test(name) && !ARABIC_LETTER.test(name);
+};
 type Draft = { form: typeof BLANK; slugTouched: boolean };
 
 function readDraft(): Draft | null {
@@ -186,7 +193,7 @@ export default function VendorRegisterPage() {
           method: 'PATCH',
           body: {
             nameAr: form.nameAr,
-            nameEn: form.nameEn || null,
+            nameEn: form.nameEn,
             ...(check?.slug && check.slug !== existing.slug ? { slug: check.slug } : {}),
             country: form.country,
             businessType: form.businessType,
@@ -200,7 +207,7 @@ export default function VendorRegisterPage() {
         method: 'POST',
         body: {
           nameAr: form.nameAr,
-          ...(form.nameEn ? { nameEn: form.nameEn } : {}),
+          nameEn: form.nameEn,
           ...(check?.slug ? { slug: check.slug } : {}),
           country: form.country,
           businessType: form.businessType,
@@ -319,10 +326,15 @@ export default function VendorRegisterPage() {
 
               <TextInput
                 label={t('اسم المتجر بالإنجليزية', 'Shop name in English')}
-                optional
+                required
                 dir="ltr"
                 maxLength={80}
                 hint={t('يُولَّد رابط المتجر تلقائياً من الاسم الإنجليزي.', 'The shop link is generated automatically from the English name.')}
+                error={
+                  ARABIC_LETTER.test(form.nameEn)
+                    ? t('اكتبه بحروف إنجليزية — منه يُولَّد رابط المتجر.', 'Use English letters — the shop link is generated from it.')
+                    : null
+                }
                 value={form.nameEn}
                 onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
               />
@@ -411,7 +423,7 @@ export default function VendorRegisterPage() {
               <button
                 className="btn btn--primary"
                 type="submit"
-                disabled={busy || form.nameAr.trim().length < 2 || check?.available === false}
+                disabled={busy || form.nameAr.trim().length < 2 || !englishNameOk(form.nameEn) || check?.available === false}
               >
                 {busy ? <Icon name="spinner" size={16} className="vo-spin" /> : null}
                 {busy

@@ -19,11 +19,11 @@ export class ApplyVendorDto {
   @Length(2, 80)
   nameAr!: string;
 
-  @ApiPropertyOptional({ example: 'Dar AlQutn' })
-  @IsOptional()
-  @IsString()
+  /** إجباري بحروف إنجليزية (3 نوفمبر 2026) — الخدمة تفحص الفارغ والعربي */
+  @ApiProperty({ example: 'Dar AlQutn' })
+  @IsString({ message: 'اسم المتجر بالإنجليزية مطلوب.' })
   @MaxLength(80)
-  nameEn?: string;
+  nameEn!: string;
 
   @ApiPropertyOptional({ example: 'dar-alqutn', description: 'يُشتقّ من الاسم إن تُرك فارغاً' })
   @IsOptional()

@@ -57,7 +57,7 @@ test('من تخطّى خطوة العملة: الإرسال ممنوع بمان�
   const applied = await fetch(`${API}/vendor/onboarding/apply`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${access}` },
-    body: JSON.stringify({ nameAr: `متجر بلا عملة ${t}`, country: 'JO' }),
+    body: JSON.stringify({ nameAr: `متجر بلا عملة ${t}`, nameEn: `No Currency ${t}`, country: 'JO' }),
   });
   expect(applied.status).toBe(201);
   await page.evaluate((token) => localStorage.setItem('basta.access', token), (await applied.json()).tokens.accessToken as string);

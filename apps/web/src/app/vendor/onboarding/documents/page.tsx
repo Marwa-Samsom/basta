@@ -170,6 +170,11 @@ export default function DocumentsPage() {
         targetLabel={targetLabel}
         onBack={() => router.push('/vendor/onboarding/currency')}
         onGo={(field) => {
+          // الاسمان في بيانات المتجر — ومسوّدة قبل 3 نوفمبر بلا اسم إنجليزي يوقفها مانعه
+          if (field === 'nameAr' || field === 'nameEn') {
+            router.push('/vendor/register');
+            return;
+          }
           // العملة في خطوتها لا في هذه الصفحة
           if (field === 'settlementCurrency') {
             router.push('/vendor/onboarding/currency');

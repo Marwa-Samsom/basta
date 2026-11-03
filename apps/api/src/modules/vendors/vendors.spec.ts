@@ -6,6 +6,7 @@ import {
   assertCurrencyChangeable,
   canSell,
   defaultCurrencyFor,
+  englishStoreName,
   isValidIban,
   normalizeIban,
   sniffDocumentMime,
@@ -20,6 +21,7 @@ const jpeg = (): Buffer => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
 
 const snapshot = (over: Partial<OnboardingSnapshot> = {}): OnboardingSnapshot => ({
   nameAr: 'دار القطن',
+  nameEn: 'Dar AlQutn',
   slug: 'dar-alqutn',
   country: 'JO',
   currencyChosen: true,
@@ -89,6 +91,23 @@ describe('الوثائق', () => {
   });
 });
 
+describe('اسم المتجر بالإنجليزية — إجباري بحروف إنجليزية (3 نوفمبر 2026)', () => {
+  it('يُحفظ بمسافة واحدة بين كلماته', () => {
+    expect(englishStoreName('  Wool   Corner ')).toBe('Wool Corner');
+    expect(englishStoreName("Mama's Kitchen 2")).toBe("Mama's Kitchen 2");
+  });
+
+  it('الفارغ مرفوض', () => {
+    for (const raw of ['', '   ', 'A']) expect(() => englishStoreName(raw)).toThrow('اسم المتجر بالإنجليزية مطلوب.');
+  });
+
+  it('الحروف العربية مرفوضة فيه، ولا بدّ من حرف إنجليزي', () => {
+    for (const raw of ['ركن الصوف', 'Basta بسطة', '365 24']) {
+      expect(() => englishStoreName(raw)).toThrow('اسم المتجر بالإنجليزية يُكتب بحروف إنجليزية.');
+    }
+  });
+});
+
 describe('موانع الإرسال', () => {
   it('لا مانع حين تكتمل الوثائق والحساب', () => {
     expect(submissionBlockers(snapshot())).toHaveLength(0);
@@ -99,6 +118,13 @@ describe('موانع الإرسال', () => {
     expect(blockers.map((b) => b.code)).toEqual(['currency_unchosen']);
     expect(blockers[0]!.field).toBe('settlementCurrency');
     expect(blockers[0]!.message).toMatch(/لا تتغيّر بعد اعتماد متجرك/);
+  });
+
+  it('مسوّدة بلا اسم إنجليزي (سُجّلت قبل أن يصير إجبارياً) مانع يشير إلى حقله', () => {
+    const blockers = submissionBlockers(snapshot({ nameEn: null }));
+    expect(blockers.map((b) => b.code)).toEqual(['name_en_missing']);
+    expect(blockers[0]!.field).toBe('nameEn');
+    expect(blockers[0]!.message).toBe('اسم المتجر بالإنجليزية مطلوب.');
   });
 
   it('تُعدّ الموانع مجتمعة لا واحداً واحداً', () => {
