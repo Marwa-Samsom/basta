@@ -22,6 +22,15 @@ export function counted(n: number, forms: Counted): string {
   return form.replace('#', num(n));
 }
 
+/** «طلب واحد ينتظر قبولك»، «طلبان ينتظران قبولك»، «4 طلبات تنتظر قبولك»، «11 طلباً ينتظر قبولك» */
+export const WAITING_ORDERS: Counted = {
+  one: 'طلب واحد ينتظر قبولك',
+  two: 'طلبان ينتظران قبولك',
+  plural: '# طلبات تنتظر قبولك',
+  accusative: '# طلباً ينتظر قبولك',
+  genitive: '# طلب ينتظر قبولك',
+};
+
 /** «منتج واحد»، «منتجان»، «4 منتجات»، «11 منتجاً»، «100 منتج» */
 export const PRODUCTS: Counted = { one: 'منتج واحد', two: 'منتجان', plural: '# منتجات', accusative: '# منتجاً', genitive: '# منتج' };
 
