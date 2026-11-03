@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError, mediaUrl } from '@/lib/api';
+import { useReturnTick } from '@/lib/fresh';
 import { digitsOnly } from '@/lib/digits';
 import { Alert, ClearableInput, EmptyState, Field, Spinner, TextArea, TextInput } from '@/components/ui';
 import { Icon } from '@/components/icons';
@@ -130,8 +131,35 @@ export function ProductEditor({ productId }: { productId?: string }) {
 
   // ------------------------------------------------------------ التحميل
 
+  /**
+   * الرجوع إلى المحرّر يجلبه من جديد ما دام البائع لم يعدّل فيه شيئاً منذ آخر تحميل — المخزون أو
+   * السعر تغيّرا من نافذة أخرى فيظهران. والمعدَّل لا يُمسّ: ما على الشاشة غير ما حُمّل، فلا جلب
+   * يكتب فوق ما كُتب. `onScreen` ما على الشاشة الآن، و`asLoaded` ما كان عليها بعد آخر تحميل.
+   */
+  const returned = useReturnTick();
+  const [fresh, setFresh] = useState(0);
+  const onScreen = useRef('');
+  const asLoaded = useRef<string | null>(null);
+  const seeding = useRef(false);
+  const quiet = useRef(false);
+  useEffect(() => {
+    onScreen.current = JSON.stringify({ form, attrValues, variants, axisIds });
+    if (seeding.current) {
+      asLoaded.current = onScreen.current;
+      seeding.current = false;
+    }
+  });
+  useEffect(() => {
+    if (!returned || asLoaded.current === null || asLoaded.current !== onScreen.current) return;
+    quiet.current = true;
+    setFresh((n) => n + 1);
+  }, [returned]);
+
   useEffect(() => {
     let alive = true;
+    // جلب الرجوع صامت: فشله لا يستبدل المحرّر برسالة — الرجوع التالي يعيد المحاولة
+    const silent = quiet.current;
+    quiet.current = false;
     void (async () => {
       try {
         const [library, own, detail] = await Promise.all([
@@ -148,6 +176,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
         ]);
         setAttributes(library.filter((a) => !a.archived || used.has(a.attributeId)));
         setCategories(own);
+        seeding.current = true;
         if (detail) {
           setProduct(detail);
           setForm({
@@ -181,7 +210,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
           );
         }
       } catch (err) {
-        if (alive) {
+        if (alive && !silent) {
           setLoadError({
             message: err instanceof Error ? err.message : t('تعذّر تحميل المحرّر.', "Couldn't load the editor."),
             notFound: err instanceof ApiError && err.status === 404,
@@ -194,7 +223,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
     return () => {
       alive = false;
     };
-  }, [productId, attempt, t]);
+  }, [productId, attempt, t, fresh]);
 
   if (loading) {
     return <Spinner label={t('جارٍ فتح المحرّر…', 'Opening the editor…')} />;
@@ -352,6 +381,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
    */
   function settle(saved: ProductDetail): void {
     setProduct(saved);
+    // ما على الشاشة بعد الحفظ هو المحفوظ: الرجوع التالي يجلبه من جديد كما بعد التحميل
+    seeding.current = true;
     const onHand = new Map(saved.variants.map((v) => [v.id, String(v.stock.onHand)]));
     setVariants((rows) =>
       rows.map((v) => {

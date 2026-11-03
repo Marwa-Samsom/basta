@@ -8,6 +8,7 @@ import { Icon } from '@/components/icons';
 import { api, apiBlob } from '@/lib/api';
 import { money, when } from '@/lib/orders';
 import { useLocale, useT } from '@/components/locale';
+import { useReturnTick } from '@/lib/fresh';
 
 interface Row {
   id: string;
@@ -114,6 +115,7 @@ export default function StatementPage() {
     return q.toString();
   };
 
+  const returned = useReturnTick();
   useEffect(() => {
     if (!currency) return;
     let alive = true;
@@ -126,7 +128,7 @@ export default function StatementPage() {
     return () => {
       alive = false;
     };
-  }, [currency, from, to]);
+  }, [currency, from, to, returned]);
 
   // الصفحة التالية تُلحق بما جُلب: الرصيد بعد كل سطر يكمل من آخر سطر، والافتتاحي والختامي للمدة كلها
   const loadMore = async () => {

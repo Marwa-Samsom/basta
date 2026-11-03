@@ -7,6 +7,7 @@ import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { DateField } from '@/components/date-field';
 import { Icon } from '@/components/icons';
 import { api, apiBlob } from '@/lib/api';
+import { useReturnTick } from '@/lib/fresh';
 import { labelOf, money, toneOf } from '@/lib/orders';
 import { useLocale, useT } from '@/components/locale';
 import { intlLocale, type Locale } from '@/lib/i18n';
@@ -307,23 +308,8 @@ export default function ReportsPage() {
   // المدى الذي وصلت أرقامه — «جارٍ التحديث» ما دام المطلوب غيره
   const [loaded, setLoaded] = useState('');
   const loading = loaded !== `${from}|${to}`;
-  // الرجوع إلى الصفحة يجلب أرقامها من جديد بصمت: طلب دُفع وهي مفتوحة في تبويب أو نافذة أخرى
-  // كان لا يظهر إلا بعد F5 (2 نوفمبر 2026). الحدثان معاً يصلان عند الرجوع، فثانيتان بينهما على الأقل
-  const [fresh, setFresh] = useState(0);
-  useEffect(() => {
-    let last = 0;
-    const back = () => {
-      if (document.visibilityState !== 'visible' || Date.now() - last < 2_000) return;
-      last = Date.now();
-      setFresh((n) => n + 1);
-    };
-    window.addEventListener('focus', back);
-    document.addEventListener('visibilitychange', back);
-    return () => {
-      window.removeEventListener('focus', back);
-      document.removeEventListener('visibilitychange', back);
-    };
-  }, []);
+  // الرجوع إلى الصفحة يجلب أرقامها من جديد بصمت (lib/fresh)
+  const returned = useReturnTick();
 
   useEffect(() => {
     let alive = true;
@@ -338,7 +324,7 @@ export default function ReportsPage() {
     return () => {
       alive = false;
     };
-  }, [from, to, fresh]);
+  }, [from, to, returned]);
 
   const pick = (days: number) => {
     setPreset(days);

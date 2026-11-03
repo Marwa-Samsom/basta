@@ -8,6 +8,7 @@ import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { cartApi, type CartLine, type CartView } from '@/lib/cart';
 import { nameIn, type Locale } from '@/lib/i18n';
 import { imageUrl } from '@/lib/storefront';
+import { useReturnTick } from '@/lib/fresh';
 
 /** الصورة المصغّرة من مفتاح صورة المنتج — المسار نفسه الذي يبنيه الخادم لبطاقات المتجر */
 const thumbOf = (key: string | null): string | null => (key ? imageUrl(`/uploads/${key}/thumb.webp`) : null);
@@ -47,6 +48,7 @@ export default function CartPage() {
   const couponInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     void cartApi
@@ -55,7 +57,8 @@ export default function CartPage() {
         if (alive) setCart(c);
       })
       .catch((err: unknown) => {
-        if (alive) setError(err instanceof Error ? err.message : t('تعذّر تحميل السلة.', "Couldn't load the cart."));
+        // فشل التحديث عند الرجوع لا يستبدل السلة برسالة
+        if (alive && !returned) setError(err instanceof Error ? err.message : t('تعذّر تحميل السلة.', "Couldn't load the cart."));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -63,7 +66,7 @@ export default function CartPage() {
     return () => {
       alive = false;
     };
-  }, [t]);
+  }, [t, returned]);
 
   async function run(action: () => Promise<CartView>, fail: (message: string) => void = setError): Promise<void> {
     setBusy(true);

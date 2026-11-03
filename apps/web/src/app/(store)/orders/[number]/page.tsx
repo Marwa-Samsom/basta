@@ -10,6 +10,7 @@ import { Alert, Spinner } from '@/components/ui';
 import { api, session } from '@/lib/api';
 import { pick, type Bilingual, type Locale } from '@/lib/i18n';
 import { orderKeyHeaders } from '@/lib/order-key';
+import { useReturnTick } from '@/lib/fresh';
 
 interface OrderResult {
   orderNumber: string;
@@ -103,6 +104,7 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
     () => false,
   );
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -120,6 +122,7 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
       } catch (err) {
         if (!alive) return;
         // التحميل الأول يعرض خطأه؛ أثناء «نتحقّق» لا يمحو انقطاعٌ عابر الصفحة، ويُعاد السؤال في موعده
+        if (attempt === 0 && returned) return; // تحديث الرجوع: فشله لا يمحو الطلب المعروض
         if (attempt === 0) setError(err instanceof Error ? err.message : t('تعذّر تحميل الطلب.', "Couldn't load the order."));
         else schedule(attempt);
         return;
@@ -133,7 +136,7 @@ export default function OrderResultPage({ params }: { params: Promise<{ number: 
       alive = false;
       if (timer) clearTimeout(timer);
     };
-  }, [number, t]);
+  }, [number, t, returned]);
 
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (!order) return <Spinner label={t('جارٍ تحميل طلبك…', 'Loading your order…')} />;

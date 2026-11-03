@@ -10,6 +10,7 @@ import { DashIdent, DashShell, type DashNavGroup } from '@/components/dash-shell
 import type { IconName } from '@/components/icons';
 import { Alert, Spinner } from '@/components/ui';
 import { api, ApiError, session } from '@/lib/api';
+import { useReturnTick } from '@/lib/fresh';
 import type { Me } from '@/lib/admin';
 import { MeContext, can } from '@/components/admin-context';
 import { useT } from '@/components/locale';
@@ -62,6 +63,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // الرجوع إلى اللوحة يعيد قراءة الصلاحيات بصمت — مُنحت أو سُحبت وهي مفتوحة
+  const returned = useReturnTick();
   useEffect(() => {
     if (!session.read()) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
@@ -75,14 +78,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         else setMe(m);
       })
       .catch((e: Error) => {
-        if (!alive) return;
+        if (!alive || returned) return;
         if (e instanceof ApiError && e.status === 403 && (e.code === 'TOTP_SETUP_REQUIRED' || /الثنائي/.test(e.message))) router.replace('/account/2fa');
         else setError(e.message);
       });
     return () => {
       alive = false;
     };
-  }, [pathname, router, t]);
+  }, [pathname, router, t, returned]);
 
   if (error) {
     return (

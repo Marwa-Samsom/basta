@@ -40,7 +40,8 @@ test('طلب دُفع والتقارير مفتوحة يظهر عند الرجو
   expect(paid.outcome).toBe('paid');
 
   // الصفحة لا تعرف بالطلب حتى يرجع إليها صاحبها
-  await page.waitForTimeout(1_000);
+  // والعدّاد يتجاهل ما يصل في الثانيتين الأوليين بعد فتح الصفحة
+  await page.waitForTimeout(2_500);
   await expect(page.getByText('لا مبيعات في هذا المدى')).toBeVisible();
 
   // الرجوع من نافذة أخرى: النافذة تستعيد التركيز

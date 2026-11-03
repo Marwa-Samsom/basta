@@ -7,6 +7,7 @@ import { SecurityPanel, SessionsPanel, type Profile } from '@/components/account
 import { Icon, type IconName } from '@/components/icons';
 import { Alert, PageHead, Spinner, TextInput } from '@/components/ui';
 import { api, session } from '@/lib/api';
+import { useReturnTick } from '@/lib/fresh';
 import { CURRENCIES, useOnboarding } from '@/lib/vendor';
 import { useLocale, useT } from '@/components/locale';
 import type { Locale } from '@/lib/i18n';
@@ -38,7 +39,8 @@ function SecurityTab() {
       .then(setProfile)
       .catch((e: Error) => setError(e.message));
   }, []);
-  useEffect(load, [load]);
+  const returned = useReturnTick();
+  useEffect(load, [load, returned]);
 
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (!profile) return <Spinner label={t('جارٍ جلب حسابك…', 'Loading your account…')} />;
@@ -73,6 +75,7 @@ function BanksTab() {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null);
+  const returned = useReturnTick();
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,7 +86,7 @@ function BanksTab() {
     api<Profile>('/me/account')
       .then((p) => setTotp(p.totpEnabled))
       .catch(() => undefined);
-  }, [owner]);
+  }, [owner, returned]);
 
   if (!owner) {
     return (

@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, API_BASE, ApiError } from './api';
+import { useReturnTick } from './fresh';
 import { intlLocale, type Locale } from './i18n';
 
 export interface Me {
@@ -11,7 +12,7 @@ export interface Me {
 }
 
 /**
- * يجلب بيانات صفحة إدارية ويعيد تحميلها عند الطلب. الخطأ نصّ جاهز للعرض،
+ * يجلب بيانات صفحة إدارية ويعيد تحميلها عند الطلب، وعند الرجوع إلى الصفحة بصمت. الخطأ نصّ جاهز للعرض،
  * و403 يُميَّز: الصفحة تقول «تحتاج صلاحية كذا» لا «حدث خطأ». و400 مدخل رفضه الخادم
  * (فترة مقلوبة مثلاً): رسالته وحدها تكفي، لا «حدث خلل غير متوقّع» فوقها (ACFG-090).
  */
@@ -25,19 +26,27 @@ export function useAdminData<T>(path: string | null): {
   const [data, setData] = useState<T | null>(null);
   const [failure, setFailure] = useState<{ path: string; message: string; forbidden: boolean; invalid: boolean } | null>(null);
   const [version, setVersion] = useState(0);
+  const returned = useReturnTick();
+  // المسار والنسخة اللذان على الشاشة — الجلب لهما ثانيةً تحديثٌ عند الرجوع إلى الصفحة لا تحميل
+  const shown = useRef('');
 
   useEffect(() => {
     if (!path) return;
     let alive = true;
+    const key = `${path}|${version}`;
+    const silent = shown.current === key;
     void (async () => {
       try {
         const next = await api<T>(path);
         if (alive) {
-          setData(next);
+          shown.current = key;
+          // ما لم يتغيّر يبقى بمرجعه: لا يُعاد رسم الصفحة ولا ما بُني على بياناتها
+          setData((old) => (silent && JSON.stringify(old) === JSON.stringify(next) ? old : next));
           setFailure(null);
         }
       } catch (e) {
-        if (!alive) return;
+        // فشل التحديث الصامت لا يمحو ما على الشاشة — الرجوع التالي يعيد المحاولة
+        if (!alive || silent) return;
         setFailure({
           path,
           message: (e as Error).message,
@@ -49,7 +58,7 @@ export function useAdminData<T>(path: string | null): {
     return () => {
       alive = false;
     };
-  }, [path, version]);
+  }, [path, version, returned]);
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   /**

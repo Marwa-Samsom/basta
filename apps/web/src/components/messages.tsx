@@ -9,6 +9,7 @@ import { useLocale, useT } from '@/components/locale';
 import { Alert, EmptyState, PageHead } from '@/components/ui';
 import { api, session } from '@/lib/api';
 import { intlLocale, pick, type Bilingual, type Locale } from '@/lib/i18n';
+import { useReturnTick } from '@/lib/fresh';
 
 type Side = 'customer' | 'vendor';
 export type Audience = Side;
@@ -144,6 +145,7 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
     return () => mq.removeEventListener('change', sync);
   }, []);
 
+  const returned = useReturnTick();
   useEffect(() => {
     if (audience === 'customer' && !session.read()) {
       router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
@@ -160,7 +162,7 @@ export function MessagesInbox({ audience }: { audience: Audience }) {
     return () => {
       alive = false;
     };
-  }, [audience, base, router]);
+  }, [audience, base, router, returned]);
 
   const term = filter.trim();
   const shown = (rows ?? []).filter(
@@ -380,6 +382,7 @@ function ThreadPane({
   const countId = useId();
   const titleId = useId();
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     api<Thread>(`${base}/${id}`)
@@ -392,7 +395,7 @@ function ThreadPane({
     return () => {
       alive = false;
     };
-  }, [base, id, onOpened]);
+  }, [base, id, onOpened, returned]);
 
   // آخر رسالة ظاهرة عند الفتح وبعد الإرسال
   const count = thread?.messages.length ?? 0;

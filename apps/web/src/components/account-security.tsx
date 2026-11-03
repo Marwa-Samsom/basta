@@ -7,6 +7,7 @@ import { useLocale, useT } from '@/components/locale';
 import { TwoFactorCard } from '@/components/two-factor-card';
 import { Alert, TextInput } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useReturnTick } from '@/lib/fresh';
 import type { Locale } from '@/lib/i18n';
 import { when } from '@/lib/orders';
 import { MIN_PASSWORD, NewPasswordField } from '@/app/reset/new-password-field';
@@ -185,7 +186,8 @@ export function SessionsPanel() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  useEffect(load, [load]);
+  const returned = useReturnTick();
+  useEffect(load, [load, returned]);
 
   async function revoke(s: Session): Promise<void> {
     setBusy(s.id);

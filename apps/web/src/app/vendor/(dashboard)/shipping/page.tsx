@@ -14,6 +14,7 @@ import { regionName, samePlace } from '@/lib/places';
 import { RegionSelect } from '@/components/region-select';
 import { useLocale, useT } from '@/components/locale';
 import type { Locale, Translate } from '@/lib/i18n';
+import { useReturnTick } from '@/lib/fresh';
 
 type Method = 'flat' | 'by_weight' | 'free_over';
 
@@ -806,6 +807,7 @@ export default function ShippingZonesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     api<ZonesView>('/vendor/shipping/zones')
@@ -814,11 +816,12 @@ export default function ShippingZonesPage() {
         setData(d);
         setSelected((s) => s ?? d.zones[0]?.id ?? 'new');
       })
-      .catch((e: Error) => alive && setLoadError(e.message));
+      // فشل التحديث عند الرجوع لا يستبدل المناطق برسالة
+      .catch((e: Error) => alive && !returned && setLoadError(e.message));
     return () => {
       alive = false;
     };
-  }, []);
+  }, [returned]);
 
   if (!data) {
     return loadError ? (

@@ -16,6 +16,7 @@ import { digitsOnly } from '@/lib/digits';
 import { nameIn, type Locale } from '@/lib/i18n';
 import { withNext } from '@/lib/safe-path';
 import { imageUrl } from '@/lib/storefront';
+import { useReturnTick } from '@/lib/fresh';
 
 interface OrderResult {
   orderId: string;
@@ -246,6 +247,7 @@ function CheckoutForm() {
     setPicked('new');
   };
 
+  const returned = useReturnTick();
   useEffect(() => {
     let alive = true;
     api<PaymentMethod>('/checkout/payment-method')
@@ -258,7 +260,7 @@ function CheckoutForm() {
     return () => {
       alive = false;
     };
-  }, [paymentAttempt, t]);
+  }, [paymentAttempt, t, returned]);
 
   useEffect(() => {
     let alive = true;
@@ -278,7 +280,7 @@ function CheckoutForm() {
     return () => {
       alive = false;
     };
-  }, [restored]);
+  }, [restored, returned]);
 
   // كل تعديل يُحفظ في التبويب — يعود بعد «أعد المحاولة» أو إعادة تحميل الصفحة
   useEffect(() => writeDraft(address), [address]);

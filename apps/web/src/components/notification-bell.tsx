@@ -6,6 +6,7 @@ import { api, session } from '@/lib/api';
 import { when } from '@/lib/orders';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
+import { useReturnTick } from '@/lib/fresh';
 
 interface Inbox {
   unread: number;
@@ -51,6 +52,8 @@ export function NotificationBell({ allHref = '/account/notifications' }: { allHr
     };
   }, [open]);
 
+  // الرجوع إلى الصفحة يسأل الجرس فوراً، لا بعد دقيقة السؤال الدوري
+  const returned = useReturnTick();
   useEffect(() => {
     if (!signedIn) return;
     let alive = true;
@@ -64,7 +67,7 @@ export function NotificationBell({ allHref = '/account/notifications' }: { allHr
       alive = false;
       clearInterval(timer);
     };
-  }, [signedIn, version]);
+  }, [signedIn, version, returned]);
 
   if (!signedIn) return null;
 
