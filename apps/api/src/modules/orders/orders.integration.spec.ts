@@ -1798,3 +1798,46 @@ describe('التزامن على الطلب نفسه (موجة «يُؤتمت» �
     }
   });
 });
+
+/**
+ * موجة «يُؤتمت» الرابعة (3 نوفمبر 2026): مدخلات الإرجاع الخاطئة على الخادم — VOPS-045. المعرّف
+ * غير المطابق يُرجع المعاملة كلها: لا مخزون ولا ردّ ولا تغيير حالة.
+ */
+describe('مدخلات الإرجاع الخاطئة — يُؤتمت 4', () => {
+  it('سبب قصير 400، ورفض المسلَّم 409، ومعرّف إرجاع لا يطابق 409 بلا أثر، و«أُرجع» للمسلَّم 409 (VOPS-045)', async () => {
+    if (!dbUp) return;
+    const { a, b, order } = await placeOrder([1, 1]);
+    await deliver(0, a.id);
+    await deliver(1, b.id);
+    const asked = await call('POST', `/me/orders/${order.orderNumber}/stores/${a.id}/return`, buyer.token, {
+      items: [{ orderItemId: a.items[0]!.id, qty: 1 }],
+      reasonCode: 'damaged',
+      description: 'وصلت قطعة مكسورة',
+    });
+    expect(asked.statusCode, asked.body).toBe(201);
+
+    const short = await call('POST', `/vendor/orders/${a.id}/return/deny`, vendors[0]!.token, { reason: 'لا' });
+    expect(short.statusCode, short.body).toBe(400);
+    expect(short.json().message).toBe('السبب مطلوب ويُعرض للطرف الآخر كما يُكتب.');
+    expect(await statusOf(a.id)).toBe('return_requested');
+
+    const denyDelivered = await call('POST', `/vendor/orders/${b.id}/return/deny`, vendors[1]!.token, { reason: 'لا يوجد طلب إرجاع لرفضه' });
+    expect(denyDelivered.statusCode, denyDelivered.body).toBe(409);
+    expect(denyDelivered.json().message).toBe('لا يمكن نقل الطلب من «تم التسليم» إلى «تم التسليم»: انتقال غير مسموح.');
+
+    const stockBefore = await stock(vendors[0]!.variantId);
+    const refundsBefore = await prisma.refund.count({ where: { subOrderId: a.id } });
+    const wrong = await vendorMove(0, a.id, 'returned', { returnRequestId: randomUUID() });
+    expect(wrong.statusCode, wrong.body).toBe(409);
+    expect(wrong.json().message).toBe('لا طلب إرجاع قائم لهذا الطلب.');
+    expect(await statusOf(a.id)).toBe('return_requested');
+    expect(await stock(vendors[0]!.variantId)).toBe(stockBefore);
+    expect(await prisma.refund.count({ where: { subOrderId: a.id } })).toBe(refundsBefore);
+    expect((await prisma.returnRequest.findUniqueOrThrow({ where: { id: asked.json().returnRequestId } })).status).toBe('requested');
+
+    const returnedDelivered = await vendorMove(1, b.id, 'returned');
+    expect(returnedDelivered.statusCode, returnedDelivered.body).toBe(409);
+    expect(returnedDelivered.json().message).toMatch(/انتقال غير مسموح\.$/);
+    expect(await statusOf(b.id)).toBe('delivered');
+  });
+});
