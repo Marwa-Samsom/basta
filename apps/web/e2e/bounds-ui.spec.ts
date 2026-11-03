@@ -139,7 +139,11 @@ test('نسبتا الخصم الحدّيتان تُعرضان «0.01%» و«90%�
   await prisma.coupon.create({ data: { code: codes.high, scope: 'platform', type: 'percent', valueBps: 9000, fundedBy: 'platform', isActive: false } });
   try {
     await signInAdmin(page, '/admin/coupons');
+    // الكوبونات بالرمز وخمسين خمسين منذ #194 — كل رمز يُطلب ببحثه لا من أول صفحة
+    const search = page.getByRole('searchbox', { name: 'ابحث برمز الكوبون' });
+    await search.fill(codes.low);
     await expect(page.getByRole('row').filter({ hasText: codes.low })).toContainText('0.01%');
+    await search.fill(codes.high);
     await expect(page.getByRole('row').filter({ hasText: codes.high })).toContainText('90%');
   } finally {
     await prisma.coupon.deleteMany({ where: { code: { in: Object.values(codes) } } });
