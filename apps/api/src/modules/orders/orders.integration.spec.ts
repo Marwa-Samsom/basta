@@ -324,6 +324,67 @@ describe('بوابة 09 · البند 1 — الانتقال غير المسمو
     expect(theirs.total).toBe(await prisma.order.count({ where: { customerUserId: stranger.userId, status: { notIn: ['pending_payment', 'payment_failed'] } } }));
   });
 
+  // BUY-006 (4 نوفمبر 2026): كانت «طلباتي» صفحات وحدها — لا تصفية ولا بحث، و GET /me/orders لا يقبل إلا page
+  it('«طلباتي»: ?status= يصفّي بحالة الأب (قيد التنفيذ، مكتمل، ملغى) و?search= بجزء من الرقم، والعدّادات مجاميع', async () => {
+    if (!dbUp) return;
+    const u = await user('filterer', 'customer');
+    const token = await login(u.email);
+    const made: string[] = [];
+    const make = async (status: 'processing' | 'completed' | 'partially_completed' | 'refunded' | 'canceled' | 'payment_failed', n: number) => {
+      const o = await prisma.order.create({
+        data: {
+          orderNumber: `FL-${SUFFIX}-${n}`.toUpperCase(),
+          idempotencyKey: randomUUID(),
+          customerUserId: u.id,
+          status,
+          currency: 'JOD',
+          itemsSubtotalMinorUnits: 1_000n,
+          grandTotalMinorUnits: 1_000n,
+          shippingAddressSnapshot: ADDRESS,
+        },
+      });
+      made.push(o.id);
+      return o.orderNumber;
+    };
+    const p1 = await make('processing', 1);
+    const p2 = await make('processing', 2);
+    const done = await make('completed', 3);
+    const part = await make('partially_completed', 4);
+    const refunded = await make('refunded', 5);
+    const canceled = await make('canceled', 6);
+    // محاولة بطاقة مرفوضة ليست طلباً — لا في القائمة ولا في عدّاد (BUY-009)
+    await make('payment_failed', 7);
+    const list = async (q = '') => {
+      const res = await call('GET', `/me/orders${q}`, token);
+      expect(res.statusCode, res.body).toBe(200);
+      return res.json() as { items: { number: string }[]; total: number; counts: Record<string, number> };
+    };
+    const numbers = (r: { items: { number: string }[] }) => r.items.map((o) => o.number).sort();
+
+    try {
+      const all = await list();
+      expect(all.total).toBe(6);
+      expect(all.counts).toEqual({ all: 6, active: 2, completed: 2, canceled: 2 });
+      expect(numbers(await list('?status=active'))).toEqual([p1, p2].sort());
+      expect(numbers(await list('?status=completed'))).toEqual([done, part].sort());
+      expect(numbers(await list('?status=canceled'))).toEqual([refunded, canceled].sort());
+      // حالة غير معروفة كـ «الكل» — لا تُخفي طلبات
+      expect((await list('?status=xyz')).total).toBe(6);
+
+      // جزء من الرقم، بأحرف صغيرة: المطابق وحده، والعدّادات للبحث نفسه
+      const found = await list(`?search=${encodeURIComponent(p2.slice(-6).toLowerCase())}`);
+      expect(numbers(found)).toEqual([p2]);
+      expect(found.counts).toEqual({ all: 1, active: 1, completed: 0, canceled: 0 });
+      // ومع التصفية: البحث داخل التبويب
+      expect((await list(`?status=completed&search=${encodeURIComponent(p2.slice(-6))}`)).total).toBe(0);
+      const none = await list('?search=ZZZZ-NOPE');
+      expect(none.items).toEqual([]);
+      expect(none.total).toBe(0);
+    } finally {
+      await prisma.order.deleteMany({ where: { id: { in: made } } });
+    }
+  });
+
   /**
    * الخادم يقبل «قيد التجهيز» أيضاً، والواجهة تعرض الزرّ عند «جاهز للشحن» وحده — الخادم أوسع
    * من الواجهة ولا ضرر: لا تتغيّر الحالة بإصدار البوليصة

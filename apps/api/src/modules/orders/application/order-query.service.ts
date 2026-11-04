@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { OrderStatus, Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
@@ -72,6 +72,14 @@ type SubOrderRow = Prisma.SubOrderGetPayload<{ include: typeof SUB_ORDER_DETAIL 
  * قراءات الطلبات لثلاثة جماهير. **كل استعلام يحمل شرط مالكه في `where`**
  * — لا جلب ثم فحص (ADR-010): طلب غيرك «غير موجود» لا «ممنوع».
  */
+/** تبويبات «طلباتي» بحالة الطلب الأب — «ملغى» يضمّ المُسترَد وتحويلاً أُلغي لأنه لم يُدفع (BUY-006) */
+const BUYER_ORDER_GROUPS = {
+  active: ['pending_payment', 'processing'],
+  completed: ['partially_completed', 'completed'],
+  canceled: ['canceled', 'refunded', 'payment_failed'],
+} as const satisfies Record<string, readonly OrderStatus[]>;
+type BuyerOrderGroup = keyof typeof BUYER_ORDER_GROUPS;
+
 @Injectable()
 export class OrderQueryService {
   constructor(
@@ -260,14 +268,27 @@ export class OrderQueryService {
 
   // ------------------------------------------------------------ المشتري
 
-  async customerList(userId: string, page = 1): Promise<{ items: unknown[]; total: number }> {
+  /**
+   * «طلباتي» — ST-18. التبويب بحالة الأب، والبحث بجزء من رقم الطلب، وعدّاد كل تبويب للبحث نفسه.
+   * كانت صفحات وحدها: مشترٍ بأربعة وأربعين طلباً يكبس «المزيد» ويقرأ الأرقام ليجد طلبه (BUY-006).
+   */
+  async customerList(
+    userId: string,
+    q: { page?: number; status?: string; search?: string } = {},
+  ): Promise<{ items: unknown[]; total: number; counts: Record<BuyerOrderGroup | 'all', number> }> {
+    const page = q.page ?? 1;
+    const search = q.search?.trim().slice(0, 40);
     // محاولات الدفع الفاشلة لا تُعدّ طلبات — إلا طلب التحويل: حجزه المشتري وينتظر
     // تحويله، أو أُلغي لأنه لم يحوّل، وعليه أن يرى ذلك في «طلباتي»
-    const where: Prisma.OrderWhereInput = {
+    const base: Prisma.OrderWhereInput = {
       customerUserId: userId,
       OR: [{ status: { notIn: ['pending_payment', 'payment_failed'] } }, { payment: { is: { method: 'bank_transfer' } } }],
+      ...(search ? { orderNumber: like(search) } : {}),
     };
-    const [rows, total] = await Promise.all([
+    // حالة غير معروفة كـ «الكل»: لا تُخفي طلبات بخطأ في الرابط
+    const group = q.status && (Object.keys(BUYER_ORDER_GROUPS) as string[]).includes(q.status) ? (q.status as BuyerOrderGroup) : null;
+    const where: Prisma.OrderWhereInput = group ? { AND: [base, { status: { in: [...BUYER_ORDER_GROUPS[group]] } }] } : base;
+    const [rows, total, grouped] = await Promise.all([
       this.prisma.order.findMany({
         where,
         orderBy: { placedAt: 'desc' },
@@ -290,8 +311,16 @@ export class OrderQueryService {
         },
       }),
       this.prisma.order.count({ where }),
+      this.prisma.order.groupBy({ by: ['status'], where: base, _count: true }),
     ]);
+    const counts = { all: 0, active: 0, completed: 0, canceled: 0 };
+    for (const g of grouped) {
+      counts.all += g._count;
+      const key = (Object.keys(BUYER_ORDER_GROUPS) as BuyerOrderGroup[]).find((k) => (BUYER_ORDER_GROUPS[k] as readonly OrderStatus[]).includes(g.status));
+      if (key) counts[key] += g._count;
+    }
     return {
+      counts,
       items: rows.map((o) => ({
         number: o.orderNumber,
         status: o.status,

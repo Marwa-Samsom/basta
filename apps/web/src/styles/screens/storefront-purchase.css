@@ -611,6 +611,9 @@
 /* ------------------------------------------------------------- ST-18 طلباتي */
 
 .sp-orders { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+/* تبويبات الحالة وخانة البحث برقم الطلب فوق القائمة (BUY-006) */
+.sp-orders-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-block-end: var(--space-3); }
+.sp-orders-search { flex: 1 1 220px; max-inline-size: 320px; }
 .sp-order {
   display: block;
   background: var(--surface-card);
