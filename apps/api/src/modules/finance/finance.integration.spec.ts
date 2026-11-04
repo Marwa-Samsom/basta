@@ -936,3 +936,38 @@ describe('صيغ طلب السحب ومرجع التحويل — يُؤتمت 4'
     expect(done.transferReference).toBe('abc');
   });
 });
+
+describe('ACFG-014 · متاجر «نسبة لمتجر» لمدير العمولات (4 نوفمبر 2026)', () => {
+  it('كل متجر إلا المحظور، بالاسم والحالة وحدهما — بـ commissions.edit بلا vendors.review', async () => {
+    if (!dbUp) return;
+    const tag = `st-${SUFFIX}`;
+    for (const status of ['approved', 'in_review', 'pending', 'suspended', 'rejected', 'banned'] as const) {
+      const u = await prisma.user.create({
+        data: { email: `v${status.replace('_', '')}.${tag}@basta.test`, fullName: `بائع ${status}`, passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'vendor_owner' } } },
+      });
+      await prisma.vendor.create({
+        data: {
+          ownerUserId: u.id, slug: `v-${status.replace('_', '-')}-${tag}`, nameAr: `حالة ${status}`, status, settlementCurrency: 'SAR', country: 'SA',
+          ...(status === 'approved' ? { approvedAt: new Date() } : {}),
+          ...(status === 'rejected' ? { rejectionReason: 'وثيقة ناقصة' } : {}),
+        },
+      });
+    }
+    // طابور المراجعة يبقى لصاحب vendors.review — والمدير هنا بلاها
+    expect((await call('GET', `/admin/vendors?status=approved&search=${tag}`, admin.token)).statusCode).toBe(403);
+
+    const res = await call('GET', `/admin/finance/commissions/vendors?search=${tag}`, admin.token);
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.json() as { items: Record<string, unknown>[]; total: number };
+    // قيد المراجعة ينشر قبل اعتماده، والمسوّدة والمرفوض والمعلَّق قد يعودون — والمحظور لا يعود
+    expect(body.items.map((v) => v['status']).sort()).toEqual(['approved', 'in_review', 'pending', 'rejected', 'suspended']);
+    expect(body.total).toBe(5);
+    // للاختيار وحده: لا بريد صاحبه ولا وثائقه
+    expect(Object.keys(body.items[0]!).sort()).toEqual(['id', 'nameAr', 'status']);
+    // بريد صاحبه يُبحث به كما في خانة البحث
+    const byEmail = (await call('GET', `/admin/finance/commissions/vendors?search=${encodeURIComponent(`vinreview.${tag}`)}`, admin.token)).json() as { items: { status: string }[] };
+    expect(byEmail.items.map((v) => v.status)).toEqual(['in_review']);
+
+    expect((await call('GET', `/admin/finance/commissions/vendors?search=${tag}`, buyer.token)).statusCode).toBe(403);
+  });
+});

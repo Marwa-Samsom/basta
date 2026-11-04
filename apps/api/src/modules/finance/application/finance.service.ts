@@ -463,6 +463,24 @@ export class FinanceService {
   }
 
   /**
+   * متاجر «نسبة لمتجر» — ACFG-014، 4 نوفمبر 2026. كانت الشاشة تختار من طابور المراجعة: يحتاج
+   * vendors.review فبقي مدير العمولات وحدها على «…»، ويعرض المعتمد وحده فالمتجر قيد المراجعة — وهو
+   * ينشر قبل اعتماده — لا تُعطى له نسبة. الآن كل متجر إلا المحظور (لا يعود)، بالاسم والحالة وحدهما.
+   */
+  async commissionVendors(q: { search?: string; limit: number }) {
+    const t = q.search;
+    const where: Prisma.VendorWhereInput = {
+      status: { not: 'banned' },
+      ...(t ? { OR: [{ nameArFold: folded(t) }, { nameEn: like(t) }, { slug: like(t) }, { owner: { email: like(t) } }] } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.vendor.findMany({ where, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: q.limit, select: { id: true, nameAr: true, status: true } }),
+      this.prisma.vendor.count({ where }),
+    ]);
+    return { items, total };
+  }
+
+  /**
    * نسبة جديدة من الآن: القاعدة السارية تُنهى بـ effectiveTo ولا تُحذف،
    * والطلبات السابقة تقرأ لقطتها — لا القاعدة (ADR-004، بوابة 10 البند 2).
    */

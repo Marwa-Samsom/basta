@@ -6,7 +6,7 @@ import { useConfirm } from '@/components/confirm';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { api } from '@/lib/api';
-import { pct, useAction, useAdminData, useAdminList } from '@/lib/admin';
+import { pct, useAction, useAdminData, useAdminList, VENDOR_STATUS, VENDOR_STATUS_EN } from '@/lib/admin';
 import { when } from '@/lib/orders';
 import { ClearableInput } from '@/components/ui';
 
@@ -23,6 +23,7 @@ interface Rule {
 interface VendorItem {
   id: string;
   nameAr: string;
+  status: string;
 }
 
 /** متاجر الاختيار في كل بحث — أكثر منها يُضيَّق بالبحث لا بالتمرير */
@@ -35,6 +36,10 @@ const PICK = 20;
  *
  * المتجر يُختار ببحث (20 أكتوبر 2026): القائمة كانت أقدم مئة متجر معتمد، فما بعدها — «غزة»
  * بين آلاف متاجر الاختبار — لا تُعطى نسبة خاصة.
+ *
+ * ومن مسار العمولة نفسه (4 نوفمبر 2026، ACFG-014): كانت القائمة من طابور المراجعة — يحتاج vendors.review
+ * فبقي مدير العمولات وحدها على «…» بلا سبب — والمعتمد وحده فيها، فالمتجر قيد المراجعة (ينشر قبل اعتماده)
+ * لا تُعطى له نسبة. الآن كل متجر إلا المحظور، بحالته إن لم يكن معتمداً، ورفض الخادم يُكتب مكان «…».
  *
  * والنسب الخاصة صفحات من الخادم ببحث باسم المتجر (3 نوفمبر 2026): كانت القواعد كلها — 534 —
  * تُجلب وتُصفّى هنا بلا «المزيد» ولا «السابق». العامة تأتي وحدها معها.
@@ -53,8 +58,10 @@ export default function AdminCommissionsPage() {
   // اسم المختار يبقى ظاهراً ولو خرج من نتائج بحث لاحق
   const [targetName, setTargetName] = useState('');
   const [vendorSearch, setVendorSearch] = useState('');
-  const vq = new URLSearchParams({ status: 'approved', limit: String(PICK), ...(vendorSearch.trim() ? { search: vendorSearch.trim() } : {}) });
-  const { data: vendors } = useAdminData<{ items: VendorItem[]; total: number }>(scope === 'vendor' ? `/admin/vendors?${vq}` : null);
+  const vq = new URLSearchParams({ limit: String(PICK), ...(vendorSearch.trim() ? { search: vendorSearch.trim() } : {}) });
+  const { data: vendors, error: vendorsError } = useAdminData<{ items: VendorItem[]; total: number }>(
+    scope === 'vendor' ? `/admin/finance/commissions/vendors?${vq}` : null,
+  );
   const [rate, setRate] = useState('');
   const formRef = useRef<HTMLElement | null>(null);
   const rateRef = useRef<HTMLInputElement | null>(null);
@@ -272,17 +279,17 @@ export default function AdminCommissionsPage() {
                 >
                   <option value="">
                     {!vendors
-                      ? '…'
+                      ? (vendorsError ?? '…')
                       : vendors.total > vendors.items.length
                         ? t(`اختر من أول ${vendors.items.length} من ${vendors.total} — أو ضيّق بالبحث`, `Pick from the first ${vendors.items.length} of ${vendors.total} — or search to narrow down`)
                         : vendors.total === 0
-                          ? t('لا متجر معتمد بهذا البحث', 'No approved shop matches this search')
+                          ? t('لا متجر بهذا البحث', 'No shop matches this search')
                           : t('اختر', 'Choose')}
                   </option>
                   {target && !(vendors?.items ?? []).some((v) => v.id === target) ? <option value={target}>{targetName || target.slice(0, 8)}</option> : null}
                   {(vendors?.items ?? []).map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.nameAr}
+                      {v.status === 'approved' ? v.nameAr : `${v.nameAr} — ${(locale === 'en' ? VENDOR_STATUS_EN : VENDOR_STATUS)[v.status] ?? v.status}`}
                     </option>
                   ))}
                 </select>
