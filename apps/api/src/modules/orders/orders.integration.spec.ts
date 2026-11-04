@@ -1405,7 +1405,9 @@ describe('تنبيهات الإدارة الدورية — مرة لكل حال�
     expect(told).toHaveLength(1);
     expect(told[0]!.payloadJson).toMatchObject({ hours: '8', link: '/admin/orders?due=acceptance' });
     expect(await about('admin_acceptance_due', b.subOrderNumber)).toHaveLength(0);
-  });
+    // الدورة تمرّ على كل ما يقارب مهلته في القاعدة بدفعاتها الحقيقية: أكثر من ألف على قاعدة التطوير
+    // (4 نوفمبر 2026) — ثانيتان وحده، وأضعافها مع الحزمة كلها؛ كان يسقط بمهلة الخمس الافتراضية
+  }, 30_000);
 
   // كانت الدورة تقرأ أقدم 200 وحدها، والمنبَّه عنه يبقى بينها حتى يُحسم — فما بعدها لا يُنبَّه أبداً.
   // ظهر على قاعدة التطوير وفيها 392 طلباً تقارب مهلتها (20 أكتوبر 2026). الدفعة هنا 1 بدل 200
@@ -1426,18 +1428,29 @@ describe('تنبيهات الإدارة الدورية — مرة لكل حال�
     // a أقدم من b في الحالتين: الدورة القديمة تعيد a في كل دفعة
     await prisma.returnRequest.update({ where: { id: returns[0]! }, data: { requestedAt: new Date(Date.now() - 5 * 86_400_000) } });
     await prisma.returnRequest.update({ where: { id: returns[1]! }, data: { requestedAt: new Date(Date.now() - 4 * 86_400_000) } });
-    await alerts.stalledReturns(new Date(), 1);
-    await alerts.stalledReturns(new Date(), 1);
+    // الدفعة 1 كانت تمرّ على كل مرتجع عالق في القاعدة سطراً سطراً — ثلاثمئة على قاعدة التطوير، وأكثر
+    // من ألف طلب يقارب مهلته (4 نوفمبر 2026) — فتجاوزت الثلاثين ثانية والحزمة كلها تعمل. الدفعة جزءٌ
+    // من عشرين مما سوى طلبَي الاختبار: نحو عشرين دفعة مهما كبرت القاعدة، و 1 على قاعدة نظيفة — فتبقى
+    // أكثر من دفعة، والمنبَّه عنه قبلهما
+    const ahead = (n: number) => Math.max(1, Math.floor(n / 20));
+    const stalled = await prisma.returnRequest.count({
+      where: { status: 'requested', requestedAt: { lt: new Date(Date.now() - 3 * 86_400_000) }, id: { notIn: returns } },
+    });
+    await alerts.stalledReturns(new Date(), ahead(stalled));
+    await alerts.stalledReturns(new Date(), ahead(stalled));
     for (const s of [a, b]) expect(await about('admin_return_stalled', s.subOrderNumber), s.subOrderNumber).toHaveLength(1);
 
     const { a: c, b: d } = await placeOrder([1, 1]);
     await prisma.subOrder.update({ where: { id: c.id }, data: { placedAt: new Date(Date.now() - 41 * 3_600_000) } });
     await prisma.subOrder.update({ where: { id: d.id }, data: { placedAt: new Date(Date.now() - 39 * 3_600_000) } });
-    await alerts.acceptanceDue(new Date(), 1);
-    await alerts.acceptanceDue(new Date(), 1);
+    // ما يقارب مهلته (آخر 12 ساعة من 48) سوى c و d
+    const now = Date.now();
+    const near = await prisma.subOrder.count({
+      where: { status: 'awaiting_vendor', id: { notIn: [c.id, d.id] }, placedAt: { gte: new Date(now - 48 * 3_600_000), lt: new Date(now - 36 * 3_600_000) } },
+    });
+    await alerts.acceptanceDue(new Date(), ahead(near));
+    await alerts.acceptanceDue(new Date(), ahead(near));
     for (const s of [c, d]) expect(await about('admin_acceptance_due', s.subOrderNumber), s.subOrderNumber).toHaveLength(1);
-    // الدفعة 1 تمرّ على كل ما يقارب مهلته في قاعدة التطوير: ثلاث ثوانٍ وحده، وتتجاوز الخمس الافتراضية
-    // والحزمة كلها تعمل معه (3 نوفمبر 2026)
   }, 30_000);
 
   it('انحراف في التدقيق: يُنبَّه من يرى التقارير مرة في اليوم لكل منظر — لا من لا يراها', async () => {
