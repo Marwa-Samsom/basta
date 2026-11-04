@@ -216,9 +216,19 @@ export default function CartPage() {
               </p>
             ) : null}
             {cart.couponCode ? (
-              <p className="sp-coupon__ok">
-                <Icon name="check-circle" size={14} />
-                {t('الكوبون المطبَّق:', 'Applied coupon:')} <span className="num">{cart.couponCode}</span>
+              <p className={cart.couponProblem ? 'sp-coupon__ok sp-coupon__ok--bad' : 'sp-coupon__ok'}>
+                <Icon name={cart.couponProblem ? 'alert' : 'check-circle'} size={14} />
+                {/* استُنفد أو انتهى منذ أُضيف: يبقى بسببه حتى يُزال، والإجمالي بدونه (4 نوفمبر 2026) */}
+                {cart.couponProblem ? (
+                  <span>
+                    {t('الكوبون', 'Coupon')} <span className="num">{cart.couponCode}</span> {t('لا يُحسب:', "isn't applied:")}{' '}
+                    {cart.couponProblem}
+                  </span>
+                ) : (
+                  <>
+                    {t('الكوبون المطبَّق:', 'Applied coupon:')} <span className="num">{cart.couponCode}</span>
+                  </>
+                )}
                 {/* كان يُزال بـ«طبّق» والخانة فارغة وحدها — طريق لا يراه أحد (27 أكتوبر 2026) */}
                 <button
                   type="button"

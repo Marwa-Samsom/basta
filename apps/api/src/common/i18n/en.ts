@@ -1160,6 +1160,9 @@ export const EN_TEMPLATES: Readonly<Record<string, string>> = {
   // موانع السلة والتسعير (cart.service.ts، pricing/domain/pricing.ts) — ما يبدأ باسم البائع أو المنتج آخر الملف
   'الكوبون {0} لا ينطبق على منتجات سلّتك.':
     "Coupon {0} doesn't apply to the products in your cart.",
+  // {1} سبب رفض التسعير له («استُنفد الكوبون.») — يُترجم من الرسائل
+  'الكوبون {0} لم يعد صالحاً — {1} أزله من سلّتك لتكمل الطلب.':
+    'Coupon {0} is no longer valid — {1} Remove it from your cart to complete the order.',
   // وثيقة مرفوضة في نواقص طلب المتجر — {0} سبب الرفض كما كتبته الإدارة
   'السجل التجاري: {0} — ارفعها من جديد.': 'Commercial register: {0} — upload it again.',
   'الهوية الشخصية: {0} — ارفعها من جديد.': 'National ID: {0} — upload it again.',
