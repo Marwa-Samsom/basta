@@ -48,6 +48,8 @@ export interface CartView {
   readonly shippingKnown: boolean;
   readonly taxInclusive: boolean;
   readonly couponCode: string | null;
+  /** لماذا لا يُحسب كوبون السلة (استُنفد، انتهى…) — يبقى فيها مانعاً حتى يُزال، و null إن صلح أو لا كوبون */
+  readonly couponProblem: string | null;
   readonly blockers: readonly string[];
 }
 
@@ -217,6 +219,7 @@ export class CartService {
         shippingKnown: false,
         taxInclusive: true,
         couponCode: cart.couponCode,
+        couponProblem: null,
         blockers: [],
       };
     }
@@ -229,6 +232,12 @@ export class CartService {
      */
     let gone: string[] = [];
     let quote: Quote | null = null;
+    /**
+     * كوبون صار لا يصلح منذ أُضيف (استُنفد، انتهى، استعمله صاحبه): تُسعَّر السلة بدونه ويبقى فيها
+     * بسببه مانعاً حتى يُزال. كان يُمحى منها بصمت، فيرى المشتري الإجمالي كاملاً بلا كلمة — وأيقونة
+     * السلة في الرأس تقرؤها قبل صفحتها، فلا يصل سببٌ يُقال مرة (بطلب صاحبة المشروع، 4 نوفمبر 2026)
+     */
+    let couponProblem: string | null = null;
     for (;;) {
       const rest = items.filter((i) => !gone.includes(i.variantId));
       if (rest.length === 0) break;
@@ -237,15 +246,15 @@ export class CartService {
           items: rest.map((i) => ({ variantId: i.variantId, qty: i.qty })),
           currency: cart.currency,
           address,
-          couponCode: cart.couponCode,
+          couponCode: couponProblem === null ? cart.couponCode : null,
           userId: cart.userId,
         });
         break;
       } catch (err) {
-        // كوبون انتهى منذ أُضيف: يسقط ويُقال السبب، ولا تتعطّل السلة كلها
-        if (cart.couponCode && err instanceof InvalidInputError) {
-          await this.prisma.cart.update({ where: { id: cart.id }, data: { couponCode: null } });
-          return this.view(token, address);
+        // يُعاد التسعير بلا الكوبون: إن سقط ثانيةً فالعلّة في غيره، وتُرمى كما هي
+        if (cart.couponCode && couponProblem === null && err instanceof InvalidInputError) {
+          couponProblem = err.message;
+          continue;
         }
         const missing = err instanceof NotFoundError ? err.details?.['variantIds'] : undefined;
         if (!Array.isArray(missing) || missing.length === 0) throw err;
@@ -255,6 +264,7 @@ export class CartService {
 
     const atAdd = new Map(items.map((i) => [i.variantId, i.priceMinorUnitsAtAdd]));
     const blockers = [...(quote?.blockers ?? [])];
+    if (couponProblem !== null) blockers.push(`الكوبون ${cart.couponCode} لم يعد صالحاً — ${couponProblem} أزله من سلّتك لتكمل الطلب.`);
     const zero = view(0n, cart.currency);
 
     /**
@@ -361,6 +371,7 @@ export class CartService {
       shippingKnown: priced?.shippingKnown ?? false,
       taxInclusive: priced?.taxInclusive ?? true,
       couponCode: priced?.coupon?.code ?? cart.couponCode,
+      couponProblem,
       blockers,
     };
   }

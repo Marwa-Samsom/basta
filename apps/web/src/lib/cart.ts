@@ -60,6 +60,8 @@ export interface CartView {
   shippingKnown: boolean;
   taxInclusive: boolean;
   couponCode: string | null;
+  /** سبب أن كوبون السلة لا يُحسب (استُنفد، انتهى…) — يبقى فيها مانعاً حتى يُزال */
+  couponProblem?: string | null;
   blockers: string[];
 }
 

@@ -823,10 +823,10 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
     expect(r.statusCode, r.body).toBe(200);
     return cart;
   }
-  /** `null` = ضيف بلا دخول */
-  const checkoutAs = async (cart: string, paymentToken: string, token: string | null = buyerToken) =>
+  /** `null` = ضيف بلا دخول. `shown` إجمالي رآه المشتري قبلُ — وإلا يُعايَن الآن */
+  const checkoutAs = async (cart: string, paymentToken: string, token: string | null = buyerToken, shown?: Awaited<ReturnType<typeof seen>>) =>
     call('POST', '/checkout', {
-      body: { address: ADDRESS, paymentToken, ...(await seen(cart)) },
+      body: { address: ADDRESS, paymentToken, ...(shown ?? (await seen(cart))) },
       headers: { 'x-cart-token': cart, 'idempotency-key': randomUUID(), ...(token ? { authorization: `Bearer ${token}` } : {}) },
     });
   async function member(tag: string): Promise<string> {
@@ -862,13 +862,20 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
     const variantId = await stocked();
     const c = await coupon(`TOTAL2-${SUFFIX}`.toUpperCase(), { total: 2 });
     const carts = await Promise.all(Array.from({ length: 5 }, () => cartWithCoupon(variantId, c.code)));
-    const results = await Promise.all(carts.map((cart) => checkoutAs(cart, 'tok_success')));
+    // الخمسة يرون الخصم تحت «ادفع» قبل أن يدفع أحد، ثم يدفعون معاً. كانت المعاينة داخل كل دفع: تحت
+    // حمل الحزمة كلها تأخّرت معاينة اثنين حتى التزم الأوّلان، فرأيا سلّتهما بلا الكوبون المستنفد ودفعا
+    // سعرها الكامل كما رأياه — أربعة «مدفوع» والحدّ سليم بعدّاده وسجلّيه (4 نوفمبر 2026)
+    const shown = await Promise.all(carts.map((cart) => seen(cart)));
+    expect(new Set(shown.map((s) => s.expectedTotal)).size, JSON.stringify(shown)).toBe(1);
+    const results = await Promise.all(carts.map((cart, i) => checkoutAs(cart, 'tok_success', buyerToken, shown[i])));
 
     const ok = results.filter((r) => r.statusCode === 200 && r.json().outcome === 'paid');
     // الرفض في موضعين كلاهما صحيح: التسعير (400) إن التزم اثنان قبل أن يُسعَّر هذا،
     // أو الحجز تحت القفل (409) إن تزامنوا فعلاً — التوقيت يختار، والحصيلة واحدة
     const rejected = results.filter((r) => r.statusCode === 400 || r.statusCode === 409);
     expect(ok, results.map((r) => `${r.statusCode} ${r.body}`).join('\n')).toHaveLength(2);
+    // ولا مدفوع بلا الكوبون: كل من مرّ مرّ بخصمه
+    for (const r of ok) expect(r.json().coupon?.code, r.body).toBe(c.code);
     expect(rejected, results.map((r) => `${r.statusCode} ${r.body}`).join('\n')).toHaveLength(3);
     for (const r of rejected) expect(r.json().message).toMatch(/استُنفد/);
     expect((await prisma.coupon.findUniqueOrThrow({ where: { id: c.id } })).usedCount).toBe(2);
@@ -894,12 +901,58 @@ describe('حدود الكوبون — تُحجز مع الطلب تحت قفل،
     const c = await coupon(`ONCE-M-${SUFFIX}`.toUpperCase(), { perUser: 1 });
     const token = await member('once');
     const carts = await Promise.all([cartWithCoupon(variantId, c.code, token), cartWithCoupon(variantId, c.code, token)]);
-    const results = await Promise.all(carts.map((cart) => checkoutAs(cart, 'tok_success', token)));
+    // المعاينتان قبل الدفعين، كما في الحدّ الكلي: معاينة بعد التزام الأول ترى السلة بلا الكوبون فتدفع كاملاً
+    const shown = await Promise.all(carts.map((cart) => seen(cart)));
+    const results = await Promise.all(carts.map((cart, i) => checkoutAs(cart, 'tok_success', token, shown[i])));
     expect(results.filter((r) => r.statusCode === 200).length, results.map((r) => r.body).join('\n')).toBe(1);
     // التسعير (400) أو الحجز تحت القفل (409) — بحسب أيّهما بلغه الطلب الثاني أولاً
     const rejected = results.filter((r) => r.statusCode === 400 || r.statusCode === 409);
     expect(rejected, results.map((r) => `${r.statusCode} ${r.body}`).join('\n')).toHaveLength(1);
     expect(rejected[0]!.json().message).toMatch(/استعملت هذا الكوبون/);
+    expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(1);
+  });
+
+  // كان يُمحى من السلة بصمت عند أول قراءة لها، فيرى المشتري الإجمالي كاملاً بلا كلمة (4 نوفمبر 2026)
+  it('كوبون استُنفد بعد إضافته: يبقى في السلة بسببه مانعاً والإجمالي بدونه، والدفع يُرفض حتى يُزال', async () => {
+    if (!dbUp) return;
+    const variantId = await stocked();
+    const c = await coupon(`GONE-${SUFFIX}`.toUpperCase(), { total: 1 });
+    const mine = await cartWithCoupon(variantId, c.code);
+    const discounted = await seen(mine);
+    // مشترٍ آخر يستعمل آخر مرّة
+    const other = await cartWithCoupon(variantId, c.code);
+    expect((await checkoutAs(other, 'tok_success')).statusCode).toBe(200);
+
+    const blocker = `الكوبون ${c.code} لم يعد صالحاً — استُنفد الكوبون. أزله من سلّتك لتكمل الطلب.`;
+    const quote = { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city };
+    // أيقونة السلة في الرأس تقرؤها أولاً: القراءة لا تمحوه، فيبقى سببه لصفحة السلة وللدفع
+    const shown = await call('POST', '/checkout/quote', { body: quote, headers: { 'x-cart-token': mine } });
+    for (const view of [await call('GET', '/cart', { headers: { 'x-cart-token': mine } }), shown]) {
+      expect(view.statusCode, view.body).toBe(200);
+      expect(view.json()).toMatchObject({ couponCode: c.code, couponProblem: 'استُنفد الكوبون.', blockers: [blocker] });
+      expect(view.json().totals.discount.minorUnits).toBe('0');
+    }
+    expect(BigInt(shown.json().totals.total.minorUnits)).toBeGreaterThan(BigInt(discounted.expectedTotal));
+    expect((await prisma.cart.findUniqueOrThrow({ where: { sessionToken: mine } })).couponCode).toBe(c.code);
+    const en = await call('GET', '/cart', { headers: { 'x-cart-token': mine, 'accept-language': 'en' } });
+    expect(en.json()).toMatchObject({
+      couponProblem: 'The coupon has run out.',
+      blockers: [`Coupon ${c.code} is no longer valid — The coupon has run out. Remove it from your cart to complete the order.`],
+    });
+
+    // الدفع بالكوبون في السلة يُرفض بسببه، بلا طلب ولا حجز — ولو أرسل الإجمالي بلا خصم كما عُرض
+    const before = await stockOf(variantId);
+    const refused = await checkoutAs(mine, 'tok_success');
+    expect(refused.statusCode, refused.body).toBe(400);
+    expect(refused.json().message).toMatch(/استُنفد/);
+    expect(await stockOf(variantId)).toEqual(before);
+
+    // أزاله: لا مانع، ويدفع ما يُعرض عليه بلا خصم
+    const removed = await call('PUT', '/cart/coupon', { body: { code: '' }, headers: { 'x-cart-token': mine } });
+    expect(removed.json()).toMatchObject({ couponCode: null, couponProblem: null, blockers: [] });
+    const paid = await checkoutAs(mine, 'tok_success');
+    expect(paid.statusCode, paid.body).toBe(200);
+    expect(paid.json().coupon).toBeUndefined();
     expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(1);
   });
 
