@@ -177,9 +177,15 @@ describe('الإشعار بلغة حساب صاحبه', () => {
     const ar = defaultTemplate('order_awaiting_transfer', 'email')!;
     expect(notifications.preview('order_awaiting_transfer', ar.subject, ar.body).body).toContain('16 أكتوبر 2026، 3:00 م');
 
+    // «أرسل تجربة لي» من النصّ الإنجليزي: بالإنجليزية ولو كانت لغة حساب المدير العربية
+    const trial = await notifications.sendTest(users.ar, 'order_placed', 'in_app', 'en');
+    expect(plain(trial.body)).toBe('Your order BST-260921-A1B2C3 is confirmed — JOD 125.500.');
+    expect((await notifications.sendTest(users.ar, 'order_placed', 'in_app')).body).toContain('مؤكَّد');
+
     const m = await notifications.matrix();
     const placed = m.events.find((e) => e.code === 'order_placed')!;
     expect(placed.templatesEn.map((t) => t.channel).sort()).toEqual(placed.templates.map((t) => t.channel).sort());
     expect(placed.templatesEn.find((t) => t.channel === 'in_app')?.body).toBe('Your order {{order_number}} is confirmed — {{amount}}.');
+    expect(plain(placed.sampleEn['amount'])).toBe('JOD 125.500');
   });
 });

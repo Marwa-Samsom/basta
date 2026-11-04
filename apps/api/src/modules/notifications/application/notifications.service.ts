@@ -280,7 +280,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     }
   }
 
-  private async sendOne(id: string): Promise<'sent' | 'failed' | 'skipped' | null> {
+  private async sendOne(id: string, forced?: TemplateLocale): Promise<'sent' | 'failed' | 'skipped' | null> {
     // الحجز شرطيّ: نسختان من المرسِل لا ترسلان الإشعار نفسه مرتين. ويُحجز بمهلة: إن سقط
     // المرسِل قبل الختام التقطه غيره بعدها، ولا يلتقطه أحد قبلها (SYS-034)
     const now = new Date();
@@ -308,7 +308,8 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     try {
       // بلغة حساب صاحبه: الإنجليزية لمن اختارها، ونصّها ومتغيّراتها بها — وما غاب نصّه بها يصل بالعربية
       const user = await this.prisma.user.findUnique({ where: { id: n.userId }, select: { email: true, phone: true, locale: true } });
-      const wanted = localeOf(user?.locale);
+      // «أرسل تجربة لي» من النصّ الإنجليزي تصل بالإنجليزية أيّاً كانت لغة حساب المدير
+      const wanted = forced ?? localeOf(user?.locale);
       // المقفول يُرسل بنصّ الكود وحده — صفّه في القاعدة للعرض لا للإرسال
       const tpl = ev?.locked
         ? (() => {
@@ -462,6 +463,8 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
       channels: CHANNELS.map((c) => ({ code: c, label: CHANNEL_LABELS[c] })),
       events: EVENTS.map((e) => ({
         ...e,
+        // العيّنة كما تصل من لغة حسابه الإنجليزية — بها يعاين المحرّر النصّ الإنجليزي
+        sampleEn: englishVars(e.sample),
         // العربية أصل القناة وتشغيلها، والإنجليزية نصّها لمن لغة حسابه الإنجليزية
         templates: rows.filter((r) => r.code === e.code && r.locale === 'ar').map((r) => ({ ...textOf(r), isEnabled: r.isEnabled })),
         templatesEn: rows.filter((r) => r.code === e.code && r.locale === 'en').map(textOf),
@@ -531,13 +534,13 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** «أرسل تجربة» — للمدير نفسه ببيانات العيّنة، ويُرسل فوراً */
-  async sendTest(adminId: string, code: string, channel: Channel) {
+  async sendTest(adminId: string, code: string, channel: Channel, locale?: TemplateLocale) {
     const ev = eventOf(code);
     if (!ev) throw new NotFoundError('حدث غير معروف.', { code });
     const n = await this.prisma.notification.create({
       data: { userId: adminId, channel, templateCode: code, payloadJson: { ...ev.sample } },
     });
-    await this.sendOne(n.id);
+    await this.sendOne(n.id, locale);
     return this.prisma.notification.findUniqueOrThrow({
       where: { id: n.id },
       select: { id: true, status: true, error: true, recipient: true, subject: true, body: true, deliveryRef: true, sentAt: true },

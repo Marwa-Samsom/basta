@@ -43,6 +43,13 @@ export class PreviewDto {
   locale?: 'ar' | 'en';
 }
 
+export class TestSendDto {
+  /** لغة النصّ المجرَّب — العربية أصل */
+  @IsOptional()
+  @IsIn(['ar', 'en'], { message: 'اللغة عربية أو إنجليزية.' })
+  locale?: 'ar' | 'en';
+}
+
 export class ReviewDto {
   @IsString()
   @Length(2, 80)
@@ -180,8 +187,8 @@ export class AdminNotificationsController {
 
   @Post('templates/:code/:channel/test')
   @HttpCode(HttpStatus.OK)
-  test(@CurrentActor() a: Actor, @Param('code') code: string, @Param('channel') channel: string) {
-    return this.notifications.sendTest(a.userId, code, channel as Channel);
+  test(@CurrentActor() a: Actor, @Param('code') code: string, @Param('channel') channel: string, @Body() dto: TestSendDto) {
+    return this.notifications.sendTest(a.userId, code, channel as Channel, dto.locale);
   }
 
   @Get('log')
