@@ -317,6 +317,8 @@
 }
 .sp-coupon__clear:hover { background: var(--surface-sunken); color: var(--text-strong); }
 .sp-coupon__ok { display: flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--success-text); }
+/* كوبون في السلة لا يُحسب (استُنفد، انتهى) — سببه بلون التحذير، و«أزل» بجانبه */
+.sp-coupon__ok--bad { color: var(--warning-text); }
 .sp-coupon__remove { margin-inline-start: auto; }
 
 /* هيكل التحميل */
