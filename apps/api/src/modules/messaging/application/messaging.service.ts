@@ -5,7 +5,7 @@ import { fold } from '../../../common/arabic-fold';
 import { folded, like, pageArgs } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor, VendorScope } from '../../../common/security/actor';
-import { NotificationsService } from '../../notifications/public';
+import { NotificationsService, storeNameVars } from '../../notifications/public';
 import {
   BODY_MAX,
   BODY_MIN,
@@ -475,13 +475,13 @@ export class MessagingService {
           tx,
         );
       } else {
-        const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: m.notify.vendorId }, select: { nameAr: true } });
+        const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: m.notify.vendorId }, select: { nameAr: true, nameEn: true } });
         await this.notifications.enqueue(
           {
             code: 'message_to_customer',
             userId: m.notify.customerId,
             vars: {
-              store_name: vendor.nameAr,
+              ...storeNameVars(vendor),
               context: m.notify.context,
               preview,
               link: `/account/messages?c=${m.conversationId}`,

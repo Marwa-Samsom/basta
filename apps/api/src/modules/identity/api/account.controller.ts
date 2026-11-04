@@ -22,7 +22,7 @@ import { AuthLimited } from '../../../common/security/throttle';
 import { AccountService } from '../application/account.service';
 import { RecoveryService } from '../application/recovery.service';
 import { AuthController } from './auth.controller';
-import { ChangePasswordDto, CurrencyPreferenceDto, UpdateProfileDto, VerifyCodeDto } from './dto/account.dto';
+import { ChangePasswordDto, CurrencyPreferenceDto, LocalePreferenceDto, UpdateProfileDto, VerifyCodeDto } from './dto/account.dto';
 
 /** معرّف الجلسة الحالية — يضعه حارس المصادقة من الرمز الموقَّع */
 const CurrentSessionId = createParamDecorator(
@@ -60,6 +60,12 @@ export class AccountController {
   @ApiOperation({ summary: 'تعديل الاسم والجوال' })
   update(@CurrentActor() actor: Actor, @Body() dto: UpdateProfileDto, @Req() req: RawReq) {
     return this.account.updateProfile(actor.userId, dto, AuthController.meta(req));
+  }
+
+  @Put('locale')
+  @ApiOperation({ summary: 'لغة الحساب — بها تصله إشعاراته وبريده' })
+  locale(@CurrentActor() actor: Actor, @Body() dto: LocalePreferenceDto) {
+    return this.account.setLocale(actor.userId, dto.locale);
   }
 
   @Put('currency')

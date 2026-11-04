@@ -1,6 +1,6 @@
 import { LatinDigits } from '../../../../common/digits';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password';
 import { NormalizeEmail } from '../../../../common/email';
 
@@ -30,6 +30,13 @@ export class CurrencyPreferenceDto {
   @IsString()
   @Matches(/^[A-Za-z]{3}$/, { message: 'عملة غير مدعومة.' })
   currency!: string;
+}
+
+/** لغة الحساب — بها تصله إشعاراته وبريده، ويحفظها زرّ اللغة لمن كان داخلاً (4 نوفمبر 2026) */
+export class LocalePreferenceDto {
+  @ApiProperty({ example: 'en', enum: ['ar', 'en'] })
+  @IsIn(['ar', 'en'], { message: 'اللغة عربية أو إنجليزية.' })
+  locale!: 'ar' | 'en';
 }
 
 export class ChangePasswordDto {

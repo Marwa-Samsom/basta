@@ -16,6 +16,9 @@ const MINOR_UNIT_DIGITS: Readonly<Record<string, number>> = Object.freeze({
   JPY: 0, KRW: 0,
 });
 
+/** العملات المعروفة — ما تحوّل الإشعارات مبالغه إلى الإنجليزية (notifications/domain/english-vars.ts) */
+export const CURRENCY_CODES: readonly string[] = Object.keys(MINOR_UNIT_DIGITS);
+
 export type CurrencyCode = string;
 
 /**

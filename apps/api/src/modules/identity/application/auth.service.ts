@@ -11,6 +11,7 @@ import { adminNeedsTotpSetup, generateTotpSecret, totpUri, verifyTotpStep } from
 import { TokenService, type AccessClaims, type TokenPair } from './token.service';
 import { normalizeEmail } from '../../../common/email';
 import { loadEnv } from '../../../common/config/env';
+import { currentLocale } from '../../../common/i18n/request-locale';
 
 /** رمز التطوير الثابت (DEV_FIXED_CODE) يُقبل بدل رمز التطبيق — لا أثر له خارج NODE_ENV=development */
 const isDevFixedCode = (submitted: string): boolean => {
@@ -143,6 +144,8 @@ export class AuthService {
         phone: input.phone ?? null,
         passwordHash,
         fullName: input.fullName,
+        // بلغة صفحة التسجيل تصله إشعاراته وبريده — حتى يغيّرها زرّ اللغة (4 نوفمبر 2026)
+        locale: currentLocale(),
         roles: { create: { role: 'customer' } },
       },
     });
@@ -205,7 +208,8 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+      // لغة صفحة الدخول لغة إشعاراته من الآن — يدخل بالإنجليزية فيصله بريده بها
+      data: { lastLoginAt: new Date(), locale: currentLocale() },
     });
     await this.audit.record({
       actorUserId: user.id,

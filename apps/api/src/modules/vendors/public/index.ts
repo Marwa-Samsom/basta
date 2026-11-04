@@ -10,4 +10,4 @@ export {
 export { VendorEvents } from '../application/vendor-events';
 
 /** دورة حياة البائع: تقرؤها وحدات أخرى لتقرّر هل يبيع هذا المتجر أصلاً. */
-export { canSell, STATUS_LABELS, type VendorLifecycle } from '../domain/onboarding';
+export { canSell, DOCUMENT_LABELS, STATUS_LABELS, type VendorLifecycle } from '../domain/onboarding';

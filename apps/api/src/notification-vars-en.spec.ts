@@ -1,0 +1,57 @@
+/**
+ * كل نصّ ثابت تضعه الوحدات في متغيّر إشعار له ترجمة (4 نوفمبر 2026): من لغة حسابه الإنجليزية
+ * تصله الحالة والسبب والقرار بالإنجليزية (notifications/domain/english-vars.ts). نصّ يُضاف بلا
+ * ترجمة يُسقط هذا، كما يُسقط en-coverage رسالة خادم بلا ترجمة. هنا لا داخل وحدة: يقرأ خرائط
+ * وحدات عدّة من واجهاتها العامة، وحدودها (ADR-002) لا تسمح لوحدة بداخل أخرى.
+ */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { toEnglish } from './common/i18n/translate';
+import { RETURN_REASON_LABELS } from './common/return-lines';
+import { DISPUTE_REASON_AR, DRIFT_LABELS } from './modules/admin/public';
+import { OUTCOME_AR, OUTCOME_CUSTOMER_TRANSFER_AR, REASON_AR } from './modules/aftersales/public';
+import { STATUS_LABELS } from './modules/orders/public/status-labels';
+import { DOCUMENT_LABELS } from './modules/vendors/public';
+
+describe('متغيّرات الإشعار بالإنجليزية', () => {
+  it('كل نصّ ثابت يضعه الكود في متغيّر إشعار له ترجمة', () => {
+    const fixed = [
+      ...Object.values(STATUS_LABELS),
+      ...Object.values(RETURN_REASON_LABELS),
+      ...Object.values(REASON_AR),
+      ...Object.values(DISPUTE_REASON_AR),
+      ...Object.values(DRIFT_LABELS),
+      ...Object.values(DOCUMENT_LABELS),
+      ...Object.values(OUTCOME_AR.customer),
+      ...Object.values(OUTCOME_AR.vendor),
+      OUTCOME_CUSTOMER_TRANSFER_AR,
+      'عميلنا', 'المشتري', 'المتجر', 'رقم التتبّع', 'مرجع التوصيل', 'لم يذكر المتجر سبباً', 'غير محدّد',
+      'أرسل طلب انضمامه', 'أعاد إرسال طلبه بعد الرفض', 'استفسار عام',
+    ];
+    const missing = fixed.filter((ar) => toEnglish(ar) === ar);
+    expect(missing).toEqual([]);
+  });
+
+
+  /**
+   * اسم المتجر في الإشعار بالاسمين (storeNameVars): «store_name: vendor.nameAr» وحده كان يُوصل المشتري
+   * الإنجليزي «متجر الورد: Shipped…». موضع جديد يكتبه كذلك يُسقط هذا باسم ملفه وسطره.
+   */
+  it('كل اسم متجر في متغيّر إشعار يمرّ بـ storeNameVars', () => {
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) return files(p);
+        return /\.ts$/.test(e.name) && !/\.spec\.ts$/.test(e.name) ? [p] : [];
+      });
+    const bare = files(join(__dirname, 'modules')).flatMap((f) =>
+      readFileSync(f, 'utf8')
+        .split('\n')
+        .map((line, i) => ({ line, at: `${relative(__dirname, f)}:${i + 1}` }))
+        .filter(({ line }) => /store_name:\s*[\w.?]*\.nameAr\b/.test(line))
+        .map(({ at }) => at),
+    );
+    expect(bare).toEqual([]);
+  });
+});

@@ -103,3 +103,55 @@ test('المدير: سحب نزاع مصعَّد بعنوانه في صندوق�
   await page.getByRole('button', { name: /^النزاعات/ }).click();
   await expect(page.locator('.vx-note', { hasText: body }).locator('.vx-note__title')).toContainText('سحب المشتري نزاعاً مصعَّداً');
 });
+
+/**
+ * من لغة حسابه الإنجليزية يصله الإشعار بالإنجليزية (4 نوفمبر 2026)، والمدير يحرّر نصّه من الصفحة
+ * نفسها: «English» تعرض النصوص الإنجليزية من اليسار، ومعاينتها بالعيّنة كما تصل («JOD 125.500»)،
+ * والحفظ يكتب الإنجليزي وحده ويترك العربي كما هو.
+ */
+test('المدير: نصّ الإشعار الإنجليزي يُعرض ويُعاين ويُحفظ دون أن يمسّ العربي', async ({ page }) => {
+  const t = tag();
+  const admin = await makeAdmin(t, ['content.manage']);
+  const key = (locale: string) => ({ code_channel_locale: { code: 'order_placed', channel: 'in_app', locale } });
+  // قاعدة التطوير مشتركة: الصفّان يعودان كما كانا تماماً
+  const before = await Promise.all(['ar', 'en'].map((l) => prisma.notificationTemplate.findUniqueOrThrow({ where: key(l) })));
+  try {
+    await signIn(page, admin.email, '/admin/notifications/templates', admin.totp);
+    const cell = page.getByRole('button', { name: /^تأكيد الطلب للمشتري · داخل الموقع:/ });
+    // داخل مجموعته: زرّ لغة الموقع في الرأس اسمه «English» أيضاً، وهو يقلب اللوحة كلها
+    const textLang = page.getByRole('group', { name: 'لغة نصّ الإشعار' });
+    await textLang.getByRole('button', { name: 'English', exact: true }).click();
+    await expect(textLang.getByRole('button', { name: 'English', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    // اللوحة نفسها باقية بالعربية
+    await expect(page.getByRole('heading', { name: 'قوالب الإشعارات', level: 1 })).toBeVisible();
+    await cell.click();
+
+    const text = page.getByRole('textbox', { name: 'النص' });
+    await expect(text).toHaveValue(before[1]!.body);
+    await expect(text).toHaveAttribute('dir', 'ltr');
+    const preview = page.locator('.ac2-preview');
+    await expect(preview).toHaveAttribute('dir', 'ltr');
+    await expect(preview).toContainText('Your order BST-260921-A1B2C3 is confirmed');
+    // المبلغ كما يصل بالإنجليزية لا «125.500 د.أ»
+    await expect(preview.locator('.ac2-token').nth(1)).toHaveText(/^JOD\s125\.500$/);
+
+    await text.fill(`Order {{order_number}} confirmed: {{amount}}. ${t}`);
+    await page.getByRole('button', { name: 'احفظ القالب' }).click();
+    await expect(page.getByText('حُفظ القالب — يحتاج مراجعة لغوية قبل اعتماده.')).toBeVisible();
+    await expect.poll(async () => (await prisma.notificationTemplate.findUniqueOrThrow({ where: key('en') })).body).toBe(`Order {{order_number}} confirmed: {{amount}}. ${t}`);
+    expect((await prisma.notificationTemplate.findUniqueOrThrow({ where: key('ar') })).body).toBe(before[0]!.body);
+
+    // العربية بنصّها كما كان، ومن اليمين
+    await textLang.getByRole('button', { name: 'العربية', exact: true }).click();
+    await cell.click();
+    await expect(text).toHaveValue(before[0]!.body);
+    await expect(text).toHaveAttribute('dir', 'rtl');
+  } finally {
+    for (const r of before) {
+      await prisma.notificationTemplate.update({
+        where: key(r.locale),
+        data: { subject: r.subject, body: r.body, isEnabled: r.isEnabled, reviewedAt: r.reviewedAt, reviewedBy: r.reviewedBy, updatedAt: r.updatedAt, updatedBy: r.updatedBy },
+      });
+    }
+  }
+});

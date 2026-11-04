@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { prisma, signInBuyer } from './fixtures';
 
 /**
  * زرّ اللغة وخانة التاريخ — 2 نوفمبر 2026. الخانة الأصلية يرسمها المتصفّح بلغته هو
@@ -92,4 +93,20 @@ test('زرّ اللغة يقلب المتجر ويبقى بعد إعادة ال�
   await expect(html).toHaveAttribute('lang', 'ar');
   await expect(html).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('link', { name: 'بِع على بسطة' })).toBeVisible();
+});
+
+/**
+ * الزرّ يحفظ اللغة في حساب من كان داخلاً (4 نوفمبر 2026): بها تصله إشعاراته وبريده. دخول واحد
+ * حقيقي — لا يحفظها رمز مزيّف.
+ */
+test('الداخل: زرّ اللغة يحفظها في حسابه، والعودة للعربية تحفظها', async ({ page }) => {
+  const { userId } = await signInBuyer(page);
+  const localeOf = async () => (await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { locale: true } })).locale;
+  expect(await localeOf()).toBe('ar');
+  await page.getByRole('button', { name: 'English' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  expect(await localeOf()).toBe('en');
+  await page.getByRole('button', { name: 'العربية' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
+  expect(await localeOf()).toBe('ar');
 });

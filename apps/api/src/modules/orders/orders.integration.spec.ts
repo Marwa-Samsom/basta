@@ -179,6 +179,7 @@ beforeAll(async () => {
         ownerUserId: u.id,
         slug: `v-${tag}-${SUFFIX}`,
         nameAr: `متجر ${tag}`,
+        nameEn: `Store ${tag}`,
         status: 'approved',
         approvedAt: new Date(),
         settlementCurrency: currency,
@@ -829,7 +830,8 @@ describe('ما بعد البيع — التتبّع والنزاع والمرا�
       where: { userId: buyer.userId, templateCode: 'order_shipped', channel: 'in_app', payloadJson: { path: ['tracking_number'], equals: trk } },
     });
     expect(notices).toHaveLength(1);
-    expect(notices[0]!.payloadJson).toMatchObject({ tracking_label: 'رقم التتبّع', store_name: expect.any(String) });
+    // واسم المتجر الإنجليزي معه: به يصل من لغة حسابه الإنجليزية (4 نوفمبر 2026)
+    expect(notices[0]!.payloadJson).toMatchObject({ tracking_label: 'رقم التتبّع', store_name: expect.stringMatching(/^متجر /), store_name_en: expect.stringMatching(/^Store /) });
   });
 
   it('رقم التتبّع لشحنته وحدها: لا يُنسخ لشركة الشحن، والتوصيل الذاتي لا يُظهر شحنة غيره', async () => {

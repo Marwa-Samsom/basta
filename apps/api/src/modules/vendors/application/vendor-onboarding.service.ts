@@ -10,7 +10,7 @@ import {
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor, VendorScope } from '../../../common/security/actor';
 import { AuditService, AuthService, TokenService, type TokenPair } from '../../identity/public';
-import { NotificationsService } from '../../notifications/public';
+import { NotificationsService, storeNameVars } from '../../notifications/public';
 import { VendorDocumentStorage } from '../infrastructure/document-storage';
 import {
   assertCurrencyChangeable,
@@ -604,7 +604,7 @@ export class VendorOnboardingService {
       code: 'admin_vendor_submitted',
       permission: 'vendors.review',
       vars: {
-        store_name: vendor.nameAr,
+        ...storeNameVars(vendor),
         kind: status === 'rejected' ? 'أعاد إرسال طلبه بعد الرفض' : 'أرسل طلب انضمامه',
         link: `/admin/vendors/${scope.vendorId}`,
       },

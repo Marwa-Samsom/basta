@@ -22,6 +22,11 @@ export class TemplateDto {
   @IsOptional()
   @IsBoolean()
   isEnabled?: boolean;
+
+  /** لغة النصّ — العربية أصل، والإنجليزية لمن لغة حسابه الإنجليزية */
+  @IsOptional()
+  @IsIn(['ar', 'en'], { message: 'اللغة عربية أو إنجليزية.' })
+  locale?: 'ar' | 'en';
 }
 
 export class PreviewDto {
@@ -31,12 +36,29 @@ export class PreviewDto {
 
   @IsString()
   body!: string;
+
+  /** لغة النصّ — العربية أصل، والإنجليزية لمن لغة حسابه الإنجليزية */
+  @IsOptional()
+  @IsIn(['ar', 'en'], { message: 'اللغة عربية أو إنجليزية.' })
+  locale?: 'ar' | 'en';
+}
+
+export class TestSendDto {
+  /** لغة النصّ المجرَّب — العربية أصل */
+  @IsOptional()
+  @IsIn(['ar', 'en'], { message: 'اللغة عربية أو إنجليزية.' })
+  locale?: 'ar' | 'en';
 }
 
 export class ReviewDto {
   @IsString()
   @Length(2, 80)
   reviewer!: string;
+
+  /** لغة النصّ — العربية أصل، والإنجليزية لمن لغة حسابه الإنجليزية */
+  @IsOptional()
+  @IsIn(['ar', 'en'], { message: 'اللغة عربية أو إنجليزية.' })
+  locale?: 'ar' | 'en';
 }
 
 /** تصفّح الصندوق — كل الحقول اختيارية، وبلاها يعود الرد كما كان (آخر 30) */
@@ -148,25 +170,25 @@ export class AdminNotificationsController {
       subject: dto.subject ?? null,
       body: dto.body,
       ...(dto.isEnabled !== undefined ? { isEnabled: dto.isEnabled } : {}),
-    });
+    }, dto.locale);
   }
 
   @Post('templates/:code/preview')
   @HttpCode(HttpStatus.OK)
   preview(@Param('code') code: string, @Body() dto: PreviewDto) {
-    return this.notifications.preview(code, dto.subject ?? null, dto.body);
+    return this.notifications.preview(code, dto.subject ?? null, dto.body, dto.locale);
   }
 
   @Post('templates/:code/:channel/review')
   @HttpCode(HttpStatus.NO_CONTENT)
   review(@CurrentActor() a: Actor, @Param('code') code: string, @Param('channel') channel: string, @Body() dto: ReviewDto) {
-    return this.notifications.markReviewed(a.userId, code, channel as Channel, dto.reviewer);
+    return this.notifications.markReviewed(a.userId, code, channel as Channel, dto.reviewer, dto.locale);
   }
 
   @Post('templates/:code/:channel/test')
   @HttpCode(HttpStatus.OK)
-  test(@CurrentActor() a: Actor, @Param('code') code: string, @Param('channel') channel: string) {
-    return this.notifications.sendTest(a.userId, code, channel as Channel);
+  test(@CurrentActor() a: Actor, @Param('code') code: string, @Param('channel') channel: string, @Body() dto: TestSendDto) {
+    return this.notifications.sendTest(a.userId, code, channel as Channel, dto.locale);
   }
 
   @Get('log')

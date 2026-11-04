@@ -14,9 +14,13 @@ import {
   prefCategoryOf,
   redactVars,
   render,
+  seedsOf,
+  TEMPLATE_LOCALES,
   usedVariables,
   type Channel,
+  type TemplateLocale,
 } from '../domain/templates';
+import { englishCounts, englishVars, storeNameVars } from '../domain/english-vars';
 import { MAX_ATTEMPTS, SENDING_LEASE_SECONDS, nextAttemptAt } from '../domain/retry';
 import { deliver } from '../infrastructure/channels';
 
@@ -34,7 +38,11 @@ const EVERY_FIVE_SECONDS = 5_000;
  * القالب مملوءاً، والعدد ومعدوده فيه بالعربية — «خلال 9 ساعة» في القاعدة تصير «خلال 9 ساعات»
  * (VOPS-019، 29 أكتوبر 2026). نصوص القوالب تُزرع في القاعدة مرة ولا يكتب الكود فوقها.
  */
-const fill = (text: string, vars: Readonly<Record<string, string>>): string => arabicCounts(render(text, vars));
+const fill = (text: string, vars: Readonly<Record<string, string>>, locale: TemplateLocale = 'ar'): string =>
+  locale === 'en' ? englishCounts(render(text, vars)) : arabicCounts(render(text, vars));
+
+/** لغة الحساب كما حُفظت — ما ليس «en» عربي */
+const localeOf = (raw: string | null | undefined): TemplateLocale => (raw === 'en' ? 'en' : 'ar');
 
 /**
  * الرابط خارج الموقع كاملاً: البريد والرسالة لا يعرفان الموقع، فـ«/vendor/orders» في نصّهما لا يُضغط ولا
@@ -80,10 +88,11 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   /** يُدرج القوالب الافتراضية الغائبة — ولا يكتب فوق تعديل الإدارة */
   async ensureDefaults(): Promise<number> {
     const r = await this.prisma.notificationTemplate.createMany({
-      data: DEFAULT_TEMPLATES.map((t) => ({
+      // العربية أصل، والإنجليزية بجانبها لمن لغة حسابه الإنجليزية (4 نوفمبر 2026)
+      data: TEMPLATE_LOCALES.flatMap((locale) => seedsOf(locale).map((t) => ({ ...t, locale }))).map((t) => ({
         code: t.code,
         channel: t.channel,
-        locale: 'ar',
+        locale: t.locale,
         subject: t.subject,
         body: t.body,
         variablesJson: [...(eventOf(t.code)?.variables ?? [])],
@@ -109,9 +118,10 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
         await this.prisma.notificationTemplate.deleteMany({
           where: { code: ev.code, channel: { notIn: seeds.map((s) => s.channel) } },
         });
-        const rows = await this.prisma.notificationTemplate.findMany({ where: { code: ev.code, locale: 'ar' } });
+        const rows = await this.prisma.notificationTemplate.findMany({ where: { code: ev.code } });
         for (const row of rows) {
-          const seed = seeds.find((s) => s.channel === row.channel)!;
+          const seed = seedsOf(localeOf(row.locale)).find((s) => s.code === ev.code && s.channel === row.channel);
+          if (!seed) continue;
           if (row.subject === seed.subject && row.body === seed.body && row.isEnabled) continue;
           await this.prisma.notificationTemplate.update({
             where: { code_channel_locale: { code: row.code, channel: row.channel, locale: row.locale } },
@@ -186,9 +196,12 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     input: { code: string; vendorId: string; vars: Record<string, string> },
     db: Db = this.prisma,
   ): Promise<number> {
-    const v = await db.vendor.findUnique({ where: { id: input.vendorId }, select: { ownerUserId: true, nameAr: true } });
+    const v = await db.vendor.findUnique({ where: { id: input.vendorId }, select: { ownerUserId: true, nameAr: true, nameEn: true } });
     if (!v) return 0;
-    return this.enqueue({ code: input.code, userId: v.ownerUserId, vars: { store_name: v.nameAr, ...input.vars } }, db);
+    const vars: Record<string, string> = { ...storeNameVars(v), ...input.vars };
+    // حدث يكتب اسماً آخر للمتجر: لا يبقى الإنجليزي لاسم غيره
+    if (vars['store_name'] !== v.nameAr) delete vars['store_name_en'];
+    return this.enqueue({ code: input.code, userId: v.ownerUserId, vars }, db);
   }
 
   /**
@@ -267,7 +280,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     }
   }
 
-  private async sendOne(id: string): Promise<'sent' | 'failed' | 'skipped' | null> {
+  private async sendOne(id: string, forced?: TemplateLocale): Promise<'sent' | 'failed' | 'skipped' | null> {
     // الحجز شرطيّ: نسختان من المرسِل لا ترسلان الإشعار نفسه مرتين. ويُحجز بمهلة: إن سقط
     // المرسِل قبل الختام التقطه غيره بعدها، ولا يلتقطه أحد قبلها (SYS-034)
     const now = new Date();
@@ -293,27 +306,30 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     if (n.attempts > MAX_ATTEMPTS) return finish('failed', { error: 'استُنفدت المحاولات: سقط الخادم أثناء آخرها.' });
 
     try {
+      // بلغة حساب صاحبه: الإنجليزية لمن اختارها، ونصّها ومتغيّراتها بها — وما غاب نصّه بها يصل بالعربية
+      const user = await this.prisma.user.findUnique({ where: { id: n.userId }, select: { email: true, phone: true, locale: true } });
+      // «أرسل تجربة لي» من النصّ الإنجليزي تصل بالإنجليزية أيّاً كانت لغة حساب المدير
+      const wanted = forced ?? localeOf(user?.locale);
       // المقفول يُرسل بنصّ الكود وحده — صفّه في القاعدة للعرض لا للإرسال
       const tpl = ev?.locked
         ? (() => {
-            const d = defaultTemplate(n.templateCode, channel);
-            return d ? { subject: d.subject, body: d.body, isEnabled: true } : null;
+            const own = defaultTemplate(n.templateCode, channel, wanted);
+            const d = own ?? defaultTemplate(n.templateCode, channel);
+            return d ? { subject: d.subject, body: d.body, isEnabled: true, locale: own ? wanted : 'ar' } : null;
           })()
-        : await this.prisma.notificationTemplate.findUnique({
-            where: { code_channel_locale: { code: n.templateCode, channel, locale: 'ar' } },
-          });
+        : await this.textOf(n.templateCode, channel, wanted);
       if (!tpl || !tpl.isEnabled) return finish('skipped', { error: 'القالب غير مفعّل' });
-      const sent = withSiteLink(vars, channel);
-      const subject = tpl.subject ? fill(tpl.subject, sent) : null;
-      const body = fill(tpl.body, sent);
+      const locale = localeOf(tpl.locale);
+      const sent = withSiteLink(locale === 'en' ? englishVars(vars) : vars, channel);
+      const subject = tpl.subject ? fill(tpl.subject, sent, locale) : null;
+      const body = fill(tpl.body, sent, locale);
       // ما يُخزَّن: النص نفسه والسرّ محجوب
       const shown = secret ? redactVars(n.templateCode, sent) : sent;
       const stored = {
-        subject: secret ? (tpl.subject ? fill(tpl.subject, shown) : null) : subject,
-        body: secret ? fill(tpl.body, shown) : body,
+        subject: secret ? (tpl.subject ? fill(tpl.subject, shown, locale) : null) : subject,
+        body: secret ? fill(tpl.body, shown, locale) : body,
       };
 
-      const user = await this.prisma.user.findUnique({ where: { id: n.userId }, select: { email: true, phone: true } });
       let recipient: string | null = null;
       if (channel === 'in_app') recipient = n.userId;
       if (channel === 'email') recipient = user?.email ?? null;
@@ -339,6 +355,18 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
       }
       return finish('failed', { error: message });
     }
+  }
+
+  /**
+   * نصّ القالب بلغة المستلم. التشغيل والإيقاف للقناة من صفّها العربي — أصلها، ومنه يختار enqueue
+   * القنوات — والنصّ من صفّ اللغة المطلوبة إن وُجد، وإلا العربي.
+   */
+  private async textOf(code: string, channel: Channel, locale: TemplateLocale) {
+    const rows = await this.prisma.notificationTemplate.findMany({ where: { code, channel, locale: { in: ['ar', locale] } } });
+    const ar = rows.find((r) => r.locale === 'ar');
+    if (!ar) return null;
+    const text = rows.find((r) => r.locale === locale) ?? ar;
+    return { subject: text.subject, body: text.body, isEnabled: ar.isEnabled, locale: text.locale };
   }
 
   // ------------------------------------------------------- داخل الموقع
@@ -422,22 +450,24 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   // ------------------------------------------------------------- الإدارة
 
   async matrix() {
-    const rows = await this.prisma.notificationTemplate.findMany({ where: { locale: 'ar' } });
+    const rows = await this.prisma.notificationTemplate.findMany();
+    const textOf = (r: (typeof rows)[number]) => ({
+      channel: r.channel,
+      subject: r.subject,
+      body: r.body,
+      reviewedAt: r.reviewedAt,
+      reviewedBy: r.reviewedBy,
+      updatedAt: r.updatedAt,
+    });
     return {
       channels: CHANNELS.map((c) => ({ code: c, label: CHANNEL_LABELS[c] })),
       events: EVENTS.map((e) => ({
         ...e,
-        templates: rows
-          .filter((r) => r.code === e.code)
-          .map((r) => ({
-            channel: r.channel,
-            subject: r.subject,
-            body: r.body,
-            isEnabled: r.isEnabled,
-            reviewedAt: r.reviewedAt,
-            reviewedBy: r.reviewedBy,
-            updatedAt: r.updatedAt,
-          })),
+        // العيّنة كما تصل من لغة حسابه الإنجليزية — بها يعاين المحرّر النصّ الإنجليزي
+        sampleEn: englishVars(e.sample),
+        // العربية أصل القناة وتشغيلها، والإنجليزية نصّها لمن لغة حسابه الإنجليزية
+        templates: rows.filter((r) => r.code === e.code && r.locale === 'ar').map((r) => ({ ...textOf(r), isEnabled: r.isEnabled })),
+        templatesEn: rows.filter((r) => r.code === e.code && r.locale === 'en').map(textOf),
       })),
     };
   }
@@ -447,6 +477,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     code: string,
     channel: Channel,
     input: { subject?: string | null; body: string; isEnabled?: boolean },
+    locale: TemplateLocale = 'ar',
   ) {
     const ev = eventOf(code);
     if (!ev) throw new NotFoundError('حدث غير معروف.', { code });
@@ -464,9 +495,9 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
     }
     // التعديل يُسقط المراجعة: نصّ جديد يحتاج قراءة جديدة
     const row = await this.prisma.notificationTemplate.upsert({
-      where: { code_channel_locale: { code, channel, locale: 'ar' } },
+      where: { code_channel_locale: { code, channel, locale } },
       create: {
-        code, channel, locale: 'ar', subject: input.subject?.trim() || null, body: input.body.trim(),
+        code, channel, locale, subject: input.subject?.trim() || null, body: input.body.trim(),
         variablesJson: [...ev.variables], isEnabled: input.isEnabled ?? true, updatedBy: adminId,
       },
       update: {
@@ -474,36 +505,42 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
         reviewedAt: null, reviewedBy: null, ...(input.isEnabled !== undefined ? { isEnabled: input.isEnabled } : {}),
       },
     });
+    // التشغيل للقناة كلها بلغتيها — الصفّ العربي أصله، فلا يُطفأ بالإنجليزية وحدها ما يُرسل بالعربية
+    if (input.isEnabled !== undefined) {
+      await this.prisma.notificationTemplate.updateMany({ where: { code, channel }, data: { isEnabled: input.isEnabled } });
+    }
     await this.prisma.auditLog.create({
-      data: { actorUserId: adminId, actorRole: 'admin', action: 'notification_template.save', entityType: 'NotificationTemplate', entityId: `${code}:${channel}`, afterJson: { subject: row.subject, body: row.body, isEnabled: row.isEnabled } },
+      data: { actorUserId: adminId, actorRole: 'admin', action: 'notification_template.save', entityType: 'NotificationTemplate', entityId: `${code}:${channel}${locale === 'en' ? ':en' : ''}`, afterJson: { subject: row.subject, body: row.body, isEnabled: input.isEnabled ?? row.isEnabled, locale } },
     });
     return row;
   }
 
-  async markReviewed(adminId: string, code: string, channel: Channel, reviewerName: string) {
+  async markReviewed(adminId: string, code: string, channel: Channel, reviewerName: string, locale: TemplateLocale = 'ar') {
     await this.prisma.notificationTemplate.update({
-      where: { code_channel_locale: { code, channel, locale: 'ar' } },
+      where: { code_channel_locale: { code, channel, locale } },
       data: { reviewedAt: new Date(), reviewedBy: reviewerName },
     });
     await this.prisma.auditLog.create({
-      data: { actorUserId: adminId, actorRole: 'admin', action: 'notification_template.review', entityType: 'NotificationTemplate', entityId: `${code}:${channel}` },
+      data: { actorUserId: adminId, actorRole: 'admin', action: 'notification_template.review', entityType: 'NotificationTemplate', entityId: `${code}:${channel}${locale === 'en' ? ':en' : ''}` },
     });
   }
 
-  preview(code: string, subject: string | null, body: string) {
+  preview(code: string, subject: string | null, body: string, locale: TemplateLocale = 'ar') {
     const ev = eventOf(code);
     if (!ev) throw new NotFoundError('حدث غير معروف.', { code });
-    return { subject: subject ? fill(subject, ev.sample) : null, body: fill(body, ev.sample) };
+    // العيّنة كما تصل صاحبها: متغيّراتها بالإنجليزية للنصّ الإنجليزي، والأسماء كما هي
+    const vars = locale === 'en' ? englishVars(ev.sample) : ev.sample;
+    return { subject: subject ? fill(subject, vars, locale) : null, body: fill(body, vars, locale) };
   }
 
   /** «أرسل تجربة» — للمدير نفسه ببيانات العيّنة، ويُرسل فوراً */
-  async sendTest(adminId: string, code: string, channel: Channel) {
+  async sendTest(adminId: string, code: string, channel: Channel, locale?: TemplateLocale) {
     const ev = eventOf(code);
     if (!ev) throw new NotFoundError('حدث غير معروف.', { code });
     const n = await this.prisma.notification.create({
       data: { userId: adminId, channel, templateCode: code, payloadJson: { ...ev.sample } },
     });
-    await this.sendOne(n.id);
+    await this.sendOne(n.id, locale);
     return this.prisma.notification.findUniqueOrThrow({
       where: { id: n.id },
       select: { id: true, status: true, error: true, recipient: true, subject: true, body: true, deliveryRef: true, sentAt: true },

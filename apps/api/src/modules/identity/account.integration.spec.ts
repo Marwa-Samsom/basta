@@ -21,9 +21,9 @@ const PASSWORD = 'كلمة-مرور-اختبار-طويلة';
 
 type Res = Awaited<ReturnType<NestFastifyApplication['inject']>>;
 const call = (
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   url: string,
-  opts: { token?: string; body?: unknown; ua?: string; cookie?: string } = {},
+  opts: { token?: string; body?: unknown; ua?: string; cookie?: string; lang?: string } = {},
 ): Promise<Res> =>
   app.inject({
     method,
@@ -33,6 +33,8 @@ const call = (
       'user-agent': opts.ua ?? 'vitest-agent',
       ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
       ...(opts.cookie ? { cookie: `basta_rt=${opts.cookie}` } : {}),
+      // الموقع يرسل لغة الصفحة كما اختارها الزائر (apps/web lib/api.ts)
+      ...(opts.lang ? { 'accept-language': opts.lang } : {}),
     },
     ...(opts.body !== undefined ? { payload: opts.body as Record<string, unknown> } : {}),
   });
@@ -529,5 +531,43 @@ describe('رمز الوصول يُقرأ مع القاعدة — لا ينتظر
     expect((await templates()).statusCode).toBe(403);
     // والجلسة نفسها باقية: ما سُحب هو الصلاحية لا الدخول
     expect((await me(token)).statusCode).toBe(200);
+  });
+});
+
+/**
+ * لغة الحساب — بها تصله إشعاراته وبريده (4 نوفمبر 2026). تُحفظ من لغة الصفحة عند التسجيل والدخول،
+ * ومن زرّ اللغة لمن كان داخلاً؛ ومن لم يخترها شيئاً يبقى بالعربية.
+ */
+describe('لغة الحساب تُحفظ من الصفحة وزرّ اللغة', () => {
+  it('التسجيل والدخول بلغة الصفحة، وزرّ اللغة يغيّرها لصاحبها وحده، ولغة غير معروفة مرفوضة', async () => {
+    if (!dbUp) return;
+    const localeOf = async (email: string) => (await prisma.user.findUniqueOrThrow({ where: { email }, select: { locale: true } })).locale;
+    const r = await call('POST', '/auth/register', { body: { email: emailOf('locale'), password: PASSWORD, fullName: 'مستخدم اللغة' }, lang: 'en' });
+    expect(r.statusCode, r.body).toBe(201);
+    expect(await localeOf(emailOf('locale'))).toBe('en');
+    // بلا رأس لغة (سكربت، عميل قديم): العربية
+    await register('locale-default');
+    expect(await localeOf(emailOf('locale-default'))).toBe('ar');
+
+    // دخل من صفحة عربية: لغته العربية
+    const ar = await call('POST', '/auth/login', { body: { email: emailOf('locale'), password: PASSWORD }, lang: 'ar' });
+    expect(ar.statusCode, ar.body).toBe(200);
+    expect(await localeOf(emailOf('locale'))).toBe('ar');
+    const token = ar.json().tokens.accessToken as string;
+
+    // زرّ اللغة
+    const set = await call('PUT', '/me/account/locale', { token, body: { locale: 'en' } });
+    expect(set.statusCode, set.body).toBe(200);
+    expect(set.json()).toEqual({ locale: 'en' });
+    expect(await localeOf(emailOf('locale'))).toBe('en');
+    // لا يمسّ غيره
+    expect(await localeOf(emailOf('locale-default'))).toBe('ar');
+
+    const bad = await call('PUT', '/me/account/locale', { token, body: { locale: 'fr' } });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.body).toContain('اللغة عربية أو إنجليزية.');
+    expect(await localeOf(emailOf('locale'))).toBe('en');
+    // بلا جلسة: 401
+    expect((await call('PUT', '/me/account/locale', { body: { locale: 'ar' } })).statusCode).toBe(401);
   });
 });

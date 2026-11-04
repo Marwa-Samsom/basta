@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { api, session } from '@/lib/api';
 import { DEFAULT_LOCALE, LOCALE_COOKIE, translator, type Locale, type Translate } from '@/lib/i18n';
 
 const LocaleContext = createContext<Locale>(DEFAULT_LOCALE);
@@ -20,10 +21,12 @@ export function useT(): Translate {
 
 /**
  * يختار الزائر لغة: الكوكي سنة، ثم تُعاد الصفحة كاملة — الخادم يصيّرها بلغتها
- * واتجاهها من أول بايت، كما تفعل عملة العرض.
+ * واتجاهها من أول بايت، كما تفعل عملة العرض. ومن كان داخلاً تُحفظ في حسابه:
+ * بها تصله إشعاراته وبريده (4 نوفمبر 2026). تعذّر الحفظ لا يمنع التبديل.
  */
-function chooseLocale(next: Locale): void {
+async function chooseLocale(next: Locale): Promise<void> {
   document.cookie = `${LOCALE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  if (session.read()) await api('/me/account/locale', { method: 'PUT', body: { locale: next } }).catch(() => undefined);
   window.location.reload();
 }
 
@@ -37,7 +40,7 @@ export function LanguageToggle() {
   const label = next === 'en' ? 'English' : 'العربية';
   return (
     // مربّع كأخواته في الرأس بلا أيقونة: على عرض 400 لا يتّسع الرأس لزرّ أعرض
-    <button type="button" className="icon-btn lang-btn" lang={next} aria-label={label} title={label} onClick={() => chooseLocale(next)}>
+    <button type="button" className="icon-btn lang-btn" lang={next} aria-label={label} title={label} onClick={() => void chooseLocale(next)}>
       {next === 'en' ? 'EN' : 'ع'}
     </button>
   );

@@ -3,7 +3,7 @@ import { ConflictError, InvalidInputError, NotFoundError } from '../../../common
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor, VendorScope } from '../../../common/security/actor';
 import { AuthService } from '../../identity/public';
-import { NotificationsService } from '../../notifications/public';
+import { NotificationsService, storeNameVars } from '../../notifications/public';
 import { isValidIban, normalizeIban } from '../domain/onboarding';
 
 /** سقف معقول: متجر بخمسة حسابات حيّة حالة نادرة، وبعشرين علامة عبث */
@@ -86,7 +86,7 @@ export class VendorBankService {
     proof: { password: string; code?: string | undefined },
     meta: { ip?: string | undefined; userAgent?: string | undefined },
   ): Promise<BankAccountView> {
-    const vendor = await this.prisma.vendor.findUnique({ where: { id: scope.vendorId }, select: { status: true, nameAr: true } });
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: scope.vendorId }, select: { status: true, nameAr: true, nameEn: true } });
     if (!vendor) throw new NotFoundError('المتجر غير موجود.');
     if (vendor.status !== 'approved' && vendor.status !== 'suspended') {
       throw new ConflictError('أثناء التسجيل يُعدَّل الحساب البنكي من خطوات التسجيل نفسها.');
@@ -147,7 +147,7 @@ export class VendorBankService {
         {
           code: 'admin_bank_account_added',
           permission: 'vendors.review',
-          vars: { store_name: vendor.nameAr, bank_name: bankName, iban_tail: tail(iban), link: `/admin/vendors/${scope.vendorId}` },
+          vars: { ...storeNameVars(vendor), bank_name: bankName, iban_tail: tail(iban), link: `/admin/vendors/${scope.vendorId}` },
         },
         tx,
       );
