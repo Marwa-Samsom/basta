@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { Alert, StatusBadge } from '@/components/ui';
 import { Icon, type IconName } from '@/components/icons';
 import { useOnboarding, type Onboarding } from '@/lib/vendor';
 import { OnboardingError, OnboardingFrame, OnboardingHead, OnboardingLoading } from '../onboarding-chrome';
 import { useLocale, useT } from '@/components/locale';
+import { apiBlob } from '@/lib/api';
 import { intlLocale, localized, type Locale } from '@/lib/i18n';
 
 const DATE: Readonly<Record<Locale, Intl.DateTimeFormat>> = {
@@ -20,6 +22,51 @@ const DOC_LABEL_EN: Record<string, string> = {
   tax_card: 'Tax certificate',
   bank_proof: 'Bank account proof',
 };
+
+/**
+ * تنزيل وثيقة رفعها البائع — VON-032، 4 نوفمبر 2026. صفحة المستندات تعد «تستطيع تنزيل الملف من صفحة
+ * الحالة.» والاسم هنا كان نصّاً: المسار يطلب الرمز فلا يصلح رابطاً، فيُجلب بالرمز ويُحفظ باسمه الأصلي.
+ */
+function DocumentDownload({ path, name, label }: { path: string; name: string; label: string }) {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const download = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const url = URL.createObjectURL(await apiBlob(path));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className="vo-doclist__get">
+      <button
+        type="button"
+        className="btn btn--secondary btn--sm"
+        disabled={busy}
+        onClick={() => void download()}
+        aria-label={t(`نزّل ${label}`, `Download ${label}`)}
+      >
+        <Icon name="download" size={14} />
+        {t('نزّل', 'Download')}
+      </button>
+      {error ? (
+        <span className="vo-doclist__error" role="alert">
+          {error}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 /** الخطوة في شريط التأهيل تتبع ما بقي فعلاً، لا اسم الصفحة */
 function stepOf(vendor: Onboarding): number {
@@ -265,6 +312,7 @@ export default function StatusPage() {
                         <bdi>{d.originalName}</bdi>
                       </span>
                     ) : null}
+                    {d.downloadPath && d.originalName ? <DocumentDownload path={d.downloadPath} name={d.originalName} label={docLabel(d)} /> : null}
                   </span>
                   <StatusBadge status={d.status} kind="document" />
                 </li>

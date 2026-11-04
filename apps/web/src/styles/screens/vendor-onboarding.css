@@ -816,6 +816,9 @@
   font-size: var(--text-2xs);
   color: var(--text-muted);
 }
+/* «نزّل» تحت اسم الملف، وسبب رفض التنزيل بجانبه (VON-032) */
+.vo-doclist__get { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-block-start: 4px; }
+.vo-doclist__error { font-size: var(--text-2xs); color: var(--danger-text); }
 
 /* ======================================================= VD-04 عملة التسوية */
 
