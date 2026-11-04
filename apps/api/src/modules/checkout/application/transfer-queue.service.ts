@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
+import { latinDigits } from '../../../common/arabic-fold';
+import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Snapshot } from '../domain/snapshot';
 
@@ -30,7 +31,7 @@ export class TransferQueueService {
               { guestEmail: like(t) },
               {
                 customer: {
-                  OR: [{ fullName: like(t) }, { email: like(t) }, { phone: { contains: t } }],
+                  OR: [{ fullNameFold: folded(t) }, { email: like(t) }, { phone: { contains: latinDigits(t) } }],
                 },
               },
             ],
@@ -95,7 +96,7 @@ export class TransferQueueService {
                 order: {
                   OR: [
                     { orderNumber: like(t) },
-                    { customer: { OR: [{ fullName: like(t) }, { email: like(t) }] } },
+                    { customer: { OR: [{ fullNameFold: folded(t) }, { email: like(t) }] } },
                   ],
                 },
               },

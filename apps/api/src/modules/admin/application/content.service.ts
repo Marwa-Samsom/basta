@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
+import { fold, latinDigits } from '../../../common/arabic-fold';
+import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { refreshRatings } from '../../aftersales/public';
 import { UPLOADS_ROOT, UPLOADS_URL_PREFIX } from '../../catalog/public';
 
@@ -86,9 +87,13 @@ export class ContentService {
   async coupons(q: { state?: CouponState; search?: string; page: number }) {
     const state = couponStateSql(new Date());
     const want = q.state ?? null;
-    const term = q.search ? `%${q.search.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+    // يُهرَّب % و _ والخط المائل فلا تصير العبارة نمطاً
+    const esc = (t: string) => t.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const term = q.search ? `%${esc(latinDigits(q.search))}%` : null;
+    // اسم المتجر بعموده الموحَّد: «الامل» تجد «متجر الأمل» (مهاجرة search_fold)
+    const foldTerm = q.search ? `%${esc(fold(q.search) || q.search)}%` : null;
     const where = Prisma.sql`(${want}::text IS NULL OR ${state} = ${want})
-      AND (${term}::text IS NULL OR c."code" ILIKE ${term} OR v."nameAr" ILIKE ${term})`;
+      AND (${term}::text IS NULL OR c."code" ILIKE ${term} OR v."nameArFold" LIKE ${foldTerm})`;
     const { skip, take } = pageArgs(q.page);
     const [ids, counted, grouped] = await Promise.all([
       this.prisma.$queryRaw<{ id: string; state: CouponState }[]>`
@@ -187,7 +192,7 @@ export class ContentService {
     const t = q.search;
     const where: Prisma.CmsPageWhereInput = {
       ...(q.status ? { isPublished: q.status === 'published' } : {}),
-      ...(t ? { OR: [{ titleAr: like(t) }, { slug: like(t) }] } : {}),
+      ...(t ? { OR: [{ titleArFold: folded(t) }, { slug: like(t) }] } : {}),
     };
     const [items, total, all, published] = await Promise.all([
       this.prisma.cmsPage.findMany({ where, orderBy: [{ slug: 'asc' }, { id: 'asc' }], ...pageArgs(q.page) }),
@@ -229,7 +234,7 @@ export class ContentService {
     const t = q.search;
     const where: Prisma.BannerWhereInput = {
       ...(q.filter === 'home' ? { placement: { startsWith: 'home_' } } : {}),
-      ...(t ? { titleAr: like(t) } : {}),
+      ...(t ? { titleArFold: folded(t) } : {}),
     };
     const [rows, total, grouped] = await Promise.all([
       this.prisma.banner.findMany({ where, orderBy: [{ placement: 'asc' }, { sort: 'asc' }, { id: 'asc' }], ...pageArgs(q.page) }),
@@ -340,7 +345,7 @@ export class ContentService {
     const t = q.search;
     const where: Prisma.ReviewWhereInput = {
       ...(q.status ? { status: q.status } : {}),
-      ...(t ? { OR: [{ product: { nameAr: like(t) } }, { user: { OR: [{ fullName: like(t) }, { email: like(t) }] } }, { title: like(t) }, { body: like(t) }] } : {}),
+      ...(t ? { OR: [{ product: { nameArFold: folded(t) } }, { user: { OR: [{ fullNameFold: folded(t) }, { email: like(t) }] } }, { titleFold: folded(t) }, { bodyFold: folded(t) }] } : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.review.findMany({

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { like, folded } from '../../../common/paging';
 import {
   ConflictError,
   InvalidInputError,
@@ -64,10 +65,10 @@ export class VendorReviewService {
       ...(t
         ? {
             OR: [
-              { nameAr: { contains: t, mode: 'insensitive' } },
-              { nameEn: { contains: t, mode: 'insensitive' } },
-              { slug: { contains: t, mode: 'insensitive' } },
-              { owner: { email: { contains: t, mode: 'insensitive' } } },
+              { nameArFold: folded(t) },
+              { nameEn: like(t) },
+              { slug: like(t) },
+              { owner: { email: like(t) } },
             ],
           }
         : {}),

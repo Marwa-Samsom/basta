@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma, Role } from '@prisma/client';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
+import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { NotificationsService } from '../../notifications/public';
 import { OrderLifecycleService } from '../../orders/public';
 
@@ -209,8 +209,8 @@ export class DisputesService {
             subOrder: {
               OR: [
                 { subOrderNumber: like(t) },
-                { vendor: { nameAr: like(t) } },
-                { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ email: like(t) }, { fullName: like(t) }] } }] } },
+                { vendor: { nameArFold: folded(t) } },
+                { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ email: like(t) }, { fullNameFold: folded(t) }] } }] } },
               ],
             },
           }

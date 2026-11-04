@@ -43,27 +43,29 @@ enum Role {
 }
 
 model User {
-  id              String     @id @default(uuid()) @db.Uuid
-  email           String?    @unique
-  phone           String?    @unique
-  passwordHash    String?
-  fullName        String
-  locale          String     @default("ar")
+  id                String     @id @default(uuid()) @db.Uuid
+  email             String?    @unique
+  phone             String?    @unique
+  passwordHash      String?
+  fullName          String
+  /// مولَّد في القاعدة: basta_fold(fullName) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  fullNameFold      String?
+  locale            String     @default("ar")
   /// عملة العرض والدفع التي اختارها — تتبعه بين أجهزته. null: افتراضية الإدارة
-  preferredCurrency String?  @db.Char(3)
-  status          UserStatus @default(active)
+  preferredCurrency String?    @db.Char(3)
+  status            UserStatus @default(active)
   /// مالك المنصة — واحد على الأكثر، يُعيَّن من سكربت المدير الأول، ولا يغيّره مدير آخر
-  isPlatformOwner Boolean    @default(false)
-  emailVerifiedAt DateTime?  @db.Timestamptz
-  phoneVerifiedAt DateTime?  @db.Timestamptz
+  isPlatformOwner   Boolean    @default(false)
+  emailVerifiedAt   DateTime?  @db.Timestamptz
+  phoneVerifiedAt   DateTime?  @db.Timestamptz
 
   // 2FA إلزامي على الإدارة ولا يمكن تعطيله — SRS A-07
-  totpSecretEnc String?
-  totpEnabledAt DateTime? @db.Timestamptz
+  totpSecretEnc        String?
+  totpEnabledAt        DateTime? @db.Timestamptz
   /// سرّ تهيئة لم تُؤكَّد بعد — لا يسري ولا يمسّ `totpSecretEnc` قبل رمز صحيح منه
   totpPendingSecretEnc String?
   /// آخر خطوة TOTP استُعملت — يُرفض ما لا يتجاوزها (مقاومة إعادة التشغيل)
-  totpLastStep  Int?
+  totpLastStep         Int?
 
   /// VD-20 — فئات أُطفئ بريدها: {"order": false, …}. الإشعار داخل الموقع يبقى دائماً
   notificationPrefs Json @default("{}")
@@ -130,18 +132,18 @@ model TotpRecoveryCode {
 }
 
 model RefreshToken {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  tokenHash String    @unique
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  tokenHash    String    @unique
   // familyId يكشف إعادة استخدام رمز مسروق: استعمال رمز مُبطَل يُبطل العائلة كلها
-  familyId  String    @db.Uuid
-  expiresAt DateTime  @db.Timestamptz
-  revokedAt DateTime? @db.Timestamptz
+  familyId     String    @db.Uuid
+  expiresAt    DateTime  @db.Timestamptz
+  revokedAt    DateTime? @db.Timestamptz
   /// من حلّ محلّه بالتدوير — يميّز «دُوِّر» عن «أُبطل»، ويعرّف جهاز الخلف لمهلة التزامن
-  replacedById String? @db.Uuid
-  userAgent String?
-  ip        String?
-  createdAt DateTime  @default(now()) @db.Timestamptz
+  replacedById String?   @db.Uuid
+  userAgent    String?
+  ip           String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -258,6 +260,8 @@ model Vendor {
   ownerUserId     String       @db.Uuid
   slug            String       @unique
   nameAr          String
+  /// مولَّد في القاعدة: basta_fold(nameAr) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  nameArFold      String?
   nameEn          String?
   logoKey         String?
   coverKey        String?
@@ -389,15 +393,17 @@ model VendorCategory {
 /// مكتبة سمات عامة (اللون، المقاس…) تديرها الإدارة ويستعملها أي منتج.
 /// كانت تُربط بالفئات العامة فيرثها فرعها — سقط الربط بسقوط الفئات.
 model Attribute {
-  id            String  @id @default(uuid()) @db.Uuid
-  code          String  @unique
+  id            String    @id @default(uuid()) @db.Uuid
+  code          String    @unique
   nameAr        String
+  /// مولَّد في القاعدة: basta_fold(nameAr) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  nameArFold    String?
   nameEn        String?
   inputType     String // select | multiselect | number | text | boolean
   unit          String?
-  isFilterable  Boolean @default(true)
-  isVariantAxis Boolean @default(false)
-  sort          Int     @default(0)
+  isFilterable  Boolean   @default(true)
+  isVariantAxis Boolean   @default(false)
+  sort          Int       @default(0)
   /// مؤرشفة: تختفي من خيارات البائع لمنتج جديد، وتبقى عند المنتجات التي تستعملها —
   /// المستعملة لا تُحذف فتنكسر متغيّراتها وصورها المربوطة بقيمها (ACFG-099)
   archivedAt    DateTime? @db.Timestamptz
@@ -450,27 +456,31 @@ enum ProductStatus {
 /// لا سعر على المنتج. السعر يعيش على المتغيّر حصراً — ومنتج بلا خيارات
 /// يحمل متغيّراً افتراضياً واحداً. هذا يلغي فرعين متوازيين في كل كود تسعير.
 model Product {
-  id            String        @id @default(uuid()) @db.Uuid
-  vendorId      String        @db.Uuid
+  id                String        @id @default(uuid()) @db.Uuid
+  vendorId          String        @db.Uuid
   /// فئة من فئات متجره أو لا شيء — المفتاح المركّب مع vendorId يمنع فئة متجر آخر
-  vendorCategoryId String?    @db.Uuid
-  brandId       String?       @db.Uuid
-  slug          String        @unique
-  nameAr        String
-  nameEn        String?
-  descriptionAr String?
-  descriptionEn String?
-  status        ProductStatus @default(draft)
+  vendorCategoryId  String?       @db.Uuid
+  brandId           String?       @db.Uuid
+  slug              String        @unique
+  nameAr            String
+  /// مولَّد في القاعدة: basta_fold(nameAr) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  nameArFold        String?
+  nameEn            String?
+  descriptionAr     String?
+  /// مولَّد في القاعدة: basta_fold(descriptionAr) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  descriptionArFold String?
+  descriptionEn     String?
+  status            ProductStatus @default(draft)
   /// سبب إيقاف الإدارة — يُمسح حين يعيد البائع النشر
-  rejectReason  String?
-  hasVariants   Boolean       @default(false)
-  ratingAvg     Decimal       @default(0) @db.Decimal(3, 2)
-  ratingCount   Int           @default(0)
-  soldCount     Int           @default(0)
-  publishedAt   DateTime?     @db.Timestamptz
-  deletedAt     DateTime?     @db.Timestamptz
-  createdAt     DateTime      @default(now()) @db.Timestamptz
-  updatedAt     DateTime      @updatedAt @db.Timestamptz
+  rejectReason      String?
+  hasVariants       Boolean       @default(false)
+  ratingAvg         Decimal       @default(0) @db.Decimal(3, 2)
+  ratingCount       Int           @default(0)
+  soldCount         Int           @default(0)
+  publishedAt       DateTime?     @db.Timestamptz
+  deletedAt         DateTime?     @db.Timestamptz
+  createdAt         DateTime      @default(now()) @db.Timestamptz
+  updatedAt         DateTime      @updatedAt @db.Timestamptz
 
   vendor           Vendor                  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   /// حذف الفئة يُفرغ منتجاتها في معاملته قبل الحذف — Restrict يمنع غير ذلك
@@ -562,18 +572,18 @@ model ProductAttributeValue {
 }
 
 model ProductImage {
-  id        String  @id @default(uuid()) @db.Uuid
-  productId String  @db.Uuid
-  variantId String? @db.Uuid
+  id            String  @id @default(uuid()) @db.Uuid
+  productId     String  @db.Uuid
+  variantId     String? @db.Uuid
   /// صورة لقيمة خيار (اللون الأحمر) — تظهر مع كل متغيّر يحملها، أحمر بأي مقاس.
   /// الصورة لمتغيّر واحد (variantId) أو لقيمة أو للجميع (كلاهما فارغ)، لا لاثنين معاً
   optionValueId String? @db.Uuid
-  fileKey   String
-  altAr     String?
-  altEn     String?
-  width     Int?
-  height    Int?
-  sort      Int     @default(0)
+  fileKey       String
+  altAr         String?
+  altEn         String?
+  width         Int?
+  height        Int?
+  sort          Int     @default(0)
 
   product     Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
@@ -779,6 +789,8 @@ model Order {
 
   /// لقطة لا مرجع: تعديل المشتري لعنوانه لاحقاً لا يغيّر عنوان طلب سابق
   shippingAddressSnapshot Json
+  /// مولَّد في القاعدة: basta_fold(shippingAddressSnapshot->>'recipientName') — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  recipientNameFold       String?
   billingAddressSnapshot  Json?
   customerNote            String?
 
@@ -874,10 +886,12 @@ model OrderItem {
   variantId  String @db.Uuid
   productId  String @db.Uuid
 
-  productNameSnapshotAr String
-  variantLabelSnapshot  String?
-  skuSnapshot           String
-  imageKeySnapshot      String?
+  productNameSnapshotAr     String
+  /// مولَّد في القاعدة: basta_fold(productNameSnapshotAr) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  productNameSnapshotArFold String?
+  variantLabelSnapshot      String?
+  skuSnapshot               String
+  imageKeySnapshot          String?
 
   unitPriceMinorUnits    BigInt
   qty                    Int
@@ -1098,31 +1112,31 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id               String        @id @default(uuid()) @db.Uuid
-  orderId          String        @unique @db.Uuid
-  provider         String
-  providerIntentId String?
-  amountMinorUnits BigInt
-  currency         String        @db.Char(3)
-  method           String // card | bank_transfer | wallet | cod
-  status           PaymentStatus @default(pending)
-  authorizedAt     DateTime?     @db.Timestamptz
-  capturedAt       DateTime?     @db.Timestamptz
-  failureCode      String?
-  failureMessage   String?
+  id                String        @id @default(uuid()) @db.Uuid
+  orderId           String        @unique @db.Uuid
+  provider          String
+  providerIntentId  String?
+  amountMinorUnits  BigInt
+  currency          String        @db.Char(3)
+  method            String // card | bank_transfer | wallet | cod
+  status            PaymentStatus @default(pending)
+  authorizedAt      DateTime?     @db.Timestamptz
+  capturedAt        DateTime?     @db.Timestamptz
+  failureCode       String?
+  failureMessage    String?
   /// نجاح وصل بعد أن أُغلق الطلب فاشلاً أو ملغى: حجزٌ للردّ يأخذه مسار واحد
-  lateCaptureAt    DateTime?     @db.Timestamptz
+  lateCaptureAt     DateTime?     @db.Timestamptz
   /// معرّف ردّ ذلك النجاح عند المزوّد — وجوده يعني أن المال عاد لصاحبه
-  lateRefundId     String?
+  lateRefundId      String?
   /// آخر موعد لخطوة المشتري (التحويل): بعده يُلغى الطلب وتعود القطع للمخزون
-  expiresAt         DateTime?    @db.Timestamptz
+  expiresAt         DateTime?     @db.Timestamptz
   /// مرجع التحويل الوارد كما في كشف البنك — تكتبه الإدارة عند تأكيد الاستلام
   transferReference String?
   /// ملاحظة المؤكِّد: اسم المحوِّل أو حسابه — منها يُعرف إلى أين يُردّ المال
   transferNote      String?
-  confirmedBy       String?      @db.Uuid
-  confirmedAt       DateTime?    @db.Timestamptz
-  createdAt        DateTime      @default(now()) @db.Timestamptz
+  confirmedBy       String?       @db.Uuid
+  confirmedAt       DateTime?     @db.Timestamptz
+  createdAt         DateTime      @default(now()) @db.Timestamptz
 
   order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   events  PaymentEvent[]
@@ -1152,23 +1166,23 @@ model PaymentEvent {
 }
 
 model Refund {
-  id                     String   @id @default(uuid()) @db.Uuid
-  subOrderId             String   @db.Uuid
-  paymentId              String   @db.Uuid
+  id                     String    @id @default(uuid()) @db.Uuid
+  subOrderId             String    @db.Uuid
+  paymentId              String    @db.Uuid
   amountMinorUnits       BigInt
   reason                 String
-  status                 String   @default("pending")
+  status                 String    @default("pending")
   /// متى حُجز للتنفيذ (processing) — ما طال عليه بلا نتيجة سقط منفّذه فيُعاد
   claimedAt              DateTime? @db.Timestamptz
   providerRefundId       String?
   /// ردّ بتحويل يدوي: مرجع التحويل الصادر كما في كشف البنك — بغيره لا يُبلَّغ المشتري
   transferReference      String?
-  requestedBy            String?  @db.Uuid
-  approvedBy             String?  @db.Uuid
-  ledgerEntryId          String?  @db.Uuid
+  requestedBy            String?   @db.Uuid
+  approvedBy             String?   @db.Uuid
+  ledgerEntryId          String?   @db.Uuid
   /// قيمة الاسترداد بعملة البائع — ما يقابله في الدفتر (amountMinorUnits بعملة الدفع)
   vendorAmountMinorUnits BigInt?
-  createdAt              DateTime @default(now()) @db.Timestamptz
+  createdAt              DateTime  @default(now()) @db.Timestamptz
 
   subOrder SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
   payment  Payment  @relation(fields: [paymentId], references: [id])
@@ -1352,7 +1366,11 @@ model Review {
   userId       String   @db.Uuid
   rating       Int
   title        String?
+  /// مولَّد في القاعدة: basta_fold(title) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  titleFold    String?
   body         String?
+  /// مولَّد في القاعدة: basta_fold(body) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  bodyFold     String?
   status       String   @default("pending")
   rejectReason String?
   createdAt    DateTime @default(now()) @db.Timestamptz
@@ -1464,26 +1482,26 @@ model AdminAlert {
 }
 
 model Notification {
-  id           String    @id @default(uuid()) @db.Uuid
-  userId       String    @db.Uuid
-  channel      String
-  templateCode String
-  payloadJson  Json
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @db.Uuid
+  channel       String
+  templateCode  String
+  payloadJson   Json
   /// queued · sending · sent · failed · skipped — صندوق صادر يُرسل بعد الالتزام
-  status       String    @default("queued")
-  error        String?
+  status        String    @default("queued")
+  error         String?
   /// النص كما أُرسل — تعديل القالب لاحقاً لا يغيّره
-  recipient    String?
-  subject      String?
-  body         String?
-  attempts     Int       @default(0)
+  recipient     String?
+  subject       String?
+  body          String?
+  attempts      Int       @default(0)
   /// queued بعد فشل: لا يُعاد قبل هذا الموعد، والمهلة تطول. sending: نهاية مهلة الحجز — بعدها يلتقطه
   /// غيره إن سقط مرسِله (domain/retry.ts). فارغ = يُرسل فوراً
   nextAttemptAt DateTime? @db.Timestamptz
-  deliveryRef  String?
-  sentAt       DateTime? @db.Timestamptz
-  readAt       DateTime? @db.Timestamptz
-  createdAt    DateTime  @default(now()) @db.Timestamptz
+  deliveryRef   String?
+  sentAt        DateTime? @db.Timestamptz
+  readAt        DateTime? @db.Timestamptz
+  createdAt     DateTime  @default(now()) @db.Timestamptz
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
@@ -1506,6 +1524,8 @@ model CmsPage {
   id          String   @id @default(uuid()) @db.Uuid
   slug        String   @unique
   titleAr     String
+  /// مولَّد في القاعدة: basta_fold(titleAr) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  titleArFold String?
   bodyAr      String
   isPublished Boolean  @default(false)
   updatedAt   DateTime @updatedAt @db.Timestamptz
@@ -1515,17 +1535,19 @@ model CmsPage {
 }
 
 model Banner {
-  id        String    @id @default(uuid()) @db.Uuid
-  placement String
-  imageKey  String
-  linkUrl   String?
-  titleAr   String?
-  sort      Int       @default(0)
-  startsAt  DateTime? @db.Timestamptz
-  endsAt    DateTime? @db.Timestamptz
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now()) @db.Timestamptz
-  updatedBy String?   @db.Uuid
+  id          String    @id @default(uuid()) @db.Uuid
+  placement   String
+  imageKey    String
+  linkUrl     String?
+  titleAr     String?
+  /// مولَّد في القاعدة: basta_fold(titleAr) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  titleArFold String?
+  sort        Int       @default(0)
+  startsAt    DateTime? @db.Timestamptz
+  endsAt      DateTime? @db.Timestamptz
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedBy   String?   @db.Uuid
 
   @@index([placement, isActive])
   @@map("banners")
@@ -1548,13 +1570,15 @@ model Conversation {
   productId  String? @db.Uuid
   subOrderId String? @db.Uuid
 
-  lastMessageAt  DateTime  @default(now()) @db.Timestamptz
+  lastMessageAt   DateTime  @default(now()) @db.Timestamptz
   /// أول 140 حرفاً من آخر رسالة — القائمة لا تجلب الرسائل
-  lastPreview    String
-  lastSenderSide String // customer | vendor
-  customerReadAt DateTime? @db.Timestamptz
-  vendorReadAt   DateTime? @db.Timestamptz
-  createdAt      DateTime  @default(now()) @db.Timestamptz
+  lastPreview     String
+  /// مولَّد في القاعدة: basta_fold(lastPreview) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  lastPreviewFold String?
+  lastSenderSide  String // customer | vendor
+  customerReadAt  DateTime? @db.Timestamptz
+  vendorReadAt    DateTime? @db.Timestamptz
+  createdAt       DateTime  @default(now()) @db.Timestamptz
 
   customer User                  @relation(fields: [customerId], references: [id])
   vendor   Vendor                @relation(fields: [vendorId], references: [id])
@@ -1604,18 +1628,20 @@ model WishlistItem {
 /// AD-17 — حملة: مدة، ومنتجات مميّزة مرتّبة يدوياً، وموضع في الواجهة،
 /// وكوبون اختياري يُعلَن معها (الكوبون يعمل بشروطه هو، لا بالحملة).
 model Campaign {
-  id        String   @id @default(uuid()) @db.Uuid
-  nameAr    String
+  id         String   @id @default(uuid()) @db.Uuid
+  nameAr     String
+  /// مولَّد في القاعدة: basta_fold(nameAr) — للبحث وحده، لا يُكتب ولا يُقرأ (مهاجرة search_fold)
+  nameArFold String?
   /// home_top | home_middle
-  placement String
-  couponId  String?  @db.Uuid
-  startsAt  DateTime @db.Timestamptz
-  endsAt    DateTime @db.Timestamptz
+  placement  String
+  couponId   String?  @db.Uuid
+  startsAt   DateTime @db.Timestamptz
+  endsAt     DateTime @db.Timestamptz
   /// إيقاف يدوي قبل موعد الانتهاء
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz
-  updatedAt DateTime @updatedAt @db.Timestamptz
-  updatedBy String?  @db.Uuid
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  updatedAt  DateTime @updatedAt @db.Timestamptz
+  updatedBy  String?  @db.Uuid
 
   coupon Coupon?           @relation(fields: [couponId], references: [id], onDelete: SetNull)
   items  CampaignProduct[]

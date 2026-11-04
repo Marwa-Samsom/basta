@@ -1,5 +1,6 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { like, folded } from '../../../common/paging';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { InventoryService } from '../../inventory/public';
@@ -284,9 +285,9 @@ export class StorefrontService implements OnModuleInit {
       // السقوط من المحرّك: تطابق نصّي بسيط — أضعف تسامحاً، وأفضل من لا نتيجة
       and.push({
         OR: [
-          { nameAr: { contains: term, mode: 'insensitive' } },
-          { nameEn: { contains: term, mode: 'insensitive' } },
-          { descriptionAr: { contains: term, mode: 'insensitive' } },
+          { nameArFold: folded(term) },
+          { nameEn: like(term) },
+          { descriptionArFold: folded(term) },
         ],
       });
     }

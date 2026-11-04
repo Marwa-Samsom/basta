@@ -6,7 +6,7 @@ import { NotificationsService } from '../../notifications/public';
 import { format as formatMoney, formatIn, money } from '../../../common/money/money';
 import { LedgerService } from './ledger.service';
 import { csvCell } from '../../../common/csv';
-import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
+import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
 
 export const ENTRY_LABELS: Record<string, string> = {
   sale_credit: 'مبيعات',
@@ -360,7 +360,7 @@ export class FinanceService {
     const t = q.search;
     const where: Prisma.PayoutRequestWhereInput = {
       ...(q.status ? { status: q.status as never } : {}),
-      ...(t ? { OR: [{ vendor: { OR: [{ nameAr: like(t) }, { nameEn: like(t) }, { slug: like(t) }] } }, { transferReference: like(t) }] } : {}),
+      ...(t ? { OR: [{ vendor: { OR: [{ nameArFold: folded(t) }, { nameEn: like(t) }, { slug: like(t) }] } }, { transferReference: like(t) }] } : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.payoutRequest.findMany({
@@ -451,7 +451,7 @@ export class FinanceService {
     const live: Prisma.CommissionRuleWhereInput = { OR: [{ effectiveTo: null }, { effectiveTo: { gt: new Date() } }] };
     const vendor: Prisma.CommissionRuleWhereInput = { ...live, scope: 'vendor' };
     const t = q.search;
-    const where: Prisma.CommissionRuleWhereInput = { ...vendor, ...(t ? { vendor: { OR: [{ nameAr: like(t) }, { nameEn: like(t) }, { slug: like(t) }] } } : {}) };
+    const where: Prisma.CommissionRuleWhereInput = { ...vendor, ...(t ? { vendor: { OR: [{ nameArFold: folded(t) }, { nameEn: like(t) }, { slug: like(t) }] } } : {}) };
     const include = { vendor: { select: { nameAr: true } } } as const;
     const [global, items, total, all] = await Promise.all([
       this.prisma.commissionRule.findFirst({ where: { ...live, scope: 'global' }, orderBy: [{ effectiveFrom: 'desc' }, { id: 'asc' }], include }),

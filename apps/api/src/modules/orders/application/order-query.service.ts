@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
+import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { TransferDetailsService } from '../../payments/public';
 import { allocate } from '../../pricing/public';
 import { AWAITING_TRANSFER } from './order-lifecycle.service';
@@ -98,8 +98,8 @@ export class OrderQueryService {
             subOrder: {
               OR: [
                 { subOrderNumber: like(t) },
-                { vendor: { nameAr: like(t) } },
-                { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ fullName: like(t) }, { email: like(t) }] } }] } },
+                { vendor: { nameArFold: folded(t) } },
+                { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ fullNameFold: folded(t) }, { email: like(t) }] } }] } },
               ],
             },
           }
@@ -168,8 +168,8 @@ export class OrderQueryService {
         ? {
             OR: [
               { subOrderNumber: like(q.search.trim()) },
-              { order: { shippingAddressSnapshot: { path: ['recipientName'], string_contains: q.search.trim() } } },
-              { items: { some: { OR: [{ productNameSnapshotAr: like(q.search.trim()) }, { skuSnapshot: like(q.search.trim()) }] } } },
+              { order: { recipientNameFold: folded(q.search.trim()) } },
+              { items: { some: { OR: [{ productNameSnapshotArFold: folded(q.search.trim()) }, { skuSnapshot: like(q.search.trim()) }] } } },
             ],
           }
         : {}),

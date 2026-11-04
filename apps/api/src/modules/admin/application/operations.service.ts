@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ConflictError, ForbiddenError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
+import { latinDigits } from '../../../common/arabic-fold';
+import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { StorefrontService } from '../../catalog/public';
 import { NotificationsService } from '../../notifications/public';
 import { DisplayCurrencyService, fxSpreadBps } from '../../pricing/public';
@@ -53,7 +54,7 @@ export class OperationsService {
     const where: Prisma.UserWhereInput = {
       ...base,
       ...(q.filter === 'tfa_off' ? { totpEnabledAt: null } : {}),
-      ...(t ? { OR: [{ fullName: like(t) }, { email: like(t) }] } : {}),
+      ...(t ? { OR: [{ fullNameFold: folded(t) }, { email: like(t) }] } : {}),
     };
     const [rows, total, all, tfaOff, me] = await Promise.all([
       this.prisma.user.findMany({
@@ -187,7 +188,7 @@ export class OperationsService {
       roles: { some: { role: 'customer' } },
       deletedAt: null,
       ...(q.search
-        ? { OR: [{ email: { contains: q.search, mode: 'insensitive' } }, { phone: { contains: q.search } }, { fullName: { contains: q.search, mode: 'insensitive' } }] }
+        ? { OR: [{ email: like(q.search) }, { phone: { contains: latinDigits(q.search) } }, { fullNameFold: folded(q.search) }] }
         : {}),
     };
     const [items, total] = await Promise.all([
@@ -293,7 +294,7 @@ export class OperationsService {
       ...(q.entityType ? { entityType: q.entityType } : {}),
       ...(q.entityId ? { entityId: q.entityId } : {}),
       ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: q.from } : {}), ...(q.to ? { lt: q.to } : {}) } } : {}),
-      ...(q.actor ? { actor: { OR: [{ email: { contains: q.actor, mode: 'insensitive' } }, { fullName: { contains: q.actor, mode: 'insensitive' } }] } } : {}),
+      ...(q.actor ? { actor: { OR: [{ email: like(q.actor) }, { fullNameFold: folded(q.actor) }] } } : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.auditLog.findMany({
@@ -449,10 +450,10 @@ export class OperationsService {
       ...(t
         ? {
             OR: [
-              { orderNumber: { contains: t, mode: 'insensitive' } },
-              { guestEmail: { contains: t, mode: 'insensitive' } },
-              { customer: { OR: [{ email: { contains: t, mode: 'insensitive' } }, { fullName: { contains: t, mode: 'insensitive' } }] } },
-              { subOrders: { some: { vendor: { nameAr: { contains: t, mode: 'insensitive' } } } } },
+              { orderNumber: like(t) },
+              { guestEmail: like(t) },
+              { customer: { OR: [{ email: like(t) }, { fullNameFold: folded(t) }] } },
+              { subOrders: { some: { vendor: { nameArFold: folded(t) } } } },
             ],
           }
         : {}),
@@ -554,8 +555,8 @@ function subOrderMatching(t: string): Prisma.SubOrderWhereInput {
   return {
     OR: [
       { subOrderNumber: like(t) },
-      { vendor: { nameAr: like(t) } },
-      { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ email: like(t) }, { fullName: like(t) }] } }] } },
+      { vendor: { nameArFold: folded(t) } },
+      { order: { OR: [{ orderNumber: like(t) }, { customer: { OR: [{ email: like(t) }, { fullNameFold: folded(t) }] } }] } },
     ],
   };
 }
