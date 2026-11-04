@@ -9,7 +9,7 @@ import {
   NotFoundError,
 } from '../../../common/errors/domain-error';
 import { MoneyError, parse as parseMoney } from '../../../common/money/money';
-import { dirOf, like, pageArgs, type SortOrder } from '../../../common/paging';
+import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ScopedRepository } from '../../../common/prisma/scoped-repository';
 import { vendorScopeOf, type Actor, type VendorScope } from '../../../common/security/actor';
@@ -218,9 +218,9 @@ export class ProductService {
       ...(search
         ? {
             OR: [
-              { nameAr: { contains: search, mode: 'insensitive' } },
-              { nameEn: { contains: search, mode: 'insensitive' } },
-              { variants: { some: { sku: { contains: search, mode: 'insensitive' }, archivedAt: null } } },
+              { nameArFold: folded(search) },
+              { nameEn: like(search) },
+              { variants: { some: { sku: like(search), archivedAt: null } } },
             ],
           }
         : {}),
@@ -301,7 +301,7 @@ export class ProductService {
     const out: Prisma.ProductVariantWhereInput = { inventory: { is: { onHand: { lte: this.prisma.inventory.fields.reserved } } } };
     const where: Prisma.ProductVariantWhereInput = {
       ...live,
-      ...(t ? { OR: [{ sku: like(t) }, { product: { OR: [{ nameAr: like(t) }, { nameEn: like(t) }] } }] } : {}),
+      ...(t ? { OR: [{ sku: like(t) }, { product: { OR: [{ nameArFold: folded(t) }, { nameEn: like(t) }] } }] } : {}),
       ...(q.filter === 'low' ? low : q.filter === 'out' ? out : {}),
     };
     const orderBy: Prisma.ProductVariantOrderByWithRelationInput[] = [
@@ -794,9 +794,9 @@ export class ProductService {
       ...(search
         ? {
             OR: [
-              { nameAr: { contains: search, mode: 'insensitive' } },
-              { nameEn: { contains: search, mode: 'insensitive' } },
-              { vendor: { nameAr: { contains: search, mode: 'insensitive' } } },
+              { nameArFold: folded(search) },
+              { nameEn: like(search) },
+              { vendor: { nameArFold: folded(search) } },
             ],
           }
         : {}),

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { like, folded } from '../../../common/paging';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { StorefrontService, type StorefrontProductCard } from '../../catalog/public';
@@ -93,7 +94,7 @@ export class CampaignsService {
   async list(q: { status?: CampaignStatus; search?: string; page: number } = { page: 1 }, now = new Date()) {
     const where: Prisma.CampaignWhereInput = {
       ...(q.status ? campaignStatusWhere(q.status, now) : {}),
-      ...(q.search ? { nameAr: { contains: q.search, mode: 'insensitive' } } : {}),
+      ...(q.search ? { nameArFold: folded(q.search) } : {}),
     };
     const [rows, total, ...perStatus] = await Promise.all([
       this.prisma.campaign.findMany({
@@ -190,7 +191,7 @@ export class CampaignsService {
         status: 'active',
         deletedAt: null,
         ...(term
-          ? { OR: [{ nameAr: { contains: term, mode: 'insensitive' } }, { nameEn: { contains: term, mode: 'insensitive' } }, { vendor: { nameAr: { contains: term, mode: 'insensitive' } } }] }
+          ? { OR: [{ nameArFold: folded(term) }, { nameEn: like(term) }, { vendor: { nameArFold: folded(term) } }] }
           : {}),
       },
       orderBy: { publishedAt: 'desc' },
@@ -221,7 +222,7 @@ export class CampaignsService {
     const where: Prisma.CouponWhereInput = {
       isActive: true,
       OR: [{ endsAt: null }, { endsAt: { gt: now } }],
-      ...(q ? { code: { contains: q, mode: 'insensitive' } } : {}),
+      ...(q ? { code: like(q) } : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.coupon.findMany({ where, orderBy: { code: 'asc' }, take: COUPON_PICK, select: { id: true, code: true, endsAt: true } }),

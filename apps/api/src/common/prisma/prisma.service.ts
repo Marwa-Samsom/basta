@@ -1,13 +1,28 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { privilegeReport, privilegeViolations } from './least-privilege';
+
+/** الأعمدة الموحّدة للبحث (…Fold، مهاجرة search_fold) — شرطٌ في البحث وحده، فلا تُقرأ مع الصفّ ولا تصل ردّاً */
+const FOLDED = {
+  product: { nameArFold: true, descriptionArFold: true },
+  vendor: { nameArFold: true },
+  user: { fullNameFold: true },
+  campaign: { nameArFold: true },
+  attribute: { nameArFold: true },
+  cmsPage: { titleArFold: true },
+  banner: { titleArFold: true },
+  review: { titleFold: true, bodyFold: true },
+  orderItem: { productNameSnapshotArFold: true },
+  conversation: { lastPreviewFold: true },
+  order: { recipientNameFold: true },
+} satisfies Prisma.GlobalOmitConfig;
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('Database');
 
   constructor() {
-    super({ log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'] });
+    super({ log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'], omit: FOLDED });
   }
 
   async onModuleInit(): Promise<void> {

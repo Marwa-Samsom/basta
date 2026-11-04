@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
-import { like, pageArgs } from '../../../common/paging';
+import { fold } from '../../../common/arabic-fold';
+import { folded, like, pageArgs } from '../../../common/paging';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import type { Actor, VendorScope } from '../../../common/security/actor';
 import { NotificationsService } from '../../notifications/public';
@@ -43,13 +44,13 @@ export interface ThreadList {
 
 /** البحث في الصندوق: سياق المحادثة (المنتج أو رقم الطلب) أو آخر رسالة، واسم الطرف الآخر */
 function threadSearch(t: string, side: Side): Prisma.ConversationWhereInput {
-  const general = ['استفسار عام', 'general inquiry'].some((l) => l.includes(t.toLowerCase()));
+  const general = ['استفسار عام', 'general inquiry'].some((l) => fold(l).includes(fold(t)));
   return {
     OR: [
-      { lastPreview: like(t) },
-      { product: { nameAr: like(t) } },
+      { lastPreviewFold: folded(t) },
+      { product: { nameArFold: folded(t) } },
       { subOrder: { subOrderNumber: like(t) } },
-      side === 'vendor' ? { customer: { fullName: like(t) } } : { vendor: { nameAr: like(t) } },
+      side === 'vendor' ? { customer: { fullNameFold: folded(t) } } : { vendor: { nameArFold: folded(t) } },
       ...(general ? [{ productId: null, subOrderId: null }] : []),
     ],
   };

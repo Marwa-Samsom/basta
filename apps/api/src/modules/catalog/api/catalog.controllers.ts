@@ -17,7 +17,7 @@ import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagg
 import type { MultipartFile } from '@fastify/multipart';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { InvalidInputError } from '../../../common/errors/domain-error';
-import { ADMIN_PAGE, like, pageOf, termOf } from '../../../common/paging';
+import { ADMIN_PAGE, folded, like, pageOf, termOf } from '../../../common/paging';
 import { assertOneOf } from '../../../common/validation';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { AuditService } from '../../identity/public';
@@ -240,7 +240,7 @@ export class AdminCatalogController {
     const term = termOf(search);
     const where = {
       ...(kind === 'axis' ? { isVariantAxis: true } : kind === 'filter' ? { isFilterable: true } : {}),
-      ...(term ? { OR: [{ nameAr: like(term) }, { code: like(term) }] } : {}),
+      ...(term ? { OR: [{ nameArFold: folded(term) }, { code: like(term) }] } : {}),
     };
     const [items, total, all, axis, filterable] = await Promise.all([
       this.prisma.attribute.findMany({

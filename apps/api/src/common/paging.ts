@@ -3,6 +3,7 @@
  * إجماليها، فتُلحق اللوحة الصفحة التالية بزرّ «المزيد». كانت هذه القوائم تقف عند أول
  * مئة أو مئتين بلا بحث ولا ما بعدها، فما بعدها لا يُوصل إليه (J-11، 20 أكتوبر 2026).
  */
+import { fold, latinDigits } from './arabic-fold';
 import { InvalidInputError } from './errors/domain-error';
 
 export const ADMIN_PAGE = 50;
@@ -24,8 +25,14 @@ export function termOf(raw?: string): string | undefined {
   return t ? t : undefined;
 }
 
-/** «يحتوي» بلا حساسية لحالة الأحرف — شرط البحث في كل حقل نصّي */
-export const like = (t: string) => ({ contains: t, mode: 'insensitive' as const });
+/** «يحتوي» بلا حساسية لحالة الأحرف — لحقل لاتيني (البريد، رقم الطلب، SKU)، والأرقام الهندية ← 0-9 */
+export const like = (t: string) => ({ contains: latinDigits(t), mode: 'insensitive' as const });
+
+/**
+ * «يحتوي» على العمود الموحَّد (`…Fold`) لنصّ عربي: «الايقاف» تجد «الإيقاف»، و«ساعه» تجد «ساعة».
+ * العبارة تُوحَّد بالقاعدة نفسها التي ولّدت العمود. عبارة لا يبقى منها شيء («ء») تُطلب كما هي.
+ */
+export const folded = (t: string) => ({ contains: fold(t) || t });
 
 /** ترتيب القوائم بتاريخها: الأحدث أولاً أو الأقدم أولاً — ?sort=newest|oldest */
 export const SORT_ORDERS = ['newest', 'oldest'] as const;

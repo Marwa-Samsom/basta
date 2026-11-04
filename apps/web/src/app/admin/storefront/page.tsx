@@ -10,6 +10,7 @@ import { localized } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { media, useAction, useAdminData, useAdminList } from '@/lib/admin';
 import { when } from '@/lib/orders';
+import { fold } from '@/lib/arabic-fold';
 
 interface Banner {
   id: string;
@@ -94,11 +95,10 @@ export default function AdminStorefrontPage() {
   const rows = featured.data ?? [];
   const ids = rows.map((p) => p.id);
   const test = FILTERS.find((x) => x.key === filter)?.test ?? (() => true);
-  const term = q.trim();
+  const term = fold(q.trim());
   // الخادم صفّى وبحث؛ والشرط نفسه هنا يُخفي صفوف التصفية السابقة ما دامت الصفحة الجديدة في الطريق
-  // (تبقى على الشاشة حتى تصل). وهو أيضاً يُبقي السطور السبعة فوقه كما في main فلا يتعارض تعديل طلب الدمج 190
-  // للمميّز بينها مع هذا الطلب
-  const shown = all.items.filter(test).filter((b) => !term || (b.titleAr ?? '').toLowerCase().includes(term.toLowerCase()));
+  // (تبقى على الشاشة حتى تصل). بالتوحيد نفسه، وإلا أخفى «الاولى» ما وجده الخادم من «الأولى»
+  const shown = all.items.filter(test).filter((b) => !term || fold(b.titleAr ?? '').includes(term));
   const { counts, placements: perPlacement } = all;
   const none = counts.all === 0;
 
