@@ -20,7 +20,7 @@ import {
   type Channel,
   type TemplateLocale,
 } from '../domain/templates';
-import { englishCounts, englishVars } from '../domain/english-vars';
+import { englishCounts, englishVars, storeNameVars } from '../domain/english-vars';
 import { MAX_ATTEMPTS, SENDING_LEASE_SECONDS, nextAttemptAt } from '../domain/retry';
 import { deliver } from '../infrastructure/channels';
 
@@ -198,9 +198,9 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
   ): Promise<number> {
     const v = await db.vendor.findUnique({ where: { id: input.vendorId }, select: { ownerUserId: true, nameAr: true, nameEn: true } });
     if (!v) return 0;
-    const vars: Record<string, string> = { store_name: v.nameAr, ...input.vars };
-    // واسمه الإنجليزي كما كتبه صاحبه: به يصله إشعاره إن كانت لغة حسابه الإنجليزية
-    if (vars['store_name'] === v.nameAr && v.nameEn) vars['store_name_en'] = v.nameEn;
+    const vars: Record<string, string> = { ...storeNameVars(v), ...input.vars };
+    // حدث يكتب اسماً آخر للمتجر: لا يبقى الإنجليزي لاسم غيره
+    if (vars['store_name'] !== v.nameAr) delete vars['store_name_en'];
     return this.enqueue({ code: input.code, userId: v.ownerUserId, vars }, db);
   }
 

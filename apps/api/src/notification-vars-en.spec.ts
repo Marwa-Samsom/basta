@@ -4,6 +4,8 @@
  * ترجمة يُسقط هذا، كما يُسقط en-coverage رسالة خادم بلا ترجمة. هنا لا داخل وحدة: يقرأ خرائط
  * وحدات عدّة من واجهاتها العامة، وحدودها (ADR-002) لا تسمح لوحدة بداخل أخرى.
  */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { toEnglish } from './common/i18n/translate';
 import { RETURN_REASON_LABELS } from './common/return-lines';
@@ -31,4 +33,25 @@ describe('متغيّرات الإشعار بالإنجليزية', () => {
     expect(missing).toEqual([]);
   });
 
+
+  /**
+   * اسم المتجر في الإشعار بالاسمين (storeNameVars): «store_name: vendor.nameAr» وحده كان يُوصل المشتري
+   * الإنجليزي «متجر الورد: Shipped…». موضع جديد يكتبه كذلك يُسقط هذا باسم ملفه وسطره.
+   */
+  it('كل اسم متجر في متغيّر إشعار يمرّ بـ storeNameVars', () => {
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) return files(p);
+        return /\.ts$/.test(e.name) && !/\.spec\.ts$/.test(e.name) ? [p] : [];
+      });
+    const bare = files(join(__dirname, 'modules')).flatMap((f) =>
+      readFileSync(f, 'utf8')
+        .split('\n')
+        .map((line, i) => ({ line, at: `${relative(__dirname, f)}:${i + 1}` }))
+        .filter(({ line }) => /store_name:\s*[\w.?]*\.nameAr\b/.test(line))
+        .map(({ at }) => at),
+    );
+    expect(bare).toEqual([]);
+  });
 });

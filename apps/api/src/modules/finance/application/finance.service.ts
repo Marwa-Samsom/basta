@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { BelowMinimumPayoutError, ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { NotificationsService } from '../../notifications/public';
+import { NotificationsService, storeNameVars } from '../../notifications/public';
 import { format as formatMoney, formatIn, money } from '../../../common/money/money';
 import { LedgerService } from './ledger.service';
 import { csvCell } from '../../../common/csv';
@@ -255,7 +255,7 @@ export class FinanceService {
        * (20 أكتوبر 2026): التعليق يوقف البيع ولا يصادر مستحقاً، لكن ما قد يُستردّ لمشترٍ (نزاع،
        * احتيال) يبقى محجوزاً مدّته. كان الرفض مطلقاً حتى يُعاد المتجر، خلافاً للقرار ولتلميح التعليق.
        */
-      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true, nameAr: true, suspendedAt: true } });
+      const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { status: true, nameAr: true, nameEn: true, suspendedAt: true } });
       if (vendor?.status === 'suspended' && vendor.suspendedAt) {
         const row = await tx.setting.findUnique({ where: { key: 'suspension_payout_hold_days' } });
         const days = Number(row?.valueJson ?? 90);
@@ -323,7 +323,7 @@ export class FinanceService {
           code: 'admin_payout_requested',
           permission: 'payouts.approve',
           vars: {
-            store_name: vendor.nameAr,
+            ...storeNameVars(vendor),
             amount: formatMoney(money(input.amountMinorUnits, input.currency)),
             link: '/admin/payouts',
           },

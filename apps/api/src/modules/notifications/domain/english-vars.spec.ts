@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { format, money } from '../../../common/money/money';
-import { englishCounts, englishMoney, englishVars } from './english-vars';
+import { englishCounts, englishMoney, englishVars, storeNameVars } from './english-vars';
 
 /** Intl يفصل رمز العملة عن الرقم بمسافة ثابتة (NBSP) — تُقرأ مسافة عادية في المقارنة */
 const NBSP = new RegExp(String.fromCodePoint(0xa0), 'g');
@@ -63,8 +63,12 @@ describe('متغيّرات الإشعار بالإنجليزية', () => {
       order_number: 'BST-261016-A1B2C3',
       link: '/account/orders/BST-261016-A1B2C3',
     });
-    // المتجر باسمه الإنجليزي إن وصل معه
-    expect(englishVars({ store_name: 'متجر الورد', store_name_en: 'Rose Store' }).store_name).toBe('Rose Store');
+    // المتجر باسمه الإنجليزي إن وصل معه — في أيّ متغيّر كُتب
+    expect(englishVars(storeNameVars({ nameAr: 'متجر الورد', nameEn: 'Rose Store' })).store_name).toBe('Rose Store');
+    expect(englishVars(storeNameVars({ nameAr: 'متجر الورد', nameEn: 'Rose Store' }, 'name')).name).toBe('Rose Store');
+    // متجر قديم بلا اسم إنجليزي: بالعربي، ولا متغيّر فارغ
+    expect(storeNameVars({ nameAr: 'متجر الورد', nameEn: null })).toEqual({ store_name: 'متجر الورد' });
+    expect(englishVars(storeNameVars({ nameAr: 'متجر الورد', nameEn: '' })).store_name).toBe('متجر الورد');
     // الاسم المكتوب لا يُترجم ولو طابق كلمة في القاموس
     expect(englishVars({ name: 'منتجات' }).name).toBe('منتجات');
     // سبب الإلغاء الآلي بكل صيغ العدد العربية

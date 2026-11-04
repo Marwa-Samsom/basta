@@ -10,7 +10,7 @@ import {
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { mergeReturnLines, RETURN_REASON_LABELS } from '../../../common/return-lines';
 import { LedgerService } from '../../finance/public';
-import { NotificationsService } from '../../notifications/public';
+import { NotificationsService, storeNameVars } from '../../notifications/public';
 import { format as formatMoney, money } from '../../../common/money/money';
 import { InventoryService } from '../../inventory/public';
 import { PAYMENT_PROVIDER, type PaymentProvider } from '../../payments/public';
@@ -715,7 +715,7 @@ export class OrderLifecycleService {
       select: {
         subOrderNumber: true,
         vendorId: true,
-        vendor: { select: { nameAr: true } },
+        vendor: { select: { nameAr: true, nameEn: true } },
         order: { select: { orderNumber: true, customerUserId: true, customer: { select: { fullName: true } } } },
         shipment: { select: { carrierCode: true, trackingNumber: true } },
       },
@@ -723,7 +723,7 @@ export class OrderLifecycleService {
     const common = {
       name: firstName(s.order.customer?.fullName),
       order_number: s.order.orderNumber,
-      store_name: s.vendor.nameAr,
+      ...storeNameVars(s.vendor),
       link: `/account/orders/${s.order.orderNumber}`,
     };
     // الرقم من صفّ الشحنة الذي كُتب للتوّ في المعاملة نفسها — إعادة الشحن بعد «تعذّر» تمرّ هنا أيضاً.

@@ -3,7 +3,7 @@ import type { Prisma, Role } from '@prisma/client';
 import { ConflictError, InvalidInputError, NotFoundError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { dirOf, folded, like, pageArgs, type SortOrder } from '../../../common/paging';
-import { NotificationsService } from '../../notifications/public';
+import { NotificationsService, storeNameVars } from '../../notifications/public';
 import { OrderLifecycleService } from '../../orders/public';
 
 /** حالات يُفتح فيها نزاع: بعد الشحن وحتى قبل الإكمال */
@@ -102,7 +102,7 @@ export class DisputesService {
         status: true,
         vendorId: true,
         subOrderNumber: true,
-        vendor: { select: { nameAr: true } },
+        vendor: { select: { nameAr: true, nameEn: true } },
         disputes: { where: { status: { in: OPEN } }, select: { id: true } },
         statusHistory: { where: { toStatus: 'refunded' }, orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
       },
@@ -140,7 +140,7 @@ export class DisputesService {
             code: 'admin_dispute_escalated',
             permission: 'disputes.resolve',
             vars: {
-              store_name: sub.vendor.nameAr,
+              ...storeNameVars(sub.vendor),
               order_number: sub.subOrderNumber,
               reason: REASON_AR[input.reasonCode] ?? input.reasonCode,
               link: '/admin/disputes',
@@ -233,7 +233,7 @@ export class DisputesService {
             id: true,
             subOrderNumber: true,
             status: true,
-            vendor: { select: { nameAr: true } },
+            vendor: { select: { nameAr: true, nameEn: true } },
             order: { select: { orderNumber: true } },
           },
         },
@@ -269,11 +269,11 @@ export class DisputesService {
       });
     }
     if (party.kind !== 'vendor') {
-      const v = await this.prisma.vendor.findUniqueOrThrow({ where: { id: s.vendorId }, select: { ownerUserId: true, nameAr: true } });
+      const v = await this.prisma.vendor.findUniqueOrThrow({ where: { id: s.vendorId }, select: { ownerUserId: true, nameAr: true, nameEn: true } });
       await this.notifications.enqueue({
         code: 'dispute_message',
         userId: v.ownerUserId,
-        vars: { name: v.nameAr, order_number: d.subOrder.subOrderNumber, link: `/vendor/disputes/${id}` },
+        vars: { ...storeNameVars(v, 'name'), order_number: d.subOrder.subOrderNumber, link: `/vendor/disputes/${id}` },
       });
     }
     // بعد التصعيد صار الحسم للإدارة: ما يضيفه طرف يقرؤه من يحسم قبل قراره
@@ -303,14 +303,14 @@ export class DisputesService {
       // ومن يحسم من المديرين: النزاع المصعَّد يجمّد مال المتجر حتى يتحرّك أحدهم
       const d = await tx.dispute.findUniqueOrThrow({
         where: { id },
-        select: { reasonCode: true, subOrder: { select: { subOrderNumber: true, vendor: { select: { nameAr: true } } } } },
+        select: { reasonCode: true, subOrder: { select: { subOrderNumber: true, vendor: { select: { nameAr: true, nameEn: true } } } } },
       });
       await this.notifications.enqueueAdmins(
         {
           code: 'admin_dispute_escalated',
           permission: 'disputes.resolve',
           vars: {
-            store_name: d.subOrder.vendor.nameAr,
+            ...storeNameVars(d.subOrder.vendor),
             order_number: d.subOrder.subOrderNumber,
             reason: REASON_AR[d.reasonCode] ?? d.reasonCode,
             link: '/admin/disputes',
@@ -342,7 +342,7 @@ export class DisputesService {
           {
             code: 'admin_dispute_withdrawn',
             permission: 'disputes.resolve',
-            vars: { store_name: d.subOrder.vendor.nameAr, order_number: d.subOrder.subOrderNumber, link: '/admin/disputes' },
+            vars: { ...storeNameVars(d.subOrder.vendor), order_number: d.subOrder.subOrderNumber, link: '/admin/disputes' },
           },
           tx,
         );

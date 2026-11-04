@@ -6,7 +6,7 @@
  * ما يكتبه الكود يُترجم: المبالغ («125.500 د.أ.» ← «JOD 125.500»)، والحالات والأسباب والقرارات
  * وعناوين الوثائق (قاموس الخادم en.ts عبر toEnglish)، وسطور التحويل والمخزون، وموعد التحويل.
  * وما كتبه إنسان يبقى كما كتبه: أسماء المتاجر والمنتجات والأشخاص، والنصوص الحرّة، والمراجع — إلا
- * المتجر يصله إشعاره باسمه الإنجليزي الذي كتبه هو (store_name_en).
+ * اسم المتجر: يصل باسمه الإنجليزي الذي كتبه صاحبه (storeNameVars).
  */
 import { toEnglish } from '../../../common/i18n/translate';
 import { CURRENCY_CODES, format, minorUnitDigits, money } from '../../../common/money/money';
@@ -63,16 +63,29 @@ const DEADLINE_EN = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeSt
 /** متغيّرات نصّها مما يكتبه الكود — تُطابَق بقاموس الخادم. ما سواها (أسماء، نصوص حرّة) لا يُمسّ */
 const CODE_TEXT = new Set(['status', 'reason', 'outcome', 'check', 'kind', 'document', 'sender', 'tracking_label', 'context']);
 
+/**
+ * اسم المتجر لمتغيّر إشعار: العربي، ومعه الإنجليزي الذي كتبه صاحبه (`store_name_en`) — به يصل من لغة
+ * حسابه الإنجليزية، مشترياً كان أو المتجر نفسه أو المدير. المتجر القديم بلا اسم إنجليزي يصل بالعربي.
+ */
+export const storeNameVars = (vendor: { nameAr: string; nameEn: string | null }, key = 'store_name'): Record<string, string> => ({
+  [key]: vendor.nameAr,
+  ...(vendor.nameEn ? { [`${key}_en`]: vendor.nameEn } : {}),
+});
+
 export function englishVars(vars: Readonly<Record<string, string>>): Record<string, string> {
   const out: Record<string, string> = { ...vars };
   for (const [key, value] of Object.entries(vars)) {
     if (typeof value !== 'string') continue;
+    // اسم كتب صاحبه نظيره الإنجليزي (storeNameVars): يصل به
+    const own = vars[`${key}_en`];
+    if (own) {
+      out[key] = own;
+      continue;
+    }
     if (key === 'amount') out[key] = englishMoney(value) ?? value;
     else if (key === 'items') out[key] = englishStock(value);
     else if (key === 'pay_to') out[key] = englishPayTo(value);
     else if (key === 'deadline' && vars['deadline_at']) out[key] = DEADLINE_EN.format(new Date(vars['deadline_at']));
-    // المتجر يُخاطَب باسمه الإنجليزي إن وصل معه (enqueueVendor) — وإلا فباسمه كما كتبه
-    else if (key === 'store_name' && vars['store_name_en']) out[key] = vars['store_name_en'];
     // التحية لمن لا اسم له: «عميلنا» ← «there» — والاسم المكتوب يبقى
     else if (key === 'name' && value === 'عميلنا') out[key] = toEnglish(value);
     else if (CODE_TEXT.has(key)) out[key] = toEnglish(value);

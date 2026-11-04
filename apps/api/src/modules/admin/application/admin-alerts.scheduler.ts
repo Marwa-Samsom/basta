@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { writeErrorLog } from '../../../common/observability/error-log';
 import { everyAfterBoot } from '../../../common/periodic';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { NotificationsService } from '../../notifications/public';
+import { NotificationsService, storeNameVars } from '../../notifications/public';
 import { acceptBy, acceptanceDueSince } from '../domain/acceptance';
 import { ReportsService } from './reports.service';
 
@@ -109,7 +109,7 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
     for (let cursor: string | undefined; ; ) {
       const rows = await this.prisma.returnRequest.findMany({
         where: { status: 'requested', requestedAt: { lt: new Date(now.getTime() - RETURN_STALL_DAYS * DAY_MS) } },
-        select: { id: true, requestedAt: true, subOrder: { select: { subOrderNumber: true, vendor: { select: { nameAr: true } } } } },
+        select: { id: true, requestedAt: true, subOrder: { select: { subOrderNumber: true, vendor: { select: { nameAr: true, nameEn: true } } } } },
         orderBy: [{ requestedAt: 'asc' }, { id: 'asc' }],
         take: batch,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -120,7 +120,7 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
           permission: 'orders.manage',
           vars: {
             order_number: r.subOrder.subOrderNumber,
-            store_name: r.subOrder.vendor.nameAr,
+            ...storeNameVars(r.subOrder.vendor),
             days: String(Math.floor((now.getTime() - r.requestedAt.getTime()) / DAY_MS)),
             link: '/admin/returns',
           },
@@ -144,7 +144,7 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
           // ما فاتت مهلته تلغيه مهمة الطلبات — لا تنبيه بما انتهى
           placedAt: { lt: acceptanceDueSince(deadline, now), gte: new Date(now.getTime() - deadline * 3_600_000) },
         },
-        select: { id: true, placedAt: true, subOrderNumber: true, vendor: { select: { nameAr: true } } },
+        select: { id: true, placedAt: true, subOrderNumber: true, vendor: { select: { nameAr: true, nameEn: true } } },
         orderBy: [{ placedAt: 'asc' }, { id: 'asc' }],
         take: batch,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -154,7 +154,7 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
         const ok = await this.notifications.alertAdminsOnce(`acceptance_due:${s.id}`, {
           code: 'admin_acceptance_due',
           permission: 'orders.manage',
-          vars: { order_number: s.subOrderNumber, store_name: s.vendor.nameAr, hours: String(left), link: '/admin/orders?due=acceptance' },
+          vars: { order_number: s.subOrderNumber, ...storeNameVars(s.vendor), hours: String(left), link: '/admin/orders?due=acceptance' },
         });
         if (ok) sent++;
       }
@@ -180,7 +180,7 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
           reasonCode: true,
           createdAt: true,
           messages: { orderBy: { createdAt: 'desc' }, select: { senderRole: true, createdAt: true } },
-          subOrder: { select: { subOrderNumber: true, vendor: { select: { nameAr: true } } } },
+          subOrder: { select: { subOrderNumber: true, vendor: { select: { nameAr: true, nameEn: true } } } },
         },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         take: batch,
@@ -203,7 +203,7 @@ export class AdminAlertsScheduler implements OnApplicationBootstrap, OnModuleDes
           permission: 'disputes.resolve',
           vars: {
             order_number: d.subOrder.subOrderNumber,
-            store_name: d.subOrder.vendor.nameAr,
+            ...storeNameVars(d.subOrder.vendor),
             reason: DISPUTE_REASON_AR[d.reasonCode] ?? d.reasonCode,
             days: String(days),
             link: '/admin/disputes',
