@@ -356,10 +356,16 @@ describe('بوابة 11 · البند 2 — التقرير المالي يطاب
       expect(row.orders).toBe(mine.length);
       expect(BigInt(row.grossMinorUnits)).toBe(mine.reduce((a, o) => a + o.grandTotalMinorUnits, 0n));
     }
-    // الدفتر نفسه سليم وقت التقرير
+    // الدفتر نفسه سليم وقت التقرير. ملفات أخرى تكتب بالتوازي، وأحدها يصنع انحرافاً عن قصد ثم يردّه
+    // («المنظر يكشف قيداً ناقصاً» في finance — استرداد بلا قيد لحظة): كانت قراءة واحدة تقع فيه
+    // فيسقط هذا مع الحزمة كلها (4 نوفمبر 2026). يُعاد الفحص حتى يصفو، والانحراف الباقي يسقط باسم منظره
     expect(report.ledger.length).toBeGreaterThan(0);
-    const drift = (await call('GET', '/admin/health/drift', admin.token)).json() as { rows: number }[];
-    expect(drift.every((d) => d.rows === 0)).toBe(true);
+    await expect
+      .poll(async () => ((await call('GET', '/admin/health/drift', admin.token)).json() as { view: string; rows: number }[]).filter((d) => d.rows > 0).map((d) => d.view), {
+        timeout: 15_000,
+        interval: 1_000,
+      })
+      .toEqual([]);
 
     const csv = await call('GET', `/admin/reports/financial.csv?from=${from}&to=${to}`, admin.token);
     expect(csv.statusCode).toBe(200);
@@ -374,7 +380,8 @@ describe('بوابة 11 · البند 2 — التقرير المالي يطاب
     const head = (sheet.getRow(1).values as string[]).slice(1);
     const rowOf = [...Array(sheet.rowCount).keys()].map((i) => sheet.getRow(i + 1).values as unknown[]).find((v) => v[1] === 'SAR')!;
     expect(String(rowOf[head.indexOf('العمولة') + 1])).toBe(sar.commissionMinorUnits);
-  }, 30_000);
+    // إحدى عشرة ثانية وحده (منها انتظار النافذة)، والحزمة كلها تبطئه أضعافاً، وفحص الانحراف قد يُعاد
+  }, 60_000);
 
   it('دخل فرق الصرف على هامش لحظة الدفع المحفوظ مع الفرعي، لا على الإعداد اليوم (ACFG-093)', async () => {
     if (!dbUp) return;
@@ -714,21 +721,35 @@ describe('بوابة 11 · البند 1 — العمليات اليومية من
       expect(new Date(mine.acceptBy!).getTime()).toBe(placedAt.getTime() + hours * 3_600_000);
 
       // البطاقة تعدّ الفرعيات نفسها التي تعرضها القائمة — لا رقم بلا قائمة. القائمة كلها لا صفحتها
-      // الأولى: على قاعدة التطوير قد يقارب المهلة مئات الطلبات من تشغيلات سابقة (20 أكتوبر 2026)
-      const all: Item[] = [...items];
-      for (let page = 2; all.length < (list.json().total as number); page++) {
-        const next = (await call('GET', `/admin/orders?due=acceptance&page=${page}`, admin.token)).json().items as Item[];
-        if (next.length === 0) break;
-        all.push(...next);
+      // الأولى: على قاعدة التطوير قد يقارب المهلة مئات الطلبات من تشغيلات سابقة (20 أكتوبر 2026) —
+      // أكثر من ألف في 4 نوفمبر، أغلبها طلبات تجارب المتصفّح لم يقبلها أحد
+      const listed = async (): Promise<number> => {
+        const all: Item[] = [];
+        for (let page = 1; ; page++) {
+          const res = (await call('GET', `/admin/orders?due=acceptance&page=${page}`, admin.token)).json() as { items: Item[]; total: number };
+          all.push(...res.items);
+          if (res.items.length === 0 || all.length >= res.total) break;
+        }
+        return all.flatMap((o) => o.subOrders).filter((s) => s.acceptanceDue).length;
+      };
+      const queued = async () => (await call('GET', '/admin/dashboard', admin.token)).json().queues.overdueAcceptance as number;
+      // ملفات أخرى تُدخل الطوابير طلبات وتُخرجها بالتوازي، فقد يتغيّر العدد بين القراءتين: تُعاد
+      // المقارنة حتى تتفق قراءتان متتاليتان، والفرق الباقي بعد ثلاث يسقط
+      let same = false;
+      let seen = '';
+      for (let attempt = 0; attempt < 3 && !same; attempt++) {
+        const [a, b] = [await listed(), await queued()];
+        same = a === b;
+        seen = `القائمة ${a} والبطاقة ${b}`;
       }
-      const queued = (await call('GET', '/admin/dashboard', admin.token)).json().queues.overdueAcceptance as number;
-      expect(queued).toBe(all.flatMap((o) => o.subOrders).filter((s) => s.acceptanceDue).length);
+      expect(same, seen).toBe(true);
 
       expect((await call('GET', '/admin/orders?due=late', admin.token)).statusCode).toBe(400);
     } finally {
       await prisma.subOrder.update({ where: { id: sub.id }, data: { placedAt: new Date() } });
     }
-  });
+    // ثانيتان ونصف وحده، وأضعافها مع الحزمة كلها: كان يسقط بمهلة الخمس الافتراضية
+  }, 60_000);
 
   it('اللوحة: طوابير العمل وتنبيهات الانحراف في مكان واحد', async () => {
     if (!dbUp) return;
