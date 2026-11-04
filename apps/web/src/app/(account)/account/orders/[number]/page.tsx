@@ -24,6 +24,7 @@ import {
   labelOf,
   money,
   toneOf,
+  SELF_DELIVERY,
   trackingLabel,
   when,
   type OrderItemView,
@@ -561,6 +562,12 @@ function StoreCard({
               <Icon name="truck" size={17} />
               {trackingLabel(s.shipment.carrierCode, locale)} <span className="sp-ship__no num">{s.shipment.trackingNumber}</span>
               <span className="sp-ship__carrier">{carrierName(s.shipment.carrierCode, locale)}</span>
+              {/* صفحة التتبّع العامة بالرقم جاهزاً — يُنسخ رابطها ويُرسل (BUY-092) */}
+              {s.shipment.carrierCode !== SELF_DELIVERY ? (
+                <Link className="sp-ship__track" href={`/track?number=${encodeURIComponent(s.shipment.trackingNumber)}`}>
+                  {t('تتبّع الشحنة', 'Track shipment')}
+                </Link>
+              ) : null}
             </p>
             {s.shipment.events.length ? (
               <ul className="sp-events">

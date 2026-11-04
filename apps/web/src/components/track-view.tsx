@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { Alert, TextInput } from '@/components/ui';
@@ -46,19 +47,20 @@ const STATUS_TEXT: Record<string, { tone: string; label: string; en: string }> =
  */
 export function TrackView() {
   const t = useT();
-  const [number, setNumber] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const [number, setNumber] = useState(() => params.get('number') ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Tracking | null>(null);
+  /** آخر رقم بُحث عنه — كي لا يُعاد البحث حين يكتب البحثُ نفسُه الرقمَ في العنوان */
+  const looked = useRef<string | null>(null);
 
-  async function submit(e: FormEvent): Promise<void> {
-    e.preventDefault();
-    const value = number.trim();
-    if (!value) {
-      setError(t('اكتب رقم التتبّع كما وصلك من المتجر.', 'Enter the tracking number exactly as the shop sent it.'));
-      return;
-    }
-    setBusy(true);
+  const lookup = useCallback(
+    async (value: string): Promise<void> => {
+      looked.current = value;
+      setBusy(true);
     setError(null);
     try {
       setResult(await api<Tracking>(`/track/${encodeURIComponent(value)}`, { auth: false }));
@@ -77,6 +79,28 @@ export function TrackView() {
     } finally {
       setBusy(false);
     }
+    },
+    [t],
+  );
+
+  // الرقم في العنوان (من «تتبّع الشحنة» في تفاصيل الطلب أو رابط أُرسل) يُبحث عنه وحده
+  const fromUrl = params.get('number')?.trim() ?? '';
+  useEffect(() => {
+    if (!fromUrl || fromUrl === looked.current) return;
+    setNumber(fromUrl);
+    void lookup(fromUrl);
+  }, [fromUrl, lookup]);
+
+  async function submit(e: FormEvent): Promise<void> {
+    e.preventDefault();
+    const value = number.trim();
+    if (!value) {
+      setError(t('اكتب رقم التتبّع كما وصلك من المتجر.', 'Enter the tracking number exactly as the shop sent it.'));
+      return;
+    }
+    // في العنوان أيضاً: يُنسخ الرابط فيفتح النتيجة نفسها
+    router.replace(`${pathname}?number=${encodeURIComponent(value)}`, { scroll: false });
+    await lookup(value);
   }
 
   return (

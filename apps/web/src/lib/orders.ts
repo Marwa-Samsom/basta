@@ -210,7 +210,7 @@ export function historyReason(h: Pick<HistoryRow, 'toStatus' | 'reason'>, locale
  * كانت صفحتا الطلب تقولان «رقم التتبّع» وتعرضان الرمز الخام «self» بعد الشحن، والإشعار
  * وخانة البائع «مرجع التوصيل» (BUY-015، J-14 — 21 أكتوبر 2026).
  */
-const SELF_DELIVERY = 'self';
+export const SELF_DELIVERY = 'self';
 const CARRIER_NAMES: Readonly<Record<string, string>> = { [SELF_DELIVERY]: 'توصيل ذاتي', 'basta-express': 'بسطة إكسبرس' };
 const CARRIER_NAMES_EN: Readonly<Record<string, string>> = { [SELF_DELIVERY]: 'Self-delivery', 'basta-express': 'Basta Express' };
 
