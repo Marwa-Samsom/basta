@@ -230,7 +230,7 @@ export default function AdminReportsPage() {
               </div>
               {data.usd.rows.length === 0 ? (
                 <EmptyState icon="chart" title={t('لا بيانات في هذه الفترة', 'No data in this period')}>
-                  {t('تظهر الأرقام هنا بمجرّد وجود طلبات مدفوعة.', 'Numbers appear here as soon as there are paid orders.')}
+                  {t('تظهر الأرقام هنا بمجرّد وجود طلبات مدفوعة. جرّب فترة أطول.', 'Numbers appear here as soon as there are paid orders. Try a longer period.')}
                 </EmptyState>
               ) : (
                 <div className="table-wrap">

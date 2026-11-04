@@ -29,7 +29,8 @@
 /* السابق نفس سهم «التالي» مقلوباً — والأيقونة نفسها تنقلب في RTL */
 .date-pop__prev .icon { rotate: 180deg; }
 
-.date-pop__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+/* minmax(0, …): عمود لا يتّسع لمحتواه — كان اسم يوم طويل يدفع السابع خارج النافذة (ACFG-089) */
+.date-pop__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .date-pop__weekday { padding-block: var(--space-1); color: var(--text-muted); font-size: var(--text-xs); text-align: center; }
 .date-pop__day {
   aspect-ratio: 1;
