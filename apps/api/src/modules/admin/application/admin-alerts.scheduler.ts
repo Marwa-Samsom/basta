@@ -23,7 +23,7 @@ export const RETURN_STALL_DAYS = 3;
 export const DISPUTE_WAIT_DAYS = 2;
 
 /** سبب النزاع بالعربي — كما في إشعار التصعيد */
-const DISPUTE_REASON_AR: Readonly<Record<string, string>> = {
+export const DISPUTE_REASON_AR: Readonly<Record<string, string>> = {
   not_received: 'لم يصلني الطلب',
   damaged: 'وصل تالفاً',
   not_as_described: 'لا يطابق الوصف',
@@ -33,7 +33,7 @@ const DISPUTE_REASON_AR: Readonly<Record<string, string>> = {
 };
 
 /** اسم كل فحص كما تعرضه لوحة الإدارة (admin/page.tsx VIEW_LABELS) */
-const DRIFT_LABELS: Readonly<Record<string, string>> = {
+export const DRIFT_LABELS: Readonly<Record<string, string>> = {
   audit_money_conservation: 'حفظ المال (بائع + منصة + مُسترد ≠ مقبوض)',
   audit_wallet_drift: 'رصيد محفظة لا يطابق دفترها',
   audit_withdrawn_drift: 'المسحوب لا يطابق قيود السحب',

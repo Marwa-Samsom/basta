@@ -9,6 +9,8 @@
  * تعجّب ولا «عزيزي العميل». الرسائل النصية قصيرة (حدّ 160 حرفاً تقريباً).
  */
 
+import { DEFAULT_TEMPLATES_EN } from './templates.en';
+
 export const CHANNELS = ['email', 'sms', 'whatsapp', 'push', 'in_app'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
@@ -110,6 +112,7 @@ export const EVENTS: readonly EventDef[] = [
       amount: '125.500 د.أ',
       pay_to: 'كليك: BASTA\nالمستفيد: شركة بسطة',
       deadline: '16 أكتوبر 2026، 3:00 م',
+      deadline_at: '2026-10-16T12:00:00.000Z',
       link: '/account/orders/BST-260921-A1B2C3',
     },
   },
@@ -766,6 +769,11 @@ export function redactVars(code: string, vars: Readonly<Record<string, string>>)
   return Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, secret.includes(k) ? REDACTED : v]));
 }
 
+/** لغات القوالب: العربية أصل كل حدث وقناة، والإنجليزية نظيرتها (templates.en.ts) */
+export type TemplateLocale = 'ar' | 'en';
+export const TEMPLATE_LOCALES: readonly TemplateLocale[] = ['ar', 'en'];
+export const seedsOf = (locale: TemplateLocale): readonly TemplateSeed[] => (locale === 'en' ? DEFAULT_TEMPLATES_EN : DEFAULT_TEMPLATES);
+
 /** القالب كما في الكود — مصدر القوالب المقفولة الوحيد، ولو عُبث بصفّها في القاعدة */
-export const defaultTemplate = (code: string, channel: Channel): TemplateSeed | undefined =>
-  DEFAULT_TEMPLATES.find((t) => t.code === code && t.channel === channel);
+export const defaultTemplate = (code: string, channel: Channel, locale: TemplateLocale = 'ar'): TemplateSeed | undefined =>
+  seedsOf(locale).find((t) => t.code === code && t.channel === channel);

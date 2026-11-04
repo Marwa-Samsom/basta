@@ -862,6 +862,33 @@ export const EN_MESSAGES: Readonly<Record<string, string>> = {
   // وثيقة مرفوضة بلا سبب مكتوب، وقائمة سمات فارغة في خطأ الاستيراد
   مرفوضة: 'Rejected',
   'لا شيء بعد': 'none yet',
+  // ---- قيم متغيّرات الإشعارات التي يكتبها الكود (4 نوفمبر 2026) — بها يصل الإشعار بلغة صاحبه
+  // (notifications/domain/english-vars.ts)، و english-vars.spec.ts يُسقط الفحص إن غابت ترجمة قيمة
+  عميلنا: 'there',
+  المشتري: 'The buyer',
+  المتجر: 'The store',
+  'رقم التتبّع': 'Tracking number',
+  'مرجع التوصيل': 'Delivery reference',
+  'لم يذكر المتجر سبباً': 'The store gave no reason',
+  'غير محدّد': 'Not specified',
+  'أرسل طلب انضمامه': 'submitted its application',
+  'أعاد إرسال طلبه بعد الرفض': 'resubmitted its application after a rejection',
+  'حُسم لصالحك، ويُردّ لك ما بقي من مبلغ هذا المتجر إلى وسيلة دفعك': 'resolved in your favor; what remains of this store’s amount is refunded to your payment method',
+  'حُسم لصالح المتجر': 'resolved in the store’s favor',
+  'حُسم لصالح المشتري، ورُدّ له ما بقي من مبلغ الطلب': 'resolved in the buyer’s favor, and what remained of the order amount was refunded to them',
+  'حُسم لصالحكم، ويُحرَّر مال الطلب بموعده': 'resolved in your favor; the order money is released on schedule',
+  'حُسم لصالحك، وستحوّل لك الإدارة ما بقي من مبلغ هذا المتجر، ونرسل لك مرجع التحويل حين يتمّ':
+    'resolved in your favor; the team will transfer what remains of this store’s amount to you and send you the transfer reference when it is done',
+  'حفظ المال (بائع + منصة + مُسترد ≠ مقبوض)': 'Money conservation (seller + platform + refunded ≠ received)',
+  'رصيد محفظة لا يطابق دفترها': 'Wallet balance does not match its ledger',
+  'المسحوب لا يطابق قيود السحب': 'Withdrawn amount does not match payout entries',
+  'طلب مدفوع بلا قيد بيع': 'Paid order without a sale entry',
+  'مخزون لا يطابق حركاته': 'Stock does not match its movements',
+  'محجوز لا يطابق الحجوزات': 'Reserved stock does not match reservations',
+  'مجموع الفرعيات لا يساوي الأب': 'Shop orders do not add up to the parent order',
+  'مدفوع بلا طلبات فرعية': 'Paid without shop orders',
+  'لم يقبله البائع خلال ساعة واحدة': 'The seller did not accept it within 1 hour',
+  'لم يقبله البائع خلال ساعتين': 'The seller did not accept it within 2 hours',
 };
 
 export const EN_TEMPLATES: Readonly<Record<string, string>> = {
@@ -1225,4 +1252,7 @@ export const EN_TEMPLATES: Readonly<Record<string, string>> = {
   '{0} يجب أن يكون أكبر من صفر.': '{0} must be greater than zero.',
   '{0} يجب أن تكون عدداً صحيحاً بين 0 و {1}، والمُدخل {2}.':
     '{0} must be a whole number between 0 and {1}; got {2}.',
+  // ---- سبب الإلغاء الآلي في الإشعار (order-scheduler: «لم يقبله البائع خلال ${hoursAr(hours)}»)
+  'لم يقبله البائع خلال {0} ساعة': 'The seller did not accept it within {0} hours',
+  'لم يقبله البائع خلال {0} ساعات': 'The seller did not accept it within {0} hours',
 };

@@ -393,6 +393,8 @@ export class CheckoutService {
             amount: formatMoney(money(order.grandTotalMinorUnits, order.currency)),
             pay_to: payToLines(details),
             deadline: DEADLINE_FORMAT.format(expiresAt),
+            // لحظته نفسها: منها يُكتب الموعد بالإنجليزية لمن لغة حسابه الإنجليزية
+            deadline_at: expiresAt.toISOString(),
             link: `/account/orders/${order.orderNumber}`,
           },
         },

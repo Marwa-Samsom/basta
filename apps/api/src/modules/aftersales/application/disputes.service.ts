@@ -38,7 +38,7 @@ const LIST_SELECT = {
 } satisfies Prisma.DisputeSelect;
 
 /** سبب النزاع كما اختاره المشتري — للإشعار؛ الرمز نفسه إن جدّ سبب لم يُترجم */
-const REASON_AR: Readonly<Record<string, string>> = {
+export const REASON_AR: Readonly<Record<string, string>> = {
   not_received: 'لم يصلني الطلب',
   damaged: 'وصل تالفاً',
   not_as_described: 'لا يطابق الوصف',
@@ -61,7 +61,7 @@ const REASON_EN: Readonly<Record<string, string>> = {
 export const DISPUTES_PAGE = 20;
 
 /** القرار كما يقرؤه كل طرف — لمن حُسم، وما يعنيه لماله */
-const OUTCOME_AR = {
+export const OUTCOME_AR = {
   customer: { customer: 'حُسم لصالحك، ويُردّ لك ما بقي من مبلغ هذا المتجر إلى وسيلة دفعك', vendor: 'حُسم لصالح المتجر' },
   vendor: { customer: 'حُسم لصالح المشتري، ورُدّ له ما بقي من مبلغ الطلب', vendor: 'حُسم لصالحكم، ويُحرَّر مال الطلب بموعده' },
 } as const;
@@ -71,7 +71,7 @@ const OUTCOME_AR = {
  * يدوياً، ثم يصل المشتري مرجعه (refund_transferred). الوعد بغير ذلك يتركه ينتظر
  * مالاً لم يخرج بعد (ADM-071، 24 أكتوبر 2026).
  */
-const OUTCOME_CUSTOMER_TRANSFER_AR = 'حُسم لصالحك، وستحوّل لك الإدارة ما بقي من مبلغ هذا المتجر، ونرسل لك مرجع التحويل حين يتمّ';
+export const OUTCOME_CUSTOMER_TRANSFER_AR = 'حُسم لصالحك، وستحوّل لك الإدارة ما بقي من مبلغ هذا المتجر، ونرسل لك مرجع التحويل حين يتمّ';
 
 /** الاسم الأول للتحية — `\s` لا `s`: «Thomas» كان يُقصّ عند أول حرف s */
 const firstName = (full: string | null | undefined): string => (full ?? '').trim().split(/\s+/)[0] || 'عميلنا';

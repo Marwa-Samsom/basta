@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { format, money } from '../../../common/money/money';
-import { DEFAULT_TEMPLATES, EVENTS, render } from './templates';
+import { DEFAULT_TEMPLATES, EVENTS, render, usedVariables } from './templates';
+import { DEFAULT_TEMPLATES_EN } from './templates.en';
 
 /**
  * لا مراجعة للمنتجات قبل النشر (قرار صاحبة المشروع 15 أكتوبر 2026): لا رسالة للبائع تَعِده بها.
@@ -79,5 +80,32 @@ describe('صفحتا الإشعارات تعرفان كل إشعار داخل ا
     const src = page('(account)/account/notifications/page.tsx');
     const missing = [...inApp].filter((c) => audienceOf.get(c) !== 'admin' && !titled(src, c));
     expect(missing).toEqual([]);
+  });
+});
+
+/**
+ * من لغة حسابه الإنجليزية يصله الإشعار بالإنجليزية (4 نوفمبر 2026): لكل قالب عربي نظيره بالقنوات
+ * نفسها والمتغيّرات نفسها — قالب يُضاف بالعربية وحدها يُسقط هذا، فلا يصل صاحبه نصّ ناقص.
+ */
+describe('لكل قالب عربي نظيره الإنجليزي', () => {
+  const key = (t: { code: string; channel: string }) => `${t.code}/${t.channel}`;
+  const ARABIC = new RegExp(`[${String.fromCodePoint(0x0600)}-${String.fromCodePoint(0x06ff)}]`);
+
+  it('القنوات نفسها لكل حدث', () => {
+    expect(DEFAULT_TEMPLATES_EN.map(key).sort()).toEqual(DEFAULT_TEMPLATES.map(key).sort());
+  });
+
+  it('المتغيّرات نفسها، والعنوان حيث للعربي عنوان', () => {
+    for (const ar of DEFAULT_TEMPLATES) {
+      const en = DEFAULT_TEMPLATES_EN.find((t) => key(t) === key(ar))!;
+      const vars = (t: typeof ar) => [...new Set(usedVariables(`${t.subject ?? ''} ${t.body}`))].sort();
+      expect(vars(en), key(ar)).toEqual(vars(ar));
+      expect(Boolean(en.subject), key(ar)).toBe(Boolean(ar.subject));
+    }
+  });
+
+  it('لا حرف عربي في نصّ إنجليزي', () => {
+    const mixed = DEFAULT_TEMPLATES_EN.filter((t) => ARABIC.test(`${t.subject ?? ''} ${t.body}`)).map(key);
+    expect(mixed).toEqual([]);
   });
 });
