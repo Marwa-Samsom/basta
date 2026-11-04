@@ -219,6 +219,7 @@ export const EN_MESSAGES: Readonly<Record<string, string>> = {
   'لا أسطر للحجز — السلة فارغة.': 'Nothing to reserve — the cart is empty.',
 
   // ---- السلة
+  'اللغة عربية أو إنجليزية.': 'Language is Arabic or English.',
   'عملة غير مدعومة.': 'Unsupported currency.',
   'أرسل رمز السلة في الترويسة x-cart-token.': 'Send the cart token in the x-cart-token header.',
   'المنتج غير متاح للبيع.': "This product isn't available for sale.",

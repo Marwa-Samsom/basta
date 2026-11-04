@@ -68,6 +68,12 @@ export class AccountService {
     return { preferredCurrency: known.code };
   }
 
+  /** لغة الحساب — بها تُرسل إشعاراته وبريده. زرّ اللغة يحفظها لمن كان داخلاً، والدخول يحفظ لغة صفحته */
+  async setLocale(userId: string, locale: 'ar' | 'en'): Promise<{ locale: 'ar' | 'en' }> {
+    await this.prisma.user.update({ where: { id: userId }, data: { locale } });
+    return { locale };
+  }
+
   async updateProfile(userId: string, input: { fullName?: string; phone?: string }, meta: RequestMeta): Promise<Profile> {
     const before = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { fullName: true, phone: true } });
     const fullName = input.fullName?.trim();
