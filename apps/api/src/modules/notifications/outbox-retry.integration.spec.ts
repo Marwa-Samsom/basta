@@ -30,6 +30,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let dbUp = false;
 
 const FAR = () => new Date(Date.now() + 24 * 3600_000);
+/**
+ * المرسِل على رسائل مستخدم هذا الملف وحده: الأقدم أولاً من الصندوق كله لا يبلغ صفّه — وهو الأحدث —
+ * والحزمة كلها تملؤه بمئات (سقط بذلك 4 نوفمبر 2026)، ولا يرسل بريد الملفات الأخرى عبر خادمنا
+ */
+const mine = () => ({ userIds: [userId] });
 async function row(attempts: number): Promise<string> {
   const r = await prisma.notification.create({
     data: {
@@ -104,14 +109,34 @@ describe('انقطاع البريد: إعادة بمهلة تطول (SYS-031)', 
 
     // عاد الخادم ولم يحن الموعد: المرسِل يتجاوزه — كان يعيده كل 5 ثوانٍ حتى الخامسة
     down = false;
-    await notifications.dispatch(500);
+    await notifications.dispatch(500, mine());
     expect(await get(id)).toMatchObject({ status: 'queued', attempts: 2 });
 
     // حان الموعد: يصل (بمرسِلنا أو بمرسِل ملف آخر — المهم أنه أُرسل بمحاولته الثالثة)
     await prisma.notification.update({ where: { id }, data: { nextAttemptAt: new Date(Date.now() - 1000) } });
-    await notifications.dispatch(500);
+    await notifications.dispatch(500, mine());
     r = await get(id);
     expect(r).toMatchObject({ status: 'sent', attempts: 3 });
+  }, 60_000);
+
+  it('المرسِل المقصور على مستخدم يتجاوز صندوق غيره ولو كان أقدم — ويرسل صفّه بدفعة من واحد', async () => {
+    if (!dbUp) return;
+    // صفّ أقدم بساعة لمستخدم آخر ينتظر: المرسِل العام يبدأ به (الأقدم أولاً)، والمقصور يتجاوزه
+    const other = await prisma.user.create({ data: { email: `outbox.other${Date.now()}@basta.test`, fullName: 'غيرنا' }, select: { id: true } });
+    try {
+      await prisma.notification.create({
+        data: { userId: other.id, channel: 'email', templateCode: 'password_reset_code', payloadJson: { name: 'غيرنا', code: '111111', minutes: '10' }, createdAt: new Date(Date.now() - 3_600_000) },
+      });
+      const id = await row(0);
+      await prisma.notification.update({ where: { id }, data: { nextAttemptAt: null } });
+      down = false;
+      await notifications.dispatch(1, mine());
+      // أرسله مرسِلنا، أو مرسِل ملف آخر سبقه — والمهم أن دفعتنا الواحدة لم تذهب لغيرنا
+      expect(await get(id)).toMatchObject({ status: 'sent', attempts: 1 });
+    } finally {
+      await prisma.notification.deleteMany({ where: { userId: other.id } });
+      await prisma.user.delete({ where: { id: other.id } });
+    }
   }, 60_000);
 
   it('السابعة إن فشلت تُعاد بعد ساعة، والثامنة إن فشلت تُختم «فشل»', async () => {
@@ -171,12 +196,12 @@ describe('سقوط المرسِل أثناء الإرسال (SYS-034)', () => {
     down = false;
     const id = await stuck(1, new Date(Date.now() + SENDING_LEASE_SECONDS * 1000));
     expect(await sendOne(id)).toBeNull();
-    await notifications.dispatch(500);
+    await notifications.dispatch(500, mine());
     expect(await get(id)).toMatchObject({ status: 'sending', attempts: 1 });
 
     // انقضت المهلة ولم يُختم: سقط مرسِله. كان يبقى «يُرسل» إلى الأبد — dispatch يلتقط queued وحده
     await prisma.notification.update({ where: { id }, data: { nextAttemptAt: new Date(Date.now() - 1000) } });
-    await notifications.dispatch(500);
+    await notifications.dispatch(500, mine());
     expect(await settled(id)).toMatchObject({ status: 'sent', attempts: 2, nextAttemptAt: null });
   }, 60_000);
 

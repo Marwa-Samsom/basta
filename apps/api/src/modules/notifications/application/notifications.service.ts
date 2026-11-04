@@ -232,7 +232,12 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
 
   // ------------------------------------------------------------- الإرسال
 
-  async dispatch(limit = 50): Promise<{ sent: number; failed: number; skipped: number }> {
+  /**
+   * الأقدم أولاً بدفعات. `only.userIds` يقصر الدفعة على رسائل هؤلاء: اختبارٌ ينتظر رسالته بعينها
+   * كان يرسل قبلها صندوق الملفات الأخرى كله — مئات عبر خادم بريده — فتنقضي مهلته مع الحزمة
+   * كلها (password-recovery-smtp، 4 نوفمبر 2026). المرسِل الدوري يبقى على الصندوق كله.
+   */
+  async dispatch(limit = 50, only?: { userIds: readonly string[] }): Promise<{ sent: number; failed: number; skipped: number }> {
     const out = { sent: 0, failed: 0, skipped: 0 };
     if (this.running) return out;
     this.running = true;
@@ -240,6 +245,7 @@ export class NotificationsService implements OnApplicationBootstrap, OnModuleDes
       const now = new Date();
       const queued = await this.prisma.notification.findMany({
         where: {
+          ...(only ? { userId: { in: [...only.userIds] } } : {}),
           OR: [
             // ما فشل قبلاً ينتظر موعده: الإعادة بمهلة تطول لا كل 5 ثوانٍ (domain/retry.ts)
             { status: 'queued', OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },

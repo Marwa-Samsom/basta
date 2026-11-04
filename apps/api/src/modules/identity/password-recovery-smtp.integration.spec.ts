@@ -18,7 +18,7 @@ let app: NestFastifyApplication;
 let smtp: SMTPServer;
 let dbUp = false;
 const inbox: { to: string[]; raw: Buffer }[] = [];
-let dispatch: (limit: number) => Promise<unknown>;
+let dispatch: (limit: number, userId: string) => Promise<unknown>;
 
 const SUFFIX = `rcv${Date.now()}`;
 const EMAIL = `forgot.${SUFFIX}@basta.test`;
@@ -42,7 +42,9 @@ async function forgotThroughSmtp(userId: string): Promise<void> {
     const started = new Date();
     expect((await call('/auth/password/forgot', { email: EMAIL })).statusCode).toBe(200);
     for (let i = 0; i < 30; i++) {
-      await dispatch(500);
+      // رسائل هذا المستخدم وحدها: الأقدم أولاً من الصندوق كله كان يرسل قبلها مئات من الملفات الأخرى
+      // عبر خادمنا، فتنقضي الدقيقة مع الحزمة كلها (تسع ثوانٍ وحده — 4 نوفمبر 2026)
+      await dispatch(50, userId);
       const row = await prisma.notification.findFirst({
         where: { userId, templateCode: 'password_reset_code', channel: 'email', createdAt: { gte: started } },
         orderBy: { createdAt: 'desc' },
@@ -90,7 +92,7 @@ beforeAll(async () => {
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
   const notifications = app.get(NotificationsService);
-  dispatch = (limit) => notifications.dispatch(limit);
+  dispatch = (limit, userId) => notifications.dispatch(limit, { userIds: [userId] });
 }, 90_000);
 
 afterAll(async () => {

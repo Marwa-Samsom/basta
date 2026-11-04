@@ -76,7 +76,8 @@ async function makeAdmin(tag: string, permissions: readonly string[]) {
  */
 async function drain(...userIds: string[]): Promise<void> {
   for (let i = 0; i < 20; i++) {
-    await notifications.dispatch(500);
+    // رسائل هؤلاء وحدهم: الأقدم أولاً من الصندوق كله لا يبلغها والحزمة كلها تملؤه (4 نوفمبر 2026)
+    await notifications.dispatch(500, { userIds });
     const left = await prisma.notification.count({ where: { userId: { in: userIds }, status: { in: ['queued', 'sending'] } } });
     if (left === 0) return;
   }
