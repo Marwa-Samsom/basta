@@ -9,6 +9,8 @@
  * بمتغيّر آخر الملف). ومتغيّر قيمته عربية معروفة (حالة، اسم وثيقة) يُترجم من EN_MESSAGES.
  */
 export const EN_MESSAGES: Readonly<Record<string, string>> = {
+  // ---- السلة: الإضافة تحترم المتاح (CHK-013)
+  'نفد هذا الخيار من المخزون.': 'This option is out of stock.',
   // ---- #174 (موجة «يُؤتمت»): رسائل قد تسبق دمجها هنا
   'المسار من 2 إلى 60 حرفاً: أحرف لاتينية صغيرة وأرقام وشرطات.': 'The path must be 2 to 60 characters: lowercase Latin letters, digits and hyphens.',
   // ---- معالج الأخطاء العام
@@ -1050,6 +1052,9 @@ export const EN_TEMPLATES: Readonly<Record<string, string>> = {
 
   // ---- السلة
   'الكمية من 1 إلى {0}.': 'The quantity must be from 1 to {0}.',
+  'في سلّتك {0} من هذا الخيار — الحدّ {1} قطعة للسطر الواحد.': 'Your cart already has {0} of this option — the limit is {1} per line.',
+  'في سلّتك {0} من هذا الخيار — المتاح {1} فقط.': 'Your cart already has {0} of this option — only {1} available.',
+  'المتاح {0} فقط.': 'Only {0} available.',
 
   // ---- المفضّلة
   'بلغت مفضّلتك {0} منتج. أزل منتجاً لم تعد تريده ثم احفظ الجديد.':

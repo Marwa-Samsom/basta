@@ -8,6 +8,9 @@ import { DisplayCurrencyService, PricingService, type Quote, type QuoteAddress }
 
 export const MAX_QTY_PER_LINE = 50;
 
+/** المتاح للبيع الآن: الموجود ناقص المحجوز للدفع — ولا يقلّ عن صفر */
+const availableOf = (inv: { onHand: number; reserved: number } | null): number => Math.max(0, (inv?.onHand ?? 0) - (inv?.reserved ?? 0));
+
 export interface CartLineView {
   readonly variantId: string;
   readonly productId: string;
@@ -106,14 +109,29 @@ export class CartService {
         isActive: true,
         product: { status: 'active', deletedAt: null, vendor: { status: 'approved' } },
       },
-      select: { id: true, vendorId: true, priceMinorUnits: true },
+      select: { id: true, vendorId: true, priceMinorUnits: true, inventory: { select: { onHand: true, reserved: true } } },
     });
     if (!variant) throw new NotFoundError('المنتج غير متاح للبيع.', { variantId });
 
     const existing = await this.prisma.cartItem.findUnique({
       where: { cartId_variantId: { cartId: cart.id, variantId } },
     });
-    const nextQty = Math.min((existing?.qty ?? 0) + qty, MAX_QTY_PER_LINE);
+    /**
+     * الإضافة تحترم المتاح مع ما في السلة — كانت «أضف إلى السلة» 3 بعد 3 تجمع 21 والمتاح 3 بلا كلمة
+     * تحت الزرّ، وتقصّ عند 50 بصمت (CHK-013، 5 نوفمبر 2026). السلة تبقى تنبّه قبل الدفع حين ينفد
+     * المخزون بعد الإضافة؛ هنا يُقال السبب لحظة الإضافة والسلة كما كانت.
+     */
+    const inCart = existing?.qty ?? 0;
+    const available = availableOf(variant.inventory);
+    if (available === 0) throw new InvalidInputError('نفد هذا الخيار من المخزون.', { variantId });
+    if (inCart + qty > MAX_QTY_PER_LINE) {
+      throw new InvalidInputError(`في سلّتك ${inCart} من هذا الخيار — الحدّ ${MAX_QTY_PER_LINE} قطعة للسطر الواحد.`, { variantId });
+    }
+    if (inCart + qty > available) {
+      if (inCart > 0) throw new InvalidInputError(`في سلّتك ${inCart} من هذا الخيار — المتاح ${available} فقط.`, { variantId });
+      throw new InvalidInputError(`المتاح ${available} فقط.`, { variantId });
+    }
+    const nextQty = inCart + qty;
 
     await this.prisma.cartItem.upsert({
       where: { cartId_variantId: { cartId: cart.id, variantId } },
@@ -138,6 +156,14 @@ export class CartService {
     if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) {
       throw new InvalidInputError(`الكمية من 1 إلى ${MAX_QTY_PER_LINE}.`);
     }
+    const line = await this.prisma.cartItem.findUnique({
+      where: { cartId_variantId: { cartId: cart.id, variantId } },
+      select: { qty: true, variant: { select: { inventory: { select: { onHand: true, reserved: true } } } } },
+    });
+    if (!line) throw new NotFoundError('المنتج ليس في سلّتك.', { variantId });
+    // الرفع فوق المتاح يُرفض، والإنقاص يمرّ ولو بقي فوقه: نفد بعد الإضافة فينقصه صاحبه خطوة خطوة (CHK-013)
+    const available = availableOf(line.variant.inventory);
+    if (qty > line.qty && qty > available) throw new InvalidInputError(`المتاح ${available} فقط.`, { variantId });
     const { count } = await this.prisma.cartItem.updateMany({
       where: { cartId: cart.id, variantId },
       data: { qty },
