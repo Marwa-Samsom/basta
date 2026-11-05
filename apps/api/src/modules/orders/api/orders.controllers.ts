@@ -214,9 +214,15 @@ export class CustomerOrdersController {
     private readonly lifecycle: OrderLifecycleService,
   ) {}
 
+  /** ?status= active | completed | canceled، و?search= جزء من رقم الطلب (BUY-006) */
   @Get()
-  list(@CurrentActor() actor: Actor, @Query('page') page?: string) {
-    return this.query.customerList(actor.userId, Number(page) || 1);
+  list(
+    @CurrentActor() actor: Actor,
+    @Query('page') page?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.query.customerList(actor.userId, { page: Number(page) || 1, ...(status ? { status } : {}), ...(search ? { search } : {}) });
   }
 
   @Get(':number')

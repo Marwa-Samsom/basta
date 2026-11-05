@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useSyncExternalStore } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { Alert, EmptyState, MoreButton, PageHead } from '@/components/ui';
@@ -84,6 +84,15 @@ function transferState(o: Row, t: Translate, locale: Locale): { label: string; t
   return null;
 }
 
+/** تبويبات الحالة كما يصفّيها الخادم بحالة الأب (?status=) — «ملغى» يضمّ المُسترَد (BUY-006) */
+const TABS: { key: '' | 'active' | 'completed' | 'canceled'; label: string; en: string }[] = [
+  { key: '', label: 'الكل', en: 'All' },
+  { key: 'active', label: 'قيد التنفيذ', en: 'In progress' },
+  { key: 'completed', label: 'مكتمل', en: 'Completed' },
+  { key: 'canceled', label: 'ملغى', en: 'Canceled' },
+];
+const tabOf = (status: string | null): string => TABS.find((tb) => tb.key && tb.key === status)?.key ?? '';
+
 /**
  * ST-18 — طلباتي.
  *
@@ -92,8 +101,20 @@ function transferState(o: Row, t: Translate, locale: Locale): { label: string; t
  *
  * صفحات من الخادم بـ«المزيد» و«السابق» (3 نوفمبر 2026): كانت أول عشرين طلباً وحدها،
  * فما قبلها لا يُوصل إليه من «طلباتي».
+ *
+ * والتبويب بالحالة والبحث برقم الطلب (4 نوفمبر 2026): مشترٍ بأربعة وأربعين طلباً كان يكبس «المزيد»
+ * ويقرأ الأرقام واحداً واحداً ليجد طلبه (BUY-006).
  */
+// useSearchParams يحتاج حدّ Suspense في صفحة تُبنى مسبقاً
 export default function MyOrdersPage() {
+  return (
+    <Suspense>
+      <MyOrders />
+    </Suspense>
+  );
+}
+
+function MyOrders() {
   const t = useT();
   const locale = useLocale();
   const router = useRouter();
@@ -106,7 +127,28 @@ export default function MyOrdersPage() {
   useEffect(() => {
     if (!session.read()) router.replace('/login?next=/account/orders');
   }, [router]);
-  const list = useAdminList<Row>(signedIn ? '/me/orders' : null, (o) => o.number);
+  const pathname = usePathname();
+  const params = useSearchParams();
+  // التبويب من العنوان: يُرسل رابطه، والتحديث يعيد المعروض نفسه
+  const tab = tabOf(params.get('status'));
+  const setTab = (next: string): void => {
+    const query = new URLSearchParams(params.toString());
+    if (next) query.set('status', next);
+    else query.delete('status');
+    const s = query.toString();
+    router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+  };
+  const [search, setSearch] = useState('');
+  const query = new URLSearchParams();
+  if (tab) query.set('status', tab);
+  if (search.trim()) query.set('search', search.trim());
+  const qs = query.toString();
+  const list = useAdminList<Row, { counts: { all: number; active: number; completed: number; canceled: number } }>(
+    signedIn ? `/me/orders${qs ? `?${qs}` : ''}` : null,
+    (o) => o.number,
+  );
+  const counts = list.data?.counts;
+  const filtered = Boolean(tab || search.trim());
   const rows = list.data ? list.items : null;
   const error = list.error;
 
@@ -114,7 +156,7 @@ export default function MyOrdersPage() {
     <div className="sp-page">
       <PageHead
         title={t('طلباتي', 'My orders')}
-        {...(list.data && list.total > 0 ? { count: list.total } : {})}
+        {...(counts && counts.all ? { count: counts.all } : {})}
         actions={
           <Link href="/account/disputes" className="btn btn--secondary btn--sm">
             <Icon name="msg" size={15} />
@@ -123,6 +165,36 @@ export default function MyOrdersPage() {
         }
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {counts && (counts.all > 0 || filtered) ? (
+        <div className="sp-orders-bar">
+          <div className="tabs" role="tablist" aria-label={t('حالة الطلب', 'Order status')}>
+            {TABS.map((tb) => (
+              <button
+                key={tb.key || 'all'}
+                type="button"
+                role="tab"
+                className="tabs__tab"
+                aria-selected={tab === tb.key}
+                onClick={() => setTab(tb.key)}
+              >
+                {t(tb.label, tb.en)}
+                <span className="tabs__count">{tb.key ? counts[tb.key] : counts.all}</span>
+              </button>
+            ))}
+          </div>
+          <span className="input-icon sp-orders-search">
+            <Icon name="search" size={16} />
+            <input
+              className="field__control"
+              type="search"
+              placeholder={t('ابحث برقم الطلب', 'Search by order number')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label={t('ابحث برقم الطلب', 'Search by order number')}
+            />
+          </span>
+        </div>
+      ) : null}
       {!rows && !error ? (
         <div className="sp-skel" role="status">
           <span className="visually-hidden">{t('جارٍ جلب طلباتك…', 'Loading your orders…')}</span>
@@ -131,7 +203,30 @@ export default function MyOrdersPage() {
           <span className="skeleton sp-skel__row" aria-hidden />
         </div>
       ) : null}
-      {rows && rows.length === 0 ? (
+      {rows && rows.length === 0 && filtered ? (
+        <EmptyState
+          icon="search"
+          title={t('لا طلب يطابق', 'No matching orders')}
+          actions={
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => {
+                setSearch('');
+                setTab('');
+              }}
+            >
+              {t('امسح البحث والتصفية', 'Clear search and filters')}
+            </button>
+          }
+        >
+          {t(
+            'لا طلب في هذه الحالة أو بهذا الرقم. جرّب تبويباً آخر، أو جزءاً أقصر من رقم الطلب كما في رسالة التأكيد.',
+            'No order in this status or with this number. Try another tab, or a shorter part of the order number as in the confirmation message.',
+          )}
+        </EmptyState>
+      ) : null}
+      {rows && rows.length === 0 && !filtered ? (
         <EmptyState
           icon="package"
           title={t('لا طلبات بعد', 'No orders yet')}
