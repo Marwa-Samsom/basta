@@ -7,6 +7,7 @@ import type { SortOrder } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { useLocale, useT } from '@/components/locale';
 import { ClearableInput, EmptyState } from '@/components/ui';
+import { DateField } from '@/components/date-field';
 import { useAdminList } from '@/lib/admin';
 import { localized, type Locale } from '@/lib/i18n';
 import { ROLE_LABEL, ROLE_LABEL_EN, labelOf, when } from '@/lib/orders';
@@ -279,6 +280,9 @@ function AuditInner() {
   const [actor, setActor] = useState('');
   const [action, setAction] = useState('');
   const [entityType, setEntityType] = useState('');
+  // الفترة: الخادم يقبلها (YYYY-MM-DD) وكانت الشاشة بلا حقليها — يومٌ من الشهر الماضي كان «المزيد» مئات المرّات (ACFG-085)
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const entityId = params.get('entityId') ?? '';
   const [sort, setSort] = useState<SortOrder>('newest');
@@ -287,11 +291,13 @@ function AuditInner() {
     ...(actor ? { actor } : {}),
     ...(action ? { action } : {}),
     ...(entityType ? { entityType } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
     ...(entityId ? { entityId } : {}),
   });
   const list = useAdminList<Entry>(`/admin/audit?${q}`, (e) => e.id);
   const { data, error, forbidden } = list;
-  const filtered = Boolean(actor || action || entityType);
+  const filtered = Boolean(actor || action || entityType || from || to);
 
   return (
     <div className="ac2-page">
@@ -325,10 +331,20 @@ function AuditInner() {
             </option>
           ))}
         </select>
+        <span className="ac2-dates">
+          <span className="ac2-inline ac2-hint">
+            {t('من', 'From')}
+            <DateField label={t('من', 'From')} value={from} onChange={setFrom} max={to || undefined} clearable />
+          </span>
+          <span className="ac2-inline ac2-hint">
+            {t('إلى', 'To')}
+            <DateField label={t('إلى', 'To')} value={to} onChange={setTo} min={from || undefined} clearable />
+          </span>
+        </span>
         <SortButton value={sort} onChange={setSort} />
         {filtered ? (
           <span className="toolbar__end">
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setActor(''), setAction(''), setEntityType(''))}>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => (setActor(''), setAction(''), setEntityType(''), setFrom(''), setTo(''))}>
               {t('أزل التصفية', 'Clear filter')}
             </button>
           </span>
