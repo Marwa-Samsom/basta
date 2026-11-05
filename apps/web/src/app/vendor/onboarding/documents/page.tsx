@@ -111,6 +111,9 @@ export default function DocumentsPage() {
         ) : (
           <Link href="/vendor/onboarding/currency">{t('لم تخترها بعد — اخترها', 'Not chosen yet — choose it')}</Link>
         )}
+        {/* لا طريق آخر إلى صفحة الحالة من هنا — خطوات الشريط لا تُكبس (VON-041) */}
+        {' · '}
+        <Link href="/vendor/onboarding/status">{t('تابع حالة طلبك', 'Track your application')}</Link>
       </p>
 
       {data.status === 'in_review' ? (

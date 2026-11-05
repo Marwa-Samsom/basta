@@ -261,15 +261,16 @@ export default function StatusPage() {
           {data.status === 'in_review' ? (
             <section className="card">
               <h3 className="vo-side-title">{t('ما يمكنك فعله الآن', 'What you can do now')}</h3>
+              {/* كشريط اللوحة: قيد المراجعة ينشر الآن ويظهر لحظة الاعتماد — كانت «كمسودّات… فور اعتماد متجرك» (VON-046، ADR-016) */}
               <p className="vo-side-text">
                 {t(
-                  'جهّز منتجاتك كمسودّات — تستطيع إرسالها للنشر فور اعتماد متجرك.',
-                  'Prepare your products as drafts — you can publish them as soon as your shop is approved.',
+                  'أضف منتجاتك وانشرها الآن — تظهر للمشترين تلقائياً لحظة اعتماد متجرك.',
+                  'Add your products and publish them now — buyers see them automatically the moment your shop is approved.',
                 )}
               </p>
               <Link className="btn btn--secondary vo-fit" href="/vendor/products">
                 <Icon name="package" size={17} />
-                {t('هيّئ منتجاتك', 'Prepare your products')}
+                {t('أضف منتجاتك', 'Add your products')}
               </Link>
             </section>
           ) : null}

@@ -17,7 +17,8 @@ const EVENTS: Record<string, Omit<InboxEvent, 'title'> & { title: Bilingual }> =
   vendor_dispute_escalated: { title: { ar: 'صُعِّد نزاع للإدارة', en: 'A dispute was escalated to admin' }, icon: 'scale', tone: 'warning', kind: 'dispute' },
   vendor_dispute_resolved: { title: { ar: 'حُسم نزاع', en: 'A dispute was resolved' }, icon: 'scale', tone: 'info', kind: 'dispute' },
   vendor_dispute_withdrawn: { title: { ar: 'سحب المشتري نزاعه', en: 'The buyer withdrew their dispute' }, icon: 'check-circle', tone: 'success', kind: 'dispute' },
-  product_rejected: { title: { ar: 'لم يُنشر منتجك', en: 'Your product was not published' }, icon: 'alert', tone: 'danger', kind: 'product' },
+  // لا مراجعة قبل النشر (ADR-016): الإدارة توقف المنشور المخالف — كان «لم يُنشر منتجك» (VOPS-068)
+  product_rejected: { title: { ar: 'أُوقف منتجك', en: 'Your product was taken down' }, icon: 'alert', tone: 'danger', kind: 'product' },
   low_stock: { title: { ar: 'مخزون قارب النفاد', en: 'Stock running low' }, icon: 'boxes', tone: 'warning', kind: 'stock' },
   payout_paid: { title: { ar: 'حُوِّل مبلغ إلى حسابك', en: 'Money was transferred to your account' }, icon: 'check-circle', tone: 'money', kind: 'payout' },
   payout_rejected: { title: { ar: 'رُفض طلب سحب', en: 'A payout request was rejected' }, icon: 'wallet', tone: 'danger', kind: 'payout' },
@@ -54,8 +55,8 @@ export default function VendorNotificationsPage() {
       events={events}
       filters={filters}
       emptyBody={t(
-        'كل شيء هادئ. الطلبات الجديدة وقرارات المراجعة وتنبيهات المخزون تظهر هنا.',
-        'All quiet. New orders, review decisions and stock alerts show up here.',
+        'كل شيء هادئ. الطلبات الجديدة وإيقاف المنتجات وتنبيهات المخزون تظهر هنا.',
+        'All quiet. New orders, product takedowns and stock alerts show up here.',
       )}
     />
   );

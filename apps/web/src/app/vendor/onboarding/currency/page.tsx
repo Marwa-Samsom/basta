@@ -241,6 +241,10 @@ export default function CurrencyPage() {
             <Icon name="back" size={16} mirror />
             {t('رجوع إلى بيانات المتجر', 'Back to shop details')}
           </Link>
+          {/* المسوّدة أيضاً تصل صفحة حالتها من هنا — كان «تابع حالة طلبك» بعد الإرسال وحده (VON-041) */}
+          <p className="vo-commit__track">
+            <Link href="/vendor/onboarding/status">{t('تابع حالة طلبك', 'Track your application')}</Link>
+          </p>
         </section>
       </div>
 
