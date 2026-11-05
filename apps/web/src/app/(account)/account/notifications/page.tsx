@@ -61,7 +61,7 @@ const KINDS: Record<string, { title: string; en: string; icon: IconName; tone: T
   vendor_approved: { title: 'قُبل متجرك', en: 'Your shop was approved', icon: 'store', tone: 'success' },
   vendor_rejected: { title: 'لم يُقبل متجرك', en: "Your shop wasn't approved", icon: 'store', tone: 'danger' },
   vendor_document_rejected: { title: 'رُفضت وثيقة من طلب متجرك', en: 'A document in your shop application was rejected', icon: 'file', tone: 'warning' },
-  product_rejected: { title: 'أُعيد منتج إليك للتعديل', en: 'A product was sent back to you for edits', icon: 'alert', tone: 'warning' },
+  product_rejected: { title: 'أُوقف منتجك', en: 'Your product was taken down', icon: 'alert', tone: 'warning' },
   low_stock: { title: 'مخزون منخفض', en: 'Low stock', icon: 'boxes', tone: 'warning' },
   message_to_customer: { title: 'ردّ من متجر', en: 'Reply from a shop', icon: 'msg', tone: 'brand' },
   message_to_vendor: { title: 'رسالة من مشترٍ', en: 'Message from a buyer', icon: 'msg', tone: 'brand' },
