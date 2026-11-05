@@ -1032,3 +1032,53 @@ describe('حدود الضريبة والخصم والمختارات — يُؤت
     }
   });
 });
+
+describe('ACFG-052 · ترتيب اللافتات من اللوحة (5 نوفمبر 2026)', () => {
+  it('الجديدة آخر الظاهرة في موضعها، و«للأعلى»/«للأسفل» تبدّل جارتها الظاهرة، والمتجر يعرضها بالترتيب', async () => {
+    if (!dbUp) return;
+    const placement = 'home_middle';
+    const png = await sharp({ create: { width: 1600, height: 500, channels: 3, background: { r: 40, g: 90, b: 100 } } }).png().toBuffer();
+    const up = multipart(png, 'banner.png', 'image/png');
+    const img = await app.inject({ method: 'POST', url: '/api/v1/admin/banners/image', headers: { authorization: `Bearer ${admin.token}`, ...up.headers }, payload: up.payload });
+    expect(img.statusCode, img.body).toBe(201);
+    const imageKey = img.json().imageKey as string;
+
+    // كان الترتيب عدد لافتات الموضع كلها ولو مخفية: 246 و 247 بين لافتات اختبارات قديمة مخفية
+    const visibleBefore = await prisma.banner.count({ where: { placement, isActive: true } });
+    const made: { id: string; sort: number }[] = [];
+    // تُخفى لافتات الاختبار ولو سقط في وسطه — لافتة ظاهرة باقية تظهر في رئيسية قاعدة التطوير
+    try {
+      for (const title of ['أ', 'ب', 'ج']) {
+        const b = await call('POST', '/admin/banners', admin.token, { placement, imageKey, titleAr: `ترتيب ${title} ${SUFFIX}`, isActive: true, sort: 999 });
+        expect(b.statusCode, b.body).toBe(201);
+        made.push(b.json());
+      }
+      expect(made.map((b) => b.sort)).toEqual([visibleBefore, visibleBefore + 1, visibleBefore + 2]);
+      const [a, b, c] = made.map((x) => x.id) as [string, string, string];
+
+      const ours = async () =>
+        ((await call('GET', `/storefront/banners?placement=${placement}`)).json() as { id: string }[]).map((x) => x.id).filter((id) => made.some((m) => m.id === id));
+      expect(await ours()).toEqual([a, b, c]);
+
+      const move = (id: string, direction: string) => call('POST', `/admin/banners/${id}/move`, admin.token, { direction });
+      expect((await move(c, 'up')).statusCode).toBe(200);
+      expect(await ours()).toEqual([a, c, b]);
+      expect((await move(a, 'down')).statusCode).toBe(200);
+      expect(await ours()).toEqual([c, a, b]);
+      // آخر الظاهرة «للأسفل»: لا شيء يتغيّر
+      if (visibleBefore === 0) {
+        expect((await move(b, 'down')).statusCode).toBe(200);
+        expect(await ours()).toEqual([c, a, b]);
+      }
+      expect((await move(a, 'sideways')).statusCode).toBe(400);
+
+      // المخفية لا تُرتَّب بين الظاهرة
+      await call('PATCH', `/admin/banners/${b}`, admin.token, { placement, imageKey, isActive: false });
+      const hidden = await move(b, 'up');
+      expect(hidden.statusCode, hidden.body).toBe(400);
+      expect(hidden.json().message).toBe('أظهر اللافتة أولاً لترتّبها.');
+    } finally {
+      await prisma.banner.updateMany({ where: { id: { in: made.map((m) => m.id) } }, data: { isActive: false } });
+    }
+  });
+});

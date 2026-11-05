@@ -262,7 +262,31 @@ export default function AdminStorefrontPage() {
                       {placements[b.placement] ?? retired[b.placement] ?? b.placement}
                     </td>
                     <td className="num" data-label={t('الترتيب', 'Order')}>
-                      {b.sort}
+                      {/* كان رقماً وحده بلا أداة لتغييره (ACFG-052) — الأسهم بين ظاهرات الموضع */}
+                      <span className="ac2-sortcell">
+                        {b.sort}
+                        {([
+                          ['up', t(`انقل ${b.titleAr ?? 'اللافتة'} للأعلى`, `Move ${b.titleAr ?? 'banner'} up`)],
+                          ['down', t(`انقل ${b.titleAr ?? 'اللافتة'} للأسفل`, `Move ${b.titleAr ?? 'banner'} down`)],
+                        ] as const).map(([direction, label]) => (
+                          <button
+                            key={direction}
+                            type="button"
+                            className="icon-btn icon-btn--sm"
+                            aria-label={label}
+                            title={b.isActive ? label : t('أظهر اللافتة أولاً لترتّبها.', 'Show the banner first to reorder it.')}
+                            disabled={act.busy || !b.isActive}
+                            onClick={() =>
+                              void act.run(async () => {
+                                await api(`/admin/banners/${b.id}/move`, { method: 'POST', body: { direction } });
+                                banners.reload();
+                              })
+                            }
+                          >
+                            <Icon name="chev-down" size={14} {...(direction === 'up' ? { className: 'ac2-flip' } : {})} />
+                          </button>
+                        ))}
+                      </span>
                     </td>
                     <td className="ac2-muted-cell" data-label={t('الجدولة', 'Schedule')}>
                       {b.startsAt ? when(b.startsAt, locale) : t('الآن', 'Now')} — {b.endsAt ? when(b.endsAt, locale) : t('مفتوح', 'Open-ended')}

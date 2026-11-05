@@ -15,7 +15,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -232,6 +232,11 @@ export class BannerDto {
 
   @IsBoolean()
   isActive!: boolean;
+}
+
+export class MoveBannerDto {
+  @IsIn(['up', 'down'], { message: 'الاتجاه: up أو down.' })
+  direction!: 'up' | 'down';
 }
 
 export class FeaturedDto {
@@ -570,6 +575,14 @@ export class AdminContentController {
   @RequirePermission('content.manage')
   updateBanner(@CurrentActor() a: Actor, @Param('id', uuidParam) id: string, @Body() dto: BannerDto) {
     return this.content.saveBanner(a.userId, { ...dto, id });
+  }
+
+  @Post('banners/:id/move')
+  @RequirePermission('content.manage')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'اللافتة للأعلى أو للأسفل بين ظاهرات موضعها — ACFG-052' })
+  moveBanner(@CurrentActor() a: Actor, @Param('id', uuidParam) id: string, @Body() dto: MoveBannerDto) {
+    return this.content.moveBanner(a.userId, id, dto.direction);
   }
 
   @Get('storefront/featured')

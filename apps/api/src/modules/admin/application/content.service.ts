@@ -281,7 +281,11 @@ export class ContentService {
       imageKey: input.imageKey,
       linkUrl: input.linkUrl || null,
       titleAr: input.titleAr?.trim() || null,
-      sort: input.sort ?? 0,
+      // الجديدة آخر الظاهرة في موضعها — كانت عدد لافتات الموضع كلها ولو مخفية (246 و 247، ACFG-052)؛
+      // والتعديل يترك ترتيبها ما لم يُرسَل، فإظهار لافتة وإخفاؤها لا يعيدها إلى الصفر
+      ...(input.id
+        ? input.sort === undefined ? {} : { sort: input.sort }
+        : { sort: await this.prisma.banner.count({ where: { placement: input.placement, isActive: true } }) }),
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
       endsAt: input.endsAt ? new Date(input.endsAt) : null,
       isActive: input.isActive,
@@ -300,10 +304,35 @@ export class ContentService {
         isActive: true,
         AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gt: now } }] }],
       },
-      orderBy: { sort: 'asc' },
+      orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: { id: true, titleAr: true, linkUrl: true, imageKey: true },
     });
     return rows.map((b) => ({ id: b.id, titleAr: b.titleAr, linkUrl: b.linkUrl, imageUrl: `${UPLOADS_URL_PREFIX}${b.imageKey}/full.webp` }));
+  }
+
+  /**
+   * «للأعلى» و«للأسفل» في اللوحة — ACFG-052، 5 نوفمبر 2026: لم تكن أداة لتغيير الترتيب (زرّ «ظاهرة»
+   * وحده). تبدّل اللافتة مع جارتها الظاهرة في موضعها، ثم تُرقَّم ظاهرات الموضع من الصفر بترتيبها
+   * الجديد — المخفية لا تدخل، فلا تفصل بين ظاهرتين. أولى الظاهرة «للأعلى» وآخرها «للأسفل» بلا تغيير.
+   */
+  async moveBanner(actorId: string, id: string, direction: 'up' | 'down') {
+    const banner = await this.prisma.banner.findUnique({ where: { id }, select: { placement: true, isActive: true } });
+    if (!banner) throw new NotFoundError('اللافتة غير موجودة.', { id });
+    if (!banner.isActive) throw new InvalidInputError('أظهر اللافتة أولاً لترتّبها.', { id });
+    return this.prisma.$transaction(async (tx) => {
+      const live = await tx.banner.findMany({
+        where: { placement: banner.placement, isActive: true },
+        orderBy: [{ sort: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+        select: { id: true, sort: true },
+      });
+      const i = live.findIndex((b) => b.id === id);
+      const j = direction === 'up' ? i - 1 : i + 1;
+      if (j >= 0 && j < live.length) [live[i], live[j]] = [live[j]!, live[i]!];
+      for (const [k, b] of live.entries()) if (b.sort !== k) await tx.banner.update({ where: { id: b.id }, data: { sort: k } });
+      const sort = live.findIndex((b) => b.id === id);
+      await tx.auditLog.create({ data: { actorUserId: actorId, actorRole: 'admin', action: 'banner.move', entityType: 'Banner', entityId: id, afterJson: { direction, sort } } });
+      return { id, sort };
+    });
   }
 
   // ------------------------------------------------------------- المميّز

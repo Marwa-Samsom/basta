@@ -270,6 +270,8 @@ fieldset.ac2-divider > legend { float: inline-start; inline-size: 100%; padding:
   background: var(--surface-sunken);
   object-fit: cover;
 }
+/* «للأعلى»/«للأسفل» بجانب رقم الترتيب في جدول اللافتات (ACFG-052) */
+.ac2-sortcell { display: inline-flex; align-items: center; gap: 4px; }
 .ac2-banner { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .ac2-flip { transform: rotate(180deg); }
 .ac2-preview-img { display: block; max-inline-size: 100%; border-radius: var(--radius-md); border: 1px solid var(--border-default); }
