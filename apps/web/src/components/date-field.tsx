@@ -77,7 +77,8 @@ export function DateField({
     return {
       full: new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }),
       month: new Intl.DateTimeFormat(loc, { month: 'long', year: 'numeric', timeZone: 'UTC' }),
-      weekday: new Intl.DateTimeFormat(loc, { weekday: 'short', timeZone: 'UTC' }),
+      // «short» بالعربية هو الاسم كاملاً («الأربعاء») وأعرض من سُبع النافذة: الحرف الأول كما في التقاويم العربية (ACFG-089)
+      weekday: new Intl.DateTimeFormat(loc, { weekday: locale === 'ar' ? 'narrow' : 'short', timeZone: 'UTC' }),
     };
   }, [locale]);
 
@@ -182,8 +183,8 @@ export function DateField({
             </button>
           </div>
           <div className="date-pop__grid" ref={grid} role="group" aria-labelledby={`${id}-month`} onKeyDown={onGridKey}>
-            {weekdays.map((w) => (
-              <span key={w} className="date-pop__weekday" aria-hidden>
+            {weekdays.map((w, i) => (
+              <span key={i} className="date-pop__weekday" aria-hidden>
                 {w}
               </span>
             ))}
