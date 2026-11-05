@@ -8,7 +8,9 @@ import { makeVendor, prisma, tag } from './fixtures';
  */
 test('صفحة المنتج: الكبسة الثانية فوق المتاح تقول السبب تحت الزرّ، والسلة تبقى 3', async ({ page }) => {
   const v = await makeVendor(tag());
+  // المخزون بحركته كما يُنقصه البائع — onHand وحده يترك انحرافاً يُسقط فحص التدقيق الليلي (db-guards)
   await prisma.inventory.update({ where: { variantId: v.variantId }, data: { onHand: 3 } });
+  await prisma.inventoryMovement.create({ data: { variantId: v.variantId, delta: -7, reason: 'manual_adjust' } });
   await page.goto(`/p/${v.productSlug}`);
 
   const increase = page.getByRole('button', { name: 'زد' });
