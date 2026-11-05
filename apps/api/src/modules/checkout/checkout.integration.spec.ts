@@ -279,10 +279,17 @@ describe('بوابة 08 · البند 2 — الفشل لا يستهلك مخز�
     // طلبات هذا المشتري وحده: ملفات الاختبار الأخرى تنشئ طلباتها في اللحظة نفسها
     const mine = () => prisma.order.count({ where: { customerUserId: buyerId } });
     const count = await mine();
-    const token = await cartWith([{ variantId: variantIds[1]!, qty: 50 }]);
-    const res = await pay(token, 'tok_success');
-    expect(res.statusCode).toBe(409);
-    expect(await mine()).toBe(count);
+    // نفد بعد الإضافة (اشتراه غيره أو أنقصه البائع): الإضافة فوق المتاح تُرفض من CHK-013، فيُضاف 3 ثم يُنقص
+    const token = await cartWith([{ variantId: variantIds[1]!, qty: 3 }]);
+    const before = await stockOf(variantIds[1]!);
+    await prisma.inventory.update({ where: { variantId: variantIds[1]! }, data: { onHand: before.reserved + 1 } });
+    try {
+      const res = await pay(token, 'tok_success');
+      expect(res.statusCode).toBe(409);
+      expect(await mine()).toBe(count);
+    } finally {
+      await prisma.inventory.update({ where: { variantId: variantIds[1]! }, data: { onHand: before.onHand } });
+    }
   });
 
   it('رمز دفع لا يعرفه المزوّد: 400 برسالته، بلا طلب ولا حجز — لا «نتحقّق من الدفع» (CHK-065)', async () => {
@@ -1286,5 +1293,52 @@ describe('المال عند الدفع (موجة «يُؤتمت» · الدفع�
     const foreign = await quoteWith(sarCoupon.code);
     expect(foreign.totals['discount']!.minorUnits).toBe('0');
     expect(foreign.blockers).toContain(`الكوبون ${sarCoupon.code} لا ينطبق على منتجات سلّتك.`);
+  });
+});
+
+describe('CHK-013 · الإضافة إلى السلة تحترم المتاح مع ما فيها (5 نوفمبر 2026)', () => {
+  it('ما يتجاوز المتاح يُرفض بسببه والسلة كما كانت؛ حتى المتاح يمرّ؛ ورفع الكمية فوقه يُرفض وإنقاصها يمرّ', async () => {
+    if (!dbUp) return;
+    const variantId = variantIds[2]!;
+    const s = await stockOf(variantId);
+    const available = s.onHand - s.reserved;
+    expect(available).toBeGreaterThan(3);
+    const token = await cartWith([{ variantId, qty: available - 1 }]);
+    const headers = { 'x-cart-token': token };
+
+    // كانت تمرّ وتجمع فوق المتاح: «أضف إلى السلة» 3 بعد 3 بعد 3 صارت 21 والمتاح 3
+    const over = await call('POST', '/cart/items', { body: { variantId, qty: 2 }, headers });
+    expect(over.statusCode, over.body).toBe(400);
+    expect(over.json().message).toBe(`في سلّتك ${available - 1} من هذا الخيار — المتاح ${available} فقط.`);
+    expect((await cartLines(token))[0]!.qty).toBe(available - 1);
+
+    expect((await call('POST', '/cart/items', { body: { variantId, qty: 1 }, headers })).statusCode).toBe(201);
+    expect((await cartLines(token))[0]!.qty).toBe(available);
+
+    const up = await call('PATCH', `/cart/items/${variantId}`, { body: { qty: available + 1 }, headers });
+    expect(up.statusCode, up.body).toBe(400);
+    expect(up.json().message).toBe(`المتاح ${available} فقط.`);
+    expect((await call('PATCH', `/cart/items/${variantId}`, { body: { qty: 1 }, headers })).statusCode).toBe(200);
+  });
+
+  it('خيار نفد يُرفض بـ «نفد هذا الخيار من المخزون.»، والحدّ 50 للسطر يُقال لا يُقصّ بصمت', async () => {
+    if (!dbUp) return;
+    const variantId = variantIds[2]!;
+    const before = await stockOf(variantId);
+    try {
+      await prisma.inventory.update({ where: { variantId }, data: { onHand: before.reserved } });
+      const gone = await call('POST', '/cart/items', { body: { variantId, qty: 1 }, headers: { 'x-cart-token': await cartWith([]) } });
+      expect(gone.statusCode, gone.body).toBe(400);
+      expect(gone.json().message).toBe('نفد هذا الخيار من المخزون.');
+
+      await prisma.inventory.update({ where: { variantId }, data: { onHand: before.reserved + 100 } });
+      const token = await cartWith([{ variantId, qty: 40 }]);
+      const cap = await call('POST', '/cart/items', { body: { variantId, qty: 20 }, headers: { 'x-cart-token': token } });
+      expect(cap.statusCode, cap.body).toBe(400);
+      expect(cap.json().message).toBe('في سلّتك 40 من هذا الخيار — الحدّ 50 قطعة للسطر الواحد.');
+      expect((await cartLines(token))[0]!.qty).toBe(40);
+    } finally {
+      await prisma.inventory.update({ where: { variantId }, data: { onHand: before.onHand } });
+    }
   });
 });
