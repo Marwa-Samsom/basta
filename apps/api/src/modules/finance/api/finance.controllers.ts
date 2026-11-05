@@ -192,6 +192,14 @@ export class AdminFinanceController {
     return this.finance.commissionRules({ ...(term ? { search: term } : {}), page: pageOf(page) });
   }
 
+  @Get('commissions/vendors')
+  @RequirePermission('commissions.edit')
+  @ApiOperation({ summary: 'متاجر «نسبة لمتجر» بالاسم والرابط والحالة — كل متجر أرسل طلبه إلا المحظور، بلا vendors.review' })
+  commissionVendors(@Query('search') search?: string, @Query('limit') limit?: string) {
+    const term = termOf(search);
+    return this.finance.commissionVendors({ ...(term ? { search: term } : {}), limit: Math.min(Math.max(Number(limit) || 20, 1), 50) });
+  }
+
   @Delete('commissions/vendor/:vendorId')
   @RequirePermission('commissions.edit')
   @ApiOperation({ summary: 'إلغاء نسبة المتجر الخاصة — يعود إلى النسبة العامة من الآن' })
