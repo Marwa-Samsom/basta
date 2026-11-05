@@ -3,7 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 /**
  * «نسبة لمتجر» — ACFG-014، 4 نوفمبر 2026. القائمة كانت من طابور المراجعة (‎/admin/vendors?status=approved‎):
  * مدير العمولات وحدها بقي على «…» بلا سبب، و«دار القطن والكتان» قيد المراجعة — وهو ينشر قبل اعتماده —
- * «لا متجر معتمد بهذا البحث». الآن من مسار العمولة نفسه، كل متجر إلا المحظور بحالته.
+ * «لا متجر معتمد بهذا البحث». الآن من مسار العمولة نفسه، كل متجر أرسل طلبه إلا المحظور بحالته ورابطه —
+ * الرابط يفرّق متجرين بالاسم نفسه (كانت 43 مسوّدة «دار القطن والكتان» حول الحقيقي، 5 نوفمبر 2026).
  *
  * بلا دخول حقيقي: الجلسة رمز مصنوع وردود الخادم مزيّفة — المدير بتحقّق ثنائي، واختبارات الدخول تأكل حدّ
  * المحاولات الذي تجرّب به صاحبة المشروع على الخادم نفسه.
@@ -43,16 +44,16 @@ async function commissionsAs(page: Page, vendors: (q: URLSearchParams) => { stat
 test('مدير العمولات وحدها يختار متجراً قيد المراجعة — بحالته، ومن مسار العمولة لا طابور المراجعة', async ({ page }) => {
   const asked = await commissionsAs(page, (q) =>
     q.get('search')?.includes('القطن')
-      ? { json: { items: [{ id: '5f0e8b8e-1111-4c3a-9d44-000000000001', nameAr: 'دار القطن والكتان', status: 'in_review' }], total: 1 } }
-      : { json: { items: Array.from({ length: 20 }, (_, i) => ({ id: `5f0e8b8e-2222-4c3a-9d44-${String(i).padStart(12, '0')}`, nameAr: `متجر ${i}`, status: 'approved' })), total: 10542 } },
+      ? { json: { items: [{ id: '5f0e8b8e-1111-4c3a-9d44-000000000001', nameAr: 'دار القطن والكتان', slug: 'cotton-house', status: 'in_review' }], total: 1 } }
+      : { json: { items: Array.from({ length: 20 }, (_, i) => ({ id: `5f0e8b8e-2222-4c3a-9d44-${String(i).padStart(12, '0')}`, nameAr: `متجر ${i}`, slug: `shop-${i}`, status: 'approved' })), total: 10542 } },
   );
   const pick = page.getByRole('combobox', { name: 'المتجر' });
   await expect(pick.locator('option').first()).toHaveText('اختر من أول 20 من 10542 — أو ضيّق بالبحث');
-  await expect(pick.locator('option').nth(1)).toHaveText('متجر 0');
+  await expect(pick.locator('option').nth(1)).toHaveText('متجر 0 · shop-0');
 
   await page.getByRole('searchbox', { name: 'ابحث عن متجر' }).fill('دار القطن');
-  await expect(pick.locator('option').nth(1)).toHaveText('دار القطن والكتان — قيد المراجعة');
-  await pick.selectOption({ label: 'دار القطن والكتان — قيد المراجعة' });
+  await expect(pick.locator('option').nth(1)).toHaveText('دار القطن والكتان — قيد المراجعة · cotton-house');
+  await pick.selectOption({ label: 'دار القطن والكتان — قيد المراجعة · cotton-house' });
   await expect(pick).toHaveValue('5f0e8b8e-1111-4c3a-9d44-000000000001');
 
   expect(asked.filter((u) => u.includes('/admin/vendors')), 'طابور المراجعة').toEqual([]);

@@ -938,7 +938,7 @@ describe('صيغ طلب السحب ومرجع التحويل — يُؤتمت 4'
 });
 
 describe('ACFG-014 · متاجر «نسبة لمتجر» لمدير العمولات (4 نوفمبر 2026)', () => {
-  it('كل متجر إلا المحظور، بالاسم والحالة وحدهما — بـ commissions.edit بلا vendors.review', async () => {
+  it('كل متجر أرسل طلبه إلا المحظور، بالاسم والرابط والحالة وحدها — بـ commissions.edit بلا vendors.review', async () => {
     if (!dbUp) return;
     const tag = `st-${SUFFIX}`;
     for (const status of ['approved', 'in_review', 'pending', 'suspended', 'rejected', 'banned'] as const) {
@@ -959,11 +959,13 @@ describe('ACFG-014 · متاجر «نسبة لمتجر» لمدير العمول
     const res = await call('GET', `/admin/finance/commissions/vendors?search=${tag}`, admin.token);
     expect(res.statusCode, res.body).toBe(200);
     const body = res.json() as { items: Record<string, unknown>[]; total: number };
-    // قيد المراجعة ينشر قبل اعتماده، والمسوّدة والمرفوض والمعلَّق قد يعودون — والمحظور لا يعود
-    expect(body.items.map((v) => v['status']).sort()).toEqual(['approved', 'in_review', 'pending', 'rejected', 'suspended']);
-    expect(body.total).toBe(5);
-    // للاختيار وحده: لا بريد صاحبه ولا وثائقه
-    expect(Object.keys(body.items[0]!).sort()).toEqual(['id', 'nameAr', 'status']);
+    // قيد المراجعة ينشر قبل اعتماده، والمرفوض والمعلَّق قد يعودان، والمحظور لا يعود. والمسوّدة لم تُرسل طلبها
+    // فلا تنشر: كانت 43 «دار القطن والكتان — مسوّدة» من اختبار التسجيل حول المتجر الحقيقي (5 نوفمبر 2026)
+    expect(body.items.map((v) => v['status']).sort()).toEqual(['approved', 'in_review', 'rejected', 'suspended']);
+    expect(body.total).toBe(4);
+    // للاختيار وحده: لا بريد صاحبه ولا وثائقه — والرابط يفرّق متجرين بالاسم نفسه
+    expect(Object.keys(body.items[0]!).sort()).toEqual(['id', 'nameAr', 'slug', 'status']);
+    expect(body.items.find((v) => v['status'] === 'in_review')?.['slug']).toBe(`v-in-review-${tag}`);
     // بريد صاحبه يُبحث به كما في خانة البحث
     const byEmail = (await call('GET', `/admin/finance/commissions/vendors?search=${encodeURIComponent(`vinreview.${tag}`)}`, admin.token)).json() as { items: { status: string }[] };
     expect(byEmail.items.map((v) => v.status)).toEqual(['in_review']);

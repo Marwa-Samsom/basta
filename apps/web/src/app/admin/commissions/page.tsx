@@ -23,6 +23,7 @@ interface Rule {
 interface VendorItem {
   id: string;
   nameAr: string;
+  slug: string;
   status: string;
 }
 
@@ -39,7 +40,8 @@ const PICK = 20;
  *
  * ومن مسار العمولة نفسه (4 نوفمبر 2026، ACFG-014): كانت القائمة من طابور المراجعة — يحتاج vendors.review
  * فبقي مدير العمولات وحدها على «…» بلا سبب — والمعتمد وحده فيها، فالمتجر قيد المراجعة (ينشر قبل اعتماده)
- * لا تُعطى له نسبة. الآن كل متجر إلا المحظور، بحالته إن لم يكن معتمداً، ورفض الخادم يُكتب مكان «…».
+ * لا تُعطى له نسبة. الآن كل متجر أرسل طلبه إلا المحظور، بحالته إن لم يكن معتمداً، ورفض الخادم يُكتب مكان «…».
+ * وبرابطه (5 نوفمبر 2026): متجران بالاسم نفسه كانا سطرين متطابقين لا يُعرف أيّهما يُختار.
  *
  * والنسب الخاصة صفحات من الخادم ببحث باسم المتجر (3 نوفمبر 2026): كانت القواعد كلها — 534 —
  * تُجلب وتُصفّى هنا بلا «المزيد» ولا «السابق». العامة تأتي وحدها معها.
@@ -289,7 +291,7 @@ export default function AdminCommissionsPage() {
                   {target && !(vendors?.items ?? []).some((v) => v.id === target) ? <option value={target}>{targetName || target.slice(0, 8)}</option> : null}
                   {(vendors?.items ?? []).map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.status === 'approved' ? v.nameAr : `${v.nameAr} — ${(locale === 'en' ? VENDOR_STATUS_EN : VENDOR_STATUS)[v.status] ?? v.status}`}
+                      {`${v.status === 'approved' ? v.nameAr : `${v.nameAr} — ${(locale === 'en' ? VENDOR_STATUS_EN : VENDOR_STATUS)[v.status] ?? v.status}`} · ${v.slug}`}
                     </option>
                   ))}
                 </select>
