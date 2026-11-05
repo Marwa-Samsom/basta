@@ -422,9 +422,12 @@ function StoreCard({
   // الأحدث أولاً من الخادم: رفضٌ يبقى ظاهراً حتى يُطلب إرجاع بعده
   const lastReturn = s.returns[0];
 
-  /** تاريخ بلوغ كل مرحلة من سجلّ الحالات — المرحلة الأولى تاريخ الطلب نفسه */
+  /**
+   * تاريخ بلوغ كل مرحلة من سجلّ الحالات — المرحلة الأولى تاريخ الطلب نفسه. آخر مرة بلغها لا أولها: طلبٌ
+   * تعذّر توصيله ثم أُعيد شحنه اليوم كان «تم الشحن» عنده بتاريخ الشحن الأول (BUY-013، 4 نوفمبر 2026)
+   */
   const reachedAt = (key: string, i: number): string | null =>
-    i === 0 ? s.placedAt : (s.history.find((h) => h.toStatus === key)?.createdAt ?? null);
+    i === 0 ? s.placedAt : ([...s.history].reverse().find((h) => h.toStatus === key)?.createdAt ?? null);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
