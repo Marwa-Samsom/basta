@@ -32,6 +32,8 @@ const FOOTER: { title: Bilingual; links: { href: string; label: Bilingual }[] }[
       { href: '/shops', label: { ar: 'كل المتاجر', en: 'All shops' } },
       { href: '/pages/returns', label: { ar: 'سياسة الإرجاع', en: 'Return policy' } },
       { href: '/account/orders', label: { ar: 'طلباتي', en: 'My orders' } },
+      // بلا حساب برقم التتبّع — كانت الصفحة لا يصلها رابط من أي مكان (BUY-092)
+      { href: '/track', label: { ar: 'تتبّع شحنتك', en: 'Track your shipment' } },
     ],
   },
   {
