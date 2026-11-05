@@ -171,8 +171,24 @@
   max-inline-size: 44ch;
 }
 .sd-hero__cta { inline-size: fit-content; margin-block-start: 6px; gap: 9px; }
-.sd-hero__media { min-width: 0; background: var(--surface-sunken); }
-.sd-hero__media img { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+.sd-hero__media { min-width: 0; display: grid; place-items: center; background: var(--surface-sunken); }
+/* contain لا cover: لافتة 1600×500 كانت تُقصّ في نصف البطل فيُقطع نصّها من الطرفين (ACFG-052) */
+.sd-hero__media img { inline-size: 100%; block-size: 100%; object-fit: contain; display: block; }
+.sd-hero__dots { display: flex; gap: 8px; margin-block-start: 6px; }
+.sd-hero__dot {
+  inline-size: 10px;
+  block-size: 10px;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.sd-hero__dot[aria-pressed='true'] { background: currentColor; opacity: 1; }
+.sd-promo { display: grid; gap: var(--space-3); }
+.sd-promo__item { display: block; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.sd-promo__item img { inline-size: 100%; block-size: auto; display: block; }
 
 /* بطاقات المتاجر */
 .sd-shops {

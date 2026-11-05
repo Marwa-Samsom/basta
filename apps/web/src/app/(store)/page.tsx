@@ -7,6 +7,7 @@ import { LatestProducts } from '@/components/latest-products';
 import { ProductGrid } from '@/components/product-card';
 import { RecentSection } from '@/components/recent';
 import { EmptyState } from '@/components/ui';
+import { HeroBanners, type HeroSlide } from '@/components/hero-banners';
 import { pageCurrency } from '@/lib/currency-server';
 import { intlLocale, nameIn, translator, type Locale } from '@/lib/i18n';
 import { pageLocale } from '@/lib/i18n-server';
@@ -66,18 +67,23 @@ function CampaignSection({ campaign, locale }: { campaign: Campaign; locale: Loc
 export default async function HomePage() {
   const [currency, locale] = await Promise.all([pageCurrency(), pageLocale()]);
   const t = translator(locale);
-  const [shopsPage, latest, banners, featured, campaigns] = await Promise.all([
+  const [shopsPage, latest, banners, middleBanners, featured, campaigns] = await Promise.all([
     getShops().catch(() => ({ items: [] })),
     listProducts({ sort: 'newest', pageSize: '12' }, currency, locale),
     getBanners('home_hero'),
+    // «وسط الرئيسية» كان موضعاً في اللوحة لا يُعرض في أي صفحة (ACFG-052)
+    getBanners('home_middle'),
     getFeatured(currency, locale),
     getCampaigns(currency, locale),
   ]);
 
-  const banner = banners[0];
-  const bannerSrc = banner ? imageUrl(banner.imageUrl) : null;
   // رابط محفوظ قبل تشديد التحقق قد يكون `//موقع-آخر` — يُعاد فحصه عند العرض
-  const bannerHref = internalPath(banner?.linkUrl);
+  const slideOf = (b: (typeof banners)[number]): HeroSlide | null => {
+    const src = imageUrl(b.imageUrl);
+    return src ? { id: b.id, title: b.titleAr, href: internalPath(b.linkUrl), src } : null;
+  };
+  const heroSlides = banners.map(slideOf).filter((s): s is HeroSlide => s !== null);
+  const promos = middleBanners.map(slideOf).filter((s): s is HeroSlide => s !== null);
   const isEmpty = latest.items.length === 0;
   const tiles = shopsPage.items.slice(0, SHOP_TILES);
   const topCampaigns = campaigns.filter((c) => c.placement === 'home_top');
@@ -85,48 +91,20 @@ export default async function HomePage() {
 
   return (
     <div className="sd-home">
-      {/* البطل — لوحة بلون العلامة وصورة البانر بجانبها إن وُجد */}
-      <section className={bannerSrc ? 'sd-hero sd-hero--media' : 'sd-hero'}>
-        <div className="sd-hero__panel">
-          <span className="sd-hero__kicker">
-            {isEmpty ? t('منصّة جديدة', 'A new platform') : t('سوق المتاجر المستقلة', 'The marketplace of independent shops')}
-          </span>
-          <h1 className="sd-hero__title">
-            {banner?.titleAr ??
-              (isEmpty
-                ? t('بسطة تبدأ الآن', 'Basta starts now')
-                : t('كل المتاجر المستقلة في سوق واحد', 'All independent shops in one marketplace'))}
-          </h1>
-          <p className="sd-hero__body">
-            {isEmpty
-              ? t(
-                  'أول المتاجر تنضم هذه الأيام. تصفّح المتاجر لترى ما وصل، وسجّل متجرك إن كنت تاجراً.',
-                  "The first shops are joining these days. Browse the shops to see what's arrived, and register your shop if you're a seller.",
-                )
-              : t(
-                  'اشترِ من بائعين حقيقيين، بعملة بلدك، وتابع كل طلب من متجره.',
-                  "Buy from real sellers, in your country's currency, and track each order from its shop.",
-                )}
-          </p>
-          {bannerHref ? (
-            <Link href={bannerHref} className="btn btn--on-brand btn--lg sd-hero__cta">
-              {t('تسوّق الآن', 'Shop now')}
-              <Icon name="next" size={17} mirror />
-            </Link>
-          ) : (
-            <Link href="/shops" className="btn btn--on-brand btn--lg sd-hero__cta">
-              {t('تصفّح المتاجر', 'Browse shops')}
-              <Icon name="next" size={17} mirror />
-            </Link>
-          )}
-        </div>
-        {bannerSrc ? (
-          <div className="sd-hero__media">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={bannerSrc} alt={banner?.titleAr ?? t('عرض', 'Offer')} />
-          </div>
-        ) : null}
-      </section>
+      {/* البطل — لوحة بلون العلامة ولافتات «أعلى الرئيسية» بجانبها تتبدّل إن وُجدت (ACFG-052) */}
+      <HeroBanners
+        slides={heroSlides}
+        kicker={isEmpty ? t('منصّة جديدة', 'A new platform') : t('سوق المتاجر المستقلة', 'The marketplace of independent shops')}
+        title={isEmpty ? t('بسطة تبدأ الآن', 'Basta starts now') : t('كل المتاجر المستقلة في سوق واحد', 'All independent shops in one marketplace')}
+        body={
+          isEmpty
+            ? t(
+                'أول المتاجر تنضم هذه الأيام. تصفّح المتاجر لترى ما وصل، وسجّل متجرك إن كنت تاجراً.',
+                "The first shops are joining these days. Browse the shops to see what's arrived, and register your shop if you're a seller.",
+              )
+            : t('اشترِ من بائعين حقيقيين، بعملة بلدك، وتابع كل طلب من متجره.', "Buy from real sellers, in your country's currency, and track each order from its shop.")
+        }
+      />
 
       {tiles.length > 0 ? (
         <section className="sd-section" aria-labelledby="sd-shops-title">
@@ -169,6 +147,24 @@ export default async function HomePage() {
 
       {/* ST-24 — من تخزين هذا الجهاز، يُرسم في المتصفّح ولا يظهر إن لم يُشاهَد شيء */}
       <RecentSection />
+
+      {promos.length > 0 ? (
+        <section className="sd-section sd-promo" aria-label={t('عروض', 'Offers')}>
+          {promos.map((p) => {
+            // eslint-disable-next-line @next/next/no-img-element
+            const img = <img src={p.src} alt={p.title ?? t('عرض', 'Offer')} />;
+            return p.href ? (
+              <Link key={p.id} href={p.href} className="sd-promo__item">
+                {img}
+              </Link>
+            ) : (
+              <div key={p.id} className="sd-promo__item">
+                {img}
+              </div>
+            );
+          })}
+        </section>
+      ) : null}
 
       {middleCampaigns.map((c) => (
         <CampaignSection key={c.id} campaign={c} locale={locale} />
