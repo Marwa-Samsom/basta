@@ -158,6 +158,8 @@ export class StorefrontService implements OnModuleInit {
   /** تعليق متجر أو رفعه أو اعتماده يغيّر ظهور منتجاته كلها — الفهرس يتبعه فوراً */
   onModuleInit(): void {
     this.vendorEvents.onVisibilityChanged((vendorId) => this.syncVendor(vendorId));
+    // متاح الوثيقة يتبع المخزون — تعديل البائع والحجز والبيع والإرجاع — وإلا كذب «المتوفّر فقط» (DISC-026)
+    this.inventory.onAvailabilityChanged((variantIds) => this.syncVariants(variantIds));
     // الاختبار يبني فهرسه بنفسه؛ مزامنة خلفية تسابقه (NODE_ENV فيه development من .env)
     if (!process.env['VITEST']) void this.backfillIndex();
   }
@@ -222,10 +224,13 @@ export class StorefrontService implements OnModuleInit {
 
     if (hit) {
       // الفهرس قال من المرشّحون؛ التفاصيل والأسعار من القاعدة دائماً
-      const rows = await this.prisma.product.findMany({
-        where: { ...VISIBLE, id: { in: [...hit.ids] } },
-        include: CARD_INCLUDE,
-      });
+      const [rows, seen] = await Promise.all([
+        this.prisma.product.findMany({
+          where: { ...VISIBLE, id: { in: [...hit.ids] } },
+          include: CARD_INCLUDE,
+        }),
+        this.visibleMatches(hit.matches),
+      ]);
       const byId = new Map(rows.map((r) => [r.id, r]));
       const ordered = hit.ids.flatMap((id) => {
         const row = byId.get(id);
@@ -235,25 +240,28 @@ export class StorefrontService implements OnModuleInit {
         items: await this.cards(ordered, fx),
         page,
         pageSize,
-        total: hit.total,
+        total: seen?.total ?? hit.total,
         engine: 'meili',
         tookMs: Date.now() - started,
         // الأوجه من توزيع المحرّك: عدّ القاعدة يتجاهل الكلمة المبحوث عنها
-        facets: await this.facetsFromDistribution(hit.facets),
+        facets: await this.facetsFromDistribution(seen ? { ...hit.facets, vendorId: seen.vendors } : hit.facets),
       };
     }
 
     const where = await this.whereOf(input, fx);
-    const [rows, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        include: CARD_INCLUDE,
-        orderBy: this.orderOf(input.sort),
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      this.prisma.product.count({ where }),
-    ]);
+    const [rows, total] =
+      input.sort === 'price_asc' || input.sort === 'price_desc'
+        ? await this.byPrice(where, input.sort, fx, page, pageSize)
+        : await Promise.all([
+            this.prisma.product.findMany({
+              where,
+              include: CARD_INCLUDE,
+              orderBy: this.orderOf(input.sort),
+              skip: (page - 1) * pageSize,
+              take: pageSize,
+            }),
+            this.prisma.product.count({ where }),
+          ]);
 
     return {
       items: await this.cards(rows, fx),
@@ -270,11 +278,48 @@ export class StorefrontService implements OnModuleInit {
     switch (sort) {
       case 'newest':
         return [{ publishedAt: 'desc' }, { createdAt: 'desc' }];
-      // السعر على المتغيّر لا على المنتج، فترتيبه في القاعدة يحتاج ضمّاً —
-      // يُترك للمحرّك، والقاعدة ترتّب بالأحدث كي لا تكذب على المستخدم بترتيب عشوائي
+      // الصلة لا تُحسب في القاعدة: الأحدث كي لا تكذب على المستخدم بترتيب عشوائي
       default:
         return [{ publishedAt: 'desc' }];
     }
+  }
+
+  /**
+   * الترتيب بالسعر في القاعدة — كما يرتّب المحرّك: أرخص متغيّر حيّ بالدولار (priceUsd)، فعشرة دنانير
+   * أغلى من عشرين ريالاً، وما لا سعر صرف له في الآخر، والأحدث نشراً عند التساوي. السعر على المتغيّر
+   * لا المنتج فلا يرتّبه orderBy: تُقرأ المطابقات خفيفةً (معرّف وعملة وأرخص سعر) ثم الصفحة وحدها
+   * بتفاصيلها. كان مسار القاعدة — تصفّح المتجر بلا كلمة وسقوط المحرّك — يرتّب بالأحدث دائماً (DISC-034).
+   */
+  private async byPrice(
+    where: Prisma.ProductWhereInput,
+    sort: 'price_asc' | 'price_desc',
+    fx: DisplayFx,
+    page: number,
+    pageSize: number,
+  ): Promise<[CardRow[], number]> {
+    const matches = await this.prisma.product.findMany({
+      where,
+      select: {
+        id: true,
+        publishedAt: true,
+        vendor: { select: { settlementCurrency: true } },
+        variants: { where: { archivedAt: null, isActive: true }, select: { priceMinorUnits: true }, orderBy: { priceMinorUnits: 'asc' }, take: 1 },
+      },
+    });
+    const direction = sort === 'price_asc' ? 1 : -1;
+    const keyed = matches.map((m) => ({
+      id: m.id,
+      usd: fx.usd(m.variants[0]?.priceMinorUnits ?? 0n, m.vendor.settlementCurrency),
+      published: m.publishedAt?.getTime() ?? 0,
+    }));
+    keyed.sort((x, y) => {
+      if (x.usd === null || y.usd === null) return x.usd === y.usd ? y.published - x.published : x.usd === null ? 1 : -1;
+      return (x.usd - y.usd) * direction || y.published - x.published;
+    });
+    const ids = keyed.slice((page - 1) * pageSize, page * pageSize).map((k) => k.id);
+    const rows = await this.prisma.product.findMany({ where: { id: { in: ids } }, include: CARD_INCLUDE });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return [ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])), matches.length];
   }
 
   private async whereOf(input: SearchInput, fx: DisplayFx): Promise<Prisma.ProductWhereInput> {
@@ -308,6 +353,13 @@ export class StorefrontService implements OnModuleInit {
 
     if (input.minPriceMinor !== undefined || input.maxPriceMinor !== undefined) {
       and.push({ OR: await this.priceBounds(input.minPriceMinor, input.maxPriceMinor, fx) });
+    }
+
+    // «المتوفّر فقط» كما في المحرّك (available > 0): متغيّر حيّ واحد على الأقل متاحه موجب (DISC-034)
+    if (input.inStockOnly) {
+      and.push({
+        variants: { some: { archivedAt: null, isActive: true, inventory: { is: { onHand: { gt: this.prisma.inventory.fields.reserved } } } } },
+      });
     }
 
     return { AND: and };
@@ -474,6 +526,23 @@ export class StorefrontService implements OnModuleInit {
   }
 
   // -------------------------------------------------------------- الأوجه
+
+  /**
+   * المطابقات التي تقبلها قاعدة الرؤية، معدودةً لكل متجر. الفهرس قد يكون قديماً (مسودّة أو موقوف كُتب
+   * والمحرّك نائم): كان وجه «المتجر» يعدّها من توزيع المحرّك فيظهر متجر بعدّ 2 ولا منتج له في النتائج
+   * (DISC-035). null: المطابقات فوق حدّ التحقّق فيبقى توزيع المحرّك.
+   */
+  private async visibleMatches(
+    matches: readonly { id: string; vendorId: string }[] | undefined,
+  ): Promise<{ total: number; vendors: Record<string, number> } | null> {
+    if (!matches) return null;
+    const rows = matches.length
+      ? await this.prisma.product.findMany({ where: { ...VISIBLE, id: { in: matches.map((m) => m.id) } }, select: { vendorId: true } })
+      : [];
+    const vendors: Record<string, number> = {};
+    for (const r of rows) vendors[r.vendorId] = (vendors[r.vendorId] ?? 0) + 1;
+    return { total: rows.length, vendors };
+  }
 
   /**
    * أوجه البحث من توزيع المحرّك. المحرّك يعطي معرّفات وأعداداً، والأسماء
@@ -933,6 +1002,14 @@ export class StorefrontService implements OnModuleInit {
       docs.length > 0 ? this.search.upsert(docs) : Promise.resolve(true),
       gone.length > 0 ? this.search.remove(gone) : Promise.resolve(true),
     ]);
+  }
+
+  /** منتجات متغيّرات تغيّر مخزونها — المرئي منها فقط، فلا تُحذف وثيقة لم تكن في الفهرس أصلاً */
+  async syncVariants(variantIds: readonly string[]): Promise<void> {
+    const ids = (
+      await this.prisma.product.findMany({ where: { ...VISIBLE, variants: { some: { id: { in: [...variantIds] } } } }, select: { id: true } })
+    ).map((p) => p.id);
+    for (let i = 0; i < ids.length; i += 500) await this.syncIndex(ids.slice(i, i + 500));
   }
 
   /** منتجات متجر كلها — بعد تغيّر حالته. syncIndex يضيف المرئي ويحذف ما سواه */

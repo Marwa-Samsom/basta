@@ -28,7 +28,15 @@ export interface SearchResult {
    * «قميص»)، فالمحرّك يحسبها بالمطابقة نفسها التي أعاد بها النتائج.
    */
   readonly facets: Readonly<Record<string, Readonly<Record<string, number>>>>;
+  /**
+   * المطابقات كلها (معرّف ومتجر) حين لا تزيد عن MATCHES_LIMIT — كي يعدّ الكتالوج وجه «المتجر»
+   * على ما تقبله قاعدة الرؤية لا على فهرس قد يكون قديماً (DISC-035). تغيب فوق الحدّ أو إن فشل سؤالها.
+   */
+  readonly matches?: readonly { readonly id: string; readonly vendorId: string }[];
 }
+
+/** حدّ المطابقات التي تُتحقّق رؤيتها لعدّ الأوجه — فوقه يُكتفى بتوزيع المحرّك */
+const MATCHES_LIMIT = 1000;
 
 /**
  * البحث والفهرسة — ADR-014.
@@ -143,9 +151,13 @@ export class SearchService {
     const filter = buildFilter(input);
     const sort = buildSort(input.sort);
 
+    const body = {
+      q: input.q ?? '',
+      ...(filter.length > 0 ? { filter } : {}),
+    };
     try {
       const res = await this.meili.request<{
-        hits: { id: string }[];
+        hits: { id: string; vendorId: string }[];
         estimatedTotalHits: number;
         processingTimeMs: number;
         facetDistribution?: Record<string, Record<string, number>>;
@@ -153,25 +165,41 @@ export class SearchService {
         'POST',
         `/indexes/${this.meili.index}/search`,
         {
-          q: input.q ?? '',
+          ...body,
           offset: (page - 1) * pageSize,
           limit: pageSize,
-          attributesToRetrieve: ['id'],
+          attributesToRetrieve: ['id', 'vendorId'],
           facets: ['vendorId', 'brandId', 'attributeValueIds'],
-          ...(filter.length > 0 ? { filter } : {}),
           ...(sort.length > 0 ? { sort } : {}),
         },
         1500,
       );
+      const total = res.estimatedTotalHits;
+      // الصفحة الأولى التي تحمل المطابقات كلها لا تحتاج سؤالاً ثانياً
+      const matches =
+        page === 1 && res.hits.length >= total
+          ? res.hits
+          : total <= MATCHES_LIMIT
+            ? await this.meili
+                .request<{ hits: { id: string; vendorId: string }[] }>(
+                  'POST',
+                  `/indexes/${this.meili.index}/search`,
+                  { ...body, limit: total, attributesToRetrieve: ['id', 'vendorId'] },
+                  1500,
+                )
+                .then((r) => r.hits)
+                .catch(() => undefined)
+            : undefined;
 
       return {
         ids: res.hits.map((h) => h.id),
-        total: res.estimatedTotalHits,
+        total,
         page,
         pageSize,
         tookMs: res.processingTimeMs,
         engine: 'meili',
         facets: res.facetDistribution ?? {},
+        ...(matches ? { matches: matches.map((m) => ({ id: m.id, vendorId: m.vendorId })) } : {}),
       };
     } catch (err) {
       /**
