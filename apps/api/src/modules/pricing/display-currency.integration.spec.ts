@@ -157,6 +157,22 @@ describe('عملة العرض — 18 أكتوبر 2026', () => {
     expect((await call('GET', `/storefront/products/${sar.slug}?currency=12`)).statusCode).toBe(400);
   });
 
+  it('DISC-092: القائمة {defaultCurrency, currencies:[{code,nameAr,symbol}]} بافتراضية الإدارة (JOD)، و xyz بالافتراضية، و 12 ← 400 «رمز العملة ثلاثة أحرف.»', async () => {
+    if (!dbUp) return;
+    const configured = (await prisma.setting.findUnique({ where: { key: 'default_display_currency' } }))?.valueJson;
+    const opts = (await call('GET', '/storefront/currencies')).json() as { defaultCurrency: string; currencies: { code: string; nameAr: string; symbol: string }[] };
+    expect(opts.defaultCurrency).toBe(configured);
+    expect(opts.defaultCurrency).toBe('JOD');
+    for (const c of opts.currencies) expect(c).toEqual(expect.objectContaining({ code: expect.stringMatching(/^[A-Z]{3}$/), nameAr: expect.any(String), symbol: expect.any(String) }));
+
+    const unknown = await call('GET', `/storefront/products/${sar.slug}?currency=xyz`);
+    expect(unknown.statusCode).toBe(200);
+    expect(unknown.json().currency).toBe('JOD');
+    const digits = await call('GET', `/storefront/products/${sar.slug}?currency=12`);
+    expect(digits.statusCode).toBe(400);
+    expect([digits.json().message].flat()).toContain('رمز العملة ثلاثة أحرف.');
+  });
+
   it('صفحة المنتج بعملة المشتري بمعامل الدفع، ومعها سعر المتجر بعملته', async () => {
     if (!dbUp) return;
     const inJod = (await call('GET', `/storefront/products/${sar.slug}?currency=JOD`)).json();
