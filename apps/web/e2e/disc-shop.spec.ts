@@ -219,11 +219,12 @@ test('DISC-047: متجر قيد المراجعة ينشر — قبل الاعت�
   await expect(page.getByRole('main').getByRole('link', { name: s.nameAr }).first()).toBeVisible();
 });
 
-// المتوقَّع: «على بسطة منذ أكتوبر 2026». الواقع: «على بسطة منذ تشرين الأول 2026» — التاريخ يُنسَّق بلغة ar-JO
-// (أسماء الأشهر الشامية) في s/[slug]/page.tsx. قرار صاحبة المشروع.
-test.fixme('DISC-041: «على بسطة منذ أكتوبر 2026» باسم الشهر «أكتوبر»', async ({ page }) => {
+// أسماء الشهور على طريقة مصر — قرار صاحبة المشروع 14 نوفمبر 2026: كانت ar-JO تقول «تشرين الأول»
+// وصارت intlLocale في كل تاريخ (s/[slug] وحالة التأهيل ومهلة التحويل في الخادم).
+test('DISC-041: «على بسطة منذ أكتوبر 2026» باسم الشهر «أكتوبر»', async ({ page }) => {
   const s = await shop({ data: { createdAt: new Date('2026-10-05T10:00:00Z') } });
   await addProduct(s, { nameAr: `منتج ${s.t}` });
   await page.goto(`/s/${s.slug}`);
   await expect(meta(page)).toContainText('على بسطة منذ أكتوبر 2026');
+  await expect(meta(page)).not.toContainText('تشرين');
 });

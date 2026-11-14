@@ -45,6 +45,14 @@ export function proxy(request: NextRequest) {
   headers.set('x-nonce', nonce);
   headers.set('content-security-policy', csp);
 
+  // رابط بـ % معطوبة (/p/%E0%A4%A) كان يبلغ Next فيردّ «400 Bad Request» بالإنجليزية بلا قالب الموقع.
+  // إعادة الكتابة لا تكفي (Next يفكّ معاملات العنوان الأصلي فيسقط 500)، فيُحوَّل إلى مسار لا وجود له
+  // فيُرسم 404 «لم نجد هذه الصفحة» داخل قشرة المتجر (DISC-063)
+  try {
+    decodeURIComponent(request.nextUrl.pathname);
+  } catch {
+    return NextResponse.redirect(new URL('/not-found', request.url));
+  }
   const response = NextResponse.next({ request: { headers } });
   response.headers.set('Content-Security-Policy', csp);
   return response;

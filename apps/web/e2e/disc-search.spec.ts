@@ -58,9 +58,8 @@ test('DISC-011: طلب اقتراح واحد بعد التوقّف لا لكل �
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(`نتائج «${w} قميص كتان»`);
 });
 
-// المتوقَّع: الصندوق يحمل الاقتراح المختار بعد فتح نتائجه. الواقع: يبقى فيه ما كُتب («<الكلمة>») لا «<الكلمة> قميص كتان» —
-// go() في search-box.tsx يفتح الرابط ولا يضع الاقتراح في الخانة. قرار صاحبة المشروع.
-test.fixme('DISC-011: بعد الضغط على اقتراح يحمل الصندوق الاقتراح نفسه', async ({ page }) => {
+// الاقتراح المختار يصير في الخانة — go() في search-box.tsx يضعه قبل فتح نتائجه
+test('DISC-011: بعد الضغط على اقتراح يحمل الصندوق الاقتراح نفسه', async ({ page }) => {
   await page.route((u) => u.pathname.endsWith('/storefront/suggest'), (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify({ suggestions: ['قميص كتان'] }) }),
   );
@@ -264,20 +263,8 @@ test('DISC-027: «المتجر» يظهر بمتجرين بعدّهما تناز
   await expect(cards(page)).toHaveCount(3);
 });
 
-// المتوقَّع: الضغط الثاني على المتجر نفسه في وجه «المتجر» يزيل التصفية. الواقع: بعد الاختيار يبقى في الأوجه متجر واحد
-// فيختفي قسم «المتجر» كله (listing.tsx يعرضه لأكثر من متجر) — لا يُضغط ثانيةً، والإزالة من الرقاقة وحدها. قرار صاحبة المشروع.
-test.fixme('DISC-027: الضغط الثاني على المتجر المختار في وجه «المتجر» يزيل التصفية', async ({ page }) => {
-  const shoe = word();
-  const a = await shop();
-  const b = await shop();
-  await indexProducts(a, [(await addProduct(a, { nameAr: `${shoe} حذاء` })).id], { q: shoe, total: 1 });
-  await indexProducts(b, [(await addProduct(b, { nameAr: `${shoe} حذاء` })).id], { q: shoe, total: 2 });
-  await search(page, shoe);
-  await facets(page).locator('a.sd-facet__item', { hasText: a.nameAr }).click();
-  await page.waitForURL((u) => u.searchParams.get('vendorId') === a.vendorId);
-  await facets(page).locator('a.sd-facet__item', { hasText: a.nameAr }).click();
-  await page.waitForURL((u) => !u.searchParams.has('vendorId'));
-});
+// DISC-027: بعد اختيار متجر يبقى في الأوجه متجر واحد فيختفي قسم «المتجر»، والإزالة من رقاقة التصفية
+// المطبّقة (الاختبار السابق) — قبلته صاحبة المشروع 14 نوفمبر 2026 بديلاً عن الضغط الثاني.
 
 test('DISC-029: زرّ الترتيب افتراضه «الأكثر ملاءمة» وعلامة ✓ على الحالي، وكل خيار يضع sort ويُسقط page، والسعر بالدولار بين العملات', async ({ page }) => {
   const w = word();

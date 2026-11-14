@@ -51,7 +51,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
     return qs ? `${base}?${qs}` : base;
   };
   const pages = Math.ceil(total / shop.pageSize);
-  const since = new Intl.DateTimeFormat(locale === 'en' ? intlLocale(locale) : 'ar-JO-u-nu-latn', { year: 'numeric', month: 'long' }).format(
+  const since = new Intl.DateTimeFormat(intlLocale(locale), { year: 'numeric', month: 'long' }).format(
     new Date(vendor.since),
   );
 

@@ -11,7 +11,7 @@ import { apiBlob } from '@/lib/api';
 import { intlLocale, localized, type Locale } from '@/lib/i18n';
 
 const DATE: Readonly<Record<Locale, Intl.DateTimeFormat>> = {
-  ar: new Intl.DateTimeFormat('ar-JO-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' }),
+  ar: new Intl.DateTimeFormat(intlLocale('ar'), { dateStyle: 'medium', timeStyle: 'short' }),
   en: new Intl.DateTimeFormat(intlLocale('en'), { dateStyle: 'medium', timeStyle: 'short' }),
 };
 

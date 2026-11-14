@@ -363,9 +363,9 @@ test('DISC-063: الرابط العربي خاماً ومشفّراً مرة ي�
   expect((await page.goto('/p/%E0%A4%A'))?.status()).not.toBe(500);
 });
 
-// المتوقَّع: /p/%E0%A4%A صفحة 404 «لم نجد هذه الصفحة». الواقع: 400 «Bad Request» من Next نفسه (بالإنجليزية وبلا
-// قالب الموقع) قبل أن يبلغ الطلب الصفحة — قرار صاحبة المشروع.
-test.fixme('DISC-063: % المعطوبة في رابط المنتج صفحة 404 «لم نجد هذه الصفحة»', async ({ page }) => {
+// % المعطوبة كانت تبلغ Next فيردّ «400 Bad Request» بالإنجليزية — الوسيط (proxy.ts) يحوّلها إلى 404 الموقع
+test('DISC-063: % المعطوبة في رابط المنتج صفحة 404 «لم نجد هذه الصفحة»', async ({ page }) => {
   expect((await page.goto('/p/%E0%A4%A'))?.status()).toBe(404);
   await expect(page.getByText('لم نجد هذه الصفحة')).toBeVisible();
+  await expect(page.getByText('Bad Request')).toHaveCount(0);
 });
