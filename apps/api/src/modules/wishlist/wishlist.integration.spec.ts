@@ -366,3 +366,102 @@ describe('ST-23 · المفضّلة', () => {
     expect((await save(carol, extra.id)).statusCode).toBe(204);
   });
 });
+
+describe('ST-23 · المفضّلة — حالات DISC', () => {
+  /** متجر بالدينار: الحالة بأرقام JOD كما كتبتها (13.000 و15.000 ومعطّل 9.000) */
+  async function jodProduct(nameAr: string, variants: readonly { price: bigint; active: boolean }[]) {
+    const owner = await prisma.user.create({
+      data: { email: `jod.${Math.random().toString(36).slice(2, 8)}.${SUFFIX}@basta.test`, fullName: 'بائع بالدينار', passwordHash: await hashPassword(PASSWORD), roles: { create: { role: 'vendor_owner' } } },
+    });
+    const vendor = await prisma.vendor.create({
+      data: { ownerUserId: owner.id, slug: `jod-${Math.random().toString(36).slice(2, 8)}-${SUFFIX}`, nameAr: 'متجر الدينار', status: 'approved', approvedAt: new Date(), settlementCurrency: 'JOD', country: 'JO' },
+    });
+    const product = await prisma.product.create({
+      data: { vendorId: vendor.id, slug: `wish-jod-${SUFFIX}-${Math.random().toString(36).slice(2, 9)}`, nameAr, status: 'active', publishedAt: new Date(), hasVariants: true },
+    });
+    productIds.push(product.id);
+    const variantIds: string[] = [];
+    for (const [i, v] of variants.entries()) {
+      const variant = await prisma.productVariant.create({
+        data: { productId: product.id, vendorId: vendor.id, sku: `WJD-${Math.random().toString(36).slice(2, 9).toUpperCase()}`, priceMinorUnits: v.price, optionsKey: `opt-${i}`, isActive: v.active },
+      });
+      variantIds.push(variant.id);
+      await prisma.inventory.create({ data: { variantId: variant.id, onHand: 5, reserved: 0 } });
+      await prisma.inventoryMovement.create({ data: { variantId: variant.id, delta: 5, reason: 'import', actorUserId: null } });
+    }
+    return { id: product.id, vendorId: vendor.id, variantIds };
+  }
+
+  it('DISC-077: 13.000 JOD المحفوظ لا المعطّل الأرخص (9.000)، والحفظ الثاني بعد الخفض لا يغيّره، فالقائمة drop بـ3.000 — وبالريال محوَّلة والحالة drop', async () => {
+    if (!dbUp) return;
+    const p = await jodProduct('قميص بالدينار', [
+      { price: 13_000n, active: true },
+      { price: 15_000n, active: true },
+      { price: 9_000n, active: false },
+    ]);
+    expect((await save(alice, p.id)).statusCode).toBe(204);
+    const row = await prisma.wishlistItem.findFirstOrThrow({ where: { userId: alice.userId, productId: p.id } });
+    expect(row.savedPriceMinorUnits).toBe(13_000n);
+    expect(row.currency).toBe('JOD');
+
+    await prisma.productVariant.update({ where: { id: p.variantIds[0]! }, data: { priceMinorUnits: 10_000n } });
+    expect((await save(alice, p.id)).statusCode).toBe(204);
+    expect((await prisma.wishlistItem.findFirstOrThrow({ where: { userId: alice.userId, productId: p.id } })).savedPriceMinorUnits).toBe(13_000n);
+
+    const item = (await listOf(alice, 'JOD')).find((i) => i.productId === p.id)!;
+    expect(item.savedPrice).toMatchObject({ minorUnits: '13000', currency: 'JOD' });
+    expect(item.currentPrice).toMatchObject({ minorUnits: '10000', currency: 'JOD' });
+    expect(item.delta).toMatchObject({ minorUnits: '3000', currency: 'JOD' });
+    expect(item.state).toBe('drop');
+
+    // بالريال: الثلاثة محوَّلة بمعامل الدفع، والحالة من سعر المتجر لا من الصرف
+    const k = 1 / (await sarToJod()) * (1 + Number((await prisma.setting.findUnique({ where: { key: 'fx_spread_bps' } }))?.valueJson ?? 200) / 10_000) ** 2;
+    const sar = (await listOf(alice, 'SAR')).find((i) => i.productId === p.id)!;
+    expect(sar.state).toBe('drop');
+    expect(sar.savedPrice.currency).toBe('SAR');
+    expect(sar.currentPrice?.currency).toBe('SAR');
+    expect(sar.delta?.currency).toBe('SAR');
+    expect(Number(sar.savedPrice.minorUnits)).toBe(Math.round(13_000 * k));
+    expect(Number(sar.currentPrice?.minorUnits)).toBe(Math.round(10_000 * k));
+  });
+
+  it('DISC-078: الموقوف من الإدارة ومنتج المتجر المعلَّق 404، وكل حالات الرفض برسالة «المنتج غير موجود أو لم يعد معروضاً.» ولا صف', async () => {
+    if (!dbUp) return;
+    const stopped = await makeProduct('موقوف من الإدارة', [{ price: 1_000n, stock: 5 }]);
+    await prisma.product.update({ where: { id: stopped.id }, data: { status: 'rejected', rejectReason: 'مخالف' } });
+    const draft = await makeProduct('مسوّدة للرسالة', [{ price: 1_000n, stock: 5 }], 'draft');
+    const deleted = await makeProduct('محذوف للرسالة', [{ price: 1_000n, stock: 5 }]);
+    await prisma.product.update({ where: { id: deleted.id }, data: { deletedAt: new Date() } });
+    const other = await jodProduct('منتج متجر معلَّق', [{ price: 2_000n, active: true }]);
+    await prisma.vendor.update({ where: { id: other.vendorId }, data: { status: 'suspended', suspendedAt: new Date() } });
+
+    for (const id of [stopped.id, other.id, draft.id, deleted.id, '00000000-0000-4000-8000-000000000000', 'abc']) {
+      const res = await save(alice, id);
+      expect(res.statusCode, id).toBe(404);
+      expect(res.json().message, id).toBe('المنتج غير موجود أو لم يعد معروضاً.');
+    }
+    expect(await prisma.wishlistItem.count({ where: { userId: alice.userId, productId: { in: [stopped.id, other.id, draft.id, deleted.id] } } })).toBe(0);
+  });
+
+  it(`DISC-080: عند ${MAX_WISHLIST - 1} طلبا حفظ متزامنان لمنتجين جديدين — واحد 204 والآخر 409 بالرسالة كاملة، والعدد ${MAX_WISHLIST} لا أكثر`, async () => {
+    if (!dbUp) return;
+    const dave = await makeUser('dave');
+    try {
+      const filler = Array.from({ length: MAX_WISHLIST - 1 }, (_, i) => ({ vendorId, slug: `wish-race-${SUFFIX}-${i}`, nameAr: `حشو تزامن ${i}`, status: 'draft' as const }));
+      await prisma.product.createMany({ data: filler });
+      const fillerIds = (await prisma.product.findMany({ where: { slug: { startsWith: `wish-race-${SUFFIX}-` } }, select: { id: true } })).map((r) => r.id);
+      productIds.push(...fillerIds);
+      await prisma.wishlistItem.createMany({ data: fillerIds.map((productId) => ({ userId: dave.userId, productId, savedPriceMinorUnits: 100n, currency: 'SAR' })) });
+      const one = await makeProduct('تزامن أول', [{ price: 1_000n, stock: 5 }]);
+      const two = await makeProduct('تزامن ثانٍ', [{ price: 1_000n, stock: 5 }]);
+
+      const results = await Promise.all([save(dave, one.id), save(dave, two.id)]);
+      expect(results.map((r) => r.statusCode).sort()).toEqual([204, 409]);
+      const refused = results.find((r) => r.statusCode === 409)!;
+      expect(refused.json().message).toBe(`بلغت مفضّلتك ${MAX_WISHLIST} منتج. أزل منتجاً لم تعد تريده ثم احفظ الجديد.`);
+      expect(await prisma.wishlistItem.count({ where: { userId: dave.userId } })).toBe(MAX_WISHLIST);
+    } finally {
+      await prisma.user.delete({ where: { id: dave.userId } }).catch(() => undefined);
+    }
+  });
+});

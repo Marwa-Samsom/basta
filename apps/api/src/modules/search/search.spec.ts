@@ -49,10 +49,10 @@ describe('الترتيب والصفحات', () => {
     expect(buildSort(undefined)).toEqual([]);
   });
 
-  it('السعر بدولار الفهرس لا بالوحدة الخام بين العملات، والأحدث صراحةً', () => {
+  it('السعر بدولار الفهرس لا بالوحدة الخام بين العملات، والأحدث بتاريخ النشر لا الإنشاء (DISC-029)', () => {
     expect(buildSort('price_asc')).toEqual(['priceUsd:asc']);
     expect(buildSort('price_desc')).toEqual(['priceUsd:desc']);
-    expect(buildSort('newest')).toEqual(['createdAt:desc']);
+    expect(buildSort('newest')).toEqual(['publishedAt:desc']);
   });
 
   it('حجم الصفحة محدود: طلب 1000 لا يسحب الفهرس كله', () => {
@@ -95,11 +95,23 @@ describe('إعدادات الفهرس', () => {
     expect(INDEX_SETTINGS.typoTolerance.minWordSizeForTypos.oneTypo).toBeLessThanOrEqual(4);
   });
 
+  it('DISC-019: خطأ واحد من أربعة أحرف بالضبط (ما دونها لا يُصحَّح)، وخطآن من ثمانية', () => {
+    expect(INDEX_SETTINGS.typoTolerance.enabled).toBe(true);
+    expect(INDEX_SETTINGS.typoTolerance.minWordSizeForTypos).toEqual({ oneTypo: 4, twoTypos: 8 });
+  });
+
   it('المرادفات العامّية متبادلة: من يبحث «جوال» يجد «هاتف» والعكس', () => {
     expect(SYNONYMS['جوال']).toContain('هاتف');
     expect(SYNONYMS['هاتف']).toContain('جوال');
     expect(SYNONYMS['بنطلون']).toContain('بنطال');
     expect(SYNONYMS['بنطال']).toContain('بنطلون');
+  });
+
+  it('DISC-020: «موبايل» و«شنطة» و«لابتوب» في جدول المرادفات بأسمائها الفصيحة', () => {
+    expect(SYNONYMS['موبايل']).toContain('هاتف');
+    expect(SYNONYMS['شنطة']).toContain('حقيبة');
+    expect(SYNONYMS['حقيبة']).toContain('شنطة');
+    expect(SYNONYMS['لابتوب']).toContain('حاسوب');
   });
 
   it('الاسم العربي أول الحقول القابلة للبحث — ترتيبها يرجّح الصلة', () => {

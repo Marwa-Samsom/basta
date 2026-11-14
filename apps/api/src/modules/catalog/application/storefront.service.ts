@@ -165,14 +165,18 @@ export class StorefrontService implements OnModuleInit {
   /**
    * فهرس بُني قبل حقل جديد يُكمَل عند الإقلاع بلا إعادة بناء يدوية: priceUsd (18 أكتوبر 2026)
    * وإلا رُتّب بالسعر خطأً بين العملات، و variantValueIds (31 أكتوبر) وإلا غاب وجه «اللون»
-   * لمنتج ألوانه متغيّرات. يُعاد كتابة المرئي فقط، ولا يمسح شيئاً.
+   * لمنتج ألوانه متغيّرات، و publishedAt (14 نوفمبر، DISC-029) وإلا رُتّب «الأحدث» بغير تاريخ
+   * النشر. يُعاد كتابة المرئي فقط، ولا يمسح شيئاً.
    */
   private async backfillIndex(): Promise<void> {
     try {
       // حقل صار قابلاً للتصفية للتوّ لا يُسأل عنه قبل أن يُطبَّق الإعداد
       await this.search.ensureIndex();
       await this.search.idle(60_000);
-      const missing = Math.max((await this.search.missing('priceUsd')) ?? 0, (await this.search.missing('variantValueIds')) ?? 0);
+      let missing = 0;
+      for (const field of ['priceUsd', 'variantValueIds', 'publishedAt']) {
+        missing = Math.max(missing, (await this.search.missing(field)) ?? 0);
+      }
       if (!missing) return;
       const ids = (await this.prisma.product.findMany({ where: VISIBLE, select: { id: true } })).map((p) => p.id);
       for (let i = 0; i < ids.length; i += 500) await this.syncIndex(ids.slice(i, i + 500));
@@ -910,7 +914,8 @@ export class StorefrontService implements OnModuleInit {
         currency: r.vendor.settlementCurrency,
         ...(usd !== null ? { priceUsd: usd } : {}),
         available: r.variants.reduce((sum, v) => sum + (levels.get(v.id)?.available ?? 0), 0),
-        createdAt: Math.floor((r.publishedAt ?? r.createdAt).getTime() / 1000),
+        createdAt: Math.floor(r.createdAt.getTime() / 1000),
+        publishedAt: Math.floor((r.publishedAt ?? r.createdAt).getTime() / 1000),
       };
     });
   }

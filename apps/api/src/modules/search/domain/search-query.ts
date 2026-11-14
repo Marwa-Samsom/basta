@@ -56,6 +56,11 @@ export interface SearchDocument {
   readonly priceUsd?: number;
   readonly available: number;
   readonly createdAt: number;
+  /**
+   * تاريخ النشر بالثواني (وإلا تاريخ الإنشاء) — مفتاح «الأحدث»: مسودّة قديمة نُشرت أمس أحدث
+   * عند المشتري من منتج أُنشئ بعدها ونُشر قبلها (DISC-029، قرار صاحب المشروع 14 نوفمبر 2026)
+   */
+  readonly publishedAt: number;
 }
 
 export const MAX_PAGE_SIZE = 48;
@@ -106,8 +111,9 @@ export function buildSort(sort: SortKey | undefined): string[] {
       return ['priceUsd:asc'];
     case 'price_desc':
       return ['priceUsd:desc'];
+    // بتاريخ النشر لا الإنشاء — DISC-029
     case 'newest':
-      return ['createdAt:desc'];
+      return ['publishedAt:desc'];
     default:
       return []; // الصلة — ترتيب المحرّك نفسه
   }
@@ -158,8 +164,10 @@ export const INDEX_SETTINGS = Object.freeze({
     'priceUsd',
     'available',
     'currency',
+    // قابل للتصفية كي يُسأل عند الإقلاع عن الوثائق التي ينقصها (publishedAt NOT EXISTS)
+    'publishedAt',
   ],
-  sortableAttributes: ['priceMinor', 'priceUsd', 'createdAt'],
+  sortableAttributes: ['priceMinor', 'priceUsd', 'createdAt', 'publishedAt'],
   typoTolerance: {
     enabled: true,
     // الكلمة العربية قصيرة: «قميص» خمسة أحرف، فعتبة الخطأ الواحد تبدأ عند أربعة
