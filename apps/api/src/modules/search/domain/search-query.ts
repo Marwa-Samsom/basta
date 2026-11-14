@@ -142,6 +142,19 @@ export const SYNONYMS: Readonly<Record<string, readonly string[]>> = Object.free
   حقيبة: ['شنطة'],
 });
 
+/**
+ * المرادفات كما تُرسَل إلى المحرّك: كل قيمة ومعها نسخة مشكولة (تنوين ضمّ آخر كل كلمة).
+ *
+ * المحرّك يخمّن لسان كل مرادف وحده، فيقرأ كلمة قصيرة فيها ياء مثل «حقيبة» فارسيةً ويطبّع ياءها
+ * ياءً فارسية، والوثيقة «حقيبة جلد» طُبّعت عربيةً — فلا تجد «شنطة» شيئاً (DISC-020). التشكيل عربي
+ * لا فارسي فتُقرأ النسخة المشكولة عربيةً، والتطبيع يحذف التشكيل فتطابق الوثيقة. تثبيت لسان الحقول
+ * (localizedAttributes) جُرّب فأصلح القيم وكسر المفاتيح التي فيها ياء («موبايل») — 14 نوفمبر 2026.
+ */
+export function engineSynonyms(table: Readonly<Record<string, readonly string[]>>): Record<string, string[]> {
+  const voweled = (phrase: string): string => phrase.split(' ').map((w) => `${w}ٌ`).join(' ');
+  return Object.fromEntries(Object.entries(table).map(([key, values]) => [key, [...new Set(values.flatMap((v) => [v, voweled(v)]))]]));
+}
+
 /** إعدادات الفهرس — مصدر واحد يقرأه الإنشاء والتحديث والاختبار. */
 export const INDEX_SETTINGS = Object.freeze({
   searchableAttributes: [
@@ -173,6 +186,6 @@ export const INDEX_SETTINGS = Object.freeze({
     // الكلمة العربية قصيرة: «قميص» خمسة أحرف، فعتبة الخطأ الواحد تبدأ عند أربعة
     minWordSizeForTypos: { oneTypo: 4, twoTypos: 8 },
   },
-  synonyms: SYNONYMS,
+  synonyms: engineSynonyms(SYNONYMS),
   pagination: { maxTotalHits: 5000 },
 });

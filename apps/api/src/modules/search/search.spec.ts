@@ -114,6 +114,12 @@ describe('إعدادات الفهرس', () => {
     expect(SYNONYMS['لابتوب']).toContain('حاسوب');
   });
 
+  it('DISC-020: كل مرادف يُرسَل ومعه نسخة مشكولة — وإلا قُرئ «حقيبة» فارسياً فلم تجد «شنطة» شيئاً', () => {
+    expect(INDEX_SETTINGS.synonyms['شنطة']).toEqual(['حقيبة', 'حقيبةٌ', 'جزدان', 'جزدانٌ']);
+    expect(INDEX_SETTINGS.synonyms['لابتوب']).toContain('لابٌ توبٌ');
+    expect(Object.keys(INDEX_SETTINGS.synonyms).sort()).toEqual(Object.keys(SYNONYMS).sort());
+  });
+
   it('الاسم العربي أول الحقول القابلة للبحث — ترتيبها يرجّح الصلة', () => {
     expect(INDEX_SETTINGS.searchableAttributes[0]).toBe('nameAr');
   });
