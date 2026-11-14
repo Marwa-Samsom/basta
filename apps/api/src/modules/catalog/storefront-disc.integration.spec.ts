@@ -310,7 +310,12 @@ describe('الاقتراحات أثناء الكتابة (DISC-011 · 015)', () 
     const more: string[] = [];
     for (let i = 1; i <= 8; i++) more.push((await makeProduct(a.id, { nameAr: `${word} قميص صيفي ${i}` })).id);
     await indexed(more);
-    const capped = (await get(`/storefront/suggest?q=${word}`)).json().suggestions as string[];
+    // تحت حِمل ملفات تعمل بالتوازي قد تتجاوز الاقتراحات مهلتها فتعود فارغة (DISC-015) — نعيد السؤال
+    let capped: string[] = [];
+    for (let attempt = 0; attempt < 10 && capped.length === 0; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 500));
+      capped = (await get(`/storefront/suggest?q=${word}`)).json().suggestions as string[];
+    }
     expect(capped).toHaveLength(6);
     expect(new Set(capped).size).toBe(6);
   });

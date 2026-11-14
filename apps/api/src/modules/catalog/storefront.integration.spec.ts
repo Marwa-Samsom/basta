@@ -216,7 +216,8 @@ describe('بوابة 07 · البحث العربي', () => {
 describe('قاعدة الرؤية — تُكتب مرة وتسري على كل مسار', () => {
   it('المنشور يظهر، ونافد المخزون يظهر معلَّماً لا مخفيّاً', async () => {
     if (!dbUp) return;
-    const res = await app.inject({ method: 'GET', ...api('/storefront/products?pageSize=48') });
+    // بمتجر الملف وحده: ملف آخر يعمل بالتوازي على القاعدة نفسها قد يُنشئ أحدث من 48 منتجاً
+    const res = await app.inject({ method: 'GET', ...api(`/storefront/products?vendorId=${vendorId}&pageSize=48`) });
     expect(res.statusCode).toBe(200);
     const items = res.json().items as { nameAr: string; isSoldOut: boolean }[];
     const perfume = items.find((i) => i.nameAr === 'عطر أحمد الملكي');
