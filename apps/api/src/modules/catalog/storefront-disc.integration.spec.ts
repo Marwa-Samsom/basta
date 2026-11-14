@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../app.module';
 import { configureApp } from '../../app.setup';
 import { hashPassword } from '../identity/public';
+import { InventoryService } from '../inventory/public';
 import { SearchService } from '../search/public';
 import { StorefrontService } from './public';
 
@@ -275,13 +276,16 @@ describe('البحث العربي — التطبيع والأخطاء والمر
   });
 
   /**
-   * المتوقَّع: «شنطة» تجد «حقيبة جلد». الواقع: 0 نتيجة — المرادف مكتوب في الفهرس («شنطة»: حقيبة، جزدان)
-   * لكن المحرّك يطبّع التاء المربوطة في الكلمة المبحوثة فلا يطابق مفتاح المرادف؛ والمفاتيح بلا «ة»
-   * (جوال، لابتوب، بنطلون) تعمل — قرار صاحبة المشروع.
+   * كان 0 نتيجة: المحرّك يخمّن لسان المرادف «حقيبة» فارسياً فيطبّعه بغير تطبيع الوثيقة. صار كل مرادف
+   * يُرسَل ومعه نسخة مشكولة تُقرأ عربيةً (engineSynonyms) — قرار صاحبة المشروع 14 نوفمبر 2026.
    */
-  it.skip('DISC-020: «شنطة» تجد «حقيبة جلد» — مرادف مفتاحه بتاء مربوطة لا يعمل', async () => {
+  it('DISC-020: «شنطة» و«شنطه» تجدان «حقيبة جلد»', async () => {
     if (!dbUp || !meiliUp) return;
-    expect(names(await found('شنطة'))).toContain('حقيبة جلد');
+    for (const term of ['شنطة', 'شنطه']) {
+      const res = await found(term);
+      expect(res.engine, term).toBe('meili');
+      expect(names(res), term).toContain('حقيبة جلد');
+    }
   });
 });
 
@@ -420,10 +424,10 @@ describe('«المتوفّر فقط» (DISC-026)', () => {
   });
 
   /**
-   * المتوقَّع في الحالة: الوجه يتبع المخزون الحالي. الواقع: تعديل المخزون من VD-11 لا يحدّث الفهرس
-   * (adjustStock لا يستدعي syncIndex)، فيبقى «available» في الوثيقة كما فُهرس — قرار صاحبة المشروع.
+   * كان الفهرس يبقى على المخزون القديم: تعديل VD-11 لا يحدّثه. صار المخزون يعلن تغيّر المتاح بعد تثبيت
+   * معاملته (تعديل، حجز، تحرير) والكتالوج يعيد كتابة الوثيقة — قرار صاحبة المشروع 14 نوفمبر 2026.
    */
-  it.skip('بعد تصفير أ وتزويد ب بخمس من VD-11: أ يسقط وب يظهر — الفهرس لا يتبع تعديل المخزون', async () => {
+  it('DISC-026: بعد تصفير أ وتزويد ب بخمس من VD-11 يتبع الوجه المخزون: أ يسقط وب يظهر', async () => {
     if (!dbUp || !meiliUp) return;
     const vendorToken = await login(v.email);
     const adjust = (productId: string, variantId: string, setTo: number) =>
@@ -435,9 +439,23 @@ describe('«المتوفّر فقط» (DISC-026)', () => {
       });
     expect((await adjust(a.id, a.variantId, 0)).statusCode).toBe(200);
     expect((await adjust(b.id, b.variantId, 5)).statusCode).toBe(200);
-    expect(await search.idle()).toBe(true);
-    const res = await list(`vendorId=${v.id}&${q('قميص')}&inStock=true`);
-    expect(res.items.map((i) => i.id)).toEqual([b.id]);
+    // المزامنة بعد تثبيت التعديل ولا تؤخّر ردّ البائع — ننتظر وصولها إلى الفهرس
+    await expect
+      .poll(async () => (await list(`vendorId=${v.id}&${q('قميص')}&inStock=true`)).items.map((i) => i.id), { timeout: 15_000 })
+      .toEqual([b.id]);
+    // وبلا التصفية القميصان معاً: النافد بقي في الفهرس ولم يُحذف
+    expect((await list(`vendorId=${v.id}&${q('قميص')}`)).items.map((i) => i.id).sort()).toEqual([a.id, b.id].sort());
+  });
+
+  it('DISC-026: حجز القطع الخمس في صفحة الدفع يُسقط ب من «المتوفّر فقط»، وتحريره يعيده', async () => {
+    if (!dbUp || !meiliUp) return;
+    const inventory = app.get(InventoryService);
+    const inStock = async () => (await list(`vendorId=${v.id}&${q('قميص')}&inStock=true`)).items.map((i) => i.id);
+    await expect.poll(inStock, { timeout: 15_000 }).toEqual([b.id]);
+    const { reservations } = await inventory.reserve({ lines: [{ variantId: b.variantId, qty: 5, label: 'قميص ب' }] });
+    await expect.poll(inStock, { timeout: 15_000 }).toEqual([]);
+    await inventory.release(reservations.map((r) => r.id));
+    await expect.poll(inStock, { timeout: 15_000 }).toEqual([b.id]);
   });
 });
 
@@ -605,17 +623,26 @@ describe('السقوط إلى قاعدة البيانات حين يتوقّف ا
   });
 
   /**
-   * المتوقَّع في الحالة: «المتوفّر فقط» والترتيب بالسعر يبقيان مطبّقَين. الواقع: مسار القاعدة (whereOf/orderOf)
-   * يتجاهل inStock ويرتّب بالأحدث دائماً — قرار صاحبة المشروع.
+   * كان مسار القاعدة (whereOf/orderOf) يتجاهل inStock ويرتّب بالأحدث دائماً. صار يطبّق «المتوفّر فقط»
+   * والترتيب بالسعر بالدولار كالمحرّك — قرار صاحبة المشروع 14 نوفمبر 2026.
    */
-  it.skip('«المتوفّر فقط» والترتيب بالسعر في مسار القاعدة — لا يُطبَّقان اليوم', async () => {
+  it('DISC-034: «المتوفّر فقط» والترتيب بالسعر تصاعدياً وتنازلياً مطبّقة في مسار القاعدة', async () => {
     if (!dbUp) return;
     const spy = engineDown();
     try {
       const inStock = await list(`vendorId=${v.id}&${q('قميص')}&inStock=true`);
+      expect(inStock.engine).toBe('db');
       expect(inStock.items.map((i) => i.id)).toEqual([linen.id]);
+      expect(inStock.total).toBe(1);
       const cheap = await list(`vendorId=${v.id}&${q('قميص')}&sort=price_asc`);
+      expect(cheap.engine).toBe('db');
       expect(cheap.items.map((i) => i.id)).toEqual([linen.id, soldOut.id]);
+      const dear = await list(`vendorId=${v.id}&${q('قميص')}&sort=price_desc`);
+      expect(dear.items.map((i) => i.id)).toEqual([soldOut.id, linen.id]);
+      // الصفحة الثانية بحجم 1 هي الثاني في الترتيب، والعدد للمطابقات كلها
+      const second = await list(`vendorId=${v.id}&${q('قميص')}&sort=price_asc&page=2&pageSize=1`);
+      expect(second.items.map((i) => i.id)).toEqual([soldOut.id]);
+      expect(second.total).toBe(2);
     } finally {
       spy.mockRestore();
     }
@@ -653,19 +680,26 @@ describe('البحث لا يُظهر غير المرئي ولو بقي في ال
   });
 
   /**
-   * المتوقَّع: (أ) و(ب) لا يظهران في أوجه المتجر. الواقع: عدّاد المتجر من توزيع المحرّك على الفهرس القديم،
-   * فمتجرهما المعتمد يبقى في الوجه بعدّ 2 ولا منتج له في النتائج — قرار صاحبة المشروع.
+   * كان عدّاد المتجر من توزيع المحرّك على الفهرس القديم، فيبقى المتجر المعتمد في الوجه بعدّ 2 ولا منتج له
+   * في النتائج. صار يُعدّ على المطابقات التي تقبلها قاعدة الرؤية — قرار صاحبة المشروع 14 نوفمبر 2026.
    */
-  it.skip('وجه المتجر لا يعدّ مسودّته ولا موقوفه من فهرس قديم', async () => {
+  it('DISC-035: وجه المتجر والعدد لا يعدّان المسودّة ولا الموقوف من فهرس قديم، ويعدّان المرئي', async () => {
     if (!dbUp || !meiliUp) return;
     const word = token();
     const shop = await makeVendor('watch-c');
     const draft = await makeProduct(shop.id, { nameAr: `ساعة ${word} أ` });
     const stopped = await makeProduct(shop.id, { nameAr: `ساعة ${word} ب` });
-    await indexed([draft.id, stopped.id]);
+    const other = await makeVendor('watch-d');
+    const live = await makeProduct(other.id, { nameAr: `ساعة ${word} د` });
+    await indexed([draft.id, stopped.id, live.id]);
     await prisma.product.update({ where: { id: draft.id }, data: { status: 'draft' } });
     await prisma.product.update({ where: { id: stopped.id }, data: { status: 'rejected', rejectReason: 'موقوف للاختبار' } });
-    expect((await list(q(word))).facets.vendors).toEqual([]);
+
+    const res = await list(q(word));
+    expect(res.engine).toBe('meili');
+    expect(res.items.map((i) => i.id)).toEqual([live.id]);
+    expect(res.facets.vendors.map((x) => [x.id, x.count])).toEqual([[other.id, 1]]);
+    expect(res.total).toBe(1);
   });
 });
 

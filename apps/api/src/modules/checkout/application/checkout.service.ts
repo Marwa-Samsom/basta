@@ -31,7 +31,8 @@ import { loadEnv } from '../../../common/config/env';
  */
 export const MAX_OPEN_TRANSFERS = 3;
 
-const DEADLINE_FORMAT = new Intl.DateTimeFormat('ar-JO-u-nu-latn', {
+// أسماء الشهور على طريقة مصر («أكتوبر» لا «تشرين الأول») — قرار صاحبة المشروع 14 نوفمبر 2026 (DISC-041)
+const DEADLINE_FORMAT = new Intl.DateTimeFormat('ar-u-nu-latn', {
   dateStyle: 'long',
   timeStyle: 'short',
   timeZone: 'Asia/Amman',

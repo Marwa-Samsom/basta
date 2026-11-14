@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import {
@@ -6,6 +6,7 @@ import {
   NotFoundError,
   ReservationExpiredError,
 } from '../../../common/errors/domain-error';
+import { afterCommit } from '../../../common/prisma/after-commit';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import {
   assertInitialStock,
@@ -83,7 +84,29 @@ const toView = (r: LockedRow): StockView => ({
  */
 @Injectable()
 export class InventoryService {
+  private readonly logger = new Logger('Inventory');
+  private readonly listeners: ((variantIds: readonly string[]) => Promise<void>)[] = [];
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * تغيّر المتاح (onHand − reserved) لمتغيّرات: تعديل، حجز، تحرير، انتهاء حجز. الوحدة لا تعرف
+   * الكتالوج (هو يعتمد عليها، ADR-002)، فيسجّل هو ما يلزمه — فهرس البحث و«المتوفّر فقط» (DISC-026).
+   * يُعلَن بعد تثبيت المعاملة لا داخلها، والمستمع لا يُسقط العملية.
+   */
+  onAvailabilityChanged(listener: (variantIds: readonly string[]) => Promise<void>): void {
+    this.listeners.push(listener);
+  }
+
+  private changed(tx: Tx, variantIds: readonly string[]): void {
+    const ids = [...new Set(variantIds)];
+    if (ids.length === 0 || this.listeners.length === 0) return;
+    afterCommit(tx, () => {
+      for (const listener of this.listeners) {
+        listener(ids).catch((err: unknown) => this.logger.error('تعذّر تحديث ما يتبع المخزون', err as Error));
+      }
+    });
+  }
 
   /** داخل معاملة المستدعي إن مُرّرت — الكتالوج ينشئ المنتج ومخزونه في معاملة واحدة. */
   private within<T>(tx: Tx | undefined, fn: (tx: Tx) => Promise<T>): Promise<T> {
@@ -202,6 +225,7 @@ export class InventoryService {
       });
       if (plan.delta !== 0) {
         await t.inventoryMovement.create({ data: this.movement(input.variantId, plan.delta, ctx) });
+        this.changed(t, [input.variantId]);
       }
       return toView(next);
     });
@@ -267,6 +291,7 @@ export class InventoryService {
           data: { reserved: { increment: l.qty }, version: { increment: 1 } },
         });
       }
+      this.changed(t, lines.map((l) => l.variantId));
 
       return {
         expiresAt,
@@ -418,6 +443,7 @@ export class InventoryService {
         data: { reserved: { decrement: qty }, version: { increment: 1 } },
       });
     }
+    this.changed(t, done.map((d) => d.variantId));
     return done;
   }
 

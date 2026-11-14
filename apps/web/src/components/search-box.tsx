@@ -61,6 +61,8 @@ function SearchBoxInner() {
 
   function go(term: string): void {
     setOpen(false);
+    // الاقتراح المختار يصير في الخانة — كانت تبقى على ما كُتب («قمي») فوق نتائج «قميص كتان» (DISC-011)
+    setValue(term);
     if (term.trim()) router.push(`/search?q=${encodeURIComponent(term.trim())}`);
   }
 

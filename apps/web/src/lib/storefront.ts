@@ -302,7 +302,11 @@ export interface Campaign {
 export const getCampaigns = (currency?: string, lang?: Locale): Promise<Campaign[]> =>
   get<Campaign[]>('/storefront/campaigns', 60, currency, lang).catch(() => []);
 
-export const getPage = (slug: string): Promise<ContentPage> => get(`/pages/${slugPath(slug)}`, 300);
+/**
+ * بلا تخزين: النسخة المخزّنة 5 دقائق كانت تبقى بعد إلغاء النشر أكثر من 6 دقائق — إعادة التوليد في الخلفية
+ * تلقى 404 فيُبقي Next القديمة (DISC-085). الصفحات قليلة الزيارة، والقراءة طلب واحد صغير.
+ */
+export const getPage = (slug: string): Promise<ContentPage> => get(`/pages/${slugPath(slug)}`, 0);
 
 /** أطول كلمة بحث يقبلها الخادم (StorefrontQueryDto.q) — وحدّ خانة البحث */
 export const SEARCH_MAX = 120;
