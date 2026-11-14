@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
+import { trackCommits } from './after-commit';
 import { privilegeReport, privilegeViolations } from './least-privilege';
 
 /** الأعمدة الموحّدة للبحث (…Fold، مهاجرة search_fold) — شرطٌ في البحث وحده، فلا تُقرأ مع الصفّ ولا تصل ردّاً */
@@ -23,6 +24,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   constructor() {
     super({ log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'], omit: FOLDED });
+    // afterCommit: ما يقرأ ما كتبته معاملة يجري بعد تثبيتها لا داخلها (فهرس البحث بعد تغيّر المخزون)
+    trackCommits(this);
   }
 
   async onModuleInit(): Promise<void> {
