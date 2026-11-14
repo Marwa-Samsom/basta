@@ -322,6 +322,36 @@ describe('AD-17 · الحملات — الترتيب والظهور في الر�
   });
 });
 
+describe('حملات الرئيسية — الكوبون الصالح الآن، والحملة بلا مرئيّ (DISC-008)', () => {
+  it('كوبون بلغ سقف استعماله لا يُعلَن والحملة باقية؛ وحملة جارية كل منتجاتها مخفية لا تظهر', async () => {
+    if (!dbUp) return;
+    const [p0, p1] = products;
+    const capped = await prisma.coupon.create({
+      data: { code: `CAP${SUFFIX}`.toUpperCase().slice(0, 30), scope: 'platform', type: 'percent', valueBps: 1000, fundedBy: 'platform', usageLimitTotal: 5, usedCount: 5 },
+    });
+    try {
+      const top = await createCampaign({ nameAr: `أعلى صالح ${SUFFIX}`, placement: 'home_top', startsAt: iso(-HOUR), endsAt: iso(HOUR), couponId: coupon.id });
+      const middle = await createCampaign({ nameAr: `وسط مستنفد ${SUFFIX}`, placement: 'home_middle', startsAt: iso(-HOUR), endsAt: iso(HOUR), couponId: capped.id });
+      const hidden = await createCampaign({ nameAr: `كلها مخفية ${SUFFIX}`, placement: 'home_top', startsAt: iso(-HOUR), endsAt: iso(HOUR) });
+      for (const id of [top, middle]) expect((await call('PUT', `/admin/campaigns/${id}/products`, content, { productIds: [p0!.id] })).statusCode).toBe(204);
+      expect((await call('PUT', `/admin/campaigns/${hidden}/products`, content, { productIds: [p1!.id] })).statusCode).toBe(204);
+      // قبل الإخفاء تظهر — فغيابها بعده بسببه
+      expect((await publicOf()).some((c) => c.id === hidden)).toBe(true);
+      await prisma.product.update({ where: { id: p1!.id }, data: { status: 'draft' } });
+
+      const pub = await publicOf();
+      expect(pub.find((c) => c.id === top)!.couponCode).toBe(coupon.code);
+      const exhausted = pub.find((c) => c.id === middle)!;
+      expect(exhausted.couponCode).toBeNull();
+      expect(exhausted.products.map((p) => p.id)).toEqual([p0!.id]);
+      expect(pub.some((c) => c.id === hidden)).toBe(false);
+    } finally {
+      await prisma.product.update({ where: { id: p1!.id }, data: { status: 'active' } });
+      await prisma.coupon.update({ where: { id: capped.id }, data: { isActive: false } });
+    }
+  });
+});
+
 describe('AD-17 · الحملات — التدقيق', () => {
   it('الإنشاء والمنتجات والإيقاف تكتب صفوف تدقيق بفاعلها وما قبلها', async () => {
     if (!dbUp) return;
